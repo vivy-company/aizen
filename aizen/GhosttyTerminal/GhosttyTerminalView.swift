@@ -259,7 +259,6 @@ class GhosttyTerminalView: NSView {
         let result = super.becomeFirstResponder()
         if result, let surface = surface?.unsafeCValue {
             ghostty_surface_set_focus(surface, true)
-            Self.logger.debug("Terminal gained focus")
         }
         return result
     }
@@ -268,7 +267,6 @@ class GhosttyTerminalView: NSView {
         let result = super.resignFirstResponder()
         if result, let surface = surface?.unsafeCValue {
             ghostty_surface_set_focus(surface, false)
-            Self.logger.debug("Terminal lost focus")
         }
         return result
     }

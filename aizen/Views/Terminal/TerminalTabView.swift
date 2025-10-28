@@ -55,14 +55,16 @@ struct TerminalTabView: View {
         } else {
             ZStack {
                 ForEach(sessions) { session in
-                    SplitTerminalView(
-                        worktree: worktree,
-                        session: session,
-                        sessionManager: sessionManager,
-                        isSelected: selectedSessionId == session.id
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .opacity(selectedSessionId == session.id ? 1 : 0)
+                    if selectedSessionId == session.id {
+                        SplitTerminalView(
+                            worktree: worktree,
+                            session: session,
+                            sessionManager: sessionManager,
+                            isSelected: true
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.identity)
+                    }
                 }
             }
             .onAppear {
@@ -142,6 +144,7 @@ struct SplitTerminalView: View {
 
     @State private var layout: SplitNode
     @State private var focusedPaneId: String
+    @State private var layoutVersion: Int = 0  // Increment when layout changes to force refresh
 
     init(worktree: Worktree, session: TerminalSession, sessionManager: TerminalSessionManager, isSelected: Bool = false) {
         self.worktree = worktree
@@ -174,6 +177,15 @@ struct SplitTerminalView: View {
                 session.focusedPaneId = newValue
                 saveContext()
             }
+            .onChange(of: isSelected) { oldValue, newValue in
+                if newValue && !oldValue {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        let currentPane = focusedPaneId
+                        focusedPaneId = ""
+                        focusedPaneId = currentPane
+                    }
+                }
+            }
             // Only set split actions for the currently selected/visible session
             .focusedSceneValue(\.terminalSplitActions, isSelected ? TerminalSplitActions(
                 splitHorizontal: splitHorizontal,
@@ -195,6 +207,7 @@ struct SplitTerminalView: View {
                     onFocus: { focusedPaneId = paneId },
                     onProcessExit: { handleProcessExit(for: paneId) }
                 )
+                .id("\(paneId)-\(layoutVersion)")  // Force refresh when layout changes
             )
 
         case .split(let split):
@@ -231,10 +244,8 @@ struct SplitTerminalView: View {
             left: .leaf(paneId: focusedPaneId),
             right: .leaf(paneId: newPaneId)
         ))
-        let oldLayout = layout
         layout = layout.replacingPane(focusedPaneId, with: newSplit).equalized()
-        print("Split H: \(oldLayout.allPaneIds().count) → \(layout.allPaneIds().count) panes")
-        print("Layout tree: \(layout)")
+        layoutVersion += 1
         focusedPaneId = newPaneId
     }
 
@@ -246,10 +257,8 @@ struct SplitTerminalView: View {
             left: .leaf(paneId: focusedPaneId),
             right: .leaf(paneId: newPaneId)
         ))
-        let oldLayout = layout
         layout = layout.replacingPane(focusedPaneId, with: newSplit).equalized()
-        print("Split V: \(oldLayout.allPaneIds().count) → \(layout.allPaneIds().count) panes")
-        print("Layout tree: \(layout)")
+        layoutVersion += 1
         focusedPaneId = newPaneId
     }
 
@@ -333,17 +342,45 @@ struct TerminalPaneView: View {
     let onFocus: () -> Void
     let onProcessExit: () -> Void
 
+    @State private var shouldFocus: Bool = false
+    @State private var focusVersion: Int = 0  // Increment to force updateNSView
+    @State private var terminalView: GhosttyTerminalView?  // Store reference to resign directly
+
     var body: some View {
         TerminalViewWrapper(
             worktree: worktree,
             session: session,
             paneId: paneId,
             sessionManager: sessionManager,
-            onProcessExit: onProcessExit
+            onProcessExit: onProcessExit,
+            shouldFocus: shouldFocus,  // Pass value directly, not binding
+            isFocused: isFocused,      // Pass focused state to manage resignation
+            focusVersion: focusVersion // Version counter to force updateNSView
         )
         .opacity(isFocused ? 1.0 : 0.6)
         .onTapGesture {
             onFocus()
+        }
+        .onChange(of: isFocused) { oldValue, newValue in
+            if newValue && !oldValue {
+                shouldFocus = true
+                focusVersion += 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    shouldFocus = false
+                }
+            } else if !newValue && oldValue {
+                focusVersion += 1
+            }
+        }
+        .onAppear {
+            if isFocused {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    shouldFocus = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        shouldFocus = false
+                    }
+                }
+            }
         }
     }
 }
@@ -411,6 +448,9 @@ struct TerminalViewWrapper: NSViewRepresentable {
     let paneId: String
     let sessionManager: TerminalSessionManager
     let onProcessExit: () -> Void
+    let shouldFocus: Bool  // Pass value directly to trigger updateNSView
+    let isFocused: Bool    // Track if this pane should have focus
+    let focusVersion: Int  // Version counter - forces updateNSView when changed
 
     @EnvironmentObject var ghosttyApp: Ghostty.App
 
@@ -427,6 +467,12 @@ struct TerminalViewWrapper: NSViewRepresentable {
         // Check if terminal already exists for this pane
         if let existingTerminal = sessionManager.getTerminal(for: sessionId, paneId: paneId) {
             context.coordinator.startMonitoring(terminal: existingTerminal)
+
+            DispatchQueue.main.async {
+                existingTerminal.needsLayout = true
+                existingTerminal.layoutSubtreeIfNeeded()
+            }
+
             return existingTerminal
         }
 
@@ -481,7 +527,12 @@ struct TerminalViewWrapper: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        // Terminal view doesn't need updates
+        if shouldFocus {
+            guard let window = nsView.window else { return }
+            window.makeFirstResponder(nsView)
+        } else if !isFocused && nsView.window?.firstResponder == nsView {
+            nsView.window?.makeFirstResponder(nil)
+        }
     }
 }
 
