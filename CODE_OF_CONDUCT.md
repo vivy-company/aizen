@@ -28,7 +28,7 @@ Violations may result in:
 
 Report issues to: aizen@vivy.company
 
-Project maintainers will review and respond to all reports.
+This project is maintained by a solo developer. Responses may take time - please be patient.
 
 ## Scope
 
