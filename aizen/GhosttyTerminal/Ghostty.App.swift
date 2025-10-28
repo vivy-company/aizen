@@ -244,8 +244,6 @@ extension Ghostty {
                 // Load config files - with bundle ID "com.aizen.terminal", won't load user's Ghostty config
                 ghostty_config_load_default_files(config)
 
-                // Unset XDG_CONFIG_HOME so it doesn't affect fish/shell config loading
-                unsetenv("XDG_CONFIG_HOME")
 
                 Ghostty.logger.info("Reloaded config - Font: \(self.terminalFontName) \(Int(self.terminalFontSize))pt, Theme: \(self.terminalThemeName)")
             } catch {
@@ -267,6 +265,10 @@ extension Ghostty {
             activeSurfaces = activeSurfaces.filter { $0.isValid }
 
             ghostty_config_free(config)
+            
+            // Unset XDG_CONFIG_HOME so it doesn't affect fish/shell config loading
+            unsetenv("XDG_CONFIG_HOME")
+
 
             Ghostty.logger.info("Configuration reloaded and propagated to \(self.activeSurfaces.count) surfaces")
         }
