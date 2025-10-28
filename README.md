@@ -6,7 +6,7 @@ A macOS developer tool for managing Git worktrees with integrated terminal and A
 
 - **Workspace Management**: Organize repositories into workspaces
 - **Git Worktree Support**: Create and manage Git worktrees with visual UI
-- **Integrated Terminal**: Split terminal panels with SwiftTerm
+- **Integrated Terminal**: GPU-accelerated terminal with libghostty
 - **AI Agent Integration**: Support for Claude, Codex, and Gemini via Agent Client Protocol (ACP)
 - **Markdown Rendering**: View and render markdown content
 - **Syntax Highlighting**: Code highlighting with HighlightSwift
@@ -19,13 +19,17 @@ A macOS developer tool for managing Git worktrees with integrated terminal and A
 
 ## Dependencies
 
-- [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) - Terminal emulator
+- [libghostty](https://github.com/ghostty-org/ghostty) - GPU-accelerated terminal emulator
 - [swift-markdown](https://github.com/apple/swift-markdown) - Markdown parsing
 - [HighlightSwift](https://github.com/appstefan/highlightswift) - Syntax highlighting
 
 ## Installation
 
-1. Clone the repository
+1. Clone the repository with Git LFS support:
+   ```bash
+   git lfs install
+   git clone https://github.com/vivy-company/aizen.git
+   ```
 2. Open `aizen.xcodeproj` in Xcode
 3. Build and run
 
