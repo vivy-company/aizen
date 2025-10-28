@@ -6,22 +6,22 @@
 //
 
 import SwiftUI
-import SwiftTerm
 import AppKit
+import Combine
 
 class TerminalSessionManager {
     static let shared = TerminalSessionManager()
 
-    private var terminals: [String: LocalProcessTerminalView] = [:]
+    private var terminals: [String: GhosttyTerminalView] = [:]
 
     private init() {}
 
-    func getTerminal(for sessionId: UUID, paneId: String) -> LocalProcessTerminalView? {
+    func getTerminal(for sessionId: UUID, paneId: String) -> GhosttyTerminalView? {
         let key = "\(sessionId.uuidString)-\(paneId)"
         return terminals[key]
     }
 
-    func setTerminal(_ terminal: LocalProcessTerminalView, for sessionId: UUID, paneId: String) {
+    func setTerminal(_ terminal: GhosttyTerminalView, for sessionId: UUID, paneId: String) {
         let key = "\(sessionId.uuidString)-\(paneId)"
         terminals[key] = terminal
     }
@@ -58,7 +58,8 @@ struct TerminalTabView: View {
                     SplitTerminalView(
                         worktree: worktree,
                         session: session,
-                        sessionManager: sessionManager
+                        sessionManager: sessionManager,
+                        isSelected: selectedSessionId == session.id
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .opacity(selectedSessionId == session.id ? 1 : 0)
@@ -137,14 +138,16 @@ struct SplitTerminalView: View {
     @ObservedObject var worktree: Worktree
     @ObservedObject var session: TerminalSession
     let sessionManager: TerminalSessionManager
+    let isSelected: Bool
 
     @State private var layout: SplitNode
     @State private var focusedPaneId: String
 
-    init(worktree: Worktree, session: TerminalSession, sessionManager: TerminalSessionManager) {
+    init(worktree: Worktree, session: TerminalSession, sessionManager: TerminalSessionManager, isSelected: Bool = false) {
         self.worktree = worktree
         self.session = session
         self.sessionManager = sessionManager
+        self.isSelected = isSelected
 
         // Load layout from session or create default
         if let layoutJSON = session.splitLayout,
@@ -171,11 +174,12 @@ struct SplitTerminalView: View {
                 session.focusedPaneId = newValue
                 saveContext()
             }
-            .focusedSceneValue(\.terminalSplitActions, TerminalSplitActions(
+            // Only set split actions for the currently selected/visible session
+            .focusedSceneValue(\.terminalSplitActions, isSelected ? TerminalSplitActions(
                 splitHorizontal: splitHorizontal,
                 splitVertical: splitVertical,
                 closePane: closePane
-            ))
+            ) : nil)
     }
 
     private func renderNode(_ node: SplitNode) -> AnyView {
@@ -193,47 +197,59 @@ struct SplitTerminalView: View {
                 )
             )
 
-        case .hsplit(let ratio, let left, let right):
-            return AnyView(
-                HSplitView {
-                    renderNode(left)
-                        .layoutPriority(ratio)
-                    renderNode(right)
-                        .layoutPriority(1 - ratio)
+        case .split(let split):
+            // Capture the current split node
+            let currentSplitNode = node
+
+            // Create computed binding (Ghostty pattern)
+            let ratioBinding = Binding<CGFloat>(
+                get: { CGFloat(split.ratio) },
+                set: { newRatio in
+                    // Update this specific split's ratio
+                    let updatedSplit = currentSplitNode.withUpdatedRatio(Double(newRatio))
+                    layout = layout.replacingNode(currentSplitNode, with: updatedSplit)
                 }
             )
 
-        case .vsplit(let ratio, let top, let bottom):
             return AnyView(
-                VSplitView {
-                    renderNode(top)
-                        .layoutPriority(ratio)
-                    renderNode(bottom)
-                        .layoutPriority(1 - ratio)
-                }
+                SplitView(
+                    split.direction == .horizontal ? .horizontal : .vertical,
+                    ratioBinding,
+                    dividerColor: Color(nsColor: .separatorColor),
+                    left: { renderNode(split.left) },
+                    right: { renderNode(split.right) }
+                )
             )
         }
     }
 
     private func splitHorizontal() {
         let newPaneId = UUID().uuidString
-        let newSplit = SplitNode.hsplit(
+        let newSplit = SplitNode.split(SplitNode.Split(
+            direction: .horizontal,
             ratio: 0.5,
             left: .leaf(paneId: focusedPaneId),
             right: .leaf(paneId: newPaneId)
-        )
-        layout = layout.replacingPane(focusedPaneId, with: newSplit)
+        ))
+        let oldLayout = layout
+        layout = layout.replacingPane(focusedPaneId, with: newSplit).equalized()
+        print("Split H: \(oldLayout.allPaneIds().count) → \(layout.allPaneIds().count) panes")
+        print("Layout tree: \(layout)")
         focusedPaneId = newPaneId
     }
 
     private func splitVertical() {
         let newPaneId = UUID().uuidString
-        let newSplit = SplitNode.vsplit(
+        let newSplit = SplitNode.split(SplitNode.Split(
+            direction: .vertical,
             ratio: 0.5,
-            top: .leaf(paneId: focusedPaneId),
-            bottom: .leaf(paneId: newPaneId)
-        )
-        layout = layout.replacingPane(focusedPaneId, with: newSplit)
+            left: .leaf(paneId: focusedPaneId),
+            right: .leaf(paneId: newPaneId)
+        ))
+        let oldLayout = layout
+        layout = layout.replacingPane(focusedPaneId, with: newSplit).equalized()
+        print("Split V: \(oldLayout.allPaneIds().count) → \(layout.allPaneIds().count) panes")
+        print("Layout tree: \(layout)")
         focusedPaneId = newPaneId
     }
 
@@ -281,7 +297,7 @@ struct SplitTerminalView: View {
         }
 
         if let newLayout = layout.removingPane(focusedPaneId) {
-            layout = newLayout
+            layout = newLayout.equalized()
             // Focus first available pane
             if let firstPane = layout.allPaneIds().first {
                 focusedPaneId = firstPane
@@ -354,50 +370,36 @@ extension FocusedValues {
 
 // MARK: - Terminal View Coordinator
 
-class TerminalViewCoordinator: LocalProcessTerminalViewDelegate {
+class TerminalViewCoordinator {
     let session: TerminalSession
     let onProcessExit: () -> Void
+    private var exitCheckTimer: Timer?
 
     init(session: TerminalSession, onProcessExit: @escaping () -> Void) {
         self.session = session
         self.onProcessExit = onProcessExit
     }
 
-    func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {
-        // Not needed for our use case
-    }
+    func startMonitoring(terminal: GhosttyTerminalView) {
+        // Poll for process exit every 500ms
+        exitCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self, weak terminal] _ in
+            guard let self = self, let terminal = terminal else { return }
 
-    func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
-        // Update terminal session title when programs send escape sequences
-        print("🔔 setTerminalTitle called with: '\(title)'")
-        DispatchQueue.main.async { [weak session] in
-            guard let session = session,
-                  let context = session.managedObjectContext else {
-                print("❌ Failed to get session or context")
-                return
-            }
-
-            print("✅ Updating terminal title to: '\(title)'")
-            session.title = title
-
-            do {
-                try context.save()
-                print("💾 Terminal title saved successfully")
-            } catch {
-                print("Failed to update terminal title: \(error)")
+            if terminal.processExited {
+                self.exitCheckTimer?.invalidate()
+                self.exitCheckTimer = nil
+                self.onProcessExit()
             }
         }
     }
 
-    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
-        // Not needed for our use case
+    func stopMonitoring() {
+        exitCheckTimer?.invalidate()
+        exitCheckTimer = nil
     }
 
-    func processTerminated(source: TerminalView, exitCode: Int32?) {
-        // Call the closure on main thread
-        DispatchQueue.main.async { [weak self] in
-            self?.onProcessExit()
-        }
+    deinit {
+        stopMonitoring()
     }
 }
 
@@ -410,13 +412,7 @@ struct TerminalViewWrapper: NSViewRepresentable {
     let sessionManager: TerminalSessionManager
     let onProcessExit: () -> Void
 
-    @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
-    @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
-    @AppStorage("terminalBackgroundColor") private var terminalBackgroundColor = "#1e1e2e"
-    @AppStorage("terminalForegroundColor") private var terminalForegroundColor = "#cdd6f4"
-    @AppStorage("terminalCursorColor") private var terminalCursorColor = "#f5e0dc"
-    @AppStorage("terminalSelectionBackground") private var terminalSelectionBackground = "#585b70"
-    @AppStorage("terminalPalette") private var terminalPalette = "#45475a,#f38ba8,#a6e3a1,#f9e2af,#89b4fa,#f5c2e7,#94e2d5,#a6adc8,#585b70,#f37799,#89d88b,#ebd391,#74a8fc,#f2aede,#6bd7ca,#bac2de"
+    @EnvironmentObject var ghosttyApp: Ghostty.App
 
     func makeCoordinator() -> TerminalViewCoordinator {
         TerminalViewCoordinator(session: session, onProcessExit: onProcessExit)
@@ -430,89 +426,54 @@ struct TerminalViewWrapper: NSViewRepresentable {
 
         // Check if terminal already exists for this pane
         if let existingTerminal = sessionManager.getTerminal(for: sessionId, paneId: paneId) {
-            // Set process delegate even for existing terminals
-            existingTerminal.processDelegate = context.coordinator
+            context.coordinator.startMonitoring(terminal: existingTerminal)
             return existingTerminal
         }
 
-        // Create new terminal
-        let terminalView = LocalProcessTerminalView(frame: .zero)
-
-        // Set terminal colors from settings
-        let bgColor = NSColor(hex: terminalBackgroundColor) ?? .black
-        let fgColor = NSColor(hex: terminalForegroundColor) ?? .white
-        let cursorColor = NSColor(hex: terminalCursorColor) ?? fgColor
-        let selectionBg = NSColor(hex: terminalSelectionBackground) ?? fgColor.withAlphaComponent(0.2)
-
-        // Set native colors first
-        terminalView.nativeBackgroundColor = bgColor
-        terminalView.nativeForegroundColor = fgColor
-
-        // Then apply ANSI color palette (this should override the palette but keep bg/fg)
-        if let palette = parseANSIPalette(terminalPalette) {
-            terminalView.installColors(palette)
+        // Ensure Ghostty app is ready
+        guard let app = ghosttyApp.app else {
+            return NSView(frame: .zero)
         }
 
-        // Set cursor and selection colors
-        terminalView.caretColor = cursorColor
-        terminalView.selectedTextBackgroundColor = selectionBg
-
-        // Apply font settings
-        if let font = NSFont(name: terminalFontName, size: terminalFontSize) {
-            terminalView.font = font
+        // Get worktree path
+        guard let path = worktree.path else {
+            return NSView(frame: .zero)
         }
 
-        if let path = worktree.path {
-            var env = ProcessInfo.processInfo.environment
-            env["TERM"] = "xterm-256color"
-            env["COLORTERM"] = "truecolor"
+        // Create new Ghostty terminal
+        let terminalView = GhosttyTerminalView(
+            frame: .zero,
+            worktreePath: path,
+            ghosttyApp: app,
+            appWrapper: ghosttyApp
+        )
 
-            // Get user's default shell
-            let shell = env["SHELL"] ?? "/bin/zsh"
-            let shellName = (shell as NSString).lastPathComponent
+        // Set process exit callback
+        terminalView.onProcessExit = onProcessExit
 
-            terminalView.startProcess(
-                executable: shell,
-                args: ["-l", "-c", "cd '\(path)' && exec $SHELL"],
-                environment: env.map { $0.key + "=" + $0.value },
-                execName: shellName
-            )
+        // Set title change callback to update session title
+        let sessionToUpdate = session
+        let moc = session.managedObjectContext
+        terminalView.onTitleChange = { title in
+            Task { @MainActor in
+                sessionToUpdate.title = title
+                // Force context to detect changes
+                moc?.refresh(sessionToUpdate, mergeChanges: true)
+                try? moc?.save()
+            }
         }
-
-        // Set process delegate for termination handling
-        terminalView.processDelegate = context.coordinator
 
         // Store terminal in manager for persistence
         sessionManager.setTerminal(terminalView, for: sessionId, paneId: paneId)
+
+        // Start monitoring for process exit
+        context.coordinator.startMonitoring(terminal: terminalView)
 
         return terminalView
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         // Terminal view doesn't need updates
-    }
-
-    private func parseANSIPalette(_ paletteString: String) -> [SwiftTerm.Color]? {
-        let hexColors = paletteString.split(separator: ",").map(String.init)
-        guard hexColors.count == 16 else { return nil }
-
-        var parsed: [SwiftTerm.Color] = []
-
-        for hex in hexColors {
-            guard let nsColor = NSColor(hex: hex),
-                  let components = nsColor.usingColorSpace(.deviceRGB)?.cgColor.components else {
-                return nil
-            }
-
-            // SwiftTerm.Color uses 16-bit values (0-65535), so multiply by 257 or use * 65535
-            let r = UInt16(components[0] * 65535)
-            let g = UInt16(components[1] * 65535)
-            let b = UInt16(components[2] * 65535)
-
-            parsed.append(SwiftTerm.Color(red: r, green: g, blue: b))
-        }
-
-        return parsed
     }
 }
 
@@ -522,20 +483,4 @@ struct TerminalViewWrapper: NSViewRepresentable {
         selectedSessionId: .constant(nil),
         repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext)
     )
-}
-
-extension NSColor {
-    convenience init?(hex: String) {
-        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
-
-        var rgb: UInt64 = 0
-        guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else { return nil }
-
-        let r = CGFloat((rgb & 0xFF0000) >> 16) / 255.0
-        let g = CGFloat((rgb & 0x00FF00) >> 8) / 255.0
-        let b = CGFloat(rgb & 0x0000FF) / 255.0
-
-        self.init(red: r, green: g, blue: b, alpha: 1.0)
-    }
 }

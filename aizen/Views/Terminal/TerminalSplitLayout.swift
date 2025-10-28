@@ -2,18 +2,38 @@
 //  TerminalSplitLayout.swift
 //  aizen
 //
-//  Data structures for terminal split pane layout
+//  Split pane layout based on Ghostty's SplitTree implementation
 //
 
 import Foundation
 
+// MARK: - Split Direction
+
+enum SplitDirection: String, Codable {
+    case horizontal  // left | right
+    case vertical    // top / bottom
+}
+
+// MARK: - Split Node
+
 indirect enum SplitNode: Codable, Equatable {
     case leaf(paneId: String)
-    case hsplit(ratio: Double, left: SplitNode, right: SplitNode)
-    case vsplit(ratio: Double, top: SplitNode, bottom: SplitNode)
+    case split(Split)
+
+    struct Split: Codable, Equatable {
+        let direction: SplitDirection
+        let ratio: Double  // 0.0 to 1.0, left/top percentage
+        let left: SplitNode  // Left (horizontal) or top (vertical)
+        let right: SplitNode  // Right (horizontal) or bottom (vertical)
+    }
+
+    // Legacy support for old hsplit/vsplit format
+    private enum LegacyNode: String, Codable {
+        case leaf, hsplit, vsplit
+    }
 
     enum CodingKeys: String, CodingKey {
-        case type, paneId, ratio, left, right, top, bottom
+        case type, paneId, direction, ratio, left, right
     }
 
     init(from decoder: Decoder) throws {
@@ -24,16 +44,12 @@ indirect enum SplitNode: Codable, Equatable {
         case "leaf":
             let id = try container.decode(String.self, forKey: .paneId)
             self = .leaf(paneId: id)
-        case "hsplit":
+        case "split":
+            let direction = try container.decode(SplitDirection.self, forKey: .direction)
             let ratio = try container.decode(Double.self, forKey: .ratio)
             let left = try container.decode(SplitNode.self, forKey: .left)
             let right = try container.decode(SplitNode.self, forKey: .right)
-            self = .hsplit(ratio: ratio, left: left, right: right)
-        case "vsplit":
-            let ratio = try container.decode(Double.self, forKey: .ratio)
-            let top = try container.decode(SplitNode.self, forKey: .top)
-            let bottom = try container.decode(SplitNode.self, forKey: .bottom)
-            self = .vsplit(ratio: ratio, top: top, bottom: bottom)
+            self = .split(Split(direction: direction, ratio: ratio, left: left, right: right))
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .type,
@@ -50,79 +66,153 @@ indirect enum SplitNode: Codable, Equatable {
         case .leaf(let paneId):
             try container.encode("leaf", forKey: .type)
             try container.encode(paneId, forKey: .paneId)
-        case .hsplit(let ratio, let left, let right):
-            try container.encode("hsplit", forKey: .type)
-            try container.encode(ratio, forKey: .ratio)
-            try container.encode(left, forKey: .left)
-            try container.encode(right, forKey: .right)
-        case .vsplit(let ratio, let top, let bottom):
-            try container.encode("vsplit", forKey: .type)
-            try container.encode(ratio, forKey: .ratio)
-            try container.encode(top, forKey: .top)
-            try container.encode(bottom, forKey: .bottom)
+        case .split(let split):
+            try container.encode("split", forKey: .type)
+            try container.encode(split.direction, forKey: .direction)
+            try container.encode(split.ratio, forKey: .ratio)
+            try container.encode(split.left, forKey: .left)
+            try container.encode(split.right, forKey: .right)
         }
     }
 
-    // Get all pane IDs in the tree
+    // MARK: - Tree Operations
+
     func allPaneIds() -> [String] {
         switch self {
         case .leaf(let paneId):
             return [paneId]
-        case .hsplit(_, let left, let right):
-            return left.allPaneIds() + right.allPaneIds()
-        case .vsplit(_, let top, let bottom):
-            return top.allPaneIds() + bottom.allPaneIds()
+        case .split(let split):
+            return split.left.allPaneIds() + split.right.allPaneIds()
         }
     }
 
-    // Find and replace a pane with a split
+    func leafCount() -> Int {
+        switch self {
+        case .leaf:
+            return 1
+        case .split(let split):
+            return split.left.leafCount() + split.right.leafCount()
+        }
+    }
+
+    // MARK: - Ghostty Equalization Algorithm
+
+    /// Calculate weight for direction-aware equalization
+    /// Same-direction splits contribute their child weights
+    /// Cross-direction splits count as single unit
+    private func weight(for direction: SplitDirection) -> Int {
+        switch self {
+        case .leaf:
+            return 1
+        case .split(let split):
+            if split.direction == direction {
+                // Same direction: weights add
+                return split.left.weight(for: direction) + split.right.weight(for: direction)
+            } else {
+                // Cross direction: single unit
+                return 1
+            }
+        }
+    }
+
+    /// Equalize split ratios based on Ghostty's weight algorithm
+    func equalized() -> SplitNode {
+        switch self {
+        case .leaf:
+            return self
+        case .split(let split):
+            let leftWeight = split.left.weight(for: split.direction)
+            let rightWeight = split.right.weight(for: split.direction)
+            let totalWeight = leftWeight + rightWeight
+            let newRatio = Double(leftWeight) / Double(totalWeight)
+
+            return .split(Split(
+                direction: split.direction,
+                ratio: max(0.1, min(0.9, newRatio)),  // Clamp 10%-90%
+                left: split.left.equalized(),
+                right: split.right.equalized()
+            ))
+        }
+    }
+
     func replacingPane(_ targetId: String, with newNode: SplitNode) -> SplitNode {
         switch self {
         case .leaf(let paneId):
             return paneId == targetId ? newNode : self
-        case .hsplit(let ratio, let left, let right):
-            return .hsplit(
-                ratio: ratio,
-                left: left.replacingPane(targetId, with: newNode),
-                right: right.replacingPane(targetId, with: newNode)
-            )
-        case .vsplit(let ratio, let top, let bottom):
-            return .vsplit(
-                ratio: ratio,
-                top: top.replacingPane(targetId, with: newNode),
-                bottom: bottom.replacingPane(targetId, with: newNode)
-            )
+        case .split(let split):
+            return .split(Split(
+                direction: split.direction,
+                ratio: split.ratio,
+                left: split.left.replacingPane(targetId, with: newNode),
+                right: split.right.replacingPane(targetId, with: newNode)
+            ))
         }
     }
 
-    // Remove a pane from the tree
     func removingPane(_ targetId: String) -> SplitNode? {
         switch self {
         case .leaf(let paneId):
             return paneId == targetId ? nil : self
-        case .hsplit(_, let left, let right):
-            let newLeft = left.removingPane(targetId)
-            let newRight = right.removingPane(targetId)
+        case .split(let split):
+            let newLeft = split.left.removingPane(targetId)
+            let newRight = split.right.removingPane(targetId)
 
+            // If left removed, promote right
             if newLeft == nil {
                 return newRight
             }
+            // If right removed, promote left
             if newRight == nil {
                 return newLeft
             }
-            return .hsplit(ratio: 0.5, left: newLeft!, right: newRight!)
-        case .vsplit(_, let top, let bottom):
-            let newTop = top.removingPane(targetId)
-            let newBottom = bottom.removingPane(targetId)
-
-            if newTop == nil {
-                return newBottom
-            }
-            if newBottom == nil {
-                return newTop
-            }
-            return .vsplit(ratio: 0.5, top: newTop!, bottom: newBottom!)
+            // Both remain, preserve split with same ratio
+            return .split(Split(
+                direction: split.direction,
+                ratio: split.ratio,
+                left: newLeft!,
+                right: newRight!
+            ))
         }
+    }
+
+    // Update THIS split's ratio (used when the split itself is being resized)
+    func withUpdatedRatio(_ newRatio: Double) -> SplitNode {
+        switch self {
+        case .leaf:
+            return self
+        case .split(let split):
+            return .split(Split(
+                direction: split.direction,
+                ratio: max(0.1, min(0.9, newRatio)),
+                left: split.left,
+                right: split.right
+            ))
+        }
+    }
+
+    // Replace a specific node in the tree (by structural equality)
+    func replacingNode(_ oldNode: SplitNode, with newNode: SplitNode) -> SplitNode {
+        // If this is the node to replace, return the new node
+        if self == oldNode {
+            return newNode
+        }
+
+        // Recurse into children
+        switch self {
+        case .leaf:
+            return self
+        case .split(let split):
+            return .split(Split(
+                direction: split.direction,
+                ratio: split.ratio,
+                left: split.left.replacingNode(oldNode, with: newNode),
+                right: split.right.replacingNode(oldNode, with: newNode)
+            ))
+        }
+    }
+
+    private func containsPane(_ paneId: String) -> Bool {
+        return allPaneIds().contains(paneId)
     }
 }
 
