@@ -42,8 +42,8 @@ struct TerminalSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Font") {
-                Picker("Font", selection: $fontName) {
+            Section(LocalizedStringKey("settings.terminal.font.section")) {
+                Picker(LocalizedStringKey("settings.terminal.font.picker"), selection: $fontName) {
                     ForEach(availableFonts, id: \.self) { font in
                         Text(font).tag(font)
                     }
@@ -51,7 +51,7 @@ struct TerminalSettingsView: View {
                 .disabled(availableFonts.isEmpty)
 
                 HStack {
-                    Text("Font Size: \(Int(fontSize))")
+                    Text(String(format: NSLocalizedString("settings.terminal.font.size", comment: ""), Int(fontSize)))
                         .frame(width: 120, alignment: .leading)
 
                     Slider(value: $fontSize, in: 8...24, step: 1)
@@ -61,8 +61,8 @@ struct TerminalSettingsView: View {
                 }
             }
 
-            Section("Theme") {
-                Picker("Theme", selection: $themeName) {
+            Section(LocalizedStringKey("settings.terminal.theme.section")) {
+                Picker(LocalizedStringKey("settings.terminal.theme.picker"), selection: $themeName) {
                     ForEach(themeNames, id: \.self) { theme in
                         Text(theme).tag(theme)
                     }

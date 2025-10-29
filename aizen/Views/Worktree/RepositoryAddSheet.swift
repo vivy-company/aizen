@@ -27,7 +27,7 @@ struct RepositoryAddSheet: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Add Repository")
+                Text("repository.add.title", bundle: .main)
                     .font(.title2)
                     .fontWeight(.semibold)
 
@@ -41,10 +41,10 @@ struct RepositoryAddSheet: View {
             ScrollView {
                 VStack(spacing: 20) {
                     // Mode picker
-                    Picker("Mode", selection: $mode) {
-                        Label("Open Existing", systemImage: "folder")
+                    Picker(String(localized: "repository.mode"), selection: $mode) {
+                        Label(String(localized: "repository.openExisting"), systemImage: "folder")
                             .tag(AddRepositoryMode.existing)
-                        Label("Clone from URL", systemImage: "arrow.down.circle")
+                        Label(String(localized: "repository.cloneFromURL"), systemImage: "arrow.down.circle")
                             .tag(AddRepositoryMode.clone)
                     }
                     .pickerStyle(.segmented)
@@ -74,12 +74,12 @@ struct RepositoryAddSheet: View {
             HStack {
                 Spacer()
 
-                Button("Cancel") {
+                Button(String(localized: "general.cancel")) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button(mode == .clone ? "Clone" : "Add") {
+                Button(mode == .clone ? String(localized: "general.clone") : String(localized: "general.add")) {
                     addRepository()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -94,27 +94,27 @@ struct RepositoryAddSheet: View {
 
     private var cloneView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Repository URL")
+            Text("repository.add.url", bundle: .main)
                 .font(.headline)
 
-            TextField("https://github.com/user/repo.git", text: $cloneURL)
+            TextField(String(localized: "repository.add.urlPlaceholder"), text: $cloneURL)
                 .textFieldStyle(.roundedBorder)
 
-            Text("Clone Location")
+            Text("repository.cloneLocation", bundle: .main)
                 .font(.headline)
                 .padding(.top, 8)
 
             HStack {
-                TextField("Select destination folder", text: $selectedPath)
+                TextField(String(localized: "repository.selectDestination"), text: $selectedPath)
                     .textFieldStyle(.roundedBorder)
                     .disabled(true)
 
-                Button("Choose...") {
+                Button(String(localized: "repository.add.choose")) {
                     selectCloneDestination()
                 }
             }
 
-            Text("The repository will be cloned to the selected location")
+            Text("repository.cloneDescription", bundle: .main)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -122,26 +122,26 @@ struct RepositoryAddSheet: View {
 
     private var existingView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Repository Location")
+            Text("repository.selectLocation", bundle: .main)
                 .font(.headline)
 
             HStack {
-                TextField("Select repository folder", text: $selectedPath)
+                TextField(String(localized: "repository.selectFolder"), text: $selectedPath)
                     .textFieldStyle(.roundedBorder)
                     .disabled(true)
 
-                Button("Choose...") {
+                Button(String(localized: "repository.add.choose")) {
                     selectExistingRepository()
                 }
             }
 
-            Text("Select a folder containing a git repository")
+            Text("repository.selectGitFolder", bundle: .main)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             if !selectedPath.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Selected:")
+                    Text("repository.add.selected", bundle: .main)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -171,7 +171,7 @@ struct RepositoryAddSheet: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "Select a git repository folder"
+        panel.message = String(localized: "repository.panelSelectGit")
 
         if panel.runModal() == .OK, let url = panel.url {
             selectedPath = url.path
@@ -183,7 +183,7 @@ struct RepositoryAddSheet: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "Select where to clone the repository"
+        panel.message = String(localized: "repository.panelSelectClone")
 
         if panel.runModal() == .OK, let url = panel.url {
             selectedPath = url.path

@@ -17,7 +17,7 @@ struct AgentsSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Agents") {
+            Section(LocalizedStringKey("settings.agents.section")) {
                 VStack(alignment: .leading, spacing: 16) {
                     // Claude Agent
                     AgentConfigView(
@@ -51,13 +51,13 @@ struct AgentsSettingsView: View {
 
                     // Default Agent Picker
                     HStack {
-                        Text("Default Agent:")
+                        Text("settings.agents.defaultAgent")
                             .frame(width: 100, alignment: .leading)
 
                         Picker("", selection: $defaultACPAgent) {
-                            Text("Claude").tag("claude")
-                            Text("Codex").tag("codex")
-                            Text("Gemini").tag("gemini")
+                            Text("settings.agents.claude").tag("claude")
+                            Text("settings.agents.codex").tag("codex")
+                            Text("settings.agents.gemini").tag("gemini")
                         }
                         .pickerStyle(.segmented)
                     }
@@ -84,7 +84,7 @@ struct AgentConfigView: View {
         GroupBox(label: Text(agentName.capitalized).font(.headline)) {
             VStack(spacing: 12) {
                 HStack {
-                    TextField("Executable Path", text: $agentPath)
+                    TextField(LocalizedStringKey("settings.agents.executablePath"), text: $agentPath)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: agentPath) { _, newValue in
                             syncToRegistry()
@@ -98,7 +98,7 @@ struct AgentConfigView: View {
 
                 HStack {
                     if !isValid {
-                        Button(isInstalling ? "Installing..." : "Install") {
+                        Button(isInstalling ? LocalizedStringKey("settings.agents.installing") : LocalizedStringKey("settings.agents.install")) {
                             installAgent()
                         }
                         .buttonStyle(.bordered)
@@ -109,7 +109,7 @@ struct AgentConfigView: View {
                                 .scaleEffect(0.7)
                         }
                     } else {
-                        Button("Test Connection") {
+                        Button(LocalizedStringKey("settings.agents.testConnection")) {
                             testConnection()
                         }
                         .buttonStyle(.bordered)
@@ -120,7 +120,7 @@ struct AgentConfigView: View {
                         }
 
                         if let result = testResult, testingAgent == agentName {
-                            Text(result)
+                            Text(localizedTestResult(result))
                                 .font(.caption)
                                 .foregroundColor(result.contains("Success") ? .green : .red)
                         }
@@ -141,6 +141,21 @@ struct AgentConfigView: View {
         .onAppear {
             loadFromRegistry()
             validatePath()
+        }
+    }
+
+    private func localizedTestResult(_ result: String) -> LocalizedStringKey {
+        switch result {
+        case "Success":
+            return "settings.agents.testResult.success"
+        case "Failed":
+            return "settings.agents.testResult.failed"
+        case "Error":
+            return "settings.agents.testResult.error"
+        case "Invalid":
+            return "settings.agents.testResult.invalid"
+        default:
+            return LocalizedStringKey(result)
         }
     }
 
@@ -210,22 +225,22 @@ struct AgentConfigView: View {
                         process.waitUntilExit()
 
                         await MainActor.run {
-                            testResult = process.terminationStatus == 0 ? "Success" : "Failed"
+                            testResult = process.terminationStatus == 0 ? String(localized: "settings.agents.testResult.success") : String(localized: "settings.agents.testResult.failed")
                         }
                     } catch {
                         await MainActor.run {
-                            testResult = "Error"
+                            testResult = String(localized: "settings.agents.testResult.error")
                         }
                     }
                 } else {
                     // For claude, just verify file validity
                     await MainActor.run {
-                        testResult = "Success"
+                        testResult = String(localized: "settings.agents.testResult.success")
                     }
                 }
             } else {
                 await MainActor.run {
-                    testResult = "Invalid"
+                    testResult = String(localized: "settings.agents.testResult.invalid")
                 }
             }
 

@@ -40,7 +40,7 @@ struct WorktreeListView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search worktrees", text: $searchText)
+                TextField(String(localized: "worktree.list.search"), text: $searchText)
                     .textFieldStyle(.plain)
 
                 if !searchText.isEmpty {
@@ -84,7 +84,7 @@ struct WorktreeListView: View {
                 Button {
                     showingCreateWorktree = true
                 } label: {
-                    Label("Add Worktree", systemImage: "plus")
+                    Label(String(localized: "worktree.list.add"), systemImage: "plus")
                 }
             }
         }
@@ -116,12 +116,12 @@ struct WorktreeListRowView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(worktree.branch ?? "Unknown")
+                    Text(worktree.branch ?? String(localized: "worktree.list.unknown"))
                         .font(.headline)
                         .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
 
                     if worktree.isPrimary {
-                        Text("MAIN")
+                        Text("worktree.detail.main", bundle: .main)
                             .font(.caption2)
                             .fontWeight(.semibold)
                             .foregroundStyle(.white)
@@ -137,7 +137,7 @@ struct WorktreeListRowView: View {
                     .lineLimit(1)
 
                 if let lastAccessed = worktree.lastAccessed {
-                    Text("Last accessed: \(lastAccessed, style: .relative)")
+                    Text(String(localized: "worktree.list.lastAccessed \(lastAccessed.formatted(.relative(presentation: .named)))"))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -158,7 +158,7 @@ struct WorktreeListRowView: View {
             Button {
                 showingDetails = true
             } label: {
-                Label("Show Details", systemImage: "info.circle")
+                Label(String(localized: "worktree.detail.showDetails"), systemImage: "info.circle")
             }
 
             Divider()
@@ -168,7 +168,7 @@ struct WorktreeListRowView: View {
                     repositoryManager.openInTerminal(path)
                 }
             } label: {
-                Label("Open in Terminal", systemImage: "terminal")
+                Label(String(localized: "worktree.detail.openTerminal"), systemImage: "terminal")
             }
 
             Button {
@@ -176,7 +176,7 @@ struct WorktreeListRowView: View {
                     repositoryManager.openInFinder(path)
                 }
             } label: {
-                Label("Open in Finder", systemImage: "folder")
+                Label(String(localized: "worktree.detail.openFinder"), systemImage: "folder")
             }
 
             Button {
@@ -184,7 +184,7 @@ struct WorktreeListRowView: View {
                     repositoryManager.openInEditor(path)
                 }
             } label: {
-                Label("Open in Editor", systemImage: "chevron.left.forwardslash.chevron.right")
+                Label(String(localized: "worktree.detail.openEditor"), systemImage: "chevron.left.forwardslash.chevron.right")
             }
 
             if !worktree.isPrimary {
@@ -193,27 +193,27 @@ struct WorktreeListRowView: View {
                 Button(role: .destructive) {
                     checkUnsavedChanges()
                 } label: {
-                    Label("Delete Worktree", systemImage: "trash")
+                    Label(String(localized: "worktree.detail.delete"), systemImage: "trash")
                 }
             }
         }
         .sheet(isPresented: $showingDetails) {
             WorktreeDetailsSheet(worktree: worktree, repositoryManager: repositoryManager)
         }
-        .alert(hasUnsavedChanges ? "Unsaved Changes" : "Delete Worktree", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
+        .alert(hasUnsavedChanges ? String(localized: "worktree.detail.unsavedChangesTitle") : String(localized: "worktree.detail.deleteConfirmTitle"), isPresented: $showingDeleteConfirmation) {
+            Button(String(localized: "worktree.create.cancel"), role: .cancel) {}
+            Button(String(localized: "worktree.detail.delete"), role: .destructive) {
                 deleteWorktree()
             }
         } message: {
             if hasUnsavedChanges {
-                Text("The worktree '\(worktree.branch ?? "Unknown")' contains modified or untracked files. Delete anyway?")
+                Text(String(localized: "worktree.detail.unsavedChangesMessage \(worktree.branch ?? String(localized: "worktree.list.unknown"))"))
             } else {
-                Text("Are you sure you want to delete the worktree '\(worktree.branch ?? "Unknown")'? This action cannot be undone.")
+                Text(String(localized: "worktree.detail.deleteConfirmMessageWithName \(worktree.branch ?? String(localized: "worktree.list.unknown"))"))
             }
         }
-        .alert("Error", isPresented: .constant(errorMessage != nil)) {
-            Button("OK") {
+        .alert(String(localized: "worktree.list.error"), isPresented: .constant(errorMessage != nil)) {
+            Button(String(localized: "worktree.list.ok")) {
                 errorMessage = nil
             }
         } message: {
@@ -268,12 +268,12 @@ struct WorktreeDetailsSheet: View {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(worktree.branch ?? "Unknown")
+                    Text(worktree.branch ?? String(localized: "worktree.list.unknown"))
                         .font(.title2)
                         .fontWeight(.bold)
 
                     if worktree.isPrimary {
-                        Text("PRIMARY WORKTREE")
+                        Text("worktree.detail.primary", bundle: .main)
                             .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundStyle(.white)
@@ -304,50 +304,50 @@ struct WorktreeDetailsSheet: View {
                     if isLoading {
                         HStack {
                             ProgressView()
-                            Text("Loading status...")
+                            Text("worktree.detail.loadingStatus", bundle: .main)
                                 .foregroundStyle(.secondary)
                         }
                     } else if ahead > 0 || behind > 0 {
                         HStack(spacing: 16) {
                             if ahead > 0 {
-                                Label("\(ahead) ahead", systemImage: "arrow.up.circle.fill")
+                                Label(String(localized: "worktree.detail.ahead \(ahead)"), systemImage: "arrow.up.circle.fill")
                                     .foregroundStyle(.green)
                             }
                             if behind > 0 {
-                                Label("\(behind) behind", systemImage: "arrow.down.circle.fill")
+                                Label(String(localized: "worktree.detail.behind \(behind)"), systemImage: "arrow.down.circle.fill")
                                     .foregroundStyle(.orange)
                             }
                         }
                     } else {
-                        Label("Up to date", systemImage: "checkmark.circle.fill")
+                        Label(String(localized: "worktree.detail.upToDate"), systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     }
 
                     // Info
-                    GroupBox("Information") {
+                    GroupBox(String(localized: "worktree.detail.information")) {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
-                                Text("Path")
+                                Text("worktree.detail.path", bundle: .main)
                                     .foregroundStyle(.secondary)
                                     .frame(width: 80, alignment: .leading)
-                                Text(worktree.path ?? "Unknown")
+                                Text(worktree.path ?? String(localized: "worktree.list.unknown"))
                                     .textSelection(.enabled)
                             }
 
                             Divider()
 
                             HStack {
-                                Text("Branch")
+                                Text("worktree.detail.branch", bundle: .main)
                                     .foregroundStyle(.secondary)
                                     .frame(width: 80, alignment: .leading)
-                                Text(currentBranch.isEmpty ? (worktree.branch ?? "Unknown") : currentBranch)
+                                Text(currentBranch.isEmpty ? (worktree.branch ?? String(localized: "worktree.list.unknown")) : currentBranch)
                                     .textSelection(.enabled)
                             }
 
                             if let lastAccessed = worktree.lastAccessed {
                                 Divider()
                                 HStack {
-                                    Text("Last Accessed")
+                                    Text("worktree.detail.lastAccessed", bundle: .main)
                                         .foregroundStyle(.secondary)
                                         .frame(width: 80, alignment: .leading)
                                     Text(lastAccessed.formatted(date: .abbreviated, time: .shortened))

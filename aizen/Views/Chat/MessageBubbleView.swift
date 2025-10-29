@@ -108,7 +108,7 @@ struct MessageBubbleView: View {
                                         .foregroundStyle(showCopyConfirmation ? .green : .secondary)
                                 }
                                 .buttonStyle(.plain)
-                                .help("Copy message")
+                                .help(String(localized: "chat.message.copy"))
                             }
                         }
                     }

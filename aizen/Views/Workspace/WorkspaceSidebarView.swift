@@ -52,7 +52,7 @@ struct WorkspaceSidebarView: View {
         VStack(spacing: 0) {
             // Workspace section
             VStack(alignment: .leading, spacing: 8) {
-                Text("Workspace")
+                Text("workspace.sidebar.title")
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
@@ -65,14 +65,14 @@ struct WorkspaceSidebarView: View {
                             Button {
                                 selectedWorkspace = workspace
                             } label: {
-                                Label("Switch to", systemImage: "arrow.right.circle")
+                                Label("workspace.switchTo", systemImage: "arrow.right.circle")
                             }
 
                             Button {
                                 workspaceToEdit = workspace
                                 showingEditWorkspace = true
                             } label: {
-                                Label("Edit", systemImage: "pencil")
+                                Label("workspace.edit", systemImage: "pencil")
                             }
                         } label: {
                             HStack {
@@ -80,7 +80,7 @@ struct WorkspaceSidebarView: View {
                                     .fill(colorFromHex(workspace.colorHex ?? "#0000FF"))
                                     .frame(width: 10, height: 10)
 
-                                Text(workspace.name ?? "Untitled")
+                                Text(workspace.name ?? String(localized: "workspace.untitled"))
 
                                 Spacer()
 
@@ -97,7 +97,7 @@ struct WorkspaceSidebarView: View {
                     Button {
                         showingWorkspaceSheet = true
                     } label: {
-                        Label("New Workspace", systemImage: "plus.circle")
+                        Label("workspace.new", systemImage: "plus.circle")
                     }
                 } label: {
                     HStack {
@@ -106,7 +106,7 @@ struct WorkspaceSidebarView: View {
                                 .fill(colorFromHex(workspace.colorHex ?? "#0000FF"))
                                 .frame(width: 8, height: 8)
 
-                            Text(workspace.name ?? "Untitled")
+                            Text(workspace.name ?? String(localized: "workspace.untitled"))
                                 .font(.title3)
                                 .fontWeight(.semibold)
 
@@ -145,7 +145,7 @@ struct WorkspaceSidebarView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search repositories", text: $searchText)
+                TextField(LocalizedStringKey("workspace.search.placeholder"), text: $searchText)
                     .textFieldStyle(.plain)
 
                 if !searchText.isEmpty {
@@ -194,7 +194,7 @@ struct WorkspaceSidebarView: View {
                 Button {
                     showingAddRepository = true
                 } label: {
-                    Label("Add Repository", systemImage: "plus")
+                    Label("workspace.addRepository", systemImage: "plus")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
@@ -205,7 +205,7 @@ struct WorkspaceSidebarView: View {
             }
             .background(.background)
         }
-        .navigationTitle("Repositories")
+        .navigationTitle(LocalizedStringKey("workspace.repositories.title"))
         .sheet(isPresented: $showingWorkspaceSheet) {
             WorkspaceCreateSheet(repositoryManager: repositoryManager)
         }
@@ -260,13 +260,13 @@ struct RepositoryRow: View {
                     repositoryManager.openInFinder(path)
                 }
             } label: {
-                Label("Open in Finder", systemImage: "folder")
+                Label("workspace.repository.openFinder", systemImage: "folder")
             }
 
             Button(role: .destructive) {
                 deleteRepository()
             } label: {
-                Label("Remove Repository", systemImage: "trash")
+                Label("workspace.repository.remove", systemImage: "trash")
             }
         }
     }
@@ -279,7 +279,7 @@ struct RepositoryRow: View {
                 .frame(width: 18, height: 18)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(repository.name ?? "Unknown")
+                Text(repository.name ?? String(localized: "workspace.repository.unknown"))
                     .font(.body)
                     .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
                     .lineLimit(1)
@@ -362,7 +362,7 @@ struct WorktreeRowView: View {
                 .frame(width: 16)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(worktree.branch ?? "Unknown")
+                Text(worktree.branch ?? String(localized: "workspace.worktree.unknown"))
                     .font(.callout)
                     .lineLimit(1)
 
@@ -376,7 +376,7 @@ struct WorktreeRowView: View {
             Spacer(minLength: 4)
 
             if worktree.isPrimary {
-                Text("MAIN")
+                Text("workspace.worktree.main")
                     .font(.caption2)
                     .fontWeight(.semibold)
                     .foregroundStyle(.white)

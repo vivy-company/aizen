@@ -30,7 +30,7 @@ struct ACPImageView: View {
             } else {
                 HStack {
                     Image(systemName: "photo")
-                    Text("Invalid image data")
+                    Text("chat.image.invalid", bundle: .main)
                         .foregroundStyle(.secondary)
                 }
                 .padding()
@@ -68,7 +68,7 @@ struct ACPResourceView: View {
             }
 
             if let mimeType = mimeType {
-                Text("Type: \(mimeType)")
+                Text(String(format: String(localized: "chat.resource.type"), mimeType))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

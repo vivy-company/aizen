@@ -83,7 +83,7 @@ struct WorktreeDetailView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 11))
                 }
-                .help("New chat session")
+                .help(String(localized: "worktree.session.newChat"))
             } else {
                 Button {
                     createNewTerminalSession()
@@ -91,7 +91,7 @@ struct WorktreeDetailView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 11))
                 }
-                .help("New terminal session")
+                .help(String(localized: "worktree.session.newTerminal"))
             }
         }
 
@@ -125,13 +125,13 @@ struct WorktreeDetailView: View {
         NavigationStack {
             contentView
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle(worktree.branch ?? "Worktree")
+            .navigationTitle(worktree.branch ?? String(localized: "worktree.session.worktree"))
             .toolbarBackground(.visible, for: .windowToolbar)
             .toolbar {
                 ToolbarItem(placement: .automatic) {
-                    Picker("Tab", selection: $selectedTab) {
-                        Label("Chat", systemImage: "message").tag("chat")
-                        Label("Terminal", systemImage: "terminal").tag("terminal")
+                    Picker(String(localized: "worktree.session.tab"), selection: $selectedTab) {
+                        Label(String(localized: "worktree.session.chat"), systemImage: "message").tag("chat")
+                        Label(String(localized: "worktree.session.terminal"), systemImage: "terminal").tag("terminal")
                     }
                     .pickerStyle(.segmented)
                 }
@@ -330,7 +330,7 @@ struct WorktreeDetailView: View {
 
         let session = TerminalSession(context: context)
         session.id = UUID()
-        session.title = "Terminal \(terminalSessions.count + 1)"
+        session.title = String(localized: "worktree.session.terminalTitle \(terminalSessions.count + 1)")
         session.createdAt = Date()
         session.worktree = worktree
 
@@ -369,7 +369,7 @@ struct DetailsTabView: View {
                         .fontWeight(.bold)
 
                     if worktree.isPrimary {
-                        Text("PRIMARY WORKTREE")
+                        Text("worktree.detail.primary", bundle: .main)
                             .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundStyle(.white)
@@ -390,7 +390,7 @@ struct DetailsTabView: View {
                             HStack(spacing: 20) {
                                 if ahead > 0 {
                                     Label {
-                                        Text("\(ahead) ahead")
+                                        Text(String(localized: "worktree.detail.ahead \(ahead)"))
                                     } icon: {
                                         Image(systemName: "arrow.up.circle.fill")
                                             .foregroundStyle(.green)
@@ -399,7 +399,7 @@ struct DetailsTabView: View {
 
                                 if behind > 0 {
                                     Label {
-                                        Text("\(behind) behind")
+                                        Text(String(localized: "worktree.detail.behind \(behind)"))
                                     } icon: {
                                         Image(systemName: "arrow.down.circle.fill")
                                             .foregroundStyle(.orange)
@@ -408,7 +408,7 @@ struct DetailsTabView: View {
                             }
                             .font(.callout)
                         } else {
-                            Label("Up to date", systemImage: "checkmark.circle.fill")
+                            Label(String(localized: "worktree.detail.upToDate"), systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                         }
                     }
@@ -417,13 +417,13 @@ struct DetailsTabView: View {
                 // Info section
                 GroupBox {
                     VStack(alignment: .leading, spacing: 12) {
-                        InfoRow(label: "Path", value: worktree.path ?? "Unknown")
+                        InfoRow(label: String(localized: "worktree.detail.path"), value: worktree.path ?? String(localized: "worktree.list.unknown"))
                         Divider()
-                        InfoRow(label: "Branch", value: currentBranch.isEmpty ? (worktree.branch ?? "Unknown") : currentBranch)
+                        InfoRow(label: String(localized: "worktree.detail.branch"), value: currentBranch.isEmpty ? (worktree.branch ?? String(localized: "worktree.list.unknown")) : currentBranch)
 
                         if let lastAccessed = worktree.lastAccessed {
                             Divider()
-                            InfoRow(label: "Last Accessed", value: lastAccessed.formatted(date: .abbreviated, time: .shortened))
+                            InfoRow(label: String(localized: "worktree.detail.lastAccessed"), value: lastAccessed.formatted(date: .abbreviated, time: .shortened))
                         }
                     }
                     .padding(4)
@@ -432,14 +432,14 @@ struct DetailsTabView: View {
 
                 // Actions
                 VStack(spacing: 12) {
-                    Text("Actions")
+                    Text("worktree.detail.actions", bundle: .main)
                         .font(.headline)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal)
 
                     VStack(spacing: 8) {
                         ActionButton(
-                            title: "Open in Terminal",
+                            title: String(localized: "worktree.detail.openTerminal"),
                             icon: "terminal",
                             color: .blue
                         ) {
@@ -447,7 +447,7 @@ struct DetailsTabView: View {
                         }
 
                         ActionButton(
-                            title: "Open in Finder",
+                            title: String(localized: "worktree.detail.openFinder"),
                             icon: "folder",
                             color: .orange
                         ) {
@@ -455,7 +455,7 @@ struct DetailsTabView: View {
                         }
 
                         ActionButton(
-                            title: "Open in Editor",
+                            title: String(localized: "worktree.detail.openEditor"),
                             icon: "chevron.left.forwardslash.chevron.right",
                             color: .purple
                         ) {
@@ -464,7 +464,7 @@ struct DetailsTabView: View {
 
                         if !worktree.isPrimary {
                             ActionButton(
-                                title: "Delete Worktree",
+                                title: String(localized: "worktree.detail.delete"),
                                 icon: "trash",
                                 color: .red
                             ) {
@@ -488,27 +488,27 @@ struct DetailsTabView: View {
                 Spacer()
             }
         }
-        .navigationTitle("Worktree Details")
+        .navigationTitle(String(localized: "worktree.list.title"))
         .toolbar {
             Button {
                 refreshStatus()
             } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
+                Label(String(localized: "worktree.detail.refresh"), systemImage: "arrow.clockwise")
             }
         }
         .task {
             refreshStatus()
         }
-        .alert(hasUnsavedChanges ? "Unsaved Changes" : "Delete Worktree", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
+        .alert(hasUnsavedChanges ? String(localized: "worktree.detail.unsavedChangesTitle") : String(localized: "worktree.detail.deleteConfirmTitle"), isPresented: $showingDeleteConfirmation) {
+            Button(String(localized: "worktree.create.cancel"), role: .cancel) {}
+            Button(String(localized: "worktree.detail.delete"), role: .destructive) {
                 deleteWorktree()
             }
         } message: {
             if hasUnsavedChanges {
-                Text("The worktree '\(worktree.branch ?? "Unknown")' contains modified or untracked files. Delete anyway?")
+                Text(String(localized: "worktree.detail.unsavedChangesMessage \(worktree.branch ?? String(localized: "worktree.list.unknown"))"))
             } else {
-                Text("Are you sure you want to delete this worktree? This action cannot be undone.")
+                Text("worktree.detail.deleteConfirmMessage", bundle: .main)
             }
         }
     }
@@ -732,7 +732,7 @@ struct SessionTabsScrollView: View {
                                 HStack(spacing: 6) {
                                     AgentIconView(agent: session.agentName ?? "claude", size: 14)
 
-                                    Text(session.title ?? session.agentName?.capitalized ?? "Chat")
+                                    Text(session.title ?? session.agentName?.capitalized ?? String(localized: "worktree.session.chat"))
                                         .font(.callout)
 
                                     Button {
@@ -755,7 +755,7 @@ struct SessionTabsScrollView: View {
                                 HStack(spacing: 6) {
                                     Image(systemName: "terminal")
                                         .font(.system(size: 12))
-                                    Text(session.title ?? "Terminal")
+                                    Text(session.title ?? String(localized: "worktree.session.terminal"))
                                         .font(.callout)
 
                                     Button {

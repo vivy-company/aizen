@@ -12,11 +12,11 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Editor") {
-                TextField("Default Editor Command", text: $defaultEditor)
-                    .help("Command to launch your preferred code editor (e.g., 'code', 'cursor', 'subl')")
+            Section(LocalizedStringKey("settings.general.editor.section")) {
+                TextField(LocalizedStringKey("settings.general.editor.command"), text: $defaultEditor)
+                    .help(LocalizedStringKey("settings.general.editor.help"))
 
-                Text("Common editors: code (VS Code), cursor (Cursor), subl (Sublime), atom")
+                Text("settings.general.editor.examples")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

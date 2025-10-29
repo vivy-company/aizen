@@ -39,7 +39,7 @@ struct WorktreeCreateSheet: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Create Worktree")
+                Text("worktree.create.title", bundle: .main)
                     .font(.title2)
                     .fontWeight(.semibold)
 
@@ -53,7 +53,7 @@ struct WorktreeCreateSheet: View {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Branch Name")
+                        Text("worktree.create.branchName", bundle: .main)
                             .font(.headline)
 
                         Spacer()
@@ -65,10 +65,10 @@ struct WorktreeCreateSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
-                        .help("Generate random name")
+                        .help(String(localized: "worktree.create.generateRandom"))
                     }
 
-                    TextField("e.g., feature-login, bugfix-auth", text: $worktreeName)
+                    TextField(String(localized: "worktree.create.branchNamePlaceholder"), text: $worktreeName)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: worktreeName) { newValue in
                             // Slugify in real-time
@@ -101,14 +101,14 @@ struct WorktreeCreateSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Base Branch")
+                    Text("worktree.create.baseBranch", bundle: .main)
                         .font(.headline)
 
                     if isLoadingBranches {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Picker("Base Branch", selection: $selectedBranch) {
+                        Picker(String(localized: "worktree.create.baseBranch"), selection: $selectedBranch) {
                             ForEach(branches, id: \.id) { branch in
                                 Text(branch.name)
                                     .tag(branch as BranchInfo?)
@@ -117,7 +117,7 @@ struct WorktreeCreateSheet: View {
                         .labelsHidden()
                     }
 
-                    Text("New branch will be created from this branch")
+                    Text("worktree.create.baseBranchHelp", bundle: .main)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -127,7 +127,7 @@ struct WorktreeCreateSheet: View {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.circle.fill")
                                 .font(.callout)
-                            Text("Worktree Creation Failed")
+                            Text("worktree.create.failed", bundle: .main)
                                 .font(.callout)
                                 .fontWeight(.semibold)
                         }
@@ -150,12 +150,12 @@ struct WorktreeCreateSheet: View {
             HStack {
                 Spacer()
 
-                Button("Cancel") {
+                Button(String(localized: "worktree.create.cancel")) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button("Create") {
+                Button(String(localized: "worktree.create.create")) {
                     createWorktree()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -187,7 +187,7 @@ struct WorktreeCreateSheet: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Failed to load branches: \(error.localizedDescription)"
+                    errorMessage = String(localized: "worktree.create.failedLoadBranches \(error.localizedDescription)")
                     isLoadingBranches = false
                 }
             }
@@ -215,7 +215,7 @@ struct WorktreeCreateSheet: View {
         }
 
         if existingBranchNames.contains(worktreeName) {
-            validationWarning = "Branch '\(worktreeName)' already exists"
+            validationWarning = String(localized: "worktree.create.branchExists \(worktreeName)")
         } else {
             validationWarning = nil
         }
@@ -224,17 +224,17 @@ struct WorktreeCreateSheet: View {
     private func createWorktree() {
         guard !isProcessing, !worktreeName.isEmpty else { return }
         guard let selectedBranch = selectedBranch else {
-            errorMessage = "Please select a base branch"
+            errorMessage = String(localized: "worktree.create.selectBaseBranch")
             return
         }
         guard let repoPath = repository.path else {
-            errorMessage = "Invalid repository path"
+            errorMessage = String(localized: "worktree.create.invalidRepoPath")
             return
         }
 
         // Check if branch name already exists
         if existingBranchNames.contains(worktreeName) {
-            errorMessage = "Branch '\(worktreeName)' already exists. Choose a different name."
+            errorMessage = String(localized: "worktree.create.branchExistsChooseDifferent \(worktreeName)")
             return
         }
 

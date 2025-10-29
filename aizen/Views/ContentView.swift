@@ -55,9 +55,9 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 400)
             } else {
                 ContentUnavailableView(
-                    "Select a Repository",
+                    String(localized: "contentView.selectRepository", bundle: .main),
                     systemImage: "folder.badge.gearshape",
-                    description: Text("Choose a repository to view its worktrees")
+                    description: Text("contentView.selectRepositoryDescription", bundle: .main)
                 )
                 .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 400)
             }
@@ -70,9 +70,9 @@ struct ContentView: View {
                 )
             } else {
                 ContentUnavailableView(
-                    "Select a Worktree",
+                    String(localized: "contentView.selectWorktree", bundle: .main),
                     systemImage: "arrow.triangle.branch",
-                    description: Text("Choose a worktree to view details and actions")
+                    description: Text("contentView.selectWorktreeDescription", bundle: .main)
                 )
             }
         }

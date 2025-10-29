@@ -24,7 +24,7 @@ struct WorkspaceEditSheet: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Edit Workspace")
+                Text("workspace.edit.title", bundle: .main)
                     .font(.title2)
                     .fontWeight(.semibold)
 
@@ -37,10 +37,10 @@ struct WorkspaceEditSheet: View {
             // Content
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Workspace Name")
+                    Text("workspace.create.name", bundle: .main)
                         .font(.headline)
 
-                    TextField("e.g., Work, Personal, Open Source", text: $workspaceName)
+                    TextField(String(localized: "workspace.create.namePlaceholder"), text: $workspaceName)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit {
                             if !workspaceName.isEmpty {
@@ -50,7 +50,7 @@ struct WorkspaceEditSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Color")
+                    Text("workspace.edit.color", bundle: .main)
                         .font(.headline)
 
                     HStack(spacing: 12) {
@@ -93,12 +93,12 @@ struct WorkspaceEditSheet: View {
             HStack {
                 Spacer()
 
-                Button("Cancel") {
+                Button(String(localized: "general.cancel")) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button("Save") {
+                Button(String(localized: "workspace.edit.save")) {
                     saveChanges()
                 }
                 .keyboardShortcut(.defaultAction)

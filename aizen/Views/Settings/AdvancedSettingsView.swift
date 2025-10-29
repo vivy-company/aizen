@@ -15,30 +15,30 @@ struct AdvancedSettingsView: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Reset App")
+                    Text("settings.advanced.reset.title")
                         .font(.headline)
 
-                    Text("This will delete all workspaces, repositories, worktrees, and chat sessions. This action cannot be undone.")
+                    Text("settings.advanced.reset.description")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
                     Button(role: .destructive) {
                         showingResetConfirmation = true
                     } label: {
-                        Label("Reset All Data", systemImage: "trash")
+                        Label("settings.advanced.reset.button", systemImage: "trash")
                     }
                 }
                 .padding(.vertical, 8)
             }
         }
         .formStyle(.grouped)
-        .alert("Reset App?", isPresented: $showingResetConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Reset", role: .destructive) {
+        .alert(LocalizedStringKey("settings.advanced.reset.alert.title"), isPresented: $showingResetConfirmation) {
+            Button(LocalizedStringKey("settings.advanced.reset.alert.cancel"), role: .cancel) {}
+            Button(LocalizedStringKey("settings.advanced.reset.alert.confirm"), role: .destructive) {
                 resetApp()
             }
         } message: {
-            Text("This will permanently delete all your data including workspaces, repositories, worktrees, and chat sessions. The app will quit after reset.")
+            Text("settings.advanced.reset.alert.message")
         }
     }
 

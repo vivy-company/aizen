@@ -205,7 +205,7 @@ struct InputAttachmentDetailView: View {
                                 .font(.system(size: 48))
                                 .foregroundStyle(.secondary)
 
-                            Text("Preview not available")
+                            Text("chat.preview.unavailable", bundle: .main)
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
 

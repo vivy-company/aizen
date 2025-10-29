@@ -85,11 +85,11 @@ struct TerminalTabView: View {
                     .foregroundStyle(.secondary)
 
                 VStack(spacing: 8) {
-                    Text("No Terminal Sessions")
+                    Text("terminal.noSessions", bundle: .main)
                         .font(.title2)
                         .fontWeight(.semibold)
 
-                    Text("Open a terminal in this worktree")
+                    Text("terminal.openInWorktree", bundle: .main)
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }
@@ -100,7 +100,7 @@ struct TerminalTabView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "plus.circle.fill")
-                    Text("New Terminal")
+                    Text("terminal.new", bundle: .main)
                         .fontWeight(.medium)
                 }
                 .padding(.horizontal, 20)
@@ -121,7 +121,7 @@ struct TerminalTabView: View {
 
         let session = TerminalSession(context: context)
         session.id = UUID()
-        session.title = "Terminal \(sessions.count + 1)"
+        session.title = String(localized: "worktree.session.terminalTitle", defaultValue: "Terminal \(sessions.count + 1)", bundle: .main)
         session.createdAt = Date()
         session.worktree = worktree
 
@@ -228,7 +228,7 @@ struct SplitTerminalView: View {
                 SplitView(
                     split.direction == .horizontal ? .horizontal : .vertical,
                     ratioBinding,
-                    dividerColor: Color(nsColor: .separatorColor),
+                    dividerColor: Color(nsColor: .black),
                     left: { renderNode(split.left) },
                     right: { renderNode(split.right) }
                 )

@@ -52,11 +52,11 @@ struct ChatTabView: View {
                     .foregroundStyle(.secondary)
 
                 VStack(spacing: 8) {
-                    Text("No Chat Sessions")
+                    Text("chat.noChatSessions", bundle: .main)
                         .font(.title2)
                         .fontWeight(.semibold)
 
-                    Text("Start a conversation with an AI agent")
+                    Text("chat.startConversation", bundle: .main)
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }

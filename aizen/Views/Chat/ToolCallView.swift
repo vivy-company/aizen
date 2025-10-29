@@ -76,10 +76,10 @@ struct ToolCallView: View {
 
     private var statusText: String {
         switch toolCall.status {
-        case .pending: return "pending"
-        case .inProgress: return "running"
-        case .completed: return "done"
-        case .failed: return "failed"
+        case .pending: return String(localized: "chat.tool.status.pending")
+        case .inProgress: return String(localized: "chat.tool.status.running")
+        case .completed: return String(localized: "chat.tool.status.done")
+        case .failed: return String(localized: "chat.tool.status.failed")
         }
     }
 
@@ -174,19 +174,19 @@ struct ContentBlockView: View {
         Group {
             switch block {
             case .text:
-                Label("Text Output", systemImage: "text.alignleft")
+                Label(String(localized: "chat.content.textOutput"), systemImage: "text.alignleft")
             case .image:
-                Label("Image", systemImage: "photo")
+                Label(String(localized: "chat.content.image"), systemImage: "photo")
             case .resource:
-                Label("Resource", systemImage: "doc.badge.gearshape")
+                Label(String(localized: "chat.content.resource"), systemImage: "doc.badge.gearshape")
             case .audio:
-                Label("Audio", systemImage: "waveform")
+                Label(String(localized: "chat.content.audio"), systemImage: "waveform")
             case .embeddedResource:
-                Label("Embedded Resource", systemImage: "doc.badge.gearshape.fill")
+                Label(String(localized: "chat.content.embeddedResource"), systemImage: "doc.badge.gearshape.fill")
             case .diff:
-                Label("Diff", systemImage: "doc.text.magnifyingglass")
+                Label(String(localized: "chat.content.diff"), systemImage: "doc.text.magnifyingglass")
             case .terminalEmbed:
-                Label("Terminal", systemImage: "terminal")
+                Label(String(localized: "chat.content.terminal"), systemImage: "terminal")
             }
         }
         .font(.system(size: 10))
@@ -197,7 +197,7 @@ struct ContentBlockView: View {
         Button(action: copyContent) {
             HStack(spacing: 3) {
                 Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
-                Text(isCopied ? "Copied" : "Copy")
+                Text(isCopied ? String(localized: "chat.content.copied") : String(localized: "chat.content.copy"))
             }
             .font(.system(size: 10))
             .foregroundColor(isCopied ? .green : .blue)
@@ -215,27 +215,27 @@ struct ContentBlockView: View {
             case .resource(let content):
                 ACPResourceView(uri: content.resource.uri, mimeType: content.resource.mimeType, text: content.resource.text)
             case .audio(let content):
-                Text("Audio content: \(content.mimeType)")
+                Text(String(format: String(localized: "chat.content.audioType"), content.mimeType))
                     .foregroundColor(.secondary)
             case .embeddedResource(let content):
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Embedded: \(content.uri)")
+                    Text(String(format: String(localized: "chat.content.embedded"), content.uri))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             case .diff(let content):
                 VStack(alignment: .leading, spacing: 4) {
                     if let path = content.path {
-                        Text("File: \(path)")
+                        Text(String(format: String(localized: "chat.content.file"), path))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    Text("Diff content")
+                    Text("chat.content.diffContent", bundle: .main)
                         .font(.system(.body, design: .monospaced))
                 }
             case .terminalEmbed(let content):
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Terminal: \(content.command)")
+                    Text(String(format: String(localized: "chat.content.terminalCommand"), content.command))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Text(content.output)
@@ -252,11 +252,11 @@ struct ContentBlockView: View {
         case .text(let content):
             textToCopy = content.text
         case .image:
-            textToCopy = "[Image content]"
+            textToCopy = String(localized: "chat.content.imageContent")
         case .resource(let content):
             textToCopy = content.resource.text ?? content.resource.uri
         case .audio(let content):
-            textToCopy = "[Audio content: \(content.mimeType)]"
+            textToCopy = String(format: String(localized: "chat.content.audioContent"), content.mimeType)
         case .embeddedResource(let content):
             textToCopy = content.uri
         case .diff(let content):

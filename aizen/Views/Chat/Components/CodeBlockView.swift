@@ -36,7 +36,7 @@ struct CodeBlockView: View {
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help("Copy code")
+                .help(String(localized: "chat.code.copy"))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)

@@ -16,13 +16,13 @@ enum GitError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .commandFailed(let message):
-            return "Git command failed: \(message)"
+            return String(localized: "error.git.commandFailed \(message)")
         case .invalidPath:
-            return "Invalid repository path"
+            return String(localized: "error.git.invalidPath")
         case .notAGitRepository:
-            return "Not a git repository"
+            return String(localized: "error.git.notRepository")
         case .worktreeNotFound:
-            return "Worktree not found"
+            return String(localized: "error.git.worktreeNotFound")
         }
     }
 }
@@ -215,7 +215,7 @@ actor GitService {
         let stderr = String(data: errorData, encoding: .utf8) ?? ""
 
         if process.terminationStatus != 0 {
-            let errorMessage = stderr.isEmpty ? "Unknown error" : stderr
+            let errorMessage = stderr.isEmpty ? String(localized: "error.git.unknownError") : stderr
             throw GitError.commandFailed(message: errorMessage)
         }
 

@@ -108,7 +108,7 @@ struct ChatSessionView: View {
                                                 .modifier(ShimmerEffect())
                                                 .transition(.opacity)
                                         } else {
-                                            Text("Agent is thinking...")
+                                            Text("chat.agent.thinking", bundle: .main)
                                                 .font(.callout)
                                                 .fontWeight(.bold)
                                                 .foregroundStyle(.secondary)
@@ -218,25 +218,25 @@ struct ChatSessionView: View {
                 AuthenticationSheet(session: agentSession)
             }
         }
-        .alert("Switch Agent?", isPresented: $showingAgentSwitchWarning) {
-            Button("Cancel", role: .cancel) {
+        .alert(String(localized: "chat.agent.switch.title"), isPresented: $showingAgentSwitchWarning) {
+            Button(String(localized: "chat.button.cancel"), role: .cancel) {
                 pendingAgentSwitch = nil
             }
-            Button("Switch", role: .destructive) {
+            Button(String(localized: "chat.button.switch"), role: .destructive) {
                 if let newAgent = pendingAgentSwitch {
                     performAgentSwitch(to: newAgent)
                 }
             }
         } message: {
-            Text("Switching agents will clear the current conversation and start a new session. This cannot be undone.")
+            Text("chat.agent.switch.message", bundle: .main)
         }
-        .alert("Permission Required", isPresented: $showingPermissionError) {
-            Button("Open Settings") {
+        .alert(String(localized: "chat.permission.title"), isPresented: $showingPermissionError) {
+            Button(String(localized: "chat.permission.openSettings")) {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
                     NSWorkspace.shared.open(url)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(String(localized: "chat.button.cancel"), role: .cancel) {}
         } message: {
             Text(permissionErrorMessage)
         }
@@ -377,7 +377,7 @@ struct ChatSessionView: View {
                         .transition(.opacity)
                     } else {
                         if inputText.isEmpty {
-                            Text(isSessionReady ? "Ask anything..." : "Starting session...")
+                            Text(isSessionReady ? String(localized: "chat.input.placeholder") : String(localized: "chat.session.starting"))
                                 .font(.system(size: 14))
                                 .foregroundStyle(.tertiary)
                                 .padding(.top, 6)
@@ -435,7 +435,7 @@ struct ChatSessionView: View {
                         }
                         .menuStyle(.borderlessButton)
                         .buttonStyle(.plain)
-                        .help("Select model")
+                        .help(String(localized: "chat.model.select"))
                         .transition(.opacity)
                     }
 
@@ -465,7 +465,7 @@ struct ChatSessionView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(!isSessionReady)
-                    .help("Record voice message")
+                    .help(String(localized: "chat.voice.record"))
                     .transition(.opacity)
 
                     if isProcessing {
@@ -641,7 +641,7 @@ struct ChatSessionView: View {
                 let errorMessage = MessageItem(
                     id: UUID().uuidString,
                     role: .system,
-                    content: "Error: \(error.localizedDescription)",
+                    content: String(localized: "chat.error.prefix \(error.localizedDescription)"),
                     timestamp: Date()
                 )
 
@@ -998,7 +998,7 @@ struct ChatSessionView: View {
             if let toolCall = request.toolCall, let rawInput = toolCall.rawInput?.value as? [String: Any] {
                 if let plan = rawInput["plan"] as? String {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Plan:")
+                        Text("chat.plan.title", bundle: .main)
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
                         PlanContentView(content: plan)
@@ -1008,11 +1008,11 @@ struct ChatSessionView: View {
                             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
                     }
                 } else if let filePath = rawInput["file_path"] as? String {
-                    Text("Write \(URL(fileURLWithPath: filePath).lastPathComponent)?")
+                    Text(String(format: String(localized: "chat.permission.write"), URL(fileURLWithPath: filePath).lastPathComponent))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 } else if let command = rawInput["command"] as? String {
-                    Text("Run `\(command)`?")
+                    Text(String(format: String(localized: "chat.permission.run"), command))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -1058,7 +1058,7 @@ struct ChatSessionView: View {
     private func agentPlanSidebar(plan: Plan) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Agent Plan")
+                Text("chat.plan.sidebar.title", bundle: .main)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.primary)
 
@@ -1147,13 +1147,13 @@ struct ChatSessionView: View {
     private func statusLabel(for status: PlanEntryStatus) -> String {
         switch status {
         case .pending:
-            return "Pending"
+            return String(localized: "chat.status.pending")
         case .inProgress:
-            return "In Progress"
+            return String(localized: "chat.status.inProgress")
         case .completed:
-            return "Completed"
+            return String(localized: "chat.status.completed")
         case .cancelled:
-            return "Cancelled"
+            return String(localized: "chat.status.cancelled")
         }
     }
 
@@ -1230,7 +1230,7 @@ struct AuthenticationSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Authentication Required")
+                Text("chat.authentication.required", bundle: .main)
                     .font(.title2)
                     .fontWeight(.semibold)
 
@@ -1260,11 +1260,11 @@ struct AuthenticationSheet: View {
                                 .font(.system(size: 48))
                                 .foregroundStyle(.secondary)
 
-                            Text("Authentication needed to continue")
+                            Text("chat.authentication.needed", bundle: .main)
                                 .font(.headline)
                                 .foregroundStyle(.primary)
 
-                            Text("Follow the instructions below to authenticate")
+                            Text("chat.authentication.instructions", bundle: .main)
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -1283,14 +1283,14 @@ struct AuthenticationSheet: View {
                     ProgressView()
                         .scaleEffect(0.8)
                         .controlSize(.small)
-                    Text("Authenticating...")
+                    Text("chat.authentication.authenticating", bundle: .main)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                Button("Skip Authentication") {
+                Button(String(localized: "chat.authentication.skip")) {
                     Task {
                         isAuthenticating = true
                         do {
@@ -1310,7 +1310,7 @@ struct AuthenticationSheet: View {
                 .buttonStyle(.borderless)
                 .disabled(isAuthenticating)
 
-                Button("Cancel") {
+                Button(String(localized: "chat.button.cancel")) {
                     dismiss()
                 }
                 .buttonStyle(.borderless)
@@ -1353,11 +1353,11 @@ struct AuthenticationSheet: View {
 
                 if method.id == "claude-login" {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("⚠️ This auth method is not implemented in claude-code-acp.")
+                        Text("chat.authentication.notImplemented", bundle: .main)
                             .font(.caption)
                             .foregroundStyle(.orange)
 
-                        Text("Instead, run this command in your terminal:")
+                        Text("chat.authentication.terminalInstructions", bundle: .main)
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
@@ -1380,7 +1380,7 @@ struct AuthenticationSheet: View {
                             .buttonStyle(.plain)
                         }
 
-                        Text("Then click 'Skip Authentication' below to start chatting.")
+                        Text("chat.authentication.skipInstructions", bundle: .main)
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }
@@ -1427,7 +1427,7 @@ struct ToolDetailsSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Tool Execution Details")
+                Text("chat.tool.details.title", bundle: .main)
                     .font(.title2)
                     .fontWeight(.semibold)
 
@@ -1534,10 +1534,10 @@ struct ToolDetailsSheet: View {
 
     private func statusLabel(for status: ToolStatus) -> String {
         switch status {
-        case .pending: return "Pending"
-        case .inProgress: return "Running"
-        case .completed: return "Done"
-        case .failed: return "Failed"
+        case .pending: return String(localized: "chat.status.pending")
+        case .inProgress: return String(localized: "chat.tool.status.running")
+        case .completed: return String(localized: "chat.tool.status.done")
+        case .failed: return String(localized: "chat.tool.status.failed")
         }
     }
 }
@@ -1563,13 +1563,13 @@ struct CompactContentBlockView: View {
                 .cornerRadius(4)
 
             case .image(let content):
-                Text("Image: \(content.mimeType)")
+                Text(String(localized: "chat.content.imageType \(content.mimeType)"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
             case .resource(let content):
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Resource: \(content.resource.uri)")
+                    Text(String(localized: "chat.content.resourceUri \(content.resource.uri)"))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -1589,12 +1589,12 @@ struct CompactContentBlockView: View {
                 }
 
             case .audio(let content):
-                Text("Audio: \(content.mimeType)")
+                Text(String(localized: "chat.content.audioType \(content.mimeType)"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
             case .embeddedResource(let content):
-                Text("Resource: \(content.uri)")
+                Text(String(localized: "chat.content.resourceUri \(content.uri)"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -1603,7 +1603,7 @@ struct CompactContentBlockView: View {
                 ScrollView([.horizontal, .vertical]) {
                     VStack(alignment: .leading, spacing: 0) {
                         if let path = content.path {
-                            Text("File: \(path)")
+                            Text(String(localized: "chat.content.file \(path)"))
                                 .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                                 .padding(.bottom, 4)

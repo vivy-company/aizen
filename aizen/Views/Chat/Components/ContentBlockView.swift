@@ -136,22 +136,22 @@ struct AttachmentChipView: View {
             if let url = URL(string: content.resource.uri) {
                 return url.lastPathComponent
             }
-            return "File"
+            return String(localized: "chat.attachment.file")
         case .image:
-            return "Image"
+            return String(localized: "chat.content.image")
         case .audio:
-            return "Audio"
+            return String(localized: "chat.content.audio")
         case .embeddedResource(let content):
             if let url = URL(string: content.uri) {
                 return url.lastPathComponent
             }
-            return "Resource"
+            return String(localized: "chat.content.resource")
         case .diff(let content):
-            return content.path ?? "Diff"
+            return content.path ?? String(localized: "chat.content.diff")
         case .terminalEmbed:
-            return "Terminal Output"
+            return String(localized: "chat.attachment.terminalOutput")
         default:
-            return "Attachment"
+            return String(localized: "chat.attachment.generic")
         }
     }
 }
@@ -196,22 +196,22 @@ struct AttachmentDetailView: View {
             if let url = URL(string: content.resource.uri) {
                 return url.lastPathComponent
             }
-            return "File"
+            return String(localized: "chat.attachment.file")
         case .image:
-            return "Image"
+            return String(localized: "chat.content.image")
         case .audio:
-            return "Audio"
+            return String(localized: "chat.content.audio")
         case .embeddedResource(let content):
             if let url = URL(string: content.uri) {
                 return url.lastPathComponent
             }
-            return "Resource"
+            return String(localized: "chat.content.resource")
         case .diff(let content):
-            return content.path ?? "Diff"
+            return content.path ?? String(localized: "chat.content.diff")
         case .terminalEmbed:
-            return "Terminal Output"
+            return String(localized: "chat.attachment.terminalOutput")
         default:
-            return "Attachment"
+            return String(localized: "chat.attachment.generic")
         }
     }
 }

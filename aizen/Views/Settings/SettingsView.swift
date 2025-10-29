@@ -23,7 +23,7 @@ struct SettingsView: View {
         TabView {
             GeneralSettingsView(defaultEditor: $defaultEditor)
                 .tabItem {
-                    Label("General", systemImage: "gear")
+                    Label("settings.general.title", systemImage: "gear")
                 }
                 .tag("general")
 
@@ -32,7 +32,7 @@ struct SettingsView: View {
                 fontSize: $terminalFontSize
             )
             .tabItem {
-                Label("Terminal", systemImage: "terminal")
+                Label("settings.terminal.title", systemImage: "terminal")
             }
             .tag("terminal")
 
@@ -45,13 +45,13 @@ struct SettingsView: View {
                 testResult: $testResult
             )
             .tabItem {
-                Label("Agents", systemImage: "brain")
+                Label("settings.agents.title", systemImage: "brain")
             }
             .tag("agents")
 
             AdvancedSettingsView()
                 .tabItem {
-                    Label("Advanced", systemImage: "gearshape.2")
+                    Label("settings.advanced.title", systemImage: "gearshape.2")
                 }
                 .tag("advanced")
         }

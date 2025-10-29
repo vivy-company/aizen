@@ -20,10 +20,10 @@ struct OnboardingView: View {
                     .frame(width: 80, height: 80)
                     .cornerRadius(16)
 
-                Text("Welcome to Aizen")
+                Text("onboarding.welcome", bundle: .main)
                     .font(.system(size: 32, weight: .bold))
 
-                Text("Your developer tool for Git worktrees with integrated terminal and AI agents")
+                Text("onboarding.subtitle", bundle: .main)
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -38,29 +38,29 @@ struct OnboardingView: View {
                 FeatureRow(
                     icon: "arrow.triangle.branch",
                     iconColor: .blue,
-                    title: "Git Worktree Management",
-                    description: "Manage multiple worktrees per repository. Switch between branches without losing work or stashing changes."
+                    title: String(localized: "onboarding.feature.worktree.title"),
+                    description: String(localized: "onboarding.feature.worktree.description")
                 )
 
                 FeatureRow(
                     icon: "terminal",
                     iconColor: .green,
-                    title: "Integrated Terminal",
-                    description: "Built-in terminal with split pane support. Execute commands directly within your worktree context."
+                    title: String(localized: "onboarding.feature.terminal.title"),
+                    description: String(localized: "onboarding.feature.terminal.description")
                 )
 
                 FeatureRow(
                     icon: "brain",
                     iconColor: .purple,
-                    title: "Agents",
-                    description: "Connect with Claude, Codex, or Gemini through the Agent Client Protocol for intelligent assistance."
+                    title: String(localized: "onboarding.feature.agents.title"),
+                    description: String(localized: "onboarding.feature.agents.description")
                 )
 
                 FeatureRow(
                     icon: "play.circle",
                     iconColor: .orange,
-                    title: "Quick Setup",
-                    description: "Add your first repository from the sidebar, configure agents in Settings, and start managing worktrees."
+                    title: String(localized: "onboarding.feature.setup.title"),
+                    description: String(localized: "onboarding.feature.setup.description")
                 )
             }
             .padding(.horizontal, 48)
@@ -72,7 +72,7 @@ struct OnboardingView: View {
             Button {
                 dismiss()
             } label: {
-                Text("Get Started")
+                Text("onboarding.getStarted", bundle: .main)
                     .font(.system(size: 16, weight: .semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
