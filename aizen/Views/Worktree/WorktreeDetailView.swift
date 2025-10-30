@@ -154,6 +154,14 @@ struct WorktreeDetailView: View {
                 if hasActiveSessions {
                     sessionToolbarItems
                 }
+                
+                if #available(macOS 26.0, *) {
+                    ToolbarSpacer()
+                } else {
+                    ToolbarItem(placement: .automatic) {
+                        Spacer().fixedSize()
+                    }
+                }
 
                 appAndGitToolbarItems
             }
