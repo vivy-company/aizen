@@ -71,7 +71,9 @@ jobs:
         run: |
           # Always ad-hoc sign to ensure proper signature structure
           # This will be replaced by proper signing if certificate is available
-          codesign --force --deep --sign - build/dmg/aizen.app
+          codesign --force --deep --sign - \
+            --entitlements aizen/aizen.entitlements \
+            build/dmg/aizen.app
 
       # Conditional code signing
       - name: Import signing certificate
