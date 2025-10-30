@@ -166,10 +166,10 @@ jobs:
           echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" > sparkle_priv.pem
 
           # Find sign_update binary (version-independent)
-          SIGN_UPDATE=$(find /opt/homebrew/Caskroom/sparkle -name sign_update -type f | grep -v old_dsa | head -1)
+          SIGN_UPDATE=$(find /opt/homebrew/Caskroom/sparkle -name sign_update -type f | grep -v old_dsa | grep -v dSYM | head -1)
 
-          # Sign the DMG
-          SIGNATURE=$($SIGN_UPDATE "build/Aizen-${{ github.event.inputs.version }}.dmg" sparkle_priv.pem)
+          # Sign the DMG (using -f flag to avoid keychain prompt, -p for signature-only output)
+          SIGNATURE=$("$SIGN_UPDATE" -f sparkle_priv.pem -p "build/Aizen-${{ github.event.inputs.version }}.dmg")
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
 
           # Clean up private key
