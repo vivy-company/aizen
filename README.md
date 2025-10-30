@@ -27,6 +27,20 @@ Manage multiple Git branches simultaneously with dedicated terminals and agents 
 
 ## Installation
 
+### Download Release
+
+Download the latest release from [aizen.win](https://aizen.win).
+
+**⚠️ Important**: The app is currently **not notarized or signed** with an Apple Developer certificate. To open it:
+
+1. Download and extract the DMG
+2. Right-click on `aizen.app` → **Open** (or use System Settings → Privacy & Security)
+3. Click **Open** when prompted
+
+The app will be properly signed and notarized once we obtain Apple Developer Program membership.
+
+### Build from Source
+
 1. Clone the repository with Git LFS support:
    ```bash
    git lfs install
