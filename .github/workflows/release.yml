@@ -20,6 +20,8 @@ env:
 jobs:
   build-and-release:
     runs-on: macos-26
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -209,8 +211,7 @@ jobs:
           aws s3 cp "build/Aizen-${{ github.event.inputs.version }}.dmg" \
             "s3://${{ secrets.R2_BUCKET_NAME }}/Aizen-${{ github.event.inputs.version }}.dmg" \
             --endpoint-url "${{ secrets.R2_ENDPOINT }}" \
-            --region auto \
-            --acl public-read
+            --region auto
 
           echo "✅ DMG uploaded to R2"
 
@@ -226,7 +227,6 @@ jobs:
           aws s3 cp appcast.xml "s3://${{ secrets.R2_BUCKET_NAME }}/appcast.xml" \
             --endpoint-url "${{ secrets.R2_ENDPOINT }}" \
             --region auto \
-            --acl public-read \
             --content-type "application/xml"
 
           echo "✅ Appcast updated on R2"
