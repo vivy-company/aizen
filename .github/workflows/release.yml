@@ -60,19 +60,24 @@ jobs:
             -arch arm64 \
             ONLY_ACTIVE_ARCH=NO \
             CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_REQUIRED=NO
 
       - name: Export app bundle
         run: |
           mkdir -p build/dmg
           cp -R build/aizen.xcarchive/Products/Applications/aizen.app build/dmg/
 
+      - name: Ad-hoc sign app (fallback)
+        run: |
+          # Always ad-hoc sign to ensure proper signature structure
+          # This will be replaced by proper signing if certificate is available
+          codesign --force --deep --sign - build/dmg/aizen.app
+
       # Conditional code signing
       - name: Import signing certificate
-        if: ${{ env.APPLE_CERTIFICATE != '' }}
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        if: ${{ env.APPLE_CERTIFICATE != '' }}
         run: |
           echo "Code signing certificate found, importing..."
 
@@ -96,9 +101,9 @@ jobs:
           rm certificate.p12
 
       - name: Sign app bundle
-        if: ${{ env.APPLE_CERTIFICATE != '' }}
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        if: ${{ env.APPLE_CERTIFICATE != '' }}
         run: |
           echo "Signing app bundle..."
           codesign --force --deep --sign "Developer ID Application" \
@@ -126,9 +131,9 @@ jobs:
           fi
 
       - name: Sign DMG
-        if: ${{ env.APPLE_CERTIFICATE != '' }}
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        if: ${{ env.APPLE_CERTIFICATE != '' }}
         run: |
           echo "Signing DMG..."
           codesign --force --sign "Developer ID Application" \
@@ -136,11 +141,11 @@ jobs:
 
       # Conditional notarization
       - name: Notarize DMG
-        if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_ID != '' && env.APPLE_APP_PASSWORD != '' }}
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_ID != '' && env.APPLE_APP_PASSWORD != '' }}
         run: |
           echo "Notarizing DMG..."
           xcrun notarytool submit \
@@ -153,11 +158,11 @@ jobs:
           echo "Notarization submitted, waiting for response..."
 
       - name: Staple notarization
-        if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_ID != '' && env.APPLE_APP_PASSWORD != '' }}
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_ID != '' && env.APPLE_APP_PASSWORD != '' }}
         run: |
           echo "Stapling notarization to DMG..."
           xcrun stapler staple "build/Aizen-${{ github.event.inputs.version }}.dmg"
