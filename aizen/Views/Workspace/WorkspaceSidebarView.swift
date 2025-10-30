@@ -39,8 +39,9 @@ struct WorkspaceSidebarView: View {
         guard let workspace = selectedWorkspace else { return [] }
         let repos = (workspace.repositories as? Set<Repository>) ?? []
 
-        // Filter out deleted/faulted Core Data objects
-        let validRepos = repos.filter { !$0.isFault && !$0.isDeleted }
+        // Filter out deleted Core Data objects
+        let validRepos = repos.filter { !$0.isDeleted }
+    
 
         if searchText.isEmpty {
             return validRepos.sorted { ($0.name ?? "") < ($1.name ?? "") }
