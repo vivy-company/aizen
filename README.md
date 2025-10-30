@@ -27,8 +27,6 @@ Manage multiple Git branches simultaneously with dedicated terminals and agents 
 
 ## Installation
 
-### Download Release
-
 Download the latest release from [aizen.win](https://aizen.win).
 
 **⚠️ Important**: The app is currently **not notarized or signed** with an Apple Developer certificate. To open it:
