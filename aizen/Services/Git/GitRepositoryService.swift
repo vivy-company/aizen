@@ -41,7 +41,7 @@ class GitRepositoryService: ObservableObject {
     // MARK: - Public API - Staging Operations
 
     func stageFile(_ file: String, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.stagingService.stageFile(at: self.worktreePath, file: file) },
@@ -51,7 +51,7 @@ class GitRepositoryService: ObservableObject {
     }
 
     func unstageFile(_ file: String, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.stagingService.unstageFile(at: self.worktreePath, file: file) },
@@ -61,7 +61,7 @@ class GitRepositoryService: ObservableObject {
     }
 
     func stageAll(onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.stagingService.stageAll(at: self.worktreePath) },
@@ -72,7 +72,7 @@ class GitRepositoryService: ObservableObject {
     }
 
     func unstageAll(onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.stagingService.unstageAll(at: self.worktreePath) },
@@ -82,7 +82,7 @@ class GitRepositoryService: ObservableObject {
     }
 
     func commit(message: String, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.stagingService.commit(at: self.worktreePath, message: message) },
@@ -93,7 +93,7 @@ class GitRepositoryService: ObservableObject {
     }
 
     func amendCommit(message: String, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.stagingService.amendCommit(at: self.worktreePath, message: message) },
@@ -104,7 +104,7 @@ class GitRepositoryService: ObservableObject {
     }
 
     func commitWithSignoff(message: String, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.stagingService.commitWithSignoff(at: self.worktreePath, message: message) },
@@ -117,7 +117,7 @@ class GitRepositoryService: ObservableObject {
     // MARK: - Branch Operations
 
     func checkoutBranch(_ branch: String, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.branchService.checkoutBranch(at: self.worktreePath, branch: branch) },
@@ -127,7 +127,7 @@ class GitRepositoryService: ObservableObject {
     }
 
     func createBranch(_ name: String, from: String? = nil, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.branchService.createBranch(at: self.worktreePath, name: name, from: from) },
@@ -139,7 +139,7 @@ class GitRepositoryService: ObservableObject {
     // MARK: - Remote Operations
 
     func fetch(onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.remoteService.fetch(at: self.worktreePath) },
@@ -154,7 +154,7 @@ class GitRepositoryService: ObservableObject {
     }
 
     func pull(onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.remoteService.pull(at: self.worktreePath) },
@@ -169,7 +169,7 @@ class GitRepositoryService: ObservableObject {
     }
 
     func push(setUpstream: Bool = false, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.executeOperationBackground(
                 { try await self.remoteService.push(at: self.worktreePath, setUpstream: setUpstream) },
@@ -186,7 +186,7 @@ class GitRepositoryService: ObservableObject {
     // MARK: - Status Loading
 
     func reloadStatus() {
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
             await self.reloadStatusInternal()
         }
@@ -201,7 +201,7 @@ class GitRepositoryService: ObservableObject {
         }
 
         do {
-            // Execute operation (already on background via Task.detached)
+            // Execute operation (already on background via Task)
             try await operation()
 
             // Success callback on MainActor

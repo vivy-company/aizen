@@ -22,10 +22,6 @@ class RepositoryManager: ObservableObject {
     private let remoteService: GitRemoteService
     private let fileSystemManager: RepositoryFileSystemManager
 
-    nonisolated var objectWillChange: ObservableObjectPublisher {
-        ObservableObjectPublisher()
-    }
-
     init(viewContext: NSManagedObjectContext) {
         self.viewContext = viewContext
 

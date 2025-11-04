@@ -11,6 +11,7 @@ struct AgentsSettingsView: View {
     @Binding var defaultACPAgent: String
 
     @State private var agents: [AgentMetadata] = []
+    @State private var enabledAgents: [AgentMetadata] = []
     @State private var showingAddCustomAgent = false
 
     var body: some View {
@@ -24,7 +25,7 @@ struct AgentsSettingsView: View {
                     Spacer()
 
                     Picker("", selection: $defaultACPAgent) {
-                        ForEach(AgentRegistry.shared.enabledAgents, id: \.id) { agent in
+                        ForEach(enabledAgents, id: \.id) { agent in
                             HStack {
                                 AgentIconView(metadata: agent, size: 16)
                                 Text(agent.name)
@@ -93,6 +94,9 @@ struct AgentsSettingsView: View {
     }
 
     private func loadAgents() {
-        agents = AgentRegistry.shared.allAgents
+        Task {
+            agents = await AgentRegistry.shared.getAllAgents()
+            enabledAgents = await AgentRegistry.shared.getEnabledAgents()
+        }
     }
 }

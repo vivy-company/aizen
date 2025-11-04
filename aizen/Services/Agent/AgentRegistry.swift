@@ -14,7 +14,7 @@ extension Notification.Name {
 }
 
 /// Manages discovery and configuration of available ACP agents
-class AgentRegistry {
+actor AgentRegistry {
     static let shared = AgentRegistry()
 
     private let defaults: UserDefaults
@@ -27,7 +27,7 @@ class AgentRegistry {
     /// Agent metadata storage with in-memory cache
     private var metadataCache: [String: AgentMetadata]?
 
-    var agentMetadata: [String: AgentMetadata] {
+    internal var agentMetadata: [String: AgentMetadata] {
         get {
             if let cache = metadataCache {
                 return cache
@@ -53,7 +53,9 @@ class AgentRegistry {
                 let encoder = JSONEncoder()
                 let data = try encoder.encode(newValue)
                 defaults.set(data, forKey: metadataStoreKey)
-                NotificationCenter.default.post(name: .agentMetadataDidChange, object: nil)
+                Task { @MainActor in
+                    NotificationCenter.default.post(name: .agentMetadataDidChange, object: nil)
+                }
             } catch {
                 logger.error("Failed to encode agent metadata: \(error.localizedDescription)")
             }
@@ -68,13 +70,13 @@ class AgentRegistry {
     // MARK: - Metadata Management
 
     /// Get all agents (enabled and disabled)
-    var allAgents: [AgentMetadata] {
+    func getAllAgents() -> [AgentMetadata] {
         Array(agentMetadata.values).sorted { $0.name < $1.name }
     }
 
     /// Get only enabled agents
-    var enabledAgents: [AgentMetadata] {
-        allAgents.filter { $0.isEnabled }
+    func getEnabledAgents() -> [AgentMetadata] {
+        getAllAgents().filter { $0.isEnabled }
     }
 
     /// Get metadata for specific agent
@@ -169,7 +171,7 @@ class AgentRegistry {
     }
 
     /// Get list of all available agent names
-    var availableAgents: [String] {
+    func getAvailableAgents() -> [String] {
         return agentMetadata.keys.sorted()
     }
 

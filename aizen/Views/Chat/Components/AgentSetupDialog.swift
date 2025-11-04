@@ -201,20 +201,16 @@ struct AgentSetupDialog: View {
 
         Task {
             // Discover only the missing agent
-            let discoveredPath = await Task.detached {
-                AgentRegistry.shared.discoverAgent(named: agentName)
-            }.value
+            let discoveredPath = await AgentRegistry.shared.discoverAgent(named: agentName)
 
-            await MainActor.run {
-                isAutoDiscovering = false
+            isAutoDiscovering = false
 
-                if let path = discoveredPath {
-                    // Set the discovered path
-                    AgentRegistry.shared.setAgentPath(path, for: agentName)
-                    retrySession()
-                } else {
-                    errorMessage = String(localized: "agentSetup.error.notFound.\(agentName)")
-                }
+            if let path = discoveredPath {
+                // Set the discovered path
+                await AgentRegistry.shared.setAgentPath(path, for: agentName)
+                retrySession()
+            } else {
+                errorMessage = String(localized: "agentSetup.error.notFound.\(agentName)")
             }
         }
     }

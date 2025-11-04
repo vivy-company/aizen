@@ -45,7 +45,7 @@ class RepositoryFileSystemManager {
         let editor = UserDefaults.standard.string(forKey: "defaultEditor") ?? "code"
 
         let task = Process()
-        task.launchPath = "/usr/bin/env"
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         task.arguments = [editor, path]
 
         do {

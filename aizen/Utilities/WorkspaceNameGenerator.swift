@@ -39,9 +39,7 @@ struct WorkspaceNameGenerator {
         "Kani", "Chikuwa", "Kuri", "Momo", "Anko"
     ]
 
-    private static var allNames: [String] {
-        japaneseCities + chineseCities + animeNames + fictionalPlaces + chiikawaCharacters
-    }
+    private static let allNames: [String] = japaneseCities + chineseCities + animeNames + fictionalPlaces + chiikawaCharacters
 
     static func generateUniqueName(excluding existingNames: [String]) -> String {
         // Filter out already used names

@@ -67,7 +67,7 @@ extension AgentRegistry {
     /// Validate all configured agents and return status
     func validateAllAgents() -> [String: Bool] {
         var status: [String: Bool] = [:]
-        for agentName in availableAgents {
+        for agentName in agentMetadata.keys {
             status[agentName] = validateAgent(named: agentName)
         }
         return status

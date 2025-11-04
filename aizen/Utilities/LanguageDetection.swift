@@ -65,8 +65,7 @@ struct LanguageDetection {
     }
 
     /// Map MIME types to highlight.js language identifiers
-    private static func languageFromMimeType(_ mimeType: String) -> String? {
-        let mapping: [String: String] = [
+    private static let mimeTypeMapping: [String: String] = [
             // Swift
             "text/x-swift": "swift",
             "application/x-swift": "swift",
@@ -130,12 +129,12 @@ struct LanguageDetection {
             "application/x-yaml": "yaml",
         ]
 
-        return mapping[mimeType]
+    private static func languageFromMimeType(_ mimeType: String) -> String? {
+        return mimeTypeMapping[mimeType]
     }
 
     /// Map file extensions to highlight.js language identifiers
-    private static func languageFromExtension(_ ext: String) -> String? {
-        let mapping: [String: String] = [
+    private static let extensionMapping: [String: String] = [
             // Swift
             "swift": "swift",
 
@@ -251,7 +250,8 @@ struct LanguageDetection {
             "gql": "graphql",
         ]
 
-        return mapping[ext]
+    private static func languageFromExtension(_ ext: String) -> String? {
+        return extensionMapping[ext]
     }
 
     /// Check if a file is likely to contain code based on MIME type or extension

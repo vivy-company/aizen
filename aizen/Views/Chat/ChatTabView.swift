@@ -114,7 +114,9 @@ struct ChatTabView: View {
     }
 
     private func loadEnabledAgents() {
-        enabledAgents = AgentRegistry.shared.enabledAgents
+        Task {
+            enabledAgents = await AgentRegistry.shared.getEnabledAgents()
+        }
     }
 
     private func createNewSession(withAgent agent: String) {
@@ -122,19 +124,22 @@ struct ChatTabView: View {
 
         let session = ChatSession(context: context)
         session.id = UUID()
-
-        // Use agent display name instead of ID
-        let displayName = AgentRegistry.shared.getMetadata(for: agent)?.name ?? agent.capitalized
-        session.title = displayName
         session.agentName = agent
         session.createdAt = Date()
         session.worktree = worktree
 
-        do {
-            try context.save()
-            selectedSessionId = session.id
-        } catch {
-            logger.error("Failed to create chat session: \(error.localizedDescription)")
+        Task {
+            // Use agent display name instead of ID
+            let displayName = await AgentRegistry.shared.getMetadata(for: agent)?.name ?? agent.capitalized
+            await MainActor.run {
+                session.title = displayName
+                do {
+                    try context.save()
+                    selectedSessionId = session.id
+                } catch {
+                    logger.error("Failed to create chat session: \(error.localizedDescription)")
+                }
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import Combine
 
+@MainActor
 class AgentRouter: ObservableObject {
     @Published var activeSessions: [String: AgentSession] = [:]
 
@@ -19,29 +20,38 @@ class AgentRouter: ObservableObject {
         }
     }
 
-    @MainActor
     init() {
-        // Initialize sessions for enabled agents
-        rebuildLookupCache()
-        for agent in AgentRegistry.shared.enabledAgents {
-            activeSessions[agent.id] = AgentSession(agentName: agent.id)
-        }
-
         // Listen for agent metadata changes
         NotificationCenter.default.addObserver(
             forName: .agentMetadataDidChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.rebuildLookupCache()
+            Task { @MainActor in
+                await self?.rebuildLookupCache()
+            }
+        }
+
+        // Initialize async
+        Task {
+            await self.rebuildLookupCache()
+            await self.initializeSessions()
         }
     }
 
-    private func rebuildLookupCache() {
+    private func rebuildLookupCache() async {
         enabledAgentLookup.removeAll()
-        for agent in AgentRegistry.shared.enabledAgents {
+        let enabledAgents = await AgentRegistry.shared.getEnabledAgents()
+        for agent in enabledAgents {
             enabledAgentLookup[agent.id.lowercased()] = agent
             enabledAgentLookup[agent.name.lowercased()] = agent
+        }
+    }
+
+    private func initializeSessions() async {
+        let enabledAgents = await AgentRegistry.shared.getEnabledAgents()
+        for agent in enabledAgents {
+            activeSessions[agent.id] = AgentSession(agentName: agent.id)
         }
     }
 
@@ -67,7 +77,9 @@ class AgentRouter: ObservableObject {
                         withTemplate: ""
                     ).trimmingCharacters(in: .whitespaces)
 
-                    ensureSession(for: matchingAgent.id)
+                    Task {
+                        await ensureSession(for: matchingAgent.id)
+                    }
                     return (matchingAgent.id, cleanedMessage)
                 }
             }
@@ -80,11 +92,10 @@ class AgentRouter: ObservableObject {
         return activeSessions[agentName]
     }
 
-    @MainActor
-    func ensureSession(for agentName: String) {
+    func ensureSession(for agentName: String) async {
         if activeSessions[agentName] == nil {
             // Only create session if agent is enabled
-            if let metadata = AgentRegistry.shared.getMetadata(for: agentName),
+            if let metadata = await AgentRegistry.shared.getMetadata(for: agentName),
                metadata.isEnabled {
                 activeSessions[agentName] = AgentSession(agentName: agentName)
             }

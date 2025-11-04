@@ -11,9 +11,12 @@ struct AgentSelectorMenu: View {
     let selectedAgent: String
     let onAgentSelect: (String) -> Void
 
+    @State private var enabledAgents: [AgentMetadata] = []
+    @State private var selectedAgentMetadata: AgentMetadata?
+
     var body: some View {
         Menu {
-            ForEach(AgentRegistry.shared.enabledAgents, id: \.id) { agentMetadata in
+            ForEach(enabledAgents, id: \.id) { agentMetadata in
                 Button {
                     onAgentSelect(agentMetadata.id)
                 } label: {
@@ -31,7 +34,7 @@ struct AgentSelectorMenu: View {
         } label: {
             HStack(spacing: 6) {
                 AgentIconView(agent: selectedAgent, size: 12)
-                Text(AgentRegistry.shared.getMetadata(for: selectedAgent)?.name ?? selectedAgent.capitalized)
+                Text(selectedAgentMetadata?.name ?? selectedAgent.capitalized)
                     .font(.system(size: 11, weight: .medium))
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8))
@@ -42,5 +45,22 @@ struct AgentSelectorMenu: View {
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
+        .task {
+            await loadAgents()
+        }
+        .onChange(of: selectedAgent) { _ in
+            Task {
+                await loadSelectedAgentMetadata()
+            }
+        }
+    }
+
+    private func loadAgents() async {
+        enabledAgents = await AgentRegistry.shared.getEnabledAgents()
+        await loadSelectedAgentMetadata()
+    }
+
+    private func loadSelectedAgentMetadata() async {
+        selectedAgentMetadata = await AgentRegistry.shared.getMetadata(for: selectedAgent)
     }
 }

@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 class ChatSessionManager {
     static let shared = ChatSessionManager()
 

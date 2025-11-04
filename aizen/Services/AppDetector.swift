@@ -28,12 +28,13 @@ enum AppCategory: String {
     case finder = "System"
 }
 
+@MainActor
 class AppDetector: ObservableObject {
     static let shared = AppDetector()
 
     @Published var detectedApps: [DetectedApp] = []
 
-    private let knownApps: [(name: String, bundleId: String, category: AppCategory)] = [
+    private static let knownApps: [(name: String, bundleId: String, category: AppCategory)] = [
         // Terminals
         ("Terminal", "com.apple.Terminal", .terminal),
         ("iTerm", "com.googlecode.iterm2", .terminal),
@@ -72,7 +73,7 @@ class AppDetector: ObservableObject {
     func detectApps() {
         var apps: [DetectedApp] = []
 
-        for (name, bundleId, category) in knownApps {
+        for (name, bundleId, category) in Self.knownApps {
             if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
                 let icon = NSWorkspace.shared.icon(forFile: appURL.path)
                 apps.append(DetectedApp(
@@ -85,9 +86,7 @@ class AppDetector: ObservableObject {
             }
         }
 
-        DispatchQueue.main.async {
-            self.detectedApps = apps
-        }
+        detectedApps = apps
     }
 
     func getApps(for category: AppCategory) -> [DetectedApp] {

@@ -302,21 +302,21 @@ struct ChatSessionView: View {
             return
         }
 
-        agentRouter.ensureSession(for: selectedAgent)
-        if let newSession = agentRouter.getSession(for: selectedAgent) {
-            sessionManager.setAgentSession(newSession, for: sessionId)
-            currentAgentSession = newSession
+        Task {
+            await agentRouter.ensureSession(for: selectedAgent)
+            if let newSession = agentRouter.getSession(for: selectedAgent) {
+                sessionManager.setAgentSession(newSession, for: sessionId)
+                currentAgentSession = newSession
 
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                messages = newSession.messages
-                toolCalls = newSession.toolCalls
-                rebuildTimeline()
-            }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    messages = newSession.messages
+                    toolCalls = newSession.toolCalls
+                    rebuildTimeline()
+                }
 
-            setupSessionObservers(session: newSession)
+                setupSessionObservers(session: newSession)
 
-            if !newSession.isActive {
-                Task {
+                if !newSession.isActive {
                     try? await newSession.start(agentName: selectedAgent, workingDir: worktree.path!)
                 }
             }
@@ -371,7 +371,7 @@ struct ChatSessionView: View {
             rebuildTimeline()
         }
 
-        Task.detached { @MainActor in
+        Task {
             do {
                 guard let agentSession = self.currentAgentSession else {
                     throw NSError(domain: "ChatSessionView", code: -1, userInfo: [NSLocalizedDescriptionKey: "No agent session"])

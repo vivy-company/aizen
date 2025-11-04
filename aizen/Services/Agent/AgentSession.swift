@@ -43,6 +43,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     private var acpClient: ACPClient?
     private var cancellables = Set<AnyCancellable>()
     private var process: Process?
+    private var notificationTask: Task<Void, Never>?
 
     // Delegates
     private let fileSystemDelegate = AgentFileSystemDelegate()
@@ -68,8 +69,8 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         self.workingDirectory = workingDir
 
         // Get agent executable path from registry
-        guard let agentPath = AgentRegistry.shared.getAgentPath(for: agentName),
-              AgentRegistry.shared.validateAgent(named: agentName) else {
+        guard let agentPath = await AgentRegistry.shared.getAgentPath(for: agentName),
+              await AgentRegistry.shared.validateAgent(named: agentName) else {
             // Agent not configured or invalid - trigger setup dialog
             needsAgentSetup = true
             missingAgentName = agentName
@@ -85,7 +86,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         await client.setDelegate(self)
 
         // Get launch arguments for this agent
-        let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
+        let launchArgs = await AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
 
         // Launch the agent process
         try await client.launch(agentPath: agentPath, arguments: launchArgs)
@@ -105,7 +106,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         if let authMethods = initResponse.authMethods, !authMethods.isEmpty {
             self.authMethods = authMethods
 
-            if let savedAuthMethod = AgentRegistry.shared.getAuthPreference(for: agentName) {
+            if let savedAuthMethod = await AgentRegistry.shared.getAuthPreference(for: agentName) {
                 if savedAuthMethod == "skip" {
                     try await createSessionDirectly(workingDir: workingDir, client: client)
                     return
@@ -146,7 +147,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
 
         startNotificationListener(client: client)
 
-        let displayName = AgentRegistry.shared.getMetadata(for: agentName)?.name ?? agentName
+        let displayName = await AgentRegistry.shared.getMetadata(for: agentName)?.name ?? agentName
         addSystemMessage("Session started with \(displayName) in \(workingDir)")
     }
 
@@ -171,7 +172,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         }
 
         startNotificationListener(client: client)
-        let displayName = AgentRegistry.shared.getMetadata(for: agentName)?.name ?? agentName
+        let displayName = await AgentRegistry.shared.getMetadata(for: agentName)?.name ?? agentName
         addSystemMessage("Session started with \(displayName) in \(workingDir)")
     }
 
@@ -198,7 +199,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             throw AgentSessionError.clientNotInitialized
         }
 
-        AgentRegistry.shared.saveSkipAuth(for: agentName)
+        await AgentRegistry.shared.saveSkipAuth(for: agentName)
 
         needsAuthentication = false
         try await createSessionDirectly(workingDir: workingDirectory, client: client)
@@ -210,7 +211,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             throw AgentSessionError.clientNotInitialized
         }
 
-        AgentRegistry.shared.saveAuthPreference(agentName: agentName, authMethodId: authMethodId)
+        await AgentRegistry.shared.saveAuthPreference(agentName: agentName, authMethodId: authMethodId)
 
         try await performAuthentication(client: client, authMethodId: authMethodId, workingDir: workingDirectory)
     }
@@ -364,6 +365,10 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     func close() async {
         isActive = false
 
+        // Cancel notification listener
+        notificationTask?.cancel()
+        notificationTask = nil
+
         if let client = acpClient {
             await client.terminate()
         }
@@ -381,7 +386,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     // MARK: - Notification Handling
 
     private func startNotificationListener(client: ACPClient) {
-        Task { @MainActor in
+        notificationTask = Task { @MainActor in
             for await notification in await client.notifications {
                 handleNotification(notification)
             }
