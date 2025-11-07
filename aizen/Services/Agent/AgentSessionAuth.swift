@@ -32,7 +32,8 @@ extension AgentSession {
         }
 
         startNotificationListener(client: client)
-        let displayName = await AgentRegistry.shared.getMetadata(for: agentName)?.name ?? agentName
+        let metadata = AgentRegistry.shared.getMetadata(for: agentName)
+        let displayName = metadata?.name ?? agentName
         addSystemMessage("Session started with \(displayName) in \(workingDir)")
     }
 
@@ -59,7 +60,7 @@ extension AgentSession {
             throw AgentSessionError.clientNotInitialized
         }
 
-        await AgentRegistry.shared.saveSkipAuth(for: agentName)
+        AgentRegistry.shared.saveSkipAuth(for: agentName)
 
         needsAuthentication = false
         try await createSessionDirectly(workingDir: workingDirectory, client: client)
@@ -71,7 +72,7 @@ extension AgentSession {
             throw AgentSessionError.clientNotInitialized
         }
 
-        await AgentRegistry.shared.saveAuthPreference(agentName: agentName, authMethodId: authMethodId)
+        AgentRegistry.shared.saveAuthPreference(agentName: agentName, authMethodId: authMethodId)
 
         try await performAuthentication(client: client, authMethodId: authMethodId, workingDir: workingDirectory)
     }

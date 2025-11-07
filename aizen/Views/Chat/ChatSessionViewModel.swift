@@ -228,28 +228,26 @@ class ChatSessionViewModel: ObservableObject {
 
     func performAgentSwitch(to newAgent: String) {
         session.agentName = newAgent
-        Task {
-            let displayName = await AgentRegistry.shared.getMetadata(for: newAgent)?.name ?? newAgent.capitalized
-            session.title = displayName
+        let displayName = AgentRegistry.shared.getMetadata(for: newAgent)?.name ?? newAgent.capitalized
+        session.title = displayName
 
-            session.objectWillChange.send()
-            worktree.objectWillChange.send()
+        session.objectWillChange.send()
+        worktree.objectWillChange.send()
 
-            do {
-                try viewContext.save()
-            } catch {
-                logger.error("Failed to save agent switch: \(error.localizedDescription)")
-            }
-
-            if let sessionId = session.id {
-                sessionManager.removeAgentSession(for: sessionId)
-            }
-            currentAgentSession = nil
-            messages = []
-
-            setupAgentSession()
-            pendingAgentSwitch = nil
+        do {
+            try viewContext.save()
+        } catch {
+            logger.error("Failed to save agent switch: \(error.localizedDescription)")
         }
+
+        if let sessionId = session.id {
+            sessionManager.removeAgentSession(for: sessionId)
+        }
+        currentAgentSession = nil
+        messages = []
+
+        setupAgentSession()
+        pendingAgentSwitch = nil
     }
 
     // MARK: - Command Autocomplete
@@ -377,6 +375,30 @@ class ChatSessionViewModel: ObservableObject {
                         self.isProcessing = false
                     }
                 }
+            }
+            .store(in: &cancellables)
+
+        session.$needsAuthentication
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                // Trigger view update - the View will check this property
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        session.$needsAgentSetup
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                // Trigger view update - the View will check this property
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        session.$agentPlan
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                // Trigger view update - the View will check this property
+                self?.objectWillChange.send()
             }
             .store(in: &cancellables)
 

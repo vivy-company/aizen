@@ -95,7 +95,7 @@ class AgentRouter: ObservableObject {
     func ensureSession(for agentName: String) async {
         if activeSessions[agentName] == nil {
             // Only create session if agent is enabled
-            if let metadata = await AgentRegistry.shared.getMetadata(for: agentName),
+            if let metadata = AgentRegistry.shared.getMetadata(for: agentName),
                metadata.isEnabled {
                 activeSessions[agentName] = AgentSession(agentName: agentName)
             }

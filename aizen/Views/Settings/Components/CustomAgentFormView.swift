@@ -98,44 +98,65 @@ struct CustomAgentFormView: View {
                             .onChange(of: executablePath) { _ in
                                 pathValidationResult = nil
                             }
+                            .onSubmit {
+                                Task {
+                                    await validateExecutablePath()
+                                }
+                            }
 
                         Button("Browse...") {
                             selectExecutableFile()
                         }
                         .buttonStyle(.bordered)
+                    }
 
-                        // Validation indicator
-                        if !executablePath.isEmpty {
+                    TextField("Launch arguments (optional)", text: $launchArgsText)
+                        .textFieldStyle(.roundedBorder)
+                        .help("Space-separated arguments (e.g., agent stdio, --experimental-acp)")
+                        .onChange(of: launchArgsText) { _ in
+                            pathValidationResult = nil
+                        }
+                        .onSubmit {
+                            Task {
+                                await validateExecutablePath()
+                            }
+                        }
+
+                    // Validation status row (automatically validates on blur/submit)
+                    if !executablePath.isEmpty {
+                        HStack(spacing: 8) {
                             if isValidatingPath {
                                 ProgressView()
                                     .scaleEffect(0.7)
-                                    .frame(width: 16, height: 16)
+                                    .controlSize(.small)
+                                Text("Validating ACP executable...")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             } else if let validation = pathValidationResult {
                                 switch validation {
                                 case .valid:
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(.green)
-                                        .help("Valid ACP executable")
+                                    Text("Valid ACP executable")
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
                                 case .invalid(let message):
                                     Image(systemName: "xmark.circle.fill")
                                         .foregroundColor(.red)
-                                        .help(message)
+                                    Text(message)
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
                                 }
                             } else {
-                                Button("Validate") {
-                                    Task {
-                                        await validateExecutablePath()
-                                    }
-                                }
-                                .buttonStyle(.borderless)
-                                .font(.caption)
+                                Image(systemName: "info.circle")
+                                    .foregroundStyle(.secondary)
+                                Text("Press Enter to validate")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
+                            Spacer()
                         }
                     }
-
-                    TextField("Launch arguments (optional)", text: $launchArgsText)
-                        .textFieldStyle(.roundedBorder)
-                        .help("Space-separated arguments (e.g., --experimental-acp)")
                 }
 
                 Section("Icon") {
@@ -274,18 +295,31 @@ struct CustomAgentFormView: View {
                 terminal: true
             )
 
-            _ = try await tempClient.initialize(
+            let initResponse = try await tempClient.initialize(
                 protocolVersion: 1,
                 capabilities: capabilities
             )
 
-            pathValidationResult = .valid
-            await tempClient.terminate()
+            // If agent requires authentication, that's still valid - we just can't test session creation
+            if let authMethods = initResponse.authMethods, !authMethods.isEmpty {
+                pathValidationResult = .valid
+                await tempClient.terminate()
+            } else {
+                // Try to create a session to fully validate
+                _ = try await tempClient.newSession(
+                    workingDirectory: FileManager.default.currentDirectoryPath,
+                    mcpServers: []
+                )
+                pathValidationResult = .valid
+                await tempClient.terminate()
+            }
         } catch {
             pathValidationResult = .invalid("Not a valid ACP executable: \(error.localizedDescription)")
         }
 
-        isValidatingPath = false
+        await MainActor.run {
+            isValidatingPath = false
+        }
     }
 
     private var isValid: Bool {
@@ -319,29 +353,35 @@ struct CustomAgentFormView: View {
         // Use SF Symbol for icon
         let iconType = AgentIconType.sfSymbol(selectedSFSymbol)
 
-        if let existing = existingMetadata {
-            // Update existing
-            var updated = existing
-            updated.name = trimmedName
-            updated.description = trimmedDescription.isEmpty ? nil : trimmedDescription
-            updated.executablePath = trimmedPath
-            updated.launchArgs = launchArgs
-            updated.iconType = iconType
+        Task {
+            if let existing = existingMetadata {
+                // Update existing
+                var updated = existing
+                updated.name = trimmedName
+                updated.description = trimmedDescription.isEmpty ? nil : trimmedDescription
+                updated.executablePath = trimmedPath
+                updated.launchArgs = launchArgs
+                updated.iconType = iconType
 
-            AgentRegistry.shared.updateAgent(updated)
-            onSave(updated)
-        } else {
-            // Create new
-            let metadata = AgentRegistry.shared.addCustomAgent(
-                name: trimmedName,
-                description: trimmedDescription.isEmpty ? nil : trimmedDescription,
-                iconType: iconType,
-                executablePath: trimmedPath,
-                launchArgs: launchArgs
-            )
-            onSave(metadata)
+                await AgentRegistry.shared.updateAgent(updated)
+                await MainActor.run {
+                    onSave(updated)
+                    dismiss()
+                }
+            } else {
+                // Create new
+                let metadata = await AgentRegistry.shared.addCustomAgent(
+                    name: trimmedName,
+                    description: trimmedDescription.isEmpty ? nil : trimmedDescription,
+                    iconType: iconType,
+                    executablePath: trimmedPath,
+                    launchArgs: launchArgs
+                )
+                await MainActor.run {
+                    onSave(metadata)
+                    dismiss()
+                }
+            }
         }
-
-        dismiss()
     }
 }

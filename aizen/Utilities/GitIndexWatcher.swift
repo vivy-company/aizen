@@ -13,9 +13,48 @@ class GitIndexWatcher {
     private let gitIndexPath: String
     private let pollInterval: TimeInterval = 1.0  // Poll every 1 second
     private var pollingTask: Task<Void, Never>?
-    private var lastIndexModificationDate: Date?
-    private var lastWorkdirChecksum: String?
-    private var onChange: (@Sendable () -> Void)?
+    private let lastIndexModificationDateLock = NSLock()
+    private var _lastIndexModificationDate: Date?
+    private var lastIndexModificationDate: Date? {
+        get {
+            lastIndexModificationDateLock.lock()
+            defer { lastIndexModificationDateLock.unlock() }
+            return _lastIndexModificationDate
+        }
+        set {
+            lastIndexModificationDateLock.lock()
+            defer { lastIndexModificationDateLock.unlock() }
+            _lastIndexModificationDate = newValue
+        }
+    }
+    private let lastWorkdirChecksumLock = NSLock()
+    private var _lastWorkdirChecksum: String?
+    private var lastWorkdirChecksum: String? {
+        get {
+            lastWorkdirChecksumLock.lock()
+            defer { lastWorkdirChecksumLock.unlock() }
+            return _lastWorkdirChecksum
+        }
+        set {
+            lastWorkdirChecksumLock.lock()
+            defer { lastWorkdirChecksumLock.unlock() }
+            _lastWorkdirChecksum = newValue
+        }
+    }
+    private let onChangeLock = NSLock()
+    private var _onChange: (@Sendable () -> Void)?
+    private var onChange: (@Sendable () -> Void)? {
+        get {
+            onChangeLock.lock()
+            defer { onChangeLock.unlock() }
+            return _onChange
+        }
+        set {
+            onChangeLock.lock()
+            defer { onChangeLock.unlock() }
+            _onChange = newValue
+        }
+    }
 
     init(worktreePath: String) {
         self.worktreePath = worktreePath

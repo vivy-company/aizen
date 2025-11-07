@@ -129,7 +129,8 @@ actor AgentInstaller {
 
     // Legacy method for backwards compatibility
     func installAgent(_ agentName: String) async throws {
-        guard let metadata = await AgentRegistry.shared.getMetadata(for: agentName) else {
+        let metadata = AgentRegistry.shared.getMetadata(for: agentName)
+        guard let metadata = metadata else {
             throw AgentInstallError.installFailed(message: "Unknown agent: \(agentName)")
         }
 

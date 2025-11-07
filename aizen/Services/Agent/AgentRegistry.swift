@@ -64,24 +64,43 @@ actor AgentRegistry {
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        initializeDefaultAgents()
+        // Initialize agents in background task
+        Task {
+            await self.initializeDefaultAgents()
+        }
     }
 
     // MARK: - Metadata Management
 
+    /// Load metadata directly from UserDefaults (thread-safe)
+    private nonisolated func loadMetadataFromDefaults() -> [String: AgentMetadata] {
+        guard let data = defaults.data(forKey: metadataStoreKey) else {
+            return [:]
+        }
+
+        do {
+            let decoder = JSONDecoder()
+            return try decoder.decode([String: AgentMetadata].self, from: data)
+        } catch {
+            return [:]
+        }
+    }
+
     /// Get all agents (enabled and disabled)
-    func getAllAgents() -> [AgentMetadata] {
-        Array(agentMetadata.values).sorted { $0.name < $1.name }
+    nonisolated func getAllAgents() -> [AgentMetadata] {
+        let metadata = loadMetadataFromDefaults()
+        return Array(metadata.values).sorted { $0.name < $1.name }
     }
 
     /// Get only enabled agents
-    func getEnabledAgents() -> [AgentMetadata] {
+    nonisolated func getEnabledAgents() -> [AgentMetadata] {
         getAllAgents().filter { $0.isEnabled }
     }
 
     /// Get metadata for specific agent
-    func getMetadata(for agentId: String) -> AgentMetadata? {
-        return agentMetadata[agentId]
+    nonisolated func getMetadata(for agentId: String) -> AgentMetadata? {
+        let metadata = loadMetadataFromDefaults()
+        return metadata[agentId]
     }
 
     /// Add custom agent
@@ -146,13 +165,15 @@ actor AgentRegistry {
     // MARK: - Agent Path Management
 
     /// Get executable path for a specific agent by name
-    func getAgentPath(for agentName: String) -> String? {
-        return agentMetadata[agentName]?.executablePath
+    nonisolated func getAgentPath(for agentName: String) -> String? {
+        let metadata = loadMetadataFromDefaults()
+        return metadata[agentName]?.executablePath
     }
 
     /// Get launch arguments for a specific agent
-    func getAgentLaunchArgs(for agentName: String) -> [String] {
-        return agentMetadata[agentName]?.launchArgs ?? []
+    nonisolated func getAgentLaunchArgs(for agentName: String) -> [String] {
+        let metadata = loadMetadataFromDefaults()
+        return metadata[agentName]?.launchArgs ?? []
     }
 
     /// Set executable path for a specific agent
@@ -178,25 +199,25 @@ actor AgentRegistry {
     // MARK: - Auth Preferences
 
     /// Save preferred auth method for an agent
-    func saveAuthPreference(agentName: String, authMethodId: String) {
+    nonisolated func saveAuthPreference(agentName: String, authMethodId: String) {
         var prefs = defaults.dictionary(forKey: authPreferencesKey) as? [String: String] ?? [:]
         prefs[agentName] = authMethodId
         defaults.set(prefs, forKey: authPreferencesKey)
     }
 
     /// Get saved auth preference for an agent
-    func getAuthPreference(for agentName: String) -> String? {
+    nonisolated func getAuthPreference(for agentName: String) -> String? {
         let prefs = defaults.dictionary(forKey: authPreferencesKey) as? [String: String] ?? [:]
         return prefs[agentName]
     }
 
     /// Save that an agent should skip authentication
-    func saveSkipAuth(for agentName: String) {
+    nonisolated func saveSkipAuth(for agentName: String) {
         saveAuthPreference(agentName: agentName, authMethodId: "skip")
     }
 
     /// Check if agent should skip authentication
-    func shouldSkipAuth(for agentName: String) -> Bool {
+    nonisolated func shouldSkipAuth(for agentName: String) -> Bool {
         return getAuthPreference(for: agentName) == "skip"
     }
 }

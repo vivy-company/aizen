@@ -20,7 +20,7 @@ actor ACPProcessManager {
 
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
-    private let logger = Logger.forCategory("ACPProcessManager")
+    private let logger: Logger
 
     // Callback for incoming data
     private var onDataReceived: ((Data) async -> Void)?
@@ -31,6 +31,7 @@ actor ACPProcessManager {
     init(encoder: JSONEncoder, decoder: JSONDecoder) {
         self.encoder = encoder
         self.decoder = decoder
+        self.logger = Logger.forCategory("ACPProcessManager")
     }
 
     // MARK: - Process Lifecycle

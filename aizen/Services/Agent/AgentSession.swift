@@ -71,8 +71,10 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         self.workingDirectory = workingDir
 
         // Get agent executable path from registry
-        guard let agentPath = await AgentRegistry.shared.getAgentPath(for: agentName),
-              await AgentRegistry.shared.validateAgent(named: agentName) else {
+        let agentPath = AgentRegistry.shared.getAgentPath(for: agentName)
+        let isValid = await AgentRegistry.shared.validateAgent(named: agentName)
+
+        guard let agentPath = agentPath, isValid else {
             // Agent not configured or invalid - trigger setup dialog
             needsAgentSetup = true
             missingAgentName = agentName
@@ -88,7 +90,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         await client.setDelegate(self)
 
         // Get launch arguments for this agent
-        let launchArgs = await AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
+        let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
 
         // Launch the agent process
         try await client.launch(agentPath: agentPath, arguments: launchArgs)
@@ -108,7 +110,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         if let authMethods = initResponse.authMethods, !authMethods.isEmpty {
             self.authMethods = authMethods
 
-            if let savedAuthMethod = await AgentRegistry.shared.getAuthPreference(for: agentName) {
+            if let savedAuthMethod = AgentRegistry.shared.getAuthPreference(for: agentName) {
                 if savedAuthMethod == "skip" {
                     try await createSessionDirectly(workingDir: workingDir, client: client)
                     return
@@ -149,7 +151,8 @@ class AgentSession: ObservableObject, ACPClientDelegate {
 
         startNotificationListener(client: client)
 
-        let displayName = await AgentRegistry.shared.getMetadata(for: agentName)?.name ?? agentName
+        let metadata = AgentRegistry.shared.getMetadata(for: agentName)
+        let displayName = metadata?.name ?? agentName
         addSystemMessage("Session started with \(displayName) in \(workingDir)")
     }
 

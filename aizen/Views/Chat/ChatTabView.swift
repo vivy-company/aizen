@@ -132,7 +132,7 @@ struct ChatTabView: View {
 
         Task {
             // Use agent display name instead of ID
-            let displayName = await AgentRegistry.shared.getMetadata(for: agent)?.name ?? agent.capitalized
+            let displayName = AgentRegistry.shared.getMetadata(for: agent)?.name ?? agent.capitalized
             await MainActor.run {
                 session.title = displayName
                 do {

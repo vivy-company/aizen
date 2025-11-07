@@ -10,7 +10,7 @@ import os.log
 
 extension Logger {
     /// Create a logger for a specific category
-    static func forCategory(_ category: String) -> Logger {
+    nonisolated static func forCategory(_ category: String) -> Logger {
         Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: category)
     }
 

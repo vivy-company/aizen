@@ -203,14 +203,20 @@ struct AgentSetupDialog: View {
             // Discover only the missing agent
             let discoveredPath = await AgentRegistry.shared.discoverAgent(named: agentName)
 
-            isAutoDiscovering = false
+            await MainActor.run {
+                isAutoDiscovering = false
+            }
 
             if let path = discoveredPath {
                 // Set the discovered path
                 await AgentRegistry.shared.setAgentPath(path, for: agentName)
-                retrySession()
+                await MainActor.run {
+                    retrySession()
+                }
             } else {
-                errorMessage = String(localized: "agentSetup.error.notFound.\(agentName)")
+                await MainActor.run {
+                    errorMessage = String(localized: "agentSetup.error.notFound.\(agentName)")
+                }
             }
         }
     }
@@ -251,12 +257,17 @@ struct AgentSetupDialog: View {
 
                 // Validate and save
                 if let agentName = session.missingAgentName {
-                    AgentRegistry.shared.setAgentPath(path, for: agentName)
+                    Task {
+                        await AgentRegistry.shared.setAgentPath(path, for: agentName)
 
-                    if AgentRegistry.shared.validateAgent(named: agentName) {
-                        retrySession()
-                    } else {
-                        errorMessage = String(localized: "agentSetup.error.invalidExecutable")
+                        let isValid = await AgentRegistry.shared.validateAgent(named: agentName)
+                        await MainActor.run {
+                            if isValid {
+                                retrySession()
+                            } else {
+                                errorMessage = String(localized: "agentSetup.error.invalidExecutable")
+                            }
+                        }
                     }
                 }
             }

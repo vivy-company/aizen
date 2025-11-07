@@ -14,6 +14,7 @@ struct AgentListItemView: View {
     @State private var isUpdating = false
     @State private var isTesting = false
     @State private var canUpdate = false
+    @State private var isAgentValid = false
     @State private var testResult: String?
     @State private var showingFilePicker = false
     @State private var showingEditSheet = false
@@ -56,16 +57,18 @@ struct AgentListItemView: View {
                     set: { newValue in
                         let wasEnabled = metadata.isEnabled
                         metadata.isEnabled = newValue
-                        AgentRegistry.shared.updateAgent(metadata)
+                        Task {
+                            await AgentRegistry.shared.updateAgent(metadata)
 
-                        // If we're disabling the current default agent, pick a new default
-                        if wasEnabled && !newValue {
-                            let defaultAgent = UserDefaults.standard.string(forKey: "defaultACPAgent") ?? "claude"
-                            if defaultAgent == metadata.id {
-                                // Find first enabled agent that's not this one
-                                Task {
+                            // If we're disabling the current default agent, pick a new default
+                            if wasEnabled && !newValue {
+                                let defaultAgent = UserDefaults.standard.string(forKey: "defaultACPAgent") ?? "claude"
+                                if defaultAgent == metadata.id {
+                                    // Find first enabled agent that's not this one
                                     if let newDefault = await AgentRegistry.shared.getEnabledAgents().first {
-                                        UserDefaults.standard.set(newDefault.id, forKey: "defaultACPAgent")
+                                        await MainActor.run {
+                                            UserDefaults.standard.set(newDefault.id, forKey: "defaultACPAgent")
+                                        }
                                     }
                                 }
                             }
@@ -95,7 +98,9 @@ struct AgentListItemView: View {
                             get: { metadata.executablePath ?? "" },
                             set: { newValue in
                                 metadata.executablePath = newValue.isEmpty ? nil : newValue
-                                AgentRegistry.shared.updateAgent(metadata)
+                                Task {
+                                    await AgentRegistry.shared.updateAgent(metadata)
+                                }
                             }
                         ))
                         .textFieldStyle(.roundedBorder)
@@ -107,7 +112,7 @@ struct AgentListItemView: View {
 
                         // Validation indicator
                         if let path = metadata.executablePath, !path.isEmpty {
-                            if AgentRegistry.shared.validateAgent(named: metadata.id) {
+                            if isAgentValid {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
                                     .help("Executable is valid")
@@ -132,7 +137,7 @@ struct AgentListItemView: View {
                         // Don't show install button while updating
                         if metadata.isBuiltIn,
                            metadata.installMethod != nil,
-                           !AgentRegistry.shared.validateAgent(named: metadata.id),
+                           !isAgentValid,
                            !isUpdating {
                             if isInstalling {
                                 ProgressView()
@@ -152,7 +157,7 @@ struct AgentListItemView: View {
 
                         // Update button (for agents installed in .aizen/agents)
                         // Show updating status even if validation fails during update
-                        if canUpdate && (AgentRegistry.shared.validateAgent(named: metadata.id) || isUpdating) {
+                        if canUpdate && (isAgentValid || isUpdating) {
                             if isUpdating {
                                 ProgressView()
                                     .scaleEffect(0.7)
@@ -171,7 +176,7 @@ struct AgentListItemView: View {
                         }
 
                         // Test Connection button (only if valid)
-                        if AgentRegistry.shared.validateAgent(named: metadata.id) {
+                        if isAgentValid {
                             if isTesting {
                                 ProgressView()
                                     .scaleEffect(0.7)
@@ -199,7 +204,9 @@ struct AgentListItemView: View {
                         // Delete button for custom agents
                         if !metadata.isBuiltIn {
                             Button(role: .destructive, action: {
-                                AgentRegistry.shared.deleteAgent(id: metadata.id)
+                                Task {
+                                    await AgentRegistry.shared.deleteAgent(id: metadata.id)
+                                }
                             }) {
                                 Image(systemName: "trash")
                             }
@@ -223,7 +230,10 @@ struct AgentListItemView: View {
             case .success(let urls):
                 if let url = urls.first {
                     metadata.executablePath = url.path
-                    AgentRegistry.shared.updateAgent(metadata)
+                    Task {
+                        await AgentRegistry.shared.updateAgent(metadata)
+                        await validateAgent()
+                    }
                 }
             case .failure(let error):
                 errorMessage = "Failed to select file: \(error.localizedDescription)"
@@ -247,11 +257,13 @@ struct AgentListItemView: View {
         }
         .onAppear {
             Task {
+                await validateAgent()
                 canUpdate = await AgentInstaller.shared.canUpdate(metadata)
             }
         }
         .onChange(of: metadata.executablePath) { _ in
             Task {
+                await validateAgent()
                 canUpdate = await AgentInstaller.shared.canUpdate(metadata)
             }
         }
@@ -260,51 +272,92 @@ struct AgentListItemView: View {
         }
     }
 
+    private func validateAgent() async {
+        // Use comprehensive validation that includes launch arguments and ACP protocol
+        let result = await AgentRegistry.shared.validateAgentWithProtocol(named: metadata.id)
+        await MainActor.run {
+            isAgentValid = result.valid
+            // Optionally update error message if validation failed
+            if !result.valid, let error = result.error {
+                errorMessage = error
+            } else if result.valid {
+                errorMessage = nil
+            }
+        }
+    }
+
     private func updateAgent() async {
-        isUpdating = true
-        testResult = nil
+        await MainActor.run {
+            isUpdating = true
+            testResult = nil
+        }
 
         do {
             // Update directly without discovery - we want to update our managed installation
             try await AgentInstaller.shared.updateAgent(metadata)
 
             // Get the path from registry (installer already set it during update)
-            if let updatedPath = AgentRegistry.shared.getAgentPath(for: metadata.id) {
-                metadata.executablePath = updatedPath
+            let updatedPath = AgentRegistry.shared.getAgentPath(for: metadata.id)
+            await MainActor.run {
+                if let path = updatedPath {
+                    metadata.executablePath = path
+                }
+                testResult = "Updated to latest version"
             }
 
-            testResult = "Updated to latest version"
-
-            // Refresh canUpdate state after successful update
-            canUpdate = await AgentInstaller.shared.canUpdate(metadata)
+            // Refresh validation and canUpdate state
+            await validateAgent()
+            let canUpdateState = await AgentInstaller.shared.canUpdate(metadata)
+            await MainActor.run {
+                canUpdate = canUpdateState
+            }
         } catch {
-            testResult = "Update failed: \(error.localizedDescription)"
+            await MainActor.run {
+                testResult = "Update failed: \(error.localizedDescription)"
+            }
         }
 
-        isUpdating = false
+        await MainActor.run {
+            isUpdating = false
+        }
     }
 
     private func installAgent() async {
-        isInstalling = true
-        testResult = nil
+        await MainActor.run {
+            isInstalling = true
+            testResult = nil
+        }
 
         do {
             // Try discovery first
-            if let discovered = AgentRegistry.shared.discoverAgent(named: metadata.id) {
-                metadata.executablePath = discovered
-                AgentRegistry.shared.updateAgent(metadata)
+            let discovered = await AgentRegistry.shared.discoverAgent(named: metadata.id)
+            if let discoveredPath = discovered {
+                await MainActor.run {
+                    metadata.executablePath = discoveredPath
+                }
+                await AgentRegistry.shared.updateAgent(metadata)
             } else {
                 // Install
                 try await AgentInstaller.shared.installAgent(metadata)
-                if let path = AgentRegistry.shared.getAgentPath(for: metadata.id) {
-                    metadata.executablePath = path
+                let path = AgentRegistry.shared.getAgentPath(for: metadata.id)
+                await MainActor.run {
+                    if let execPath = path {
+                        metadata.executablePath = execPath
+                    }
                 }
             }
+
+            // Refresh validation state
+            await validateAgent()
         } catch {
-            testResult = "Install failed: \(error.localizedDescription)"
+            await MainActor.run {
+                testResult = "Install failed: \(error.localizedDescription)"
+            }
         }
 
-        isInstalling = false
+        await MainActor.run {
+            isInstalling = false
+        }
     }
 
     private func testConnection() async {

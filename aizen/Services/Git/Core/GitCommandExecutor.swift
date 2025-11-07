@@ -32,21 +32,12 @@ actor GitCommandExecutor {
 
     private let fileManager: FileManager
 
-    // Cache shell environment (load once) - actor-isolated
-    private var cachedShellEnvironment: [String: String]?
-
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
     }
 
     private func getShellEnvironment() -> [String: String] {
-        if let cached = cachedShellEnvironment {
-            return cached
-        }
-
-        let env = ShellEnvironment.loadUserShellEnvironment()
-        cachedShellEnvironment = env
-        return env
+        return ShellEnvironment.loadUserShellEnvironment()
     }
 
     /// Execute a git command fully asynchronously without blocking

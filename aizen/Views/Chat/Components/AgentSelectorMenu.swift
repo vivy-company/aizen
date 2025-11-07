@@ -61,6 +61,6 @@ struct AgentSelectorMenu: View {
     }
 
     private func loadSelectedAgentMetadata() async {
-        selectedAgentMetadata = await AgentRegistry.shared.getMetadata(for: selectedAgent)
+        selectedAgentMetadata = AgentRegistry.shared.getMetadata(for: selectedAgent)
     }
 }

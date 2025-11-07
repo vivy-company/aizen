@@ -8,7 +8,7 @@
 import Foundation
 
 enum ShellEnvironment {
-    static func loadUserShellEnvironment() -> [String: String] {
+    nonisolated static func loadUserShellEnvironment() -> [String: String] {
         let shell = getLoginShell()
         let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
 
@@ -58,7 +58,7 @@ enum ShellEnvironment {
         return shellEnv.isEmpty ? ProcessInfo.processInfo.environment : shellEnv
     }
 
-    private static func getLoginShell() -> String {
+    nonisolated private static func getLoginShell() -> String {
         if let shell = ProcessInfo.processInfo.environment["SHELL"], !shell.isEmpty {
             return shell
         }
