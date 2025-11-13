@@ -67,11 +67,6 @@ jobs:
           mkdir -p build/dmg
           cp -R build/aizen.xcarchive/Products/Applications/aizen.app build/dmg/
 
-      - name: Ad-hoc sign app (fallback)
-        run: |
-          # Deep sign entire bundle to ensure all components have matching Team IDs
-          codesign --force --deep --sign - build/dmg/aizen.app
-
       # Conditional code signing
       - name: Import signing certificate
         env:
