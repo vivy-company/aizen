@@ -185,12 +185,10 @@ jobs:
           SIGNATURE=$("$SIGN_UPDATE" -f sparkle_priv.pem -p "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg")
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
 
-          # Clean up private key
-          rm sparkle_priv.pem
-
       - name: Generate appcast
         env:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          SPARKLE_PRIVATE_KEY_FILE: sparkle_priv.pem
         run: |
           chmod +x scripts/generate-appcast.sh
           scripts/generate-appcast.sh \
@@ -236,6 +234,9 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
+          # Clean up private key
+          rm -f sparkle_priv.pem
+
           # Delete keychain if it was created
           if security list-keychains | grep -q build.keychain; then
             security delete-keychain build.keychain
