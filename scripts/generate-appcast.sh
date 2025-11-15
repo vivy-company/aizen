@@ -27,16 +27,6 @@ if [ ! -f "$DMG_PATH" ]; then
     exit 1
 fi
 
-# Check for Sparkle's generate_appcast tool
-if ! command -v generate_appcast &> /dev/null; then
-    echo "Error: Sparkle's generate_appcast tool not found."
-    echo ""
-    echo "Please install Sparkle CLI tools:"
-    echo "  brew install sparkle"
-    echo ""
-    exit 1
-fi
-
 # Check if private key exists
 if [ ! -f "$PRIVATE_KEY" ]; then
     echo "Error: Private key not found at $PRIVATE_KEY"
