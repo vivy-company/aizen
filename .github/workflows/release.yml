@@ -204,8 +204,26 @@ jobs:
           echo "Using sign_update: $SIGN_UPDATE"
           echo "DMG path: build/Aizen-${{ github.event.inputs.marketing_version }}.dmg"
 
-          # Sign the DMG (EdDSA signature)
-          SIGNATURE=$("$SIGN_UPDATE" "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" sparkle_priv.pem 2>&1)
+          # Check sign_update help/usage
+          echo "Checking sign_update usage..."
+          "$SIGN_UPDATE" --help 2>&1 || true
+
+          # Sign the DMG (EdDSA signature) - try with absolute path to key
+          echo "Attempting to sign DMG..."
+          set +e  # Don't exit on error temporarily
+          SIGNATURE=$("$SIGN_UPDATE" "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" sparkle_priv.pem)
+          EXIT_CODE=$?
+          set -e
+
+          echo "sign_update exit code: $EXIT_CODE"
+          echo "Signature output: '$SIGNATURE'"
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "Error: sign_update failed with exit code $EXIT_CODE"
+            # Try reading the error
+            "$SIGN_UPDATE" "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" sparkle_priv.pem 2>&1 || true
+            exit 1
+          fi
 
           if [ -z "$SIGNATURE" ]; then
             echo "Error: sign_update returned empty signature"
