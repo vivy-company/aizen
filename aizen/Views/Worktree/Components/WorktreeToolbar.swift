@@ -120,6 +120,7 @@ struct GitStatusView: View {
                 .transition(.opacity)
             }
         }
+        .padding(.horizontal, 8)
         .animation(.easeInOut(duration: 0.2), value: additions)
         .animation(.easeInOut(duration: 0.2), value: deletions)
         .animation(.easeInOut(duration: 0.2), value: untrackedFiles)

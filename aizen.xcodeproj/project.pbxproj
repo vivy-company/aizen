@@ -11,6 +11,10 @@
 		CC128B182EAF8DD600EA9A50 /* HighlightSwift in Frameworks */ = {isa = PBXBuildFile; productRef = CC128B172EAF8DD600EA9A50 /* HighlightSwift */; };
 		CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC128B1A2EAF8DD600EA9A50 /* Sparkle */; };
 		CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = CCB04B732EA241B60007DBB1 /* Markdown */; };
+		CC8001732EC989600037DA4C /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CCFE00042EBF000000000004 /* CodeEditTextView */; };
+		CC8001742EC989600037DA4C /* Neon in Frameworks */ = {isa = PBXBuildFile; productRef = CCFE00052EBF000000000005 /* Neon */; };
+		CC8001752EC989600037DA4C /* SwiftTreeSitter in Frameworks */ = {isa = PBXBuildFile; productRef = CCFE00062EBF000000000006 /* SwiftTreeSitter */; };
+		CC80198E2EC98CE50037DA4C /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCFE00082EBF000000000008 /* CodeEditSourceEditor */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,6 +77,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CC80198E2EC98CE50037DA4C /* CodeEditSourceEditor in Frameworks */,
+				CC8001752EC989600037DA4C /* SwiftTreeSitter in Frameworks */,
+				CC8001742EC989600037DA4C /* Neon in Frameworks */,
+				CC8001732EC989600037DA4C /* CodeEditTextView in Frameworks */,
 				CC1234572EA241B30007DBB1 /* libghostty.a in Frameworks */,
 				CC128B182EAF8DD600EA9A50 /* HighlightSwift in Frameworks */,
 				CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */,
@@ -150,6 +158,10 @@
 				CCB04B732EA241B60007DBB1 /* Markdown */,
 				CC128B172EAF8DD600EA9A50 /* HighlightSwift */,
 				CC128B1A2EAF8DD600EA9A50 /* Sparkle */,
+				CCFE00042EBF000000000004 /* CodeEditTextView */,
+				CCFE00052EBF000000000005 /* Neon */,
+				CCFE00062EBF000000000006 /* SwiftTreeSitter */,
+				CCFE00082EBF000000000008 /* CodeEditSourceEditor */,
 			);
 			productName = aizen;
 			productReference = CCB04B422EA241B30007DBB1 /* aizen.app */;
@@ -237,6 +249,10 @@
 				CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				CC128B162EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "highlightswift" */,
 				CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				CCFE00012EBF000000000001 /* XCRemoteSwiftPackageReference "CodeEditTextView" */,
+				CCFE00022EBF000000000002 /* XCRemoteSwiftPackageReference "Neon" */,
+				CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */,
+				CCFE00072EBF000000000007 /* XCRemoteSwiftPackageReference "CodeEditSourceEditor" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CCB04B432EA241B30007DBB1 /* Products */;
@@ -733,6 +749,38 @@
 				kind = branch;
 			};
 		};
+		CCFE00012EBF000000000001 /* XCRemoteSwiftPackageReference "CodeEditTextView" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/CodeEditApp/CodeEditTextView";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.12.1;
+			};
+		};
+		CCFE00022EBF000000000002 /* XCRemoteSwiftPackageReference "Neon" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ChimeHQ/Neon";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ChimeHQ/SwiftTreeSitter";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.8.0;
+			};
+		};
+		CCFE00072EBF000000000007 /* XCRemoteSwiftPackageReference "CodeEditSourceEditor" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/CodeEditApp/CodeEditSourceEditor";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.13.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -750,6 +798,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */;
 			productName = Markdown;
+		};
+		CCFE00042EBF000000000004 /* CodeEditTextView */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCFE00012EBF000000000001 /* XCRemoteSwiftPackageReference "CodeEditTextView" */;
+			productName = CodeEditTextView;
+		};
+		CCFE00052EBF000000000005 /* Neon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCFE00022EBF000000000002 /* XCRemoteSwiftPackageReference "Neon" */;
+			productName = Neon;
+		};
+		CCFE00062EBF000000000006 /* SwiftTreeSitter */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */;
+			productName = SwiftTreeSitter;
+		};
+		CCFE00082EBF000000000008 /* CodeEditSourceEditor */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCFE00072EBF000000000007 /* XCRemoteSwiftPackageReference "CodeEditSourceEditor" */;
+			productName = CodeEditSourceEditor;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

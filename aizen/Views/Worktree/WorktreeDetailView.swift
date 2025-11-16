@@ -62,6 +62,10 @@ struct WorktreeDetailView: View {
         (selectedTab == "chat" && !chatSessions.isEmpty) || (selectedTab == "terminal" && !terminalSessions.isEmpty)
     }
 
+    var shouldShowSessionToolbar: Bool {
+        selectedTab != "files" && hasActiveSessions
+    }
+
     var hasGitChanges: Bool {
         gitRepositoryService.currentStatus.additions > 0 ||
         gitRepositoryService.currentStatus.deletions > 0 ||
@@ -72,18 +76,34 @@ struct WorktreeDetailView: View {
 
     @ViewBuilder
     var contentView: some View {
-        Group {
-            if selectedTab == "chat" {
-                ChatTabView(
-                    worktree: worktree,
-                    selectedSessionId: $viewModel.selectedChatSessionId
-                )
-            } else {
-                TerminalTabView(
-                    worktree: worktree,
-                    selectedSessionId: $viewModel.selectedTerminalSessionId,
-                    repositoryManager: repositoryManager
-                )
+        // Show diff view if file is selected, otherwise show normal content
+        if let selectedFile = viewModel.selectedDiffFile,
+           let worktreePath = worktree.path {
+            DiffView(
+                fileName: (selectedFile as NSString).lastPathComponent,
+                filePath: selectedFile,
+                repoPath: worktreePath,
+                onClose: {
+                    viewModel.closeDiffView()
+                }
+            )
+            .transition(.opacity)
+        } else {
+            Group {
+                if selectedTab == "chat" {
+                    ChatTabView(
+                        worktree: worktree,
+                        selectedSessionId: $viewModel.selectedChatSessionId
+                    )
+                } else if selectedTab == "terminal" {
+                    TerminalTabView(
+                        worktree: worktree,
+                        selectedSessionId: $viewModel.selectedTerminalSessionId,
+                        repositoryManager: repositoryManager
+                    )
+                } else if selectedTab == "files" {
+                    FileTabView(worktree: worktree)
+                }
             }
         }
     }
@@ -186,6 +206,7 @@ struct WorktreeDetailView: View {
                             onClose: { showingGitSidebar = false },
                             gitStatus: gitRepositoryService.currentStatus,
                             isOperationPending: gitRepositoryService.isOperationPending,
+                            selectedDiffFile: viewModel.selectedDiffFile,
                             onStageFile: stageFile,
                             onUnstageFile: unstageFile,
                             onStageAll: stageAllFiles,
@@ -197,7 +218,10 @@ struct WorktreeDetailView: View {
                             onCreateBranch: createBranch,
                             onFetch: fetchChanges,
                             onPull: pullChanges,
-                            onPush: pushChanges
+                            onPush: pushChanges,
+                            onFileClick: { file in
+                                viewModel.selectFileForDiff(file)
+                            }
                         )
                         .frame(width: sidebarWidth)
                         .id(gitRepositoryService.currentStatus.id)
@@ -205,6 +229,7 @@ struct WorktreeDetailView: View {
                     }
                 }
                 .animation(.easeInOut(duration: 0.2), value: showingGitSidebar)
+                .animation(.easeInOut(duration: 0.2), value: viewModel.selectedDiffFile)
             .navigationTitle(worktree.branch ?? String(localized: "worktree.session.worktree"))
             .toolbarBackground(.visible, for: .windowToolbar)
             .toast()
@@ -213,12 +238,13 @@ struct WorktreeDetailView: View {
                     Picker(String(localized: "worktree.session.tab"), selection: $selectedTab) {
                         Label(String(localized: "worktree.session.chat"), systemImage: "message").tag("chat")
                         Label(String(localized: "worktree.session.terminal"), systemImage: "terminal").tag("terminal")
+                        Label(String(localized: "worktree.session.files"), systemImage: "folder").tag("files")
                     }
                     .pickerStyle(.segmented)
                 }
 
 
-                if hasActiveSessions {
+                if shouldShowSessionToolbar {
                     sessionToolbarItems
                 }
 

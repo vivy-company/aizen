@@ -53,6 +53,8 @@ class ChatSessionViewModel: ObservableObject {
     // MARK: - Derived State (bridges nested AgentSession properties for reliable observation)
     @Published var needsAuth: Bool = false
     @Published var needsSetup: Bool = false
+    @Published var needsUpdate: Bool = false
+    @Published var versionInfo: AgentVersionInfo?
     @Published var hasAgentPlan: Bool = false
     @Published var currentAgentPlan: Plan?
     @Published var hasModes: Bool = false
@@ -103,7 +105,12 @@ class ChatSessionViewModel: ObservableObject {
 
             if !existingSession.isActive {
                 Task {
-                    try? await existingSession.start(agentName: selectedAgent, workingDir: worktree.path!)
+                    do {
+                        try await existingSession.start(agentName: selectedAgent, workingDir: worktree.path!)
+                    } catch {
+                        print("[ChatSessionViewModel] Failed to start session for \(selectedAgent): \(error.localizedDescription)")
+                        // Session will show auth dialog or setup dialog automatically via needsAuthentication/needsAgentSetup
+                    }
                 }
             }
             return
@@ -125,7 +132,12 @@ class ChatSessionViewModel: ObservableObject {
                 setupSessionObservers(session: newSession)
 
                 if !newSession.isActive {
-                    try? await newSession.start(agentName: selectedAgent, workingDir: worktree.path!)
+                    do {
+                        try await newSession.start(agentName: selectedAgent, workingDir: worktree.path!)
+                    } catch {
+                        print("[ChatSessionViewModel] Failed to start new session for \(selectedAgent): \(error.localizedDescription)")
+                        // Session will show auth dialog or setup dialog automatically via needsAuthentication/needsAgentSetup
+                    }
                 }
             }
         }
@@ -135,6 +147,8 @@ class ChatSessionViewModel: ObservableObject {
     private func updateDerivedState(from session: AgentSession) {
         needsAuth = session.needsAuthentication
         needsSetup = session.needsAgentSetup
+        needsUpdate = session.needsUpdate
+        versionInfo = session.versionInfo
         hasAgentPlan = session.agentPlan != nil
         currentAgentPlan = session.agentPlan
         hasModes = !session.availableModes.isEmpty
@@ -393,6 +407,20 @@ class ChatSessionViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] needsSetup in
                 self?.needsSetup = needsSetup
+            }
+            .store(in: &cancellables)
+
+        session.$needsUpdate
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] needsUpdate in
+                self?.needsUpdate = needsUpdate
+            }
+            .store(in: &cancellables)
+
+        session.$versionInfo
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] versionInfo in
+                self?.versionInfo = versionInfo
             }
             .store(in: &cancellables)
 

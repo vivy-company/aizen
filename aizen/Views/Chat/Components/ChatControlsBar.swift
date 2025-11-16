@@ -35,6 +35,14 @@ struct ChatControlsBar: View {
             Menu {
                 Button("Re-authenticate") {
                     AgentRegistry.shared.clearAuthPreference(for: selectedAgent)
+
+                    // Trigger re-authentication by setting needsAuthentication
+                    if let session = currentAgentSession {
+                        Task { @MainActor in
+                            session.needsAuthentication = true
+                        }
+                    }
+
                     withAnimation {
                         showingAuthClearedMessage = true
                     }

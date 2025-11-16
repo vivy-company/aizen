@@ -94,7 +94,36 @@ struct ToolCallView: View {
 
     // MARK: - Tool Icon
 
+    @ViewBuilder
     private var toolIcon: some View {
+        switch toolCall.kind {
+        case .read, .edit, .delete, .move:
+            // For file operations, use FileIconView if title looks like a path
+            if toolCall.title.contains("/") || toolCall.title.contains(".") {
+                FileIconView(path: toolCall.title, size: 12)
+            } else {
+                fallbackIcon
+            }
+        case .search:
+            Image(systemName: "magnifyingglass")
+        case .execute:
+            Image(systemName: "terminal")
+        case .think:
+            Image(systemName: "brain")
+        case .fetch:
+            Image(systemName: "arrow.down.circle")
+        case .switchMode:
+            Image(systemName: "arrow.left.arrow.right")
+        case .plan:
+            Image(systemName: "list.bullet.clipboard")
+        case .exitPlanMode:
+            Image(systemName: "checkmark.circle")
+        case .other:
+            Image(systemName: "wrench.and.screwdriver")
+        }
+    }
+
+    private var fallbackIcon: some View {
         Group {
             switch toolCall.kind {
             case .read:
@@ -105,25 +134,10 @@ struct ToolCallView: View {
                 Image(systemName: "trash")
             case .move:
                 Image(systemName: "arrow.right.doc.on.clipboard")
-            case .search:
-                Image(systemName: "magnifyingglass")
-            case .execute:
-                Image(systemName: "terminal")
-            case .think:
-                Image(systemName: "brain")
-            case .fetch:
-                Image(systemName: "arrow.down.circle")
-            case .switchMode:
-                Image(systemName: "arrow.left.arrow.right")
-            case .plan:
-                Image(systemName: "list.bullet.clipboard")
-            case .exitPlanMode:
-                Image(systemName: "checkmark.circle")
-            case .other:
-                Image(systemName: "wrench.and.screwdriver")
+            default:
+                Image(systemName: "doc")
             }
         }
-        .font(.system(size: 11))
     }
 
     // MARK: - Colors

@@ -13,6 +13,8 @@ import Combine
 class WorktreeViewModel: ObservableObject {
     @Published var selectedChatSessionId: UUID?
     @Published var selectedTerminalSessionId: UUID?
+    @Published var selectedFileSessionId: UUID?
+    @Published var selectedDiffFile: String?
 
     private let worktree: Worktree
     private let repositoryManager: RepositoryManager
@@ -20,5 +22,15 @@ class WorktreeViewModel: ObservableObject {
     init(worktree: Worktree, repositoryManager: RepositoryManager) {
         self.worktree = worktree
         self.repositoryManager = repositoryManager
+    }
+
+    // MARK: - Diff Viewing
+
+    func selectFileForDiff(_ filePath: String?) {
+        selectedDiffFile = filePath
+    }
+
+    func closeDiffView() {
+        selectedDiffFile = nil
     }
 }

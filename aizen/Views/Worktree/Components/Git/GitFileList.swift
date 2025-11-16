@@ -3,8 +3,10 @@ import SwiftUI
 struct GitFileList: View {
     let gitStatus: GitStatus
     let isOperationPending: Bool
+    let selectedFile: String?
     let onStageFile: (String) -> Void
     let onUnstageFile: (String) -> Void
+    let onFileClick: (String) -> Void
 
     var body: some View {
         ScrollView {
@@ -131,7 +133,13 @@ struct GitFileList: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onFileClick(file)
+        }
         .padding(.vertical, 2)
+        .background(selectedFile == file ? Color.accentColor.opacity(0.2) : Color.clear)
+        .cornerRadius(4)
     }
 
     private func conflictRow(file: String) -> some View {
@@ -147,7 +155,13 @@ struct GitFileList: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onFileClick(file)
+        }
         .padding(.vertical, 2)
         .padding(.leading, 8)
+        .background(selectedFile == file ? Color.accentColor.opacity(0.2) : Color.clear)
+        .cornerRadius(4)
     }
 }

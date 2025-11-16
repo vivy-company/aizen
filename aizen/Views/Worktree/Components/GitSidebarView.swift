@@ -9,6 +9,7 @@ struct GitSidebarView: View {
     // Single source of truth - no bindings, no optimistic updates
     let gitStatus: GitStatus
     let isOperationPending: Bool
+    let selectedDiffFile: String?
 
     // Callbacks for operations
     var onStageFile: (String) -> Void
@@ -23,6 +24,7 @@ struct GitSidebarView: View {
     var onFetch: () -> Void
     var onPull: () -> Void
     var onPush: () -> Void
+    var onFileClick: (String) -> Void
 
     @State private var commitMessage: String = ""
     @State private var selectedBranchInfo: BranchInfo?
@@ -45,8 +47,10 @@ struct GitSidebarView: View {
             GitFileList(
                 gitStatus: gitStatus,
                 isOperationPending: isOperationPending,
+                selectedFile: selectedDiffFile,
                 onStageFile: onStageFile,
-                onUnstageFile: onUnstageFile
+                onUnstageFile: onUnstageFile,
+                onFileClick: onFileClick
             )
 
             Divider()
@@ -114,6 +118,7 @@ struct GitSidebarView: View {
             deletions: 12
         ),
         isOperationPending: false,
+        selectedDiffFile: nil,
         onStageFile: { _ in },
         onUnstageFile: { _ in },
         onStageAll: { completion in completion() },
@@ -125,6 +130,7 @@ struct GitSidebarView: View {
         onCreateBranch: { _ in },
         onFetch: {},
         onPull: {},
-        onPush: {}
+        onPush: {},
+        onFileClick: { _ in }
     )
 }

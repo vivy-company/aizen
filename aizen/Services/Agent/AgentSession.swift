@@ -39,6 +39,10 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     @Published var missingAgentName: String?
     @Published var setupError: String?
 
+    // Version update state
+    @Published var needsUpdate: Bool = false
+    @Published var versionInfo: AgentVersionInfo?
+
     // MARK: - Internal Properties
 
     var acpClient: ACPClient?
@@ -107,6 +111,18 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             )
         )
 
+        // Check agent version in background (non-blocking)
+        Task {
+            let versionInfo = await AgentVersionChecker.shared.checkVersion(for: agentName)
+            await MainActor.run {
+                if versionInfo.isOutdated {
+                    self.versionInfo = versionInfo
+                    self.needsUpdate = true
+                    self.addSystemMessage("⚠️ Update available: \(agentName) v\(versionInfo.current ?? "?") → v\(versionInfo.latest ?? "?")")
+                }
+            }
+        }
+
         if let authMethods = initResponse.authMethods, !authMethods.isEmpty {
             self.authMethods = authMethods
 
@@ -119,13 +135,19 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                         try await performAuthentication(client: client, authMethodId: savedAuthMethod, workingDir: workingDir)
                         return
                     } catch {
+                        print("[AgentSession] Saved auth method '\(savedAuthMethod)' failed for \(agentName): \(error.localizedDescription)")
+                        addSystemMessage("⚠️ Saved authentication method failed. Please re-authenticate.")
                         // Fall through to show auth dialog
                     }
                 }
             }
 
-            // No saved preference - show auth dialog
+            // No saved preference or auth failed - show auth dialog
+            // Set session as active so UI can display properly, even though we're waiting for auth
+            self.isActive = true
             self.needsAuthentication = true
+            startNotificationListener(client: client)
+
             addSystemMessage("Authentication required for \(agentName). Available methods: \(authMethods.map { $0.name }.joined(separator: ", "))")
             return
         }

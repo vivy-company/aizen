@@ -92,7 +92,7 @@ struct AttachmentChipView: View {
             showingContent = true
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: iconName)
+                attachmentIcon
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
 
@@ -108,6 +108,32 @@ struct AttachmentChipView: View {
         .buttonStyle(.plain)
         .sheet(isPresented: $showingContent) {
             AttachmentDetailView(block: block)
+        }
+    }
+
+    @ViewBuilder
+    private var attachmentIcon: some View {
+        switch block {
+        case .resource(let content):
+            if let url = URL(string: content.resource.uri) {
+                FileIconView(path: url.path, size: 10)
+            } else {
+                Image(systemName: "doc.fill")
+            }
+        case .embeddedResource(let content):
+            if let url = URL(string: content.uri) {
+                FileIconView(path: url.path, size: 10)
+            } else {
+                Image(systemName: "doc.badge.gearshape.fill")
+            }
+        case .diff(let content):
+            if let path = content.path {
+                FileIconView(path: path, size: 10)
+            } else {
+                Image(systemName: "doc.text.magnifyingglass")
+            }
+        default:
+            Image(systemName: iconName)
         }
     }
 

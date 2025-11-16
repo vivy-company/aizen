@@ -30,6 +30,12 @@ struct SettingsView: View {
             }
             .tag("terminal")
 
+            EditorSettingsView()
+                .tabItem {
+                    Label("settings.editor.title", systemImage: "doc.text")
+                }
+                .tag("editor")
+
             AgentsSettingsView(defaultACPAgent: $defaultACPAgent)
                 .tabItem {
                     Label("settings.agents.title", systemImage: "brain")

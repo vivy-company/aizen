@@ -25,6 +25,7 @@
         <relationship name="repository" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Repository" inverseName="worktrees" inverseEntity="Repository"/>
         <relationship name="terminalSessions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="TerminalSession" inverseName="worktree" inverseEntity="TerminalSession"/>
         <relationship name="chatSessions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ChatSession" inverseName="worktree" inverseEntity="ChatSession"/>
+        <relationship name="fileBrowserSession" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="FileBrowserSession" inverseName="worktree" inverseEntity="FileBrowserSession"/>
     </entity>
     <entity name="TerminalSession" representedClassName="TerminalSession" syncable="YES" codeGenerationType="class">
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
@@ -68,14 +69,20 @@
         <attribute name="timestamp" attributeType="Date" usesScalarValueType="NO"/>
         <relationship name="message" maxCount="1" deletionRule="Nullify" destinationEntity="ChatMessage" inverseName="toolCalls" inverseEntity="ChatMessage"/>
     </entity>
+    <entity name="FileBrowserSession" representedClassName="FileBrowserSession" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="currentPath" optional="YES" attributeType="String"/>
+        <relationship name="worktree" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Worktree" inverseName="fileBrowserSession" inverseEntity="Worktree"/>
+    </entity>
     <elements>
         <element name="Workspace" positionX="-400" positionY="-18" width="128" height="104"/>
         <element name="Repository" positionX="-200" positionY="-18" width="128" height="119"/>
-        <element name="Worktree" positionX="0" positionY="-18" width="128" height="134"/>
+        <element name="Worktree" positionX="0" positionY="-18" width="128" height="149"/>
         <element name="TerminalSession" positionX="200" positionY="-18" width="128" height="89"/>
         <element name="ChatSession" positionX="200" positionY="100" width="128" height="134"/>
         <element name="ChatConversation" positionX="400" positionY="-18" width="128" height="89"/>
         <element name="ChatMessage" positionX="600" positionY="-18" width="128" height="164"/>
         <element name="ToolCallRecord" positionX="800" positionY="-18" width="128" height="149"/>
+        <element name="FileBrowserSession" positionX="200" positionY="220" width="128" height="74"/>
     </elements>
 </model>

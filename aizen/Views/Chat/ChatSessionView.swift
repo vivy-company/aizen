@@ -26,6 +26,7 @@ struct ChatSessionView: View {
     @State private var permissionErrorMessage = ""
     @State private var showingAgentSetupDialog = false
     @State private var showingAgentPlan = false
+    @State private var showingUpdateSheet = false
 
     init(worktree: Worktree, session: ChatSession, sessionManager: ChatSessionManager, viewContext: NSManagedObjectContext) {
         self.worktree = worktree
@@ -153,6 +154,13 @@ struct ChatSessionView: View {
                 }
             }
         }
+        .onReceive(viewModel.$needsUpdate) { needsUpdate in
+            if needsUpdate {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingUpdateSheet = true
+                }
+            }
+        }
         .onReceive(viewModel.$hasAgentPlan) { hasPlan in
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 showingAgentPlan = hasPlan
@@ -174,6 +182,14 @@ struct ChatSessionView: View {
         .sheet(isPresented: $showingAgentSetupDialog) {
             if let agentSession = viewModel.currentAgentSession {
                 AgentSetupDialog(session: agentSession)
+            }
+        }
+        .sheet(isPresented: $showingUpdateSheet) {
+            if let versionInfo = viewModel.versionInfo {
+                AgentUpdateSheet(
+                    agentName: viewModel.selectedAgent,
+                    versionInfo: versionInfo
+                )
             }
         }
         .sheet(isPresented: $showingAgentPlan) {

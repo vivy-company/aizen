@@ -95,7 +95,7 @@ struct AttachmentChipWithDelete: View {
                 showingDetail = true
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: iconName)
+                    attachmentIcon
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
 
@@ -130,23 +130,20 @@ struct AttachmentChipWithDelete: View {
         }
     }
 
-    private var iconName: String {
+    @ViewBuilder
+    private var attachmentIcon: some View {
         let ext = url.pathExtension.lowercased()
         switch ext {
         case "jpg", "jpeg", "png", "gif", "heic", "bmp", "tiff":
-            return "photo.fill"
-        case "pdf":
-            return "doc.text.fill"
-        case "txt", "md", "rtf":
-            return "doc.text"
+            Image(systemName: "photo.fill")
         case "mp3", "wav", "aiff", "m4a":
-            return "waveform"
+            Image(systemName: "waveform")
         case "mp4", "mov", "avi":
-            return "play.rectangle.fill"
+            Image(systemName: "play.rectangle.fill")
         case "zip", "tar", "gz":
-            return "doc.zipper"
+            Image(systemName: "doc.zipper")
         default:
-            return "doc.fill"
+            FileIconView(path: url.path, size: 10)
         }
     }
 
@@ -206,9 +203,7 @@ struct InputAttachmentDetailView: View {
                         }
                     } else {
                         VStack(spacing: 12) {
-                            Image(systemName: "doc.fill")
-                                .font(.system(size: 48))
-                                .foregroundStyle(.secondary)
+                            FileIconView(path: url.path, size: 48)
 
                             Text("chat.preview.unavailable", bundle: .main)
                                 .font(.headline)
