@@ -20,6 +20,8 @@ struct AgentListItemView: View {
     @State private var showingEditSheet = false
     @State private var errorMessage: String?
     @State private var testTask: Task<Void, Never>?
+    @State private var authMethodName: String?
+    @State private var showingAuthClearedMessage = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -129,6 +131,35 @@ struct AgentListItemView: View {
                         Text("Launch args: \(metadata.launchArgs.joined(separator: " "))")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                    }
+
+                    // Authentication section
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Authentication:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+
+                            Text(authMethodName ?? "Not configured")
+                                .font(.caption)
+                                .foregroundColor(authMethodName != nil ? .primary : .secondary)
+
+                            if authMethodName != nil {
+                                Button("Change") {
+                                    AgentRegistry.shared.clearAuthPreference(for: metadata.id)
+                                    loadAuthStatus()
+                                    showingAuthClearedMessage = true
+                                }
+                                .buttonStyle(.borderless)
+                                .font(.caption)
+                            }
+                        }
+
+                        if showingAuthClearedMessage {
+                            Text("Auth cleared. New chat sessions will prompt for authentication.")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
                     }
 
                     // Action buttons
@@ -260,6 +291,7 @@ struct AgentListItemView: View {
                 await validateAgent()
                 canUpdate = await AgentInstaller.shared.canUpdate(metadata)
             }
+            loadAuthStatus()
         }
         .onChange(of: metadata.executablePath) { _ in
             Task {
@@ -416,5 +448,10 @@ struct AgentListItemView: View {
         }
 
         await testTask?.value
+    }
+
+    private func loadAuthStatus() {
+        authMethodName = AgentRegistry.shared.getAuthMethodName(for: metadata.id)
+        showingAuthClearedMessage = false
     }
 }

@@ -13,6 +13,8 @@ struct ChatControlsBar: View {
     let hasModes: Bool
     let onAgentSelect: (String) -> Void
 
+    @State private var showingAuthClearedMessage = false
+
     var body: some View {
         HStack(spacing: 8) {
             AgentSelectorMenu(selectedAgent: selectedAgent, onAgentSelect: onAgentSelect)
@@ -22,6 +24,33 @@ struct ChatControlsBar: View {
             }
 
             Spacer()
+
+            if showingAuthClearedMessage {
+                Text("Auth cleared. Start new session to re-authenticate.")
+                    .font(.caption)
+                    .foregroundColor(.green)
+                    .transition(.opacity)
+            }
+
+            Menu {
+                Button("Re-authenticate") {
+                    AgentRegistry.shared.clearAuthPreference(for: selectedAgent)
+                    withAnimation {
+                        showingAuthClearedMessage = true
+                    }
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        withAnimation {
+                            showingAuthClearedMessage = false
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .foregroundColor(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .help("Session options")
         }
     }
 }

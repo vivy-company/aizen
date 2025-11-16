@@ -220,4 +220,24 @@ actor AgentRegistry {
     nonisolated func shouldSkipAuth(for agentName: String) -> Bool {
         return getAuthPreference(for: agentName) == "skip"
     }
+
+    /// Clear saved auth preference for an agent
+    nonisolated func clearAuthPreference(for agentName: String) {
+        var prefs = defaults.dictionary(forKey: authPreferencesKey) as? [String: String] ?? [:]
+        prefs.removeValue(forKey: agentName)
+        defaults.set(prefs, forKey: authPreferencesKey)
+    }
+
+    /// Get displayable auth method name for an agent
+    nonisolated func getAuthMethodName(for agentName: String) -> String? {
+        guard let authMethodId = getAuthPreference(for: agentName) else {
+            return nil
+        }
+
+        if authMethodId == "skip" {
+            return "None"
+        }
+
+        return authMethodId
+    }
 }
