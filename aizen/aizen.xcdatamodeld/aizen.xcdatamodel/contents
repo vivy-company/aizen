@@ -26,6 +26,7 @@
         <relationship name="terminalSessions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="TerminalSession" inverseName="worktree" inverseEntity="TerminalSession"/>
         <relationship name="chatSessions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ChatSession" inverseName="worktree" inverseEntity="ChatSession"/>
         <relationship name="fileBrowserSession" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="FileBrowserSession" inverseName="worktree" inverseEntity="FileBrowserSession"/>
+        <relationship name="browserSessions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="BrowserSession" inverseName="worktree" inverseEntity="BrowserSession"/>
     </entity>
     <entity name="TerminalSession" representedClassName="TerminalSession" syncable="YES" codeGenerationType="class">
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
@@ -77,6 +78,14 @@
         <attribute name="selectedFilePath" optional="YES" attributeType="String"/>
         <relationship name="worktree" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Worktree" inverseName="fileBrowserSession" inverseEntity="Worktree"/>
     </entity>
+    <entity name="BrowserSession" representedClassName="BrowserSession" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="url" attributeType="String"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="order" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="worktree" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Worktree" inverseName="browserSessions" inverseEntity="Worktree"/>
+    </entity>
     <elements>
         <element name="Workspace" positionX="-400" positionY="-18" width="128" height="104"/>
         <element name="Repository" positionX="-200" positionY="-18" width="128" height="119"/>
@@ -87,5 +96,6 @@
         <element name="ChatMessage" positionX="600" positionY="-18" width="128" height="164"/>
         <element name="ToolCallRecord" positionX="800" positionY="-18" width="128" height="149"/>
         <element name="FileBrowserSession" positionX="200" positionY="220" width="128" height="74"/>
+        <element name="BrowserSession" positionX="200" positionY="320" width="128" height="119"/>
     </elements>
 </model>

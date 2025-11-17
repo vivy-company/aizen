@@ -45,6 +45,24 @@ actor GitWorktreeService: GitDomainService {
         }
 
         try await executeVoid(arguments, at: repoPath)
+
+        // Pull LFS objects if LFS is enabled in the repository
+        try await pullLFSObjects(at: path)
+    }
+
+    func pullLFSObjects(at worktreePath: String) async throws {
+        // Check if git-lfs is installed and repository uses LFS
+        do {
+            let lfsFiles = try await executor.executeGit(arguments: ["lfs", "ls-files"], at: worktreePath)
+
+            // If LFS is being used (command succeeds and has output), pull the objects
+            if !lfsFiles.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                try await executeVoid(["lfs", "pull"], at: worktreePath)
+            }
+        } catch {
+            // LFS not installed or not used in this repo - skip silently
+            // This is expected behavior, not an error
+        }
     }
 
     func removeWorktree(at worktreePath: String, repoPath: String, force: Bool = false) async throws {

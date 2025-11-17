@@ -28,5 +28,10 @@
 	<string>https://r2.aizen.win/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>i71fQnr49FNgiXkBf4sKYd5pb7FjxI9HHh7EvJGnc/4=</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

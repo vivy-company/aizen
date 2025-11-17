@@ -14,6 +14,7 @@ class WorktreeViewModel: ObservableObject {
     @Published var selectedChatSessionId: UUID?
     @Published var selectedTerminalSessionId: UUID?
     @Published var selectedFileSessionId: UUID?
+    @Published var selectedBrowserSessionId: UUID?
     @Published var selectedDiffFile: String?
 
     private let worktree: Worktree
