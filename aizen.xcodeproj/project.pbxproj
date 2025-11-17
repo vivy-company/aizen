@@ -10,9 +10,10 @@
 		CC1234572EA241B30007DBB1 /* libghostty.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* libghostty.a */; };
 		CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC128B1A2EAF8DD600EA9A50 /* Sparkle */; };
 		CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = CCB04B732EA241B60007DBB1 /* Markdown */; };
-		CC8001732EC989600037DA4C /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CCFE00042EBF000000000004 /* CodeEditTextView */; };
 		CC8001752EC989600037DA4C /* SwiftTreeSitter in Frameworks */ = {isa = PBXBuildFile; productRef = CCFE00062EBF000000000006 /* SwiftTreeSitter */; };
-		CC80198E2EC98CE50037DA4C /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCFE00082EBF000000000008 /* CodeEditSourceEditor */; };
+		CCA569F12ECB04E100955D13 /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CCA569F02ECB04E100955D13 /* CodeEditTextView */; };
+		CCA569F42ECB04F500955D13 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA569F32ECB04F500955D13 /* CodeEditSourceEditor */; };
+		CCA569F72ECB053900955D13 /* CodeEditLanguages in Frameworks */ = {isa = PBXBuildFile; productRef = CCA569F62ECB053900955D13 /* CodeEditLanguages */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,12 +76,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CC80198E2EC98CE50037DA4C /* CodeEditSourceEditor in Frameworks */,
+				CCA569F12ECB04E100955D13 /* CodeEditTextView in Frameworks */,
 				CC8001752EC989600037DA4C /* SwiftTreeSitter in Frameworks */,
-				CC8001732EC989600037DA4C /* CodeEditTextView in Frameworks */,
 				CC1234572EA241B30007DBB1 /* libghostty.a in Frameworks */,
 				CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */,
 				CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */,
+				CCA569F72ECB053900955D13 /* CodeEditLanguages in Frameworks */,
+				CCA569F42ECB04F500955D13 /* CodeEditSourceEditor in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -153,9 +155,10 @@
 			packageProductDependencies = (
 				CCB04B732EA241B60007DBB1 /* Markdown */,
 				CC128B1A2EAF8DD600EA9A50 /* Sparkle */,
-				CCFE00042EBF000000000004 /* CodeEditTextView */,
 				CCFE00062EBF000000000006 /* SwiftTreeSitter */,
-				CCFE00082EBF000000000008 /* CodeEditSourceEditor */,
+				CCA569F02ECB04E100955D13 /* CodeEditTextView */,
+				CCA569F32ECB04F500955D13 /* CodeEditSourceEditor */,
+				CCA569F62ECB053900955D13 /* CodeEditLanguages */,
 			);
 			productName = aizen;
 			productReference = CCB04B422EA241B30007DBB1 /* aizen.app */;
@@ -242,9 +245,10 @@
 			packageReferences = (
 				CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */,
-				CCFE00012EBF000000000001 /* XCRemoteSwiftPackageReference "CodeEditTextView" */,
 				CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */,
-				CCFE00072EBF000000000007 /* XCRemoteSwiftPackageReference "CodeEditSourceEditor" */,
+				CCA569EF2ECB04E100955D13 /* XCLocalSwiftPackageReference "Packages/CodeEditTextView" */,
+				CCA569F22ECB04F500955D13 /* XCLocalSwiftPackageReference "Packages/CodeEditSourceEditor" */,
+				CCA569F52ECB053900955D13 /* XCRemoteSwiftPackageReference "CodeEditLanguages" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CCB04B432EA241B30007DBB1 /* Products */;
@@ -716,6 +720,17 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		CCA569EF2ECB04E100955D13 /* XCLocalSwiftPackageReference "Packages/CodeEditTextView" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/CodeEditTextView;
+		};
+		CCA569F22ECB04F500955D13 /* XCLocalSwiftPackageReference "Packages/CodeEditSourceEditor" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/CodeEditSourceEditor;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -723,6 +738,14 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.0.0;
+			};
+		};
+		CCA569F52ECB053900955D13 /* XCRemoteSwiftPackageReference "CodeEditLanguages" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/CodeEditApp/CodeEditLanguages.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.21;
 			};
 		};
 		CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
@@ -733,28 +756,12 @@
 				kind = branch;
 			};
 		};
-		CCFE00012EBF000000000001 /* XCRemoteSwiftPackageReference "CodeEditTextView" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/CodeEditApp/CodeEditTextView";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.12.1;
-			};
-		};
 		CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ChimeHQ/SwiftTreeSitter";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.8.0;
-			};
-		};
-		CCFE00072EBF000000000007 /* XCRemoteSwiftPackageReference "CodeEditSourceEditor" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/CodeEditApp/CodeEditSourceEditor";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.13.2;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -765,25 +772,28 @@
 			package = CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
+		CCA569F02ECB04E100955D13 /* CodeEditTextView */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CodeEditTextView;
+		};
+		CCA569F32ECB04F500955D13 /* CodeEditSourceEditor */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CodeEditSourceEditor;
+		};
+		CCA569F62ECB053900955D13 /* CodeEditLanguages */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCA569F52ECB053900955D13 /* XCRemoteSwiftPackageReference "CodeEditLanguages" */;
+			productName = CodeEditLanguages;
+		};
 		CCB04B732EA241B60007DBB1 /* Markdown */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */;
 			productName = Markdown;
 		};
-		CCFE00042EBF000000000004 /* CodeEditTextView */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CCFE00012EBF000000000001 /* XCRemoteSwiftPackageReference "CodeEditTextView" */;
-			productName = CodeEditTextView;
-		};
 		CCFE00062EBF000000000006 /* SwiftTreeSitter */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */;
 			productName = SwiftTreeSitter;
-		};
-		CCFE00082EBF000000000008 /* CodeEditSourceEditor */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CCFE00072EBF000000000007 /* XCRemoteSwiftPackageReference "CodeEditSourceEditor" */;
-			productName = CodeEditSourceEditor;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -66,14 +66,26 @@ actor TreeSitterHighlighter {
                     for: captureName,
                     theme: theme
                 ) {
-                    // Convert byte range to string indices
+                    // Convert byte range to string indices with bounds checking
                     let utf8View = text.utf8
-                    let startIndex = utf8View.index(utf8View.startIndex, offsetBy: Int(capture.node.byteRange.lowerBound))
-                    let endIndex = utf8View.index(utf8View.startIndex, offsetBy: Int(capture.node.byteRange.upperBound))
+                    let startOffset = Int(capture.node.byteRange.lowerBound)
+                    let endOffset = Int(capture.node.byteRange.upperBound)
+
+                    // Ensure offsets are within bounds
+                    guard startOffset <= utf8View.count,
+                          endOffset <= utf8View.count,
+                          startOffset <= endOffset else {
+                        continue
+                    }
+
+                    let startIndex = utf8View.index(utf8View.startIndex, offsetBy: startOffset)
+                    let endIndex = utf8View.index(utf8View.startIndex, offsetBy: endOffset)
 
                     // Convert to String.Index
-                    let stringStart = String.Index(startIndex, within: text)!
-                    let stringEnd = String.Index(endIndex, within: text)!
+                    guard let stringStart = String.Index(startIndex, within: text),
+                          let stringEnd = String.Index(endIndex, within: text) else {
+                        continue
+                    }
 
                     // Apply color to attributed string
                     if let attrStart = AttributedString.Index(stringStart, within: attributedString),

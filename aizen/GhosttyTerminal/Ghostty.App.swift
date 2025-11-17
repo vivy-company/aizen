@@ -118,6 +118,9 @@ extension Ghostty {
 
                 theme = \(terminalThemeName)
 
+                # Custom keybinds
+                keybind = shift+enter=text:\\n
+
                 """
 
                 Ghostty.logger.info("Using Ghostty theme: \(self.terminalThemeName)")
@@ -238,6 +241,9 @@ extension Ghostty {
                 shell-integration-features = cursor,sudo,title
 
                 theme = \(terminalThemeName)
+
+                # Custom keybinds
+                keybind = shift+enter=text:\\n
 
                 """
 
