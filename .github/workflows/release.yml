@@ -62,6 +62,8 @@ jobs:
             -configuration "${{ env.CONFIGURATION }}" \
             -archivePath build/aizen.xcarchive \
             -arch arm64 \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
             ONLY_ACTIVE_ARCH=NO \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO
