@@ -47,7 +47,13 @@ actor GitWorktreeService: GitDomainService {
         try await executeVoid(arguments, at: repoPath)
 
         // Pull LFS objects if LFS is enabled in the repository
-        try await pullLFSObjects(at: path)
+        // This is a best-effort operation - don't fail worktree creation if LFS pull fails
+        do {
+            try await pullLFSObjects(at: path)
+        } catch {
+            // LFS pull failed (e.g., due to uncommitted changes, no remote, etc.)
+            // This is non-fatal - the worktree is already created successfully
+        }
     }
 
     func pullLFSObjects(at worktreePath: String) async throws {
