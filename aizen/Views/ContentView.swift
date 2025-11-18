@@ -153,10 +153,7 @@ struct ContentView: View {
         .onChange(of: selectedWorktree) { newValue in
             selectedWorktreeId = newValue?.id?.uuidString
 
-            if let newWorktree = newValue, previousWorktree != newWorktree {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    columnVisibility = .doubleColumn
-                }
+            if let newWorktree = newValue {
                 previousWorktree = newWorktree
             }
         }

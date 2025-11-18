@@ -22,6 +22,9 @@ struct WorkspaceSidebarView: View {
     @State private var showingWorkspaceSheet = false
     @State private var showingEditWorkspace = false
     @State private var workspaceToEdit: Workspace?
+    @State private var refreshTimer: Timer?
+
+    private let refreshInterval: TimeInterval = 10.0
 
     private func colorFromHex(_ hex: String) -> Color {
         var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -43,7 +46,7 @@ struct WorkspaceSidebarView: View {
 
         // Filter out deleted Core Data objects
         let validRepos = repos.filter { !$0.isDeleted }
-    
+
 
         if searchText.isEmpty {
             return validRepos.sorted { ($0.name ?? "") < ($1.name ?? "") }
@@ -51,6 +54,29 @@ struct WorkspaceSidebarView: View {
             return validRepos
                 .filter { ($0.name ?? "").localizedCaseInsensitiveContains(searchText) }
                 .sorted { ($0.name ?? "") < ($1.name ?? "") }
+        }
+    }
+
+    private func startPeriodicRefresh() {
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in
+            refreshAllRepositories()
+        }
+    }
+
+    private func stopPeriodicRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+
+    private func refreshAllRepositories() {
+        Task {
+            for repository in filteredRepositories {
+                do {
+                    try await repositoryManager.refreshRepository(repository)
+                } catch {
+                    logger.error("Failed to refresh repository \(repository.name ?? "unknown"): \(error.localizedDescription)")
+                }
+            }
         }
     }
 
@@ -175,7 +201,6 @@ struct WorkspaceSidebarView: View {
                     RepositoryRow(
                         repository: repository,
                         isSelected: selectedRepository?.id == repository.id,
-                        selectedWorktree: $selectedWorktree,
                         repositoryManager: repositoryManager,
                         onSelect: {
                             selectedRepository = repository
@@ -184,10 +209,6 @@ struct WorkspaceSidebarView: View {
                                 let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
                                 selectedWorktree = worktrees.first(where: { $0.isPrimary })
                             }
-                        },
-                        onWorktreeSelect: { worktree in
-                            selectedRepository = repository
-                            selectedWorktree = worktree
                         }
                     )
                     .listRowSeparator(.hidden)
@@ -225,6 +246,12 @@ struct WorkspaceSidebarView: View {
                 WorkspaceEditSheet(workspace: workspace, repositoryManager: repositoryManager)
             }
         }
+        .onAppear {
+            startPeriodicRefresh()
+        }
+        .onDisappear {
+            stopPeriodicRefresh()
+        }
     }
 }
 
@@ -232,55 +259,27 @@ struct RepositoryRow: View {
     private let logger = Logger.workspace
     @ObservedObject var repository: Repository
     let isSelected: Bool
-    @Binding var selectedWorktree: Worktree?
     @ObservedObject var repositoryManager: RepositoryManager
     let onSelect: () -> Void
-    let onWorktreeSelect: (Worktree) -> Void
-
-    @State private var isExpanded = true
-    @State private var isRefreshing = false
-
-    var worktrees: [Worktree] {
-        let wts = (repository.worktrees as? Set<Worktree>) ?? []
-        return wts.sorted { wt1, wt2 in
-            if wt1.isPrimary != wt2.isPrimary {
-                return wt1.isPrimary
-            }
-            return (wt1.branch ?? "") < (wt2.branch ?? "")
-        }
-    }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            ForEach(worktrees, id: \.id) { worktree in
-                WorktreeRowView(
-                    worktree: worktree,
-                    isSelected: selectedWorktree?.id == worktree.id
-                )
-                .onTapGesture {
-                    onWorktreeSelect(worktree)
+        repositoryLabel
+            .background(selectionBackground)
+            .contextMenu {
+                Button {
+                    if let path = repository.path {
+                        repositoryManager.openInFinder(path)
+                    }
+                } label: {
+                    Label("workspace.repository.openFinder", systemImage: "folder")
                 }
-            }
-        } label: {
-            repositoryLabel
-        }
-        .background(selectionBackground)
-        .disclosureGroupStyle(SidebarDisclosureStyle())
-        .contextMenu {
-            Button {
-                if let path = repository.path {
-                    repositoryManager.openInFinder(path)
-                }
-            } label: {
-                Label("workspace.repository.openFinder", systemImage: "folder")
-            }
 
-            Button(role: .destructive) {
-                deleteRepository()
-            } label: {
-                Label("workspace.repository.remove", systemImage: "trash")
+                Button(role: .destructive) {
+                    deleteRepository()
+                } label: {
+                    Label("workspace.repository.remove", systemImage: "trash")
+                }
             }
-        }
     }
 
     private var repositoryLabel: some View {
@@ -306,21 +305,6 @@ struct RepositoryRow: View {
             }
 
             Spacer(minLength: 8)
-
-            if isRefreshing {
-                ProgressView()
-                    .controlSize(.small)
-                    .padding(.trailing, 4)
-            } else {
-                Button {
-                    refreshRepository()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 4)
-            }
         }
         .padding(.leading, 8)
         .padding(.trailing, 12)
@@ -348,92 +332,8 @@ struct RepositoryRow: View {
             }
         }
     }
-
-    private func refreshRepository() {
-        isRefreshing = true
-        Task {
-            do {
-                try await repositoryManager.refreshRepository(repository)
-            } catch {
-                logger.error("Failed to refresh repository: \(error.localizedDescription)")
-            }
-            isRefreshing = false
-        }
-    }
 }
 
-struct WorktreeRowView: View {
-    @ObservedObject var worktree: Worktree
-    let isSelected: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: worktree.isPrimary ? "arrow.triangle.branch" : "arrow.triangle.2.circlepath")
-                .font(.caption)
-                .foregroundStyle(isSelected ? .blue : .secondary)
-                .frame(width: 16)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(worktree.branch ?? String(localized: "workspace.worktree.unknown"))
-                    .font(.callout)
-                    .lineLimit(1)
-
-                Text(worktree.path ?? "")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            Spacer(minLength: 4)
-
-            if worktree.isPrimary {
-                Text("workspace.worktree.main")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(.blue, in: Capsule())
-            }
-        }
-        .padding(.leading, 48)
-        .padding(.trailing, 12)
-        .padding(.vertical, 6)
-        .contentShape(Rectangle())
-    }
-}
-
-struct SidebarDisclosureStyle: DisclosureGroupStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Button {
-                    withAnimation {
-                        configuration.isExpanded.toggle()
-                    }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
-                        .frame(width: 16, height: 16)
-                        .animation(.easeInOut(duration: 0.2), value: configuration.isExpanded)
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, 8)
-
-                configuration.label
-            }
-
-            if configuration.isExpanded {
-                configuration.content
-                    .padding(.top, 4)
-            }
-        }
-    }
-}
 
 #Preview {
     WorkspaceSidebarView(
