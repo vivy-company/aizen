@@ -191,6 +191,70 @@ struct BrowserTabView: View {
                 }
             }
         )
+        .contextMenu {
+            if let sessionId = session.id {
+                Button("Close Tab") {
+                    manager.closeSession(sessionId)
+                }
+
+                Divider()
+
+                Button("Close All to the Left") {
+                    closeAllToLeft(of: sessionId)
+                }
+                .disabled(!canCloseToLeft(of: sessionId))
+
+                Button("Close All to the Right") {
+                    closeAllToRight(of: sessionId)
+                }
+                .disabled(!canCloseToRight(of: sessionId))
+
+                Divider()
+
+                Button("Close Other Tabs") {
+                    closeOtherTabs(except: sessionId)
+                }
+                .disabled(manager.sessions.count <= 1)
+            }
+        }
+    }
+
+    private func canCloseToLeft(of sessionId: UUID) -> Bool {
+        guard let index = manager.sessions.firstIndex(where: { $0.id == sessionId }) else { return false }
+        return index > 0
+    }
+
+    private func canCloseToRight(of sessionId: UUID) -> Bool {
+        guard let index = manager.sessions.firstIndex(where: { $0.id == sessionId }) else { return false }
+        return index < manager.sessions.count - 1
+    }
+
+    private func closeAllToLeft(of sessionId: UUID) {
+        guard let index = manager.sessions.firstIndex(where: { $0.id == sessionId }) else { return }
+
+        for i in (0..<index).reversed() {
+            if let id = manager.sessions[i].id {
+                manager.closeSession(id)
+            }
+        }
+    }
+
+    private func closeAllToRight(of sessionId: UUID) {
+        guard let index = manager.sessions.firstIndex(where: { $0.id == sessionId }) else { return }
+
+        for i in ((index + 1)..<manager.sessions.count).reversed() {
+            if let id = manager.sessions[i].id {
+                manager.closeSession(id)
+            }
+        }
+    }
+
+    private func closeOtherTabs(except sessionId: UUID) {
+        for session in manager.sessions {
+            if let id = session.id, id != sessionId {
+                manager.closeSession(id)
+            }
+        }
     }
 
     // MARK: - Empty States

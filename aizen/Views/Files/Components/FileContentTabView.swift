@@ -24,6 +24,38 @@ struct FileContentTabView: View {
         viewModel.selectedFileId = viewModel.openFiles[currentIndex + 1].id
     }
 
+    private func canCloseToLeft(of fileId: UUID) -> Bool {
+        guard let index = viewModel.openFiles.firstIndex(where: { $0.id == fileId }) else { return false }
+        return index > 0
+    }
+
+    private func canCloseToRight(of fileId: UUID) -> Bool {
+        guard let index = viewModel.openFiles.firstIndex(where: { $0.id == fileId }) else { return false }
+        return index < viewModel.openFiles.count - 1
+    }
+
+    private func closeAllToLeft(of fileId: UUID) {
+        guard let index = viewModel.openFiles.firstIndex(where: { $0.id == fileId }) else { return }
+
+        for i in (0..<index).reversed() {
+            viewModel.closeFile(id: viewModel.openFiles[i].id)
+        }
+    }
+
+    private func closeAllToRight(of fileId: UUID) {
+        guard let index = viewModel.openFiles.firstIndex(where: { $0.id == fileId }) else { return }
+
+        for i in ((index + 1)..<viewModel.openFiles.count).reversed() {
+            viewModel.closeFile(id: viewModel.openFiles[i].id)
+        }
+    }
+
+    private func closeOtherTabs(except fileId: UUID) {
+        for file in viewModel.openFiles where file.id != fileId {
+            viewModel.closeFile(id: file.id)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if viewModel.openFiles.isEmpty {
@@ -63,6 +95,30 @@ struct FileContentTabView: View {
                                         viewModel.closeFile(id: file.id)
                                     }
                                 )
+                                .contextMenu {
+                                    Button("Close") {
+                                        viewModel.closeFile(id: file.id)
+                                    }
+
+                                    Divider()
+
+                                    Button("Close All to the Left") {
+                                        closeAllToLeft(of: file.id)
+                                    }
+                                    .disabled(!canCloseToLeft(of: file.id))
+
+                                    Button("Close All to the Right") {
+                                        closeAllToRight(of: file.id)
+                                    }
+                                    .disabled(!canCloseToRight(of: file.id))
+
+                                    Divider()
+
+                                    Button("Close Other Tabs") {
+                                        closeOtherTabs(except: file.id)
+                                    }
+                                    .disabled(viewModel.openFiles.count <= 1)
+                                }
                             }
                         }
                     }
