@@ -93,7 +93,9 @@ struct WorktreeSessionManager {
 
         do {
             try context.save()
-            viewModel.selectedChatSessionId = session.id
+            DispatchQueue.main.async {
+                viewModel.selectedChatSessionId = session.id
+            }
         } catch {
             logger.error("Failed to create chat session: \(error.localizedDescription)")
         }
@@ -113,8 +115,10 @@ struct WorktreeSessionManager {
         do {
             try context.save()
             logger.info("Created new terminal session with ID: \(session.id?.uuidString ?? "nil")")
-            viewModel.selectedTerminalSessionId = session.id
-            logger.info("Set selectedTerminalSessionId to: \(session.id?.uuidString ?? "nil")")
+            DispatchQueue.main.async {
+                viewModel.selectedTerminalSessionId = session.id
+                logger.info("Set selectedTerminalSessionId to: \(session.id?.uuidString ?? "nil")")
+            }
         } catch {
             logger.error("Failed to create terminal session: \(error.localizedDescription)")
         }

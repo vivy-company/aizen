@@ -81,8 +81,10 @@ class BrowserSessionManager: ObservableObject {
 
         do {
             try viewContext.save()
-            sessions.append(newSession)
-            selectSession(newId)
+            loadSessions()
+            DispatchQueue.main.async {
+                self.selectSession(newId)
+            }
         } catch {
             logger.error("Failed to create browser session: \(error)")
         }
@@ -98,23 +100,15 @@ class BrowserSessionManager: ObservableObject {
         // Remove webview
         webViews.removeValue(forKey: sessionId)
 
-        // Remove from sessions array first
-        sessions.removeAll { $0.id == sessionId }
-
         // Check if we need to switch to another tab BEFORE deleting
         let needsNewActiveTab = activeSessionId == sessionId
-        var newActiveSessionId: UUID?
-
-        if needsNewActiveTab && !sessions.isEmpty {
-            // Pick the first remaining session
-            newActiveSessionId = sessions.first?.id
-        }
 
         // Delete from Core Data
         viewContext.delete(session)
 
         do {
             try viewContext.save()
+            loadSessions()
 
             // If this was the last tab, create a new empty tab
             if sessions.isEmpty {
@@ -124,18 +118,18 @@ class BrowserSessionManager: ObservableObject {
 
             // Switch to another session if the closed one was active
             if needsNewActiveTab {
-                if let newId = newActiveSessionId {
-                    selectSession(newId)
-                } else {
-                    activeSessionId = nil
-                    currentURL = ""
-                    pageTitle = ""
+                DispatchQueue.main.async {
+                    if let newId = self.sessions.first?.id {
+                        self.selectSession(newId)
+                    } else {
+                        self.activeSessionId = nil
+                        self.currentURL = ""
+                        self.pageTitle = ""
+                    }
                 }
             }
         } catch {
             logger.error("Failed to delete browser session: \(error)")
-            // Re-add to sessions array on failure
-            sessions.append(session)
         }
     }
 
