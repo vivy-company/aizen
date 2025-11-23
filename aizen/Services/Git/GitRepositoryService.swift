@@ -141,19 +141,42 @@ class GitRepositoryService: ObservableObject {
     // MARK: - Remote Operations
 
     func fetch(onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
+        logger.info("GitRepositoryService.fetch() called")
         Task { [weak self] in
-            guard let self = self else { return }
+            guard let self = self else {
+                self?.logger.error("fetch: self is nil in Task")
+                return
+            }
+            self.logger.info("fetch: starting executeOperationBackground")
             await self.executeOperationBackground(
-                { try await self.remoteService.fetch(at: self.worktreePath) },
+                {
+                    self.logger.info("fetch: executing remoteService.fetch")
+                    try await self.remoteService.fetch(at: self.worktreePath)
+                    self.logger.info("fetch: remoteService.fetch completed")
+                },
                 onSuccess: { [weak self] in
+                    guard let self = self else {
+                        self?.logger.info("fetch onSuccess: self is nil, calling callback")
+                        onSuccess?()
+                        return
+                    }
+                    self.logger.info("fetch onSuccess: starting status reload")
                     // Refresh status after fetch to update ahead/behind counts
                     Task { [weak self] in
                         guard let self = self else { return }
+                        self.logger.info("fetch onSuccess: calling reloadStatusInternal")
                         await self.reloadStatusInternal()
-                        onSuccess?()
+                        self.logger.info("fetch onSuccess: reloadStatusInternal completed, calling callback")
+                        await MainActor.run {
+                            onSuccess?()
+                            self.logger.info("fetch onSuccess: callback completed")
+                        }
                     }
                 },
-                onError: onError
+                onError: { error in
+                    self.logger.error("fetch failed: \(error.localizedDescription)")
+                    onError?(error)
+                }
             )
         }
     }
@@ -164,11 +187,17 @@ class GitRepositoryService: ObservableObject {
             await self.executeOperationBackground(
                 { try await self.remoteService.pull(at: self.worktreePath) },
                 onSuccess: { [weak self] in
+                    guard let self = self else {
+                        onSuccess?()
+                        return
+                    }
                     // Refresh status after pull to update file lists and tracking info
                     Task { [weak self] in
                         guard let self = self else { return }
                         await self.reloadStatusInternal()
-                        onSuccess?()
+                        await MainActor.run {
+                            onSuccess?()
+                        }
                     }
                 },
                 onError: onError
@@ -177,19 +206,39 @@ class GitRepositoryService: ObservableObject {
     }
 
     func push(setUpstream: Bool = false, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
+        logger.info("GitRepositoryService.push() called")
         Task { [weak self] in
             guard let self = self else { return }
+            self.logger.info("push: starting executeOperationBackground")
             await self.executeOperationBackground(
-                { try await self.remoteService.push(at: self.worktreePath, setUpstream: setUpstream) },
+                {
+                    self.logger.info("push: executing remoteService.push")
+                    try await self.remoteService.push(at: self.worktreePath, setUpstream: setUpstream)
+                    self.logger.info("push: remoteService.push completed")
+                },
                 onSuccess: { [weak self] in
+                    guard let self = self else {
+                        self?.logger.info("push onSuccess: self is nil, calling callback")
+                        onSuccess?()
+                        return
+                    }
+                    self.logger.info("push onSuccess: starting status reload")
                     // Refresh status after push to update ahead/behind counts
                     Task { [weak self] in
                         guard let self = self else { return }
+                        self.logger.info("push onSuccess: calling reloadStatusInternal")
                         await self.reloadStatusInternal()
-                        onSuccess?()
+                        self.logger.info("push onSuccess: reloadStatusInternal completed, calling callback")
+                        await MainActor.run {
+                            onSuccess?()
+                            self.logger.info("push onSuccess: callback completed")
+                        }
                     }
                 },
-                onError: onError
+                onError: { error in
+                    self.logger.error("push failed: \(error.localizedDescription)")
+                    onError?(error)
+                }
             )
         }
     }

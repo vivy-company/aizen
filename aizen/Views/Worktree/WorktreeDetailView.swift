@@ -151,7 +151,6 @@ struct WorktreeDetailView: View {
 
     @ToolbarContentBuilder
     var sessionToolbarItems: some ToolbarContent {
-
         ToolbarItem(placement: .automatic) {
             SessionTabsScrollView(
                 selectedTab: selectedTab,
@@ -160,38 +159,11 @@ struct WorktreeDetailView: View {
                 selectedChatSessionId: $viewModel.selectedChatSessionId,
                 selectedTerminalSessionId: $viewModel.selectedTerminalSessionId,
                 onCloseChatSession: sessionManager.closeChatSession,
-                onCloseTerminalSession: sessionManager.closeTerminalSession
+                onCloseTerminalSession: sessionManager.closeTerminalSession,
+                onCreateChatSession: sessionManager.createNewChatSession,
+                onCreateTerminalSession: sessionManager.createNewTerminalSession
             )
         }
-        
-        if #available(macOS 26.0, *) {
-            ToolbarSpacer(.fixed)
-        } else {
-            ToolbarItem(placement: .automatic) {
-                Spacer().frame(width: 16).fixedSize()
-            }
-        }
-
-        ToolbarItem(placement: .automatic) {
-            if selectedTab == "chat" {
-                Button {
-                    sessionManager.createNewChatSession()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11))
-                }
-                .help(String(localized: "worktree.session.newChat"))
-            } else {
-                Button {
-                    sessionManager.createNewTerminalSession()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11))
-                }
-                .help(String(localized: "worktree.session.newTerminal"))
-            }
-        }
-
     }
 
     @ToolbarContentBuilder

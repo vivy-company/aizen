@@ -14,21 +14,7 @@ struct WorktreeGitOperations {
     let worktree: Worktree
     let logger: Logger
 
-    private var gitOperationHandler: GitOperationHandler?
-
-    init(
-        gitRepositoryService: GitRepositoryService,
-        repositoryManager: RepositoryManager,
-        worktree: Worktree,
-        logger: Logger
-    ) {
-        self.gitRepositoryService = gitRepositoryService
-        self.repositoryManager = repositoryManager
-        self.worktree = worktree
-        self.logger = logger
-    }
-
-    private func ensureHandler() -> GitOperationHandler {
+    private var handler: GitOperationHandler {
         GitOperationHandler(
             gitService: gitRepositoryService,
             repositoryManager: repositoryManager,
@@ -37,50 +23,50 @@ struct WorktreeGitOperations {
     }
 
     func stageFile(_ file: String) {
-        ensureHandler().stageFile(file)
+        handler.stageFile(file)
     }
 
     func unstageFile(_ file: String) {
-        ensureHandler().unstageFile(file)
+        handler.unstageFile(file)
     }
 
     func stageAll(onComplete: @escaping () -> Void) {
-        ensureHandler().stageAll(onComplete: onComplete)
+        handler.stageAll(onComplete: onComplete)
     }
 
     func unstageAll() {
-        ensureHandler().unstageAll()
+        handler.unstageAll()
     }
 
     func commit(_ message: String) {
-        ensureHandler().commit(message)
+        handler.commit(message)
     }
 
     func amendCommit(_ message: String) {
-        ensureHandler().amendCommit(message)
+        handler.amendCommit(message)
     }
 
     func commitWithSignoff(_ message: String) {
-        ensureHandler().commitWithSignoff(message)
+        handler.commitWithSignoff(message)
     }
 
     func switchBranch(_ branch: String) {
-        ensureHandler().switchBranch(branch, repository: worktree.repository)
+        handler.switchBranch(branch, repository: worktree.repository)
     }
 
     func createBranch(_ name: String) {
-        ensureHandler().createBranch(name, repository: worktree.repository)
+        handler.createBranch(name, repository: worktree.repository)
     }
 
     func fetch() {
-        ensureHandler().fetch(repository: worktree.repository)
+        handler.fetch(repository: worktree.repository)
     }
 
     func pull() {
-        ensureHandler().pull(repository: worktree.repository)
+        handler.pull(repository: worktree.repository)
     }
 
     func push() {
-        ensureHandler().push(repository: worktree.repository)
+        handler.push(repository: worktree.repository)
     }
 }

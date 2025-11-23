@@ -168,16 +168,20 @@ class GitOperationHandler {
     }
 
     func push(repository: Repository?) {
+        logger.info("Push initiated - checking remote...")
         ToastManager.shared.showLoading("Checking remote...")
 
         // Fetch first to check for remote changes
         gitService.fetch(
-            onSuccess: { [weak self] in
-                guard let self = self else { return }
+            onSuccess: { [self] in
+                self.logger.info("Fetch completed successfully in push flow")
 
                 // After fetch, check if we're behind
                 let status = self.gitService.currentStatus
+                self.logger.info("Current status - ahead: \(status.aheadCount), behind: \(status.behindCount)")
+
                 if status.behindCount > 0 {
+                    self.logger.warning("Remote has \(status.behindCount) commits ahead, blocking push")
                     ToastManager.shared.show(
                         "Remote has \(status.behindCount) new commit(s). Pull manually before pushing.",
                         type: .error,
@@ -185,25 +189,29 @@ class GitOperationHandler {
                     )
                 } else {
                     // No remote changes, proceed with push
+                    self.logger.info("No remote changes detected, proceeding with push")
                     self.performPush(repository: repository)
                 }
             },
-            onError: { [weak self] _ in
+            onError: { [self] error in
+                self.logger.error("Fetch failed in push flow: \(error.localizedDescription)")
                 // Fetch failed, try push anyway
-                self?.performPush(repository: repository)
+                self.performPush(repository: repository)
             }
         )
     }
 
     private func performPush(repository: Repository?) {
+        logger.info("performPush called")
         ToastManager.shared.showLoading("Pushing changes...")
         gitService.push(
-            onSuccess: {
+            onSuccess: { [self] in
+                self.logger.info("Push completed successfully")
                 ToastManager.shared.show("Push completed successfully", type: .success)
             },
-            onError: { [logger] error in
+            onError: { [self] error in
+                self.logger.error("Failed to push changes: \(error)")
                 ToastManager.shared.show("Push failed: \(error.localizedDescription)", type: .error, duration: 5.0)
-                logger.error("Failed to push changes: \(error)")
             }
         )
 

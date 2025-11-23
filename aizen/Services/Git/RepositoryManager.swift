@@ -9,10 +9,13 @@ import Foundation
 import CoreData
 import AppKit
 import Combine
+import os.log
 
 @MainActor
 class RepositoryManager: ObservableObject {
     private let viewContext: NSManagedObjectContext
+    private let container: NSPersistentContainer
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "RepositoryManager")
 
     // Domain services
     private let executor: GitCommandExecutor
@@ -24,6 +27,7 @@ class RepositoryManager: ObservableObject {
 
     init(viewContext: NSManagedObjectContext) {
         self.viewContext = viewContext
+        self.container = PersistenceController.shared.container
 
         // Initialize domain services
         self.executor = GitCommandExecutor()
@@ -142,15 +146,44 @@ class RepositoryManager: ObservableObject {
     }
 
     func refreshRepository(_ repository: Repository) async throws {
-        repository.lastUpdated = Date()
-        try await scanWorktrees(for: repository)
-        try viewContext.save()
+        guard let repositoryPath = repository.path else {
+            throw GitError.invalidPath
+        }
+
+        do {
+            repository.lastUpdated = Date()
+            try await scanWorktrees(for: repository)
+
+            // Save with error handling
+            if viewContext.hasChanges {
+                try viewContext.save()
+            }
+        } catch let error as NSError {
+            logger.error("Failed to refresh repository \(repositoryPath): \(error.localizedDescription)")
+
+            // Log merge conflict details if present
+            if let conflicts = error.userInfo[NSPersistentStoreSaveConflictsErrorKey] as? [NSMergeConflict] {
+                for conflict in conflicts {
+                    logger.error("Merge conflict: \(conflict.sourceObject.objectID)")
+                }
+            }
+
+            // Attempt recovery by refreshing the object from persistent store
+            viewContext.refresh(repository, mergeChanges: false)
+            logger.info("Recovered by refreshing repository from store")
+
+            throw error
+        }
     }
 
     // MARK: - Worktree Operations
 
     func scanWorktrees(for repository: Repository) async throws {
-        let worktreeInfos = try await worktreeService.listWorktrees(at: repository.path!)
+        guard let repositoryPath = repository.path else {
+            throw GitError.invalidPath
+        }
+
+        let worktreeInfos = try await worktreeService.listWorktrees(at: repositoryPath)
 
         // Get existing worktrees
         let existingWorktrees = (repository.worktrees as? Set<Worktree>) ?? []
