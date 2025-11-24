@@ -96,16 +96,6 @@ struct ToolCallView: View {
                 if let firstLine = trimmed.split(separator: "\n").map(String.init).first, !firstLine.isEmpty {
                     return firstLine
                 }
-            case .diff(let content):
-                if let path = content.path, !path.isEmpty {
-                    return path
-                }
-                if let firstNew = content.newText.split(separator: "\n").map(String.init).first, !firstNew.isEmpty {
-                    return firstNew
-                }
-                if let firstOld = content.oldText.split(separator: "\n").map(String.init).first, !firstOld.isEmpty {
-                    return firstOld
-                }
             default:
                 continue
             }
@@ -214,14 +204,10 @@ struct ContentBlockView: View {
                 Label(String(localized: "chat.content.image"), systemImage: "photo")
             case .resource:
                 Label(String(localized: "chat.content.resource"), systemImage: "doc.badge.gearshape")
+            case .resourceLink:
+                Label(String(localized: "chat.content.resourceLink"), systemImage: "link.circle")
             case .audio:
                 Label(String(localized: "chat.content.audio"), systemImage: "waveform")
-            case .embeddedResource:
-                Label(String(localized: "chat.content.embeddedResource"), systemImage: "doc.badge.gearshape.fill")
-            case .diff:
-                Label(String(localized: "chat.content.diff"), systemImage: "doc.text.magnifyingglass")
-            case .terminalEmbed:
-                Label(String(localized: "chat.content.terminal"), systemImage: "terminal")
             }
         }
         .font(.system(size: 10))
@@ -240,44 +226,32 @@ struct ContentBlockView: View {
         .buttonStyle(.plain)
     }
 
+    @ViewBuilder
     private var contentBody: some View {
-        Group {
-            switch block {
+        switch block {
             case .text(let content):
                 TextContentView(text: content.text)
             case .image(let content):
                 ACPImageView(data: content.data, mimeType: content.mimeType)
             case .resource(let content):
-                ACPResourceView(uri: content.resource.uri, mimeType: content.resource.mimeType, text: content.resource.text)
+                resourceView(for: content.resource)
             case .audio(let content):
                 Text(String(format: String(localized: "chat.content.audioType"), content.mimeType))
                     .foregroundColor(.secondary)
-            case .embeddedResource(let content):
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(String(format: String(localized: "chat.content.embedded"), content.uri))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            case .diff(let content):
+            case .resourceLink(let content):
                 VStack(alignment: .leading, spacing: 4) {
-                    if let path = content.path {
-                        Text(String(format: String(localized: "chat.content.file"), path))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    if let title = content.title {
+                        Text(title)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
                     }
-                    Text("chat.content.diffContent", bundle: .main)
-                        .font(.system(.body, design: .monospaced))
-                }
-            case .terminalEmbed(let content):
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(String(format: String(localized: "chat.content.terminalCommand"), content.command))
+                    Text(content.uri)
                         .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(content.output)
-                        .font(.system(.body, design: .monospaced))
+                        .foregroundColor(.blue)
                 }
+            default:
+                Text("Unsupported content type")
             }
-        }
     }
 
     private func copyContent() {
@@ -289,15 +263,21 @@ struct ContentBlockView: View {
         case .image:
             textToCopy = String(localized: "chat.content.imageContent")
         case .resource(let content):
-            textToCopy = content.resource.text ?? content.resource.uri
+            let uri: String
+            let text: String?
+            switch content.resource {
+            case .text(let textResource):
+                uri = textResource.uri
+                text = textResource.text
+            case .blob(let blobResource):
+                uri = blobResource.uri
+                text = nil
+            }
+            textToCopy = text ?? uri
+        case .resourceLink(let content):
+            textToCopy = content.uri
         case .audio(let content):
             textToCopy = String(format: String(localized: "chat.content.audioContent"), content.mimeType)
-        case .embeddedResource(let content):
-            textToCopy = content.uri
-        case .diff(let content):
-            textToCopy = "Old: \(content.oldText)\nNew: \(content.newText)"
-        case .terminalEmbed(let content):
-            textToCopy = content.output
         }
 
         NSPasteboard.general.clearContents()
@@ -307,6 +287,24 @@ struct ContentBlockView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             isCopied = false
         }
+    }
+
+    @ViewBuilder
+    private func resourceView(for resource: EmbeddedResourceType) -> some View {
+        let uri: String
+        let mimeType: String?
+        let text: String?
+        switch resource {
+        case .text(let textResource):
+            uri = textResource.uri
+            mimeType = textResource.mimeType
+            text = textResource.text
+        case .blob(let blobResource):
+            uri = blobResource.uri
+            mimeType = blobResource.mimeType
+            text = nil
+        }
+        ACPResourceView(uri: uri, mimeType: mimeType, text: text)
     }
 }
 
@@ -439,7 +437,7 @@ struct TerminalContentView: View {
             title: "Read file: main.swift",
             kind: .read,
             status: .completed,
-            content: [.text(TextContent(text: "import SwiftUI\n\nstruct ContentView: View {\n    var body: some View {\n        Text(\"Hello, World!\")\n    }\n}"))],
+            content: [.text(TextContent(text: "import SwiftUI\n\nstruct ContentView: View {\n    var body: some View {\n        Text(\"Hello, World!\")\n    }\n}", annotations: nil, _meta: nil))],
             locations: nil,
             rawInput: nil,
             rawOutput: nil
@@ -450,7 +448,7 @@ struct TerminalContentView: View {
             title: "Execute: swift build",
             kind: .execute,
             status: .inProgress,
-            content: [.text(TextContent(text: "$ swift build\nBuilding for production..."))],
+            content: [.text(TextContent(text: "$ swift build\nBuilding for production...", annotations: nil, _meta: nil))],
             locations: nil,
             rawInput: nil,
             rawOutput: nil
@@ -472,7 +470,7 @@ struct TerminalContentView: View {
             title: "Edit file: Config.swift",
             kind: .edit,
             status: .failed,
-            content: [.text(TextContent(text: "Error: File not found"))],
+            content: [.text(TextContent(text: "Error: File not found", annotations: nil, _meta: nil))],
             locations: nil,
             rawInput: nil,
             rawOutput: nil
@@ -483,7 +481,7 @@ struct TerminalContentView: View {
             title: "Apply diff",
             kind: .edit,
             status: .completed,
-            content: [.text(TextContent(text: "--- a/file.swift\n+++ b/file.swift\n@@ -1,3 +1,4 @@\n import SwiftUI\n+import Combine\n \n struct View: View {"))],
+            content: [.text(TextContent(text: "--- a/file.swift\n+++ b/file.swift\n@@ -1,3 +1,4 @@\n import SwiftUI\n+import Combine\n \n struct View: View {", annotations: nil, _meta: nil))],
             locations: nil,
             rawInput: nil,
             rawOutput: nil

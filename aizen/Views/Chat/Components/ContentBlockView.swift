@@ -158,7 +158,7 @@ struct AttachmentChipView: View {
     private var fileName: String {
         switch block {
         case .resource(let content):
-            resourceName(for: content.resource)
+            return resourceName(for: content.resource)
         case .resourceLink(let content):
             if let url = URL(string: content.uri) {
                 return url.lastPathComponent
@@ -220,6 +220,23 @@ struct AttachmentDetailView: View {
             return String(localized: "chat.content.audio")
         case .text:
             return String(localized: "chat.content.text")
+        }
+    }
+
+    private func resourceName(for resource: EmbeddedResourceType) -> String {
+        let uri = getResourceUri(from: resource)
+        if let url = URL(string: uri) {
+            return url.lastPathComponent
+        }
+        return String(localized: "chat.attachment.file")
+    }
+
+    private func getResourceUri(from resource: EmbeddedResourceType) -> String {
+        switch resource {
+        case .text(let textResource):
+            return textResource.uri
+        case .blob(let blobResource):
+            return blobResource.uri
         }
     }
 }
