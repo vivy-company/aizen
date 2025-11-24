@@ -37,46 +37,53 @@ extension AgentSession {
             // Handle different update types
             switch updateType {
             case "tool_call", "tool_call_update":
-                // Tool call info is at the update level, not in an array
+                // Prefer full payload when provided
+                if let toolCallsPayload = updateNotification.update.toolCalls, !toolCallsPayload.isEmpty {
+                    updateToolCalls(toolCallsPayload)
+                    break
+                }
+
+                // Fallback to single-field updates
                 if let toolCallId = updateNotification.update.toolCallId {
                     // If this is a new tool call (not an update), mark current message complete
-                    // This creates a visual break between agent message and tool calls
-
                     if updateNotification.update.sessionUpdate == "tool_call" &&
                        !toolCalls.contains(where: { $0.toolCallId == toolCallId }) {
                         markLastMessageComplete()
                     }
 
-                    // Check if this is an existing tool call
                     if let existingIndex = toolCalls.firstIndex(where: { $0.toolCallId == toolCallId }) {
-                        // Update existing tool call with new fields
+                        // Update existing tool call with new fields/content
                         var updated = toolCalls[existingIndex]
+                        let newBlocks = decodeContentBlocks(updateNotification.update.content)
+                        let mergedContent = coalesceAdjacentTextBlocks(updated.content + newBlocks)
 
-                        if let status = updateNotification.update.status {
-                            updated = ToolCall(
-                                toolCallId: updated.toolCallId,
-                                title: updateNotification.update.title ?? updated.title,
-                                kind: updateNotification.update.kind ?? updated.kind,
-                                status: status,
-                                content: updated.content,
-                                timestamp: updated.timestamp
-                            )
-                        }
+                        updated = ToolCall(
+                            toolCallId: updated.toolCallId,
+                            title: updateNotification.update.title ?? updated.title,
+                            kind: updateNotification.update.kind ?? updated.kind,
+                            status: updateNotification.update.status ?? updated.status,
+                            content: mergedContent,
+                            locations: updateNotification.update.locations ?? updated.locations,
+                            rawInput: updateNotification.update.rawInput ?? updated.rawInput,
+                            rawOutput: updateNotification.update.rawOutput ?? updated.rawOutput,
+                            timestamp: updated.timestamp
+                        )
 
                         toolCalls[existingIndex] = updated
-                    } else if let title = updateNotification.update.title,
-                              let kind = updateNotification.update.kind,
-                              let status = updateNotification.update.status {
-                        // New tool call
-                        let toolCall = ToolCall(
+                    } else {
+                        // Create minimal placeholder so it shows up in UI even if some fields missing
+                        let newCall = ToolCall(
                             toolCallId: toolCallId,
-                            title: title,
-                            kind: kind,
-                            status: status,
-                            content: [],
+                            title: updateNotification.update.title ?? "Tool call",
+                            kind: updateNotification.update.kind ?? .other,
+                            status: updateNotification.update.status ?? .pending,
+                            content: coalesceAdjacentTextBlocks(decodeContentBlocks(updateNotification.update.content)),
+                            locations: updateNotification.update.locations,
+                            rawInput: updateNotification.update.rawInput,
+                            rawOutput: updateNotification.update.rawOutput,
                             timestamp: Date()
                         )
-                        toolCalls.append(toolCall)
+                        toolCalls.append(newCall)
                     }
                 }
 
@@ -160,18 +167,122 @@ extension AgentSession {
             if let index = toolCalls.firstIndex(where: { $0.toolCallId == newCall.toolCallId }) {
                 // Merge content instead of replacing entirely
                 let existingContent = toolCalls[index].content
-                let mergedContent = existingContent + newCall.content
-
+                let mergedContent = coalesceAdjacentTextBlocks(existingContent + newCall.content)
                 toolCalls[index] = ToolCall(
                     toolCallId: newCall.toolCallId,
-                    title: newCall.title,
+                    title: newCall.title.isEmpty ? toolCalls[index].title : newCall.title,
                     kind: newCall.kind,
                     status: newCall.status,
-                    content: mergedContent
+                    content: mergedContent,
+                    locations: newCall.locations ?? toolCalls[index].locations,
+                    rawInput: newCall.rawInput ?? toolCalls[index].rawInput,
+                    rawOutput: newCall.rawOutput ?? toolCalls[index].rawOutput,
+                    timestamp: toolCalls[index].timestamp
                 )
             } else {
                 toolCalls.append(newCall)
             }
         }
     }
+
+    // MARK: - Content Decoding
+
+    private func decodeContentBlocks(_ content: AnyCodable?) -> [ContentBlock] {
+        guard let value = content?.value else { return [] }
+
+        // 1) simple shapes
+        if let string = value as? String {
+            return [.text(TextContent(text: string))]
+        }
+
+        if let strings = value as? [String] {
+            return [.text(TextContent(text: strings.joined(separator: "\n")))]
+        }
+
+        // 2) try direct decode of standard content blocks
+        if let array = value as? [[String: Any]] {
+            do {
+                let data = try JSONSerialization.data(withJSONObject: array)
+                return try JSONDecoder().decode([ContentBlock].self, from: data)
+            } catch {
+                // Attempt to unwrap MCP-style {"type":"content","content":{...}}
+                let flattened = array.compactMap { dict -> String? in
+                    if let inner = dict["content"] as? [String: Any] {
+                        return extractText(inner["text"])
+                    }
+                    return extractText(dict["text"])
+                }
+                if !flattened.isEmpty {
+                    return [.text(TextContent(text: flattened.joined()))]
+                }
+                logger.debug("Tool call content decode failed: \(error.localizedDescription); raw=\(array)")
+            }
+        }
+
+        // 3) single dict
+        if let dict = value as? [String: Any] {
+            if let text = extractText(dict["text"]) {
+                return [.text(TextContent(text: text))]
+            }
+            if let inner = dict["content"] as? [String: Any], let text = extractText(inner["text"]) {
+                return [.text(TextContent(text: text))]
+            }
+        }
+
+        // last resort
+        logger.debug("Tool call content decode failed: unhandled shape raw=\(String(describing: value))")
+        return []
+    }
+
+    /// Merge adjacent text blocks to avoid fragment spam from streamed chunks
+    private func coalesceAdjacentTextBlocks(_ blocks: [ContentBlock]) -> [ContentBlock] {
+        var result: [ContentBlock] = []
+
+        for block in blocks {
+            if case .text(let newText) = block, let last = result.last, case .text(let lastText) = last {
+                // Skip exact duplicates
+                if lastText.text == newText.text {
+                    continue
+                }
+                // Replace last with combined text
+                result.removeLast()
+                let combined = TextContent(text: lastText.text + newText.text)
+                result.append(.text(combined))
+            } else {
+                result.append(block)
+            }
+        }
+        return result
+    }
+
+    /// Extract best-effort string from loosely-typed "text" payloads
+    private func extractText(_ raw: Any?) -> String? {
+        guard let raw else { return nil }
+
+        if let str = raw as? String { return str }
+
+        if let dict = raw as? [String: Any] {
+            // Prefer common output keys
+            let preferredKeys = ["stdout", "stderr", "output", "text", "message", "result"]
+            for key in preferredKeys {
+                if let val = dict[key] as? String {
+                    return val
+                }
+            }
+            // Fallback: pretty-print JSON
+            if let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted]),
+               let string = String(data: data, encoding: .utf8) {
+                return string
+            }
+        }
+
+        if let array = raw as? [Any],
+           let data = try? JSONSerialization.data(withJSONObject: array, options: [.prettyPrinted]),
+           let string = String(data: data, encoding: .utf8) {
+            return string
+        }
+
+        return String(describing: raw)
+    }
+
 }

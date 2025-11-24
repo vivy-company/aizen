@@ -272,6 +272,8 @@ actor ACPClient {
         let requestId = RequestId.number(nextRequestId)
         nextRequestId += 1
 
+        logger.debug("→ Request \(method, privacy: .public) [id: \(self.requestIdDescription(requestId))]")
+
         let paramsData = try encoder.encode(params)
         let paramsValue = try decoder.decode(AnyCodable.self, from: paramsData)
 
@@ -333,11 +335,14 @@ actor ACPClient {
         do {
             let message = try decoder.decode(ACPMessage.self, from: data)
 
+            logger.debug("← Message \(self.describeMessage(message), privacy: .public)")
+
             switch message {
             case .response(let response):
                 await handleResponse(response)
 
             case .notification(let notification):
+                logger.debug("↪︎ Notification \(notification.method, privacy: .public)")
                 notificationContinuation.yield(notification)
 
             case .request(let request):
@@ -415,6 +420,24 @@ actor ACPClient {
     private func failRequest(id: RequestId, error: Error) async {
         if let continuation = pendingRequests.removeValue(forKey: id) {
             continuation.resume(throwing: error)
+        }
+    }
+
+    private func requestIdDescription(_ id: RequestId) -> String {
+        switch id {
+        case .number(let num): return String(num)
+        case .string(let str): return str
+        }
+    }
+
+    private func describeMessage(_ message: ACPMessage) -> String {
+        switch message {
+        case .request(let request):
+            return "request \(request.method) [id: \(requestIdDescription(request.id))]"
+        case .response(let response):
+            return "response [id: \(requestIdDescription(response.id))]"
+        case .notification(let notification):
+            return "notification \(notification.method)"
         }
     }
 }

@@ -38,6 +38,7 @@ struct TerminalPaneView: View {
         }
         .ignoresSafeArea(.container, edges: .bottom)
         .opacity(isFocused ? 1.0 : 0.6)
+        .clipped()
         .onTapGesture {
             onFocus()
         }

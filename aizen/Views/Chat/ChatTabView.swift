@@ -44,8 +44,11 @@ struct ChatTabView: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .opacity(selectedSessionId == session.id ? 1 : 0)
+                    .allowsHitTesting(selectedSessionId == session.id)
+                    .zIndex(selectedSessionId == session.id ? 1 : 0)
                 }
             }
+            .animation(.easeInOut(duration: 0.2), value: selectedSessionId)
             .onAppear {
                 if selectedSessionId == nil {
                     selectedSessionId = sessions.first?.id

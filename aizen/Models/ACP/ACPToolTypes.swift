@@ -15,13 +15,18 @@ struct ToolCall: Codable, Identifiable {
     let kind: ToolKind
     let status: ToolStatus
     let content: [ContentBlock]
+    let locations: [ToolLocation]?
+    let rawInput: AnyCodable?
+    let rawOutput: AnyCodable?
     var timestamp: Date = Date()
 
     var id: String { toolCallId }
 
     enum CodingKeys: String, CodingKey {
         case toolCallId = "tool_call_id"
-        case title, kind, status, content
+        case title, kind, status, content, locations
+        case rawInput = "raw_input"
+        case rawOutput = "raw_output"
     }
 }
 
@@ -102,4 +107,3 @@ enum PlanEntryStatus: String, Codable {
 struct Plan: Codable {
     let entries: [PlanEntry]
 }
-

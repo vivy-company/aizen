@@ -135,7 +135,11 @@ struct TerminalViewWrapper: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         // Always update frame size to match allocated space
         // This matches Ghostty's SurfaceRepresentable approach
-        nsView.frame.size = size
+        if nsView.frame.size != size || nsView.frame.origin != .zero {
+            nsView.frame = CGRect(origin: .zero, size: size)
+            nsView.needsLayout = true
+            nsView.layoutSubtreeIfNeeded()
+        }
 
         // Handle focus changes
         if shouldFocus {

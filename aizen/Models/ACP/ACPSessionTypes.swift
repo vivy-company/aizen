@@ -421,6 +421,7 @@ struct SessionUpdate: Codable {
     let status: ToolStatus?
     let locations: [ToolLocation]?
     let rawInput: AnyCodable?
+    let rawOutput: AnyCodable?
 
     enum CodingKeys: String, CodingKey {
         case sessionUpdate
@@ -435,6 +436,6 @@ struct SessionUpdate: Codable {
         case status
         case locations
         case rawInput
+        case rawOutput
     }
 }
-

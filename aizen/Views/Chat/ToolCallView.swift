@@ -6,67 +6,45 @@
 //
 
 import SwiftUI
+import Foundation
 
 struct ToolCallView: View {
     let toolCall: ToolCall
-    @State private var isExpanded = false
+    var onOpenDetails: ((ToolCall) -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    isExpanded.toggle()
-                }
-            }) {
-                HStack(spacing: 6) {
-                    // Status dot
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 5, height: 5)
+        Button(action: { onOpenDetails?(toolCall) }) {
+            HStack(spacing: 8) {
+                // Status dot
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 6, height: 6)
 
-                    // Tool icon
-                    toolIcon
+                // Tool icon
+                toolIcon
+                    .foregroundColor(.secondary)
+                    .frame(width: 12, height: 12)
+
+                // Title
+                Text(toolCall.title)
+                    .font(.system(size: 11))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                if let preview = editPreviewText {
+                    Text(preview)
+                        .font(.system(size: 10, design: .monospaced))
                         .foregroundColor(.secondary)
-                        .frame(width: 12, height: 12)
-
-                    // Title
-                    Text(toolCall.title)
-                        .font(.system(size: 11))
-                        .foregroundColor(.primary)
                         .lineLimit(1)
-
-                    // Minimal status text
-                    Text(statusText)
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    // Expand indicator (only show if has content)
-                    if !toolCall.content.isEmpty {
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 9))
-                            .foregroundColor(.secondary)
-                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer(minLength: 6)
             }
-            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
             .contentShape(Rectangle())
-
-            // Expanded content
-            if isExpanded && !toolCall.content.isEmpty {
-                Divider()
-                    .padding(.vertical, 2)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(toolCall.content.enumerated()), id: \.offset) { _, block in
-                        ContentBlockView(block: block)
-                    }
-                }
-                .padding(8)
-            }
         }
+        .buttonStyle(.plain)
         .background(backgroundColor)
         .cornerRadius(3)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -83,6 +61,22 @@ struct ToolCallView: View {
         }
     }
 
+    private var statusBadge: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 7, height: 7)
+
+            Text(statusText)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(statusColor)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(statusColor.opacity(0.12))
+        .cornerRadius(10)
+    }
+
     private var statusColor: Color {
         switch toolCall.status {
         case .pending: return .yellow
@@ -90,6 +84,34 @@ struct ToolCallView: View {
         case .completed: return .green
         case .failed: return .red
         }
+    }
+
+    private var editPreviewText: String? {
+        guard toolCall.kind == .edit else { return nil }
+
+        for block in toolCall.content {
+            switch block {
+            case .text(let content):
+                let trimmed = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let firstLine = trimmed.split(separator: "\n").map(String.init).first, !firstLine.isEmpty {
+                    return firstLine
+                }
+            case .diff(let content):
+                if let path = content.path, !path.isEmpty {
+                    return path
+                }
+                if let firstNew = content.newText.split(separator: "\n").map(String.init).first, !firstNew.isEmpty {
+                    return firstNew
+                }
+                if let firstOld = content.oldText.split(separator: "\n").map(String.init).first, !firstOld.isEmpty {
+                    return firstOld
+                }
+            default:
+                continue
+            }
+        }
+
+        return nil
     }
 
     // MARK: - Tool Icon
@@ -157,6 +179,7 @@ struct ToolCallView: View {
         // This is a placeholder for future enhancement
         nil
     }
+
 }
 
 // MARK: - Content Block View
@@ -418,7 +441,10 @@ struct TerminalContentView: View {
             title: "Read file: main.swift",
             kind: .read,
             status: .completed,
-            content: [.text(TextContent(text: "import SwiftUI\n\nstruct ContentView: View {\n    var body: some View {\n        Text(\"Hello, World!\")\n    }\n}"))]
+            content: [.text(TextContent(text: "import SwiftUI\n\nstruct ContentView: View {\n    var body: some View {\n        Text(\"Hello, World!\")\n    }\n}"))],
+            locations: nil,
+            rawInput: nil,
+            rawOutput: nil
         ))
 
         ToolCallView(toolCall: ToolCall(
@@ -426,7 +452,10 @@ struct TerminalContentView: View {
             title: "Execute: swift build",
             kind: .execute,
             status: .inProgress,
-            content: [.text(TextContent(text: "$ swift build\nBuilding for production..."))]
+            content: [.text(TextContent(text: "$ swift build\nBuilding for production..."))],
+            locations: nil,
+            rawInput: nil,
+            rawOutput: nil
         ))
 
         ToolCallView(toolCall: ToolCall(
@@ -434,7 +463,10 @@ struct TerminalContentView: View {
             title: "Search for TODO comments",
             kind: .search,
             status: .pending,
-            content: []
+            content: [],
+            locations: nil,
+            rawInput: nil,
+            rawOutput: nil
         ))
 
         ToolCallView(toolCall: ToolCall(
@@ -442,7 +474,10 @@ struct TerminalContentView: View {
             title: "Edit file: Config.swift",
             kind: .edit,
             status: .failed,
-            content: [.text(TextContent(text: "Error: File not found"))]
+            content: [.text(TextContent(text: "Error: File not found"))],
+            locations: nil,
+            rawInput: nil,
+            rawOutput: nil
         ))
 
         ToolCallView(toolCall: ToolCall(
@@ -450,7 +485,10 @@ struct TerminalContentView: View {
             title: "Apply diff",
             kind: .edit,
             status: .completed,
-            content: [.text(TextContent(text: "--- a/file.swift\n+++ b/file.swift\n@@ -1,3 +1,4 @@\n import SwiftUI\n+import Combine\n \n struct View: View {"))]
+            content: [.text(TextContent(text: "--- a/file.swift\n+++ b/file.swift\n@@ -1,3 +1,4 @@\n import SwiftUI\n+import Combine\n \n struct View: View {"))],
+            locations: nil,
+            rawInput: nil,
+            rawOutput: nil
         ))
     }
     .padding()

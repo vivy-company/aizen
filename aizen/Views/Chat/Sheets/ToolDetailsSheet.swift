@@ -6,11 +6,11 @@
 //
 
 import SwiftUI
+import Foundation
 
 struct ToolDetailsSheet: View {
     @Environment(\.dismiss) private var dismiss
     let toolCalls: [ToolCall]
-    @State private var expandedTools: Set<String> = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,63 +48,66 @@ struct ToolDetailsSheet: View {
 
     @ViewBuilder
     private func toolCallDetailView(_ toolCall: ToolCall) -> some View {
-        let isExpanded = expandedTools.contains(toolCall.toolCallId)
+        VStack(alignment: .leading, spacing: 10) {
+            // Header
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(statusColor(for: toolCall.status))
+                    .frame(width: 8, height: 8)
 
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    if isExpanded {
-                        expandedTools.remove(toolCall.toolCallId)
-                    } else {
-                        expandedTools.insert(toolCall.toolCallId)
-                    }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(toolCall.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text(statusLabel(for: toolCall.status))
+                        .font(.system(size: 11))
+                        .foregroundStyle(statusColor(for: toolCall.status))
                 }
-            }) {
-                HStack(spacing: 10) {
-                    Circle()
-                        .fill(statusColor(for: toolCall.status))
-                        .frame(width: 6, height: 6)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(toolCall.title)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.primary)
-
-                        Text(statusLabel(for: toolCall.status))
-                            .font(.system(size: 10))
-                            .foregroundStyle(statusColor(for: toolCall.status))
-                    }
-
-                    Spacer()
-
-                    if !toolCall.content.isEmpty {
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Spacer()
             }
-            .buttonStyle(.plain)
-            .contentShape(Rectangle())
 
-            if isExpanded && !toolCall.content.isEmpty {
-                Divider()
-                    .padding(.vertical, 4)
+            if let locations = toolCall.locations, !locations.isEmpty {
+                SectionHeader(title: "Files")
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(locations.enumerated()), id: \.offset) { _, loc in
+                        HStack(spacing: 6) {
+                            Text(loc.path ?? "unknown")
+                                .font(.system(size: 11, weight: .semibold))
+                                .lineLimit(1)
+                            if let start = loc.startLine {
+                                Text("L\(start)\(loc.endLine != nil ? "–\(loc.endLine!)" : "")")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
 
+            if let rawInput = toolCall.rawInput {
+                SectionHeader(title: "Input")
+                JsonBlockView(text: stringify(rawInput))
+            }
+
+            if let rawOutput = toolCall.rawOutput {
+                SectionHeader(title: "Output")
+                JsonBlockView(text: stringify(rawOutput))
+            }
+
+            if !toolCall.content.isEmpty {
+                SectionHeader(title: "Text Output")
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(toolCall.content.enumerated()), id: \.offset) { _, block in
                         CompactContentBlockView(block: block)
                     }
                 }
-                .padding(10)
-                .padding(.horizontal, 2)
             }
         }
-        .background(Color(.controlBackgroundColor).opacity(0.2))
-        .cornerRadius(6)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.controlBackgroundColor).opacity(0.35))
+        .cornerRadius(8)
     }
 
     private func statusColor(for status: ToolStatus) -> Color {
@@ -124,6 +127,7 @@ struct ToolDetailsSheet: View {
         case .failed: return String(localized: "chat.tool.status.failed")
         }
     }
+
 }
 
 // MARK: - Compact Content Block View
@@ -234,4 +238,53 @@ struct CompactContentBlockView: View {
         }
         return .primary
     }
+}
+
+// MARK: - Helpers
+
+private struct SectionHeader: View {
+    let title: String
+    var body: some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct JsonBlockView: View {
+    let text: String
+    var body: some View {
+        ScrollView([.horizontal, .vertical]) {
+            Text(text)
+                .font(.system(size: 11, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: 200)
+        .padding(8)
+        .background(Color(nsColor: .textBackgroundColor))
+        .cornerRadius(4)
+    }
+}
+
+private func stringify(_ any: AnyCodable) -> String {
+    // If the raw value is already a String, try to pretty-print if JSON
+    if let str = any.value as? String {
+        if let data = str.data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: data),
+           let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted]),
+           let out = String(data: pretty, encoding: .utf8) {
+            return out
+        }
+        return str
+    }
+
+    if let data = try? JSONEncoder().encode(any),
+       let obj = try? JSONSerialization.jsonObject(with: data),
+       let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted]),
+       let string = String(data: pretty, encoding: .utf8) {
+        return string
+    }
+    return String(describing: any.value)
 }

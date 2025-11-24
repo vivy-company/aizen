@@ -15,11 +15,12 @@ struct ChatMessageList: View {
     let onScrollProxyReady: (ScrollViewProxy) -> Void
     let onAppear: () -> Void
     let renderInlineMarkdown: (String) -> AttributedString
+    var onToolTap: (ToolCall) -> Void = { _ in }
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 16) {
+                LazyVStack(spacing: 10) {
                     ForEach(timelineItems, id: \.id) { item in
                         switch item {
                         case .message(let message):
@@ -27,8 +28,10 @@ struct ChatMessageList: View {
                                 .id(message.id)
                                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
                         case .toolCall(let toolCall):
-                            ToolCallView(toolCall: toolCall)
-                                .transition(.opacity.combined(with: .move(edge: .leading)))
+                            ToolCallView(toolCall: toolCall) { tapped in
+                                onToolTap(tapped)
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .leading)))
                         }
                     }
 
@@ -38,7 +41,7 @@ struct ChatMessageList: View {
                             .transition(.opacity)
                     }
                 }
-                .padding(.vertical, 16)
+                .padding(.vertical, 12)
                 .padding(.horizontal, 20)
             }
             .onAppear {

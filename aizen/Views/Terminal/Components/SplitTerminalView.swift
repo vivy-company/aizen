@@ -19,6 +19,8 @@ struct SplitTerminalView: View {
     @State private var layout: SplitNode
     @State private var focusedPaneId: String
     @State private var layoutVersion: Int = 0  // Increment when layout changes to force refresh
+    @State private var layoutSaveWorkItem: DispatchWorkItem?
+    @State private var focusSaveWorkItem: DispatchWorkItem?
     private let logger = Logger.terminal
 
     init(worktree: Worktree, session: TerminalSession, sessionManager: TerminalSessionManager, isSelected: Bool = false) {
@@ -41,24 +43,18 @@ struct SplitTerminalView: View {
 
     var body: some View {
         renderNode(layout)
-            .task(id: "\(layout)-\(focusedPaneId)-\(isSelected)") {
-                // Save layout when it changes
-                if let json = SplitLayoutHelper.encode(layout) {
-                    session.splitLayout = json
-                }
-
-                // Save focused pane when it changes
-                session.focusedPaneId = focusedPaneId
-
-                saveContext()
-
-                // Refresh focus when tab becomes selected
-                if isSelected {
-                    try? await Task.sleep(nanoseconds: 50_000_000) // 0.05s
-                    let currentPane = focusedPaneId
-                    focusedPaneId = ""
-                    focusedPaneId = currentPane
-                }
+            // Persist layout changes without re-triggering the whole task chain
+            .onChange(of: layout) { _ in
+                scheduleLayoutSave()
+            }
+            // Persist focused pane changes separately
+            .onChange(of: focusedPaneId) { _ in
+                scheduleFocusSave()
+            }
+            // Initial persistence to store default layout/pane
+            .onAppear {
+                persistLayout()
+                persistFocus()
             }
             // Only set split actions for the currently selected/visible session
             .focusedSceneValue(\.terminalSplitActions, isSelected ? TerminalSplitActions(
@@ -66,6 +62,10 @@ struct SplitTerminalView: View {
                 splitVertical: splitVertical,
                 closePane: closePane
             ) : nil)
+            .onDisappear {
+                layoutSaveWorkItem?.cancel()
+                focusSaveWorkItem?.cancel()
+            }
     }
 
     private func renderNode(_ node: SplitNode) -> AnyView {
@@ -195,5 +195,39 @@ struct SplitTerminalView: View {
         } catch {
             logger.error("Failed to save split layout: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Persistence Helpers
+
+    private func scheduleLayoutSave() {
+        layoutSaveWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [layout] in
+            persistLayout(layout)
+        }
+        layoutSaveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
+    }
+
+    private func scheduleFocusSave() {
+        focusSaveWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [focusedPaneId] in
+            persistFocus(focusedPaneId)
+        }
+        focusSaveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: workItem)
+    }
+
+    private func persistLayout(_ layoutToSave: SplitNode? = nil) {
+        let node = layoutToSave ?? layout
+        if let json = SplitLayoutHelper.encode(node) {
+            session.splitLayout = json
+            saveContext()
+        }
+    }
+
+    private func persistFocus(_ paneId: String? = nil) {
+        let id = paneId ?? focusedPaneId
+        session.focusedPaneId = id
+        saveContext()
     }
 }

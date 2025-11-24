@@ -37,6 +37,7 @@ class GhosttyRenderingSetup {
         metalLayer.device = MTLCreateSystemDefaultDevice()
         metalLayer.pixelFormat = .bgra8Unorm
         metalLayer.framebufferOnly = true
+        metalLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 2.0
 
         // IMPORTANT: Set layer before wantsLayer for proper Metal initialization
         view.layer = metalLayer
@@ -178,7 +179,8 @@ class GhosttyRenderingSetup {
         guard let surface = surface else { return false }
         guard view.bounds.width > 0 && view.bounds.height > 0 else { return false }
 
-        let scaledSize = view.convertToBacking(view.bounds.size)
+        var scaledSize = view.convertToBacking(view.bounds.size)
+        scaledSize = snapSizeToCell(surface: surface, scaledSize: scaledSize)
 
         // Only update if size changed by at least 1 pixel
         let widthChanged = abs(scaledSize.width - lastSize.width) >= 1.0
@@ -187,12 +189,22 @@ class GhosttyRenderingSetup {
         guard widthChanged || heightChanged else { return false }
 
         lastSize = scaledSize
+        if let metalLayer = metalLayer {
+            metalLayer.drawableSize = scaledSize
+        }
         ghostty_surface_set_size(
             surface,
             UInt32(scaledSize.width),
             UInt32(scaledSize.height)
         )
+        ghostty_surface_refresh(surface)
 
         return true
+    }
+
+    /// Snap the desired pixel size down to the nearest full terminal cell to avoid partial-cell artifacts.
+    /// Snap size to whole pixels (scaledSize is already in pixel units).
+    func snapSizeToCell(surface: ghostty_surface_t, scaledSize: CGSize) -> CGSize {
+        CGSize(width: floor(scaledSize.width), height: floor(scaledSize.height))
     }
 }

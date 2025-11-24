@@ -155,25 +155,8 @@ class GhosttyTerminalView: NSView {
     }
 
     private func setupFrameObservation() {
-        // Observe frame changes to resize terminal when split panes are resized
-        NotificationCenter.default.addObserver(
-            forName: NSView.frameDidChangeNotification,
-            object: self,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self = self,
-                  let surface = self.surface?.unsafeCValue else { return }
-
-            let scaledSize = self.convertToBacking(self.bounds.size)
-            ghostty_surface_set_size(
-                surface,
-                UInt32(scaledSize.width),
-                UInt32(scaledSize.height)
-            )
-        }
-
-        // Enable frame change notifications
-        self.postsFrameChangedNotifications = true
+        // We rely on layout() + updateLayout to resize the surface.
+        self.postsFrameChangedNotifications = false
     }
 
     // MARK: - NSView Overrides

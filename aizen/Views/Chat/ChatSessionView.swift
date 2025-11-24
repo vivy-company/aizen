@@ -22,6 +22,7 @@ struct ChatSessionView: View {
     @State private var showingVoiceRecording = false
     @State private var showingPermissionError = false
     @State private var permissionErrorMessage = ""
+    @State private var selectedToolCall: ToolCall?
 
     init(worktree: Worktree, session: ChatSession, sessionManager: ChatSessionManager, viewContext: NSManagedObjectContext) {
         self.worktree = worktree
@@ -54,7 +55,10 @@ struct ChatSessionView: View {
                             viewModel.scrollProxy = proxy
                         },
                         onAppear: viewModel.loadMessages,
-                        renderInlineMarkdown: viewModel.renderInlineMarkdown
+                        renderInlineMarkdown: viewModel.renderInlineMarkdown,
+                        onToolTap: { toolCall in
+                            selectedToolCall = toolCall
+                        }
                     )
 
                     Spacer(minLength: 0)
@@ -147,6 +151,9 @@ struct ChatSessionView: View {
                     versionInfo: versionInfo
                 )
             }
+        }
+        .sheet(item: $selectedToolCall) { toolCall in
+            ToolDetailsSheet(toolCalls: [toolCall])
         }
         .sheet(isPresented: Binding(
             get: {

@@ -29,7 +29,6 @@ class ChatSessionViewModel: ObservableObject {
 
     // MARK: - Services
 
-    @Published var agentRouter = AgentRouter()
     @Published var audioService = AudioService()
 
     // MARK: - State
@@ -122,27 +121,26 @@ class ChatSessionViewModel: ObservableObject {
         }
 
         Task {
-            await agentRouter.ensureSession(for: selectedAgent)
-            if let newSession = agentRouter.getSession(for: selectedAgent) {
-                sessionManager.setAgentSession(newSession, for: sessionId)
-                currentAgentSession = newSession
-                updateDerivedState(from: newSession)
+            // Create a dedicated AgentSession for this chat session to avoid cross-tab interference
+            let newSession = AgentSession(agentName: self.selectedAgent, workingDirectory: worktree.path ?? "")
+            sessionManager.setAgentSession(newSession, for: sessionId)
+            currentAgentSession = newSession
+            updateDerivedState(from: newSession)
 
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    messages = newSession.messages
-                    toolCalls = newSession.toolCalls
-                    rebuildTimeline()
-                }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                messages = newSession.messages
+                toolCalls = newSession.toolCalls
+                rebuildTimeline()
+            }
 
-                setupSessionObservers(session: newSession)
+            setupSessionObservers(session: newSession)
 
-                if !newSession.isActive {
-                    do {
-                        try await newSession.start(agentName: self.selectedAgent, workingDir: worktree.path!)
-                    } catch {
-                        self.logger.error("Failed to start new session for \(self.selectedAgent): \(error.localizedDescription)")
-                        // Session will show auth dialog or setup dialog automatically via needsAuthentication/needsAgentSetup
-                    }
+            if !newSession.isActive {
+                do {
+                    try await newSession.start(agentName: self.selectedAgent, workingDir: worktree.path!)
+                } catch {
+                    self.logger.error("Failed to start new session for \(self.selectedAgent): \(error.localizedDescription)")
+                    // Session will show auth dialog or setup dialog automatically via needsAuthentication/needsAgentSetup
                 }
             }
         }
