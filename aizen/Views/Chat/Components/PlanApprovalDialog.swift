@@ -24,62 +24,51 @@ struct PlanApprovalDialog: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
-                Image(systemName: "list.clipboard")
-                    .font(.title3)
-                    .foregroundStyle(.blue)
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.15))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "list.clipboard")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.blue)
+                }
 
-                Text("Agent Plan")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Review Plan")
+                        .font(.headline)
+                    Text("The agent wants to execute this plan")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
                 Button {
                     isPresented = false
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 18))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(Color(nsColor: .separatorColor).opacity(0.5), in: Circle())
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-            .background(.ultraThinMaterial)
-
-            Divider()
+            .padding(20)
 
             // Plan content
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Review the agent's proposed plan:")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    if let planContent = planContent {
-                        PlanContentView(content: planContent)
-                            .font(.system(size: 13))
-                            .foregroundStyle(.primary)
-                            .padding(16)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(nsColor: .textBackgroundColor))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .strokeBorder(Color.blue.opacity(0.2), lineWidth: 1)
-                            )
-                    }
+                if let planContent = planContent {
+                    PlanContentView(content: planContent)
+                        .padding(20)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(24)
             }
-
-            Divider()
+            .background(Color(nsColor: .textBackgroundColor))
 
             // Action buttons
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 if let options = request.options {
                     ForEach(options, id: \.optionId) { option in
                         Button {
@@ -87,47 +76,50 @@ struct PlanApprovalDialog: View {
                             isPresented = false
                         } label: {
                             HStack(spacing: 6) {
-                                if option.kind.contains("allow") {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 14))
-                                } else if option.kind.contains("reject") {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 14))
-                                }
+                                Image(systemName: buttonIcon(for: option))
+                                    .font(.system(size: 12, weight: .semibold))
                                 Text(option.name)
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(.system(size: 13, weight: .medium))
                             }
                             .foregroundStyle(buttonForeground(for: option))
-                            .padding(.horizontal, 20)
+                            .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .background {
-                                buttonBackground(for: option)
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .background(buttonBackground(for: option))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                         .buttonStyle(.plain)
                     }
                 }
-
-                Spacer()
             }
-            .padding(20)
-            .background(.ultraThinMaterial)
+            .padding(16)
+            .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(width: 600, height: 500)
-        .background(.regularMaterial)
+        .frame(width: 580, height: 480)
+        .background(Color(nsColor: .windowBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.25), radius: 30, y: 15)
+    }
+
+    private func buttonIcon(for option: PermissionOption) -> String {
+        if option.kind == "allow_always" {
+            return "checkmark.circle.fill"
+        } else if option.kind.contains("allow") {
+            return "checkmark"
+        } else if option.kind.contains("reject") {
+            return "xmark"
+        }
+        return "circle"
     }
 
     private func buttonForeground(for option: PermissionOption) -> Color {
-        if option.kind.contains("allow") {
+        if option.kind.contains("allow") || option.kind.contains("reject") {
             return .white
-        } else if option.kind.contains("reject") {
-            return .white
-        } else {
-            return .primary
         }
+        return .primary
     }
 
     private func buttonBackground(for option: PermissionOption) -> Color {
@@ -136,9 +128,8 @@ struct PlanApprovalDialog: View {
         } else if option.kind.contains("allow") {
             return .blue
         } else if option.kind.contains("reject") {
-            return .red
-        } else {
-            return .secondary.opacity(0.2)
+            return .red.opacity(0.85)
         }
+        return .secondary.opacity(0.2)
     }
 }

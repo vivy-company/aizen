@@ -500,6 +500,21 @@ struct TerminalContentView: View {
 }
 
 
+// MARK: - Inline Diff Line (local to avoid conflict with DiffView.DiffLine)
+
+private enum InlineDiffLineType {
+    case context
+    case added
+    case deleted
+    case separator
+}
+
+private struct InlineDiffLine: Identifiable {
+    let id = UUID()
+    let type: InlineDiffLineType
+    let content: String
+}
+
 // MARK: - Inline Diff View
 
 struct InlineDiffView: View {
@@ -512,13 +527,17 @@ struct InlineDiffView: View {
         max(terminalFontSize - 2, 9)
     }
 
+    private var diffLines: [InlineDiffLine] {
+        computeUnifiedDiff(oldText: diff.oldText, newText: diff.newText)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             // File path header
             HStack(spacing: 4) {
                 Image(systemName: "doc.badge.plus")
                     .font(.system(size: 9))
-                Text(diff.path)
+                Text(URL(fileURLWithPath: diff.path).lastPathComponent)
                     .font(.system(size: 10, weight: .medium))
             }
             .foregroundStyle(.secondary)
@@ -526,31 +545,172 @@ struct InlineDiffView: View {
             // Diff content
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    if let oldText = diff.oldText {
-                        ForEach(Array(oldText.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, line in
-                            Text("- \(line)")
-                                .font(.custom(terminalFontName, size: fontSize))
-                                .foregroundColor(.red)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.red.opacity(0.1))
-                        }
-                    }
-                    ForEach(Array(diff.newText.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, line in
-                        Text("+ \(line)")
-                            .font(.custom(terminalFontName, size: fontSize))
-                            .foregroundColor(.green)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.green.opacity(0.1))
+                    ForEach(diffLines) { line in
+                        diffLineView(line)
                     }
                 }
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxHeight: 150)
+            .frame(maxHeight: 200)
             .padding(8)
             .background(Color(nsColor: .textBackgroundColor))
             .cornerRadius(6)
         }
+    }
+
+    @ViewBuilder
+    private func diffLineView(_ line: InlineDiffLine) -> some View {
+        switch line.type {
+        case .context:
+            Text("  \(line.content)")
+                .font(.custom(terminalFontName, size: fontSize))
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        case .added:
+            Text("+ \(line.content)")
+                .font(.custom(terminalFontName, size: fontSize))
+                .foregroundColor(.green)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.green.opacity(0.1))
+        case .deleted:
+            Text("- \(line.content)")
+                .font(.custom(terminalFontName, size: fontSize))
+                .foregroundColor(.red)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.red.opacity(0.1))
+        case .separator:
+            Text(line.content)
+                .font(.custom(terminalFontName, size: fontSize))
+                .foregroundColor(.cyan)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 2)
+        }
+    }
+
+    // MARK: - Diff Computation
+
+    private func computeUnifiedDiff(oldText: String?, newText: String, contextLines: Int = 3) -> [InlineDiffLine] {
+        let oldLines = (oldText ?? "").split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let newLines = newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+
+        // Compute LCS to find matching lines
+        let lcs = longestCommonSubsequence(oldLines, newLines)
+
+        // Build edit script
+        var edits: [(type: InlineDiffLineType, content: String)] = []
+        var oldIdx = 0
+        var newIdx = 0
+        var lcsIdx = 0
+
+        while oldIdx < oldLines.count || newIdx < newLines.count {
+            if lcsIdx < lcs.count && oldIdx < oldLines.count && newIdx < newLines.count &&
+               oldLines[oldIdx] == lcs[lcsIdx] && newLines[newIdx] == lcs[lcsIdx] {
+                // Matching line (context)
+                edits.append((.context, oldLines[oldIdx]))
+                oldIdx += 1
+                newIdx += 1
+                lcsIdx += 1
+            } else if oldIdx < oldLines.count && (lcsIdx >= lcs.count || oldLines[oldIdx] != lcs[lcsIdx]) {
+                // Line removed from old
+                edits.append((.deleted, oldLines[oldIdx]))
+                oldIdx += 1
+            } else if newIdx < newLines.count {
+                // Line added in new
+                edits.append((.added, newLines[newIdx]))
+                newIdx += 1
+            }
+        }
+
+        // Generate unified diff with context
+        return generateHunks(edits: edits, contextLines: contextLines)
+    }
+
+    private func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
+        let m = a.count
+        let n = b.count
+        guard m > 0 && n > 0 else { return [] }
+
+        var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
+
+        for i in 1...m {
+            for j in 1...n {
+                if a[i - 1] == b[j - 1] {
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                } else {
+                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+                }
+            }
+        }
+
+        // Backtrack to find LCS
+        var result: [String] = []
+        var i = m, j = n
+        while i > 0 && j > 0 {
+            if a[i - 1] == b[j - 1] {
+                result.append(a[i - 1])
+                i -= 1
+                j -= 1
+            } else if dp[i - 1][j] > dp[i][j - 1] {
+                i -= 1
+            } else {
+                j -= 1
+            }
+        }
+        return result.reversed()
+    }
+
+    private func generateHunks(edits: [(type: InlineDiffLineType, content: String)], contextLines: Int) -> [InlineDiffLine] {
+        var result: [InlineDiffLine] = []
+
+        // Find ranges of changes
+        var changeIndices: [Int] = []
+        for (i, edit) in edits.enumerated() {
+            if edit.type != .context {
+                changeIndices.append(i)
+            }
+        }
+
+        if changeIndices.isEmpty {
+            return [] // No changes
+        }
+
+        // Group changes into hunks
+        var hunks: [[Int]] = []
+        var currentHunk: [Int] = []
+
+        for idx in changeIndices {
+            if currentHunk.isEmpty {
+                currentHunk.append(idx)
+            } else if idx - currentHunk.last! <= contextLines * 2 + 1 {
+                currentHunk.append(idx)
+            } else {
+                hunks.append(currentHunk)
+                currentHunk = [idx]
+            }
+        }
+        if !currentHunk.isEmpty {
+            hunks.append(currentHunk)
+        }
+
+        // Generate output for each hunk
+        for (hunkIdx, hunk) in hunks.enumerated() {
+            let startIdx = max(0, hunk.first! - contextLines)
+            let endIdx = min(edits.count - 1, hunk.last! + contextLines)
+
+            // Add separator between hunks
+            if hunkIdx > 0 {
+                result.append(InlineDiffLine(type: .separator, content: "···"))
+            }
+
+            // Add lines in this hunk
+            for i in startIdx...endIdx {
+                let edit = edits[i]
+                result.append(InlineDiffLine(type: edit.type, content: edit.content))
+            }
+        }
+
+        return result
     }
 }
 

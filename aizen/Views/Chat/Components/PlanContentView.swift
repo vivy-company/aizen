@@ -11,10 +11,7 @@ struct PlanContentView: View {
     let content: String
 
     var body: some View {
-        ScrollView {
-            MarkdownRenderedView(content: content, isStreaming: false)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-        }
+        MarkdownRenderedView(content: content, isStreaming: false)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

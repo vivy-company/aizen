@@ -55,7 +55,6 @@ class ChatSessionViewModel: ObservableObject {
     @Published var needsSetup: Bool = false
     @Published var needsUpdate: Bool = false
     @Published var versionInfo: AgentVersionInfo?
-    @Published var hasAgentPlan: Bool = false
     @Published var currentAgentPlan: Plan?
     @Published var hasModes: Bool = false
     @Published var currentModeId: String?
@@ -161,7 +160,6 @@ class ChatSessionViewModel: ObservableObject {
         needsSetup = session.needsAgentSetup
         needsUpdate = session.needsUpdate
         versionInfo = session.versionInfo
-        hasAgentPlan = session.agentPlan != nil
         currentAgentPlan = session.agentPlan
         hasModes = !session.availableModes.isEmpty
         currentModeId = session.currentModeId
@@ -352,7 +350,6 @@ class ChatSessionViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] plan in
                 self?.logger.debug("Agent plan status changed: \(plan != nil)")
-                self?.hasAgentPlan = plan != nil
                 self?.currentAgentPlan = plan
             }
             .store(in: &cancellables)

@@ -65,7 +65,17 @@ struct ChatSessionView: View {
                     Spacer(minLength: 0)
 
                     VStack(spacing: 8) {
-                        // Permission Requests (excluding plan requests - those show as sheet)
+                        // Agent Plan (inline, above permission requests)
+                        if let plan = viewModel.currentAgentPlan {
+                            HStack {
+                                AgentPlanInlineView(plan: plan)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 20)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
+
+                        // Permission Requests (excluding plan requests)
                         if let agentSession = viewModel.currentAgentSession,
                            viewModel.showingPermissionAlert,
                            let request = viewModel.currentPermissionRequest,
@@ -158,24 +168,22 @@ struct ChatSessionView: View {
         }
         .sheet(isPresented: Binding(
             get: {
-                // Show plan sheet if we have a plan request or an active plan
+                // Show plan approval sheet if we have a plan request
                 if viewModel.showingPermissionAlert,
                    let request = viewModel.currentPermissionRequest,
                    isPlanRequest(request) {
                     return true
                 }
-                return viewModel.hasAgentPlan
+                return false
             },
             set: { if !$0 {
-                viewModel.hasAgentPlan = false
                 viewModel.showingPermissionAlert = false
             }}
         )) {
-            // Check if this is a plan approval request or plan progress view
+            // Plan approval dialog
             if let request = viewModel.currentPermissionRequest,
                isPlanRequest(request),
                let agentSession = viewModel.currentAgentSession {
-                // Plan approval - show approval dialog
                 PlanApprovalDialog(
                     session: agentSession,
                     request: request,
@@ -184,16 +192,6 @@ struct ChatSessionView: View {
                         set: { if !$0 { viewModel.showingPermissionAlert = false } }
                     )
                 )
-            } else if let plan = viewModel.currentAgentPlan {
-                // Plan progress - show progress dialog
-                AgentPlanDialog(
-                    plan: plan,
-                    isPresented: Binding(
-                        get: { true },
-                        set: { if !$0 { viewModel.hasAgentPlan = false } }
-                    )
-                )
-                .frame(minWidth: 500, minHeight: 400)
             }
         }
         .alert(String(localized: "chat.agent.switch.title"), isPresented: $viewModel.showingAgentSwitchWarning) {

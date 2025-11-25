@@ -35,25 +35,35 @@ actor TreeSitterHighlighter {
             return AttributedString(text)
         }
 
-        // Get highlights query URL
-        guard let queryURL = language.queryURL else {
-            // No highlights query available, return plain text
-            return AttributedString(text)
+        // Build combined query data (parent queries first, then language-specific)
+        var combinedQueryData = Data()
+
+        // Load parent query first (if exists) for inheritance
+        // TypeScript inherits from JavaScript, TSX from JSX, C++ from C, etc.
+        if let parentURL = language.parentQueryURL,
+           let parentData = try? Data(contentsOf: parentURL) {
+            combinedQueryData.append(parentData)
+            combinedQueryData.append(Data("\n".utf8))
         }
 
-        // Load query from file
+        // Load language's own query
+        guard let queryURL = language.queryURL else {
+            return AttributedString(text)
+        }
         guard let queryData = try? Data(contentsOf: queryURL) else {
             return AttributedString(text)
         }
+        combinedQueryData.append(queryData)
 
-        // Create query
-        let query = try Query(language: tsLanguage, data: queryData)
+        // Create query from combined data
+        let query = try Query(language: tsLanguage, data: combinedQueryData)
 
         // Execute query
         let queryCursor = query.execute(node: tree.rootNode!, in: tree)
 
-        // Build attributed string with highlights
-        var attributedString = AttributedString(text)
+        // Build attributed string with highlights using NSMutableAttributedString
+        // for proper NSRange compatibility with tree-sitter captures
+        let attributedString = NSMutableAttributedString(string: text)
 
         // Apply colors based on capture names
         for match in queryCursor {
@@ -66,37 +76,21 @@ actor TreeSitterHighlighter {
                     for: captureName,
                     theme: theme
                 ) {
-                    // Convert byte range to string indices with bounds checking
-                    let utf8View = text.utf8
-                    let startOffset = Int(capture.node.byteRange.lowerBound)
-                    let endOffset = Int(capture.node.byteRange.upperBound)
+                    // Use capture.range (NSRange) directly - already correctly calculated
+                    let range = capture.range
 
-                    // Ensure offsets are within bounds
-                    guard startOffset <= utf8View.count,
-                          endOffset <= utf8View.count,
-                          startOffset <= endOffset else {
+                    // Validate range is within bounds
+                    guard range.location != NSNotFound,
+                          range.location + range.length <= (text as NSString).length else {
                         continue
                     }
 
-                    let startIndex = utf8View.index(utf8View.startIndex, offsetBy: startOffset)
-                    let endIndex = utf8View.index(utf8View.startIndex, offsetBy: endOffset)
-
-                    // Convert to String.Index
-                    guard let stringStart = String.Index(startIndex, within: text),
-                          let stringEnd = String.Index(endIndex, within: text) else {
-                        continue
-                    }
-
-                    // Apply color to attributed string
-                    if let attrStart = AttributedString.Index(stringStart, within: attributedString),
-                       let attrEnd = AttributedString.Index(stringEnd, within: attributedString) {
-                        attributedString[attrStart..<attrEnd].foregroundColor = Color(nsColor: color)
-                    }
+                    attributedString.addAttribute(.foregroundColor, value: color, range: range)
                 }
             }
         }
 
-        return attributedString
+        return AttributedString(attributedString)
     }
 
     /// Get or create parser for a language
