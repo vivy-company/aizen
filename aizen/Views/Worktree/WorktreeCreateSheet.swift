@@ -12,7 +12,8 @@ struct WorktreeCreateSheet: View {
     @ObservedObject var repository: Repository
     @ObservedObject var repositoryManager: RepositoryManager
 
-    @State private var worktreeName = ""
+    @State private var folderName = ""
+    @State private var branchName = ""
     @State private var selectedBranch: BranchInfo?
     @State private var isProcessing = false
     @State private var errorMessage: String?
@@ -72,23 +73,13 @@ struct WorktreeCreateSheet: View {
                         .help(String(localized: "worktree.create.generateRandom"))
                     }
 
-                    TextField(String(localized: "worktree.create.branchNamePlaceholder"), text: $worktreeName)
+                    TextField(String(localized: "worktree.create.branchNamePlaceholder"), text: $branchName)
                         .textFieldStyle(.roundedBorder)
-                        .onChange(of: worktreeName) { newValue in
-                            // Slugify in real-time
-                            let slugified = newValue
-                                .replacingOccurrences(of: " ", with: "-")
-                                .lowercased()
-
-                            if slugified != newValue {
-                                worktreeName = slugified
-                            }
-
-                            // Validate branch name
+                        .onChange(of: branchName) { _ in
                             validateBranchName()
                         }
                         .onSubmit {
-                            if !worktreeName.isEmpty && validationWarning == nil {
+                            if !branchName.isEmpty && validationWarning == nil {
                                 createWorktree()
                             }
                         }
@@ -157,7 +148,7 @@ struct WorktreeCreateSheet: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
-                .disabled(isProcessing || worktreeName.isEmpty || validationWarning != nil)
+                .disabled(isProcessing || branchName.isEmpty || validationWarning != nil)
             }
             .padding()
         }
@@ -180,31 +171,32 @@ struct WorktreeCreateSheet: View {
     }
 
     private func generateRandomName() {
-        // Only exclude existing worktree names
         let excludedNames = Set(existingWorktreeNames)
-        worktreeName = WorkspaceNameGenerator.generateUniqueName(excluding: Array(excludedNames))
+        let generated = WorkspaceNameGenerator.generateUniqueName(excluding: Array(excludedNames))
             .lowercased()
             .replacingOccurrences(of: " ", with: "-")
             .replacingOccurrences(of: "'", with: "")
+        folderName = generated
+        branchName = generated
         validateBranchName()
     }
 
     private func validateBranchName() {
-        guard !worktreeName.isEmpty else {
+        guard !branchName.isEmpty else {
             validationWarning = nil
             return
         }
 
-        // Check against existing worktree names
-        if existingWorktreeNames.contains(worktreeName) {
-            validationWarning = String(localized: "worktree.create.branchExists \(worktreeName)")
+        // Check against existing branch names
+        if existingWorktreeNames.contains(branchName) {
+            validationWarning = String(localized: "worktree.create.branchExists \(branchName)")
         } else {
             validationWarning = nil
         }
     }
 
     private func createWorktree() {
-        guard !isProcessing, !worktreeName.isEmpty else { return }
+        guard !isProcessing, !branchName.isEmpty else { return }
 
         // Use selectedBranch if available, otherwise use default branch
         let baseBranchName: String
@@ -224,16 +216,16 @@ struct WorktreeCreateSheet: View {
 
         Task {
             do {
-                // Build path: repo/.aizen/{branch-name}
+                // Build path: repo/.aizen/{folderName}
                 let repoURL = URL(fileURLWithPath: repoPath)
                 let aizenDir = repoURL.appendingPathComponent(".aizen")
-                let worktreePath = aizenDir.appendingPathComponent(worktreeName).path
+                let worktreePath = aizenDir.appendingPathComponent(folderName).path
 
                 // Create new branch from selected base branch and create worktree
                 _ = try await repositoryManager.addWorktree(
                     to: repository,
                     path: worktreePath,
-                    branch: worktreeName,
+                    branch: branchName,
                     createBranch: true,
                     baseBranch: baseBranchName
                 )
