@@ -3594,6 +3594,17 @@
         }
       }
     },
+    "worktree.detail.copyBranchName" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Branch Name"
+          }
+        }
+      }
+    },
     "worktree.detail.openEditor" : {
       "extractionState" : "manual",
       "localizations" : {

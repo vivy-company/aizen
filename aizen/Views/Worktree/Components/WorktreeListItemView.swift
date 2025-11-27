@@ -119,6 +119,15 @@ struct WorktreeListItemView: View {
                 Label(String(localized: "worktree.detail.openEditor"), systemImage: "chevron.left.forwardslash.chevron.right")
             }
 
+            Button {
+                if let branch = worktree.branch {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(branch, forType: .string)
+                }
+            } label: {
+                Label(String(localized: "worktree.detail.copyBranchName"), systemImage: "doc.on.doc")
+            }
+
             Divider()
 
             Menu {
