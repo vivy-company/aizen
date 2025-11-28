@@ -29,6 +29,9 @@ struct ContentView: View {
     @State private var showingOnboarding = false
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
 
+    // Command palette state
+    @State private var commandPaletteController: CommandPaletteWindowController?
+
     // Persistent selection storage
     @AppStorage("selectedWorkspaceId") private var selectedWorkspaceId: String?
     @AppStorage("selectedRepositoryId") private var selectedRepositoryId: String?
@@ -173,6 +176,34 @@ struct ContentView: View {
                 if let repository = selectedRepository {
                     let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
                     selectedWorktree = worktrees.first(where: { $0.isPrimary && !$0.isDeleted })
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .commandPaletteShortcut)) { _ in
+            showCommandPalette()
+        }
+    }
+
+    private func showCommandPalette() {
+        let controller = CommandPaletteWindowController(
+            managedObjectContext: viewContext,
+            onNavigate: { workspaceId, repoId, worktreeId in
+                navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
+            }
+        )
+        commandPaletteController = controller
+        controller.showWindow(nil)
+    }
+
+    private func navigateToWorktree(workspaceId: UUID, repoId: UUID, worktreeId: UUID) {
+        if let workspace = workspaces.first(where: { $0.id == workspaceId }) {
+            selectedWorkspace = workspace
+            let repos = (workspace.repositories as? Set<Repository>) ?? []
+            if let repo = repos.first(where: { $0.id == repoId }) {
+                selectedRepository = repo
+                let worktrees = (repo.worktrees as? Set<Worktree>) ?? []
+                if let worktree = worktrees.first(where: { $0.id == worktreeId }) {
+                    selectedWorktree = worktree
                 }
             }
         }

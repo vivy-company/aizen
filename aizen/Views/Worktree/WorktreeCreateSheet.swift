@@ -19,6 +19,20 @@ struct WorktreeCreateSheet: View {
     @State private var errorMessage: String?
     @State private var validationWarning: String?
     @State private var showingBranchSelector = false
+    @State private var selectedTemplateIndex: Int?
+
+    @AppStorage("branchNameTemplates") private var branchNameTemplatesData: Data = Data()
+
+    private var branchNameTemplates: [String] {
+        (try? JSONDecoder().decode([String].self, from: branchNameTemplatesData)) ?? []
+    }
+
+    private var currentPlaceholder: String {
+        if let index = selectedTemplateIndex, index < branchNameTemplates.count {
+            return branchNameTemplates[index]
+        }
+        return String(localized: "worktree.create.branchNamePlaceholder")
+    }
 
     private var currentBranch: String {
         // Get main branch from repository worktrees
@@ -73,7 +87,7 @@ struct WorktreeCreateSheet: View {
                         .help(String(localized: "worktree.create.generateRandom"))
                     }
 
-                    TextField(String(localized: "worktree.create.branchNamePlaceholder"), text: $branchName)
+                    TextField(currentPlaceholder, text: $branchName)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: branchName) { _ in
                             validateBranchName()
@@ -83,6 +97,34 @@ struct WorktreeCreateSheet: View {
                                 createWorktree()
                             }
                         }
+
+                    if !branchNameTemplates.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(Array(branchNameTemplates.enumerated()), id: \.offset) { index, template in
+                                Button {
+                                    if selectedTemplateIndex == index {
+                                        selectedTemplateIndex = nil
+                                    } else {
+                                        selectedTemplateIndex = index
+                                        branchName = template
+                                    }
+                                    validateBranchName()
+                                } label: {
+                                    Text(template)
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(
+                                            selectedTemplateIndex == index
+                                                ? Color.accentColor.opacity(0.3)
+                                                : Color.secondary.opacity(0.2),
+                                            in: Capsule()
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
 
                     if let warning = validationWarning {
                         HStack(spacing: 4) {

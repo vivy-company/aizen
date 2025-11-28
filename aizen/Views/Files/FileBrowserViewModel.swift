@@ -69,7 +69,7 @@ class FileBrowserViewModel: ObservableObject {
     @Published var selectedFileId: UUID?
     @Published var expandedPaths: Set<String> = []
     @Published var treeRefreshTrigger = UUID()
-    @AppStorage("showHiddenFiles") var showHiddenFiles: Bool = false
+    @AppStorage("showHiddenFiles") var showHiddenFiles: Bool = true
 
     // Git status tracking
     @Published private(set) var gitFileStatus: [String: FileGitStatus] = [:]

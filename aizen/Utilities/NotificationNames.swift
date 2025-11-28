@@ -27,6 +27,14 @@ extension Notification.Name {
     /// Posted when Command+P is pressed to open file search
     static let fileSearchShortcut = Notification.Name("FileSearchShortcut")
 
+    /// Posted when Command+K is pressed to open command palette
+    static let commandPaletteShortcut = Notification.Name("CommandPaletteShortcut")
+
+    // MARK: - Navigation
+
+    /// Posted when navigating to a specific worktree from command palette
+    static let navigateToWorktree = Notification.Name("NavigateToWorktree")
+
     // MARK: - File Operations
 
     /// Posted when a file should be opened in the editor (from tool calls, etc.)

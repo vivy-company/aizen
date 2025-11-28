@@ -61,6 +61,7 @@ struct FileTreeItem: View {
     let onOpenFile: (String) -> Void
     let viewModel: FileBrowserViewModel
 
+    @AppStorage("editorTheme") private var editorTheme: String = "Catppuccin Mocha"
     @State private var isHovering = false
     @State private var showingDialog: FileInputDialogType?
     @State private var showingDeleteAlert = false
@@ -69,21 +70,23 @@ struct FileTreeItem: View {
         expandedPaths.contains(item.path)
     }
 
+    private var gitColors: GitStatusColors {
+        GhosttyThemeParser.loadGitStatusColors(named: editorTheme)
+    }
+
     private func textColor(for item: FileItem) -> Color {
         guard let status = item.gitStatus else { return .primary }
         switch status {
         case .modified, .mixed:
-            return .orange
+            return Color(nsColor: gitColors.modified)
         case .staged, .added:
-            return .green
+            return Color(nsColor: gitColors.added)
         case .untracked:
-            return .accentColor
-        case .deleted:
-            return .red
-        case .conflicted:
-            return .red
+            return Color(nsColor: gitColors.untracked)
+        case .deleted, .conflicted:
+            return Color(nsColor: gitColors.deleted)
         case .renamed:
-            return .purple
+            return Color(nsColor: gitColors.renamed)
         }
     }
 
@@ -121,13 +124,13 @@ struct FileTreeItem: View {
 
                 // Icon
                 FileIconView(path: item.path, size: 12)
-                    .opacity(item.isHidden || item.isGitIgnored ? 0.5 : 1.0)
+                    .opacity(item.isGitIgnored ? 0.5 : 1.0)
 
                 // Name
                 Text(item.name)
                     .font(.system(size: 12))
                     .foregroundColor(textColor(for: item))
-                    .opacity(item.isHidden || item.isGitIgnored ? 0.5 : 1.0)
+                    .opacity(item.isGitIgnored ? 0.5 : 1.0)
                     .lineLimit(1)
 
                 Spacer()

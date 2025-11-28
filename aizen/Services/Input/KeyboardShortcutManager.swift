@@ -14,6 +14,7 @@ enum KeyCode {
     static let tab: UInt16 = 48
     static let escape: UInt16 = 53
     static let p: UInt16 = 35
+    static let k: UInt16 = 40
 }
 
 // MARK: - Keyboard Shortcut Manager
@@ -66,6 +67,12 @@ class KeyboardShortcutManager {
             // Command+P: File search (global shortcut)
             if event.keyCode == KeyCode.p && event.modifierFlags.contains(.command) {
                 NotificationCenter.default.post(name: .fileSearchShortcut, object: nil)
+                return nil
+            }
+
+            // Command+K: Command palette (global shortcut)
+            if event.keyCode == KeyCode.k && event.modifierFlags.contains(.command) {
+                NotificationCenter.default.post(name: .commandPaletteShortcut, object: nil)
                 return nil
             }
 

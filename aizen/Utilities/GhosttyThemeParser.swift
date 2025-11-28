@@ -11,6 +11,22 @@ import CodeEditSourceEditor
 
 typealias Attribute = EditorTheme.Attribute
 
+struct GitStatusColors {
+    let modified: NSColor   // yellow - modified/mixed files
+    let added: NSColor      // green - staged/added files
+    let untracked: NSColor  // blue - untracked files
+    let deleted: NSColor    // red - deleted/conflicted files
+    let renamed: NSColor    // magenta - renamed files
+
+    static let `default` = GitStatusColors(
+        modified: NSColor(hex: "F9E2AF"),
+        added: NSColor(hex: "A6E3A1"),
+        untracked: NSColor(hex: "89B4FA"),
+        deleted: NSColor(hex: "F38BA8"),
+        renamed: NSColor(hex: "F5C2E7")
+    )
+}
+
 struct GhosttyThemeParser {
     struct ParsedTheme {
         var background: NSColor?
@@ -18,6 +34,16 @@ struct GhosttyThemeParser {
         var cursorColor: NSColor?
         var selectionBackground: NSColor?
         var palette: [Int: NSColor] = [:]
+
+        func toGitStatusColors() -> GitStatusColors {
+            GitStatusColors(
+                modified: palette[3] ?? NSColor(hex: "F9E2AF"),   // yellow
+                added: palette[2] ?? NSColor(hex: "A6E3A1"),      // green
+                untracked: palette[4] ?? NSColor(hex: "89B4FA"),  // blue
+                deleted: palette[1] ?? NSColor(hex: "F38BA8"),    // red
+                renamed: palette[5] ?? NSColor(hex: "F5C2E7")     // magenta
+            )
+        }
 
         func toEditorTheme() -> EditorTheme {
             let bg = background ?? NSColor(hex: "1E1E2E")
@@ -78,7 +104,7 @@ struct GhosttyThemeParser {
         }
     }
 
-    static func parse(contentsOf path: String) -> EditorTheme? {
+    private static func parseRaw(contentsOf path: String) -> ParsedTheme? {
         guard let content = try? String(contentsOfFile: path) else {
             return nil
         }
@@ -118,7 +144,11 @@ struct GhosttyThemeParser {
             }
         }
 
-        return theme.toEditorTheme()
+        return theme
+    }
+
+    static func parse(contentsOf path: String) -> EditorTheme? {
+        parseRaw(contentsOf: path)?.toEditorTheme()
     }
 
     static func availableThemes() -> [String] {
@@ -144,5 +174,14 @@ struct GhosttyThemeParser {
             .appendingPathComponent(name)
 
         return parse(contentsOf: themePath)
+    }
+
+    static func loadGitStatusColors(named name: String) -> GitStatusColors {
+        guard let resourcePath = Bundle.main.resourcePath else { return .default }
+        let themePath = ((resourcePath as NSString)
+            .appendingPathComponent("ghostty/themes") as NSString)
+            .appendingPathComponent(name)
+
+        return parseRaw(contentsOf: themePath)?.toGitStatusColors() ?? .default
     }
 }

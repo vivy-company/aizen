@@ -12,8 +12,16 @@ struct GeneralSettingsView: View {
     @AppStorage("defaultTerminalBundleId") private var defaultTerminalBundleId: String?
     @AppStorage("defaultEditorBundleId") private var defaultEditorBundleId: String?
     @AppStorage("useCliEditor") private var useCliEditor = false
+    @AppStorage("branchNameTemplates") private var branchNameTemplatesData: Data = Data()
 
     @ObservedObject private var appDetector = AppDetector.shared
+
+    @State private var newTemplate = ""
+
+    private var branchNameTemplates: [String] {
+        get { (try? JSONDecoder().decode([String].self, from: branchNameTemplatesData)) ?? [] }
+        set { branchNameTemplatesData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+    }
 
     var body: some View {
         Form {
@@ -64,8 +72,6 @@ struct GeneralSettingsView: View {
                 }
                 .help("Choose which code editor to use when opening projects")
 
-                Divider()
-
                 Toggle("Use CLI command instead", isOn: $useCliEditor)
                     .help("Use a command-line tool instead of an installed application")
 
@@ -78,8 +84,68 @@ struct GeneralSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Section("Branch Templates") {
+                ForEach(Array(branchNameTemplates.enumerated()), id: \.offset) { index, template in
+                    HStack {
+                        TextField("Template", text: Binding(
+                            get: { template },
+                            set: { updateTemplate(at: index, with: $0) }
+                        ))
+                        .textFieldStyle(.plain)
+
+                        Button {
+                            removeTemplate(at: index)
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                HStack {
+                    TextField("Add template (e.g., aizen/, feature/)", text: $newTemplate)
+                        .textFieldStyle(.plain)
+                        .onSubmit {
+                            addTemplate()
+                        }
+                    Button {
+                        addTemplate()
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(.green)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(newTemplate.isEmpty)
+                }
+            }
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    private func addTemplate() {
+        guard !newTemplate.isEmpty else { return }
+        var templates = branchNameTemplates
+        if !templates.contains(newTemplate) {
+            templates.append(newTemplate)
+            branchNameTemplatesData = (try? JSONEncoder().encode(templates)) ?? Data()
+        }
+        newTemplate = ""
+    }
+
+    private func updateTemplate(at index: Int, with value: String) {
+        var templates = branchNameTemplates
+        guard index < templates.count else { return }
+        templates[index] = value
+        branchNameTemplatesData = (try? JSONEncoder().encode(templates)) ?? Data()
+    }
+
+    private func removeTemplate(at index: Int) {
+        var templates = branchNameTemplates
+        guard index < templates.count else { return }
+        templates.remove(at: index)
+        branchNameTemplatesData = (try? JSONEncoder().encode(templates)) ?? Data()
     }
 }
