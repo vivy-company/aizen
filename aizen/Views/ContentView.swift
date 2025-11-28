@@ -152,6 +152,20 @@ struct ContentView: View {
         }
         .onChange(of: selectedWorkspace) { newValue in
             selectedWorkspaceId = newValue?.id?.uuidString
+
+            // Restore last selected repository for this workspace
+            if let workspace = newValue {
+                let repositories = (workspace.repositories as? Set<Repository>) ?? []
+                if let lastRepoId = workspace.lastSelectedRepositoryId,
+                   let lastRepo = repositories.first(where: { $0.id == lastRepoId && !$0.isDeleted }) {
+                    selectedRepository = lastRepo
+                } else {
+                    // Fall back to first repository if last selected doesn't exist
+                    selectedRepository = repositories.sorted { ($0.name ?? "") < ($1.name ?? "") }.first
+                }
+            } else {
+                selectedRepository = nil
+            }
         }
         .onChange(of: selectedRepository) { newValue in
             selectedRepositoryId = newValue?.id?.uuidString
@@ -160,6 +174,12 @@ struct ContentView: View {
                 selectedRepository = nil
                 selectedWorktree = nil
             } else if let repo = newValue {
+                // Save last selected repository to workspace
+                if let workspace = selectedWorkspace {
+                    workspace.lastSelectedRepositoryId = repo.id
+                    try? viewContext.save()
+                }
+
                 // Auto-select primary worktree when repository changes
                 let worktrees = (repo.worktrees as? Set<Worktree>) ?? []
                 selectedWorktree = worktrees.first(where: { $0.isPrimary })

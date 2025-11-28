@@ -5,6 +5,7 @@
         <attribute name="name" attributeType="String"/>
         <attribute name="order" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="colorHex" optional="YES" attributeType="String"/>
+        <attribute name="lastSelectedRepositoryId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <relationship name="repositories" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Repository" inverseName="workspace" inverseEntity="Repository"/>
     </entity>
     <entity name="Repository" representedClassName="Repository" syncable="YES" codeGenerationType="class">
