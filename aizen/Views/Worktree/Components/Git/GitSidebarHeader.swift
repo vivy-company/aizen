@@ -32,7 +32,7 @@ struct GitSidebarHeader: View {
             .disabled(isOperationPending || (gitStatus.stagedFiles.isEmpty && gitStatus.modifiedFiles.isEmpty && gitStatus.untrackedFiles.isEmpty))
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .frame(height: 44)
     }
 
     private var headerTitle: String {

@@ -11,6 +11,7 @@ struct EditorSettingsView: View {
     @AppStorage("editorTheme") private var editorTheme: String = "Catppuccin Mocha"
     @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
     @AppStorage("editorFontSize") private var editorFontSize: Double = 12.0
+    @AppStorage("diffFontSize") private var diffFontSize: Double = 11.0
     @AppStorage("editorWrapLines") private var editorWrapLines: Bool = true
     @AppStorage("editorShowMinimap") private var editorShowMinimap: Bool = false
     @AppStorage("editorShowGutter") private var editorShowGutter: Bool = true
@@ -53,6 +54,18 @@ struct EditorSettingsView: View {
                         "\(Int(editorFontSize)) pt",
                         value: $editorFontSize,
                         in: 8...24,
+                        step: 1
+                    )
+                    .frame(width: 120)
+                }
+
+                HStack {
+                    Text("Diff Font Size")
+                    Spacer()
+                    Stepper(
+                        "\(Int(diffFontSize)) pt",
+                        value: $diffFontSize,
+                        in: 8...18,
                         step: 1
                     )
                     .frame(width: 120)
@@ -107,6 +120,7 @@ struct EditorSettingsView: View {
                     editorTheme = "Catppuccin Mocha"
                     editorFontFamily = "Menlo"
                     editorFontSize = 12.0
+                    diffFontSize = 11.0
                     editorWrapLines = true
                     editorShowMinimap = false
                     editorShowGutter = true

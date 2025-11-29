@@ -10,7 +10,7 @@ import CoreData
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @StateObject private var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: RepositoryManager
     @StateObject private var tabStateManager = WorktreeTabStateManager()
 
     @FetchRequest(
@@ -32,13 +32,19 @@ struct ContentView: View {
     // Command palette state
     @State private var commandPaletteController: CommandPaletteWindowController?
 
+    // Git changes overlay state (passed from RootView)
+    @Binding var showingGitChanges: Bool
+    @Binding var gitChangesWorktree: Worktree?
+
     // Persistent selection storage
     @AppStorage("selectedWorkspaceId") private var selectedWorkspaceId: String?
     @AppStorage("selectedRepositoryId") private var selectedRepositoryId: String?
     @AppStorage("selectedWorktreeId") private var selectedWorktreeId: String?
 
-    init(context: NSManagedObjectContext) {
-        _repositoryManager = StateObject(wrappedValue: RepositoryManager(viewContext: context))
+    init(context: NSManagedObjectContext, repositoryManager: RepositoryManager, showingGitChanges: Binding<Bool>, gitChangesWorktree: Binding<Worktree?>) {
+        self.repositoryManager = repositoryManager
+        _showingGitChanges = showingGitChanges
+        _gitChangesWorktree = gitChangesWorktree
     }
 
     var body: some View {
@@ -87,11 +93,17 @@ struct ContentView: View {
                     worktree: worktree,
                     repositoryManager: repositoryManager,
                     tabStateManager: tabStateManager,
+                    showingGitChanges: $showingGitChanges,
                     onWorktreeDeleted: { nextWorktree in
                         selectedWorktree = nextWorktree
                     }
                 )
                 .id(worktree.id)
+                .onChange(of: showingGitChanges) { showing in
+                    if showing {
+                        gitChangesWorktree = worktree
+                    }
+                }
             } else {
                 placeholderView(
                     titleKey: "contentView.selectWorktree",
@@ -265,6 +277,6 @@ private func placeholderView(
 }
 
 #Preview {
-    ContentView(context: PersistenceController.preview.container.viewContext)
+    RootView(context: PersistenceController.preview.container.viewContext)
         .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }

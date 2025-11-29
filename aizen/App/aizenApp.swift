@@ -47,7 +47,7 @@ struct aizenApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(context: persistenceController.container.viewContext)
+            RootView(context: persistenceController.container.viewContext)
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .environmentObject(ghosttyApp)
                 .task(id: "\(terminalFontName)\(terminalFontSize)\(terminalThemeName)") {

@@ -130,16 +130,29 @@ struct DiffView: View {
 
 // MARK: - Diff Line Model
 
-struct DiffLine: Identifiable {
-    let id = UUID()
+struct DiffLine: Identifiable, Hashable {
     let lineNumber: Int
     let oldLineNumber: String?
     let newLineNumber: String?
     let content: String
     let type: DiffLineType
+
+    var id: Int { lineNumber }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(lineNumber)
+        hasher.combine(content)
+        hasher.combine(type)
+    }
+
+    static func == (lhs: DiffLine, rhs: DiffLine) -> Bool {
+        lhs.lineNumber == rhs.lineNumber &&
+        lhs.content == rhs.content &&
+        lhs.type == rhs.type
+    }
 }
 
-enum DiffLineType {
+enum DiffLineType: Hashable {
     case added
     case deleted
     case context
