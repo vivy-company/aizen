@@ -3284,6 +3284,39 @@
         }
       }
     },
+    "workspace.repository.alsoDelete" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also delete repository from filesystem"
+          }
+        }
+      }
+    },
+    "workspace.repository.copyPath" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Path"
+          }
+        }
+      }
+    },
+    "workspace.repository.openEditor" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Editor"
+          }
+        }
+      }
+    },
     "workspace.repository.openFinder" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3295,6 +3328,17 @@
         }
       }
     },
+    "workspace.repository.openTerminal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Terminal"
+          }
+        }
+      }
+    },
     "workspace.repository.remove" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3302,6 +3346,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remove Repository"
+          }
+        }
+      }
+    },
+    "workspace.repository.removeButton" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        }
+      }
+    },
+    "workspace.repository.removeMessage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This will unlink the repository from Aizen. The repository files will remain on disk unless you check the option below."
+          }
+        }
+      }
+    },
+    "workspace.repository.removeTitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Repository?"
           }
         }
       }

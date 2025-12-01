@@ -182,6 +182,12 @@ struct WorkspaceSidebarView: View {
                                 let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
                                 selectedWorktree = worktrees.first(where: { $0.isPrimary })
                             }
+                        },
+                        onRemove: {
+                            if selectedRepository?.id == repository.id {
+                                selectedRepository = nil
+                                selectedWorktree = nil
+                            }
                         }
                     )
                     .listRowSeparator(.hidden)
@@ -239,11 +245,23 @@ struct RepositoryRow: View {
     let isSelected: Bool
     @ObservedObject var repositoryManager: RepositoryManager
     let onSelect: () -> Void
+    let onRemove: () -> Void
+
+    @State private var showingRemoveConfirmation = false
+    @State private var alsoDeleteFromFilesystem = false
 
     var body: some View {
         repositoryLabel
             .background(selectionBackground)
             .contextMenu {
+                Button {
+                    if let path = repository.path {
+                        repositoryManager.openInTerminal(path)
+                    }
+                } label: {
+                    Label("workspace.repository.openTerminal", systemImage: "terminal")
+                }
+
                 Button {
                     if let path = repository.path {
                         repositoryManager.openInFinder(path)
@@ -252,11 +270,44 @@ struct RepositoryRow: View {
                     Label("workspace.repository.openFinder", systemImage: "folder")
                 }
 
+                Button {
+                    if let path = repository.path {
+                        repositoryManager.openInEditor(path)
+                    }
+                } label: {
+                    Label("workspace.repository.openEditor", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+
+                Button {
+                    if let path = repository.path {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(path, forType: .string)
+                    }
+                } label: {
+                    Label("workspace.repository.copyPath", systemImage: "doc.on.doc")
+                }
+
+                Divider()
+
                 Button(role: .destructive) {
-                    deleteRepository()
+                    showingRemoveConfirmation = true
                 } label: {
                     Label("workspace.repository.remove", systemImage: "trash")
                 }
+            }
+            .sheet(isPresented: $showingRemoveConfirmation) {
+                RepositoryRemoveSheet(
+                    repositoryName: repository.name ?? String(localized: "workspace.repository.unknown"),
+                    alsoDeleteFromFilesystem: $alsoDeleteFromFilesystem,
+                    onCancel: {
+                        showingRemoveConfirmation = false
+                        alsoDeleteFromFilesystem = false
+                    },
+                    onRemove: {
+                        showingRemoveConfirmation = false
+                        removeRepository()
+                    }
+                )
             }
     }
 
@@ -301,12 +352,26 @@ struct RepositoryRow: View {
         }
     }
 
-    private func deleteRepository() {
+    private func removeRepository() {
         Task {
             do {
+                // Delete from filesystem if checkbox was checked
+                if alsoDeleteFromFilesystem, let path = repository.path {
+                    let fileURL = URL(fileURLWithPath: path)
+                    try FileManager.default.removeItem(at: fileURL)
+                }
+
+                // Clear selection before deleting
+                onRemove()
+
+                // Unlink from Core Data
                 try repositoryManager.deleteRepository(repository)
+
+                // Reset state
+                alsoDeleteFromFilesystem = false
             } catch {
-                logger.error("Failed to delete repository: \(error.localizedDescription)")
+                logger.error("Failed to remove repository: \(error.localizedDescription)")
+                alsoDeleteFromFilesystem = false
             }
         }
     }
@@ -361,6 +426,51 @@ struct WorkspaceRow: View {
         .onTapGesture {
             onSelect()
         }
+    }
+}
+
+struct RepositoryRemoveSheet: View {
+    let repositoryName: String
+    @Binding var alsoDeleteFromFilesystem: Bool
+    let onCancel: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "folder.badge.minus")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+
+            Text("workspace.repository.removeTitle")
+                .font(.headline)
+
+            Text("workspace.repository.removeMessage")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Toggle(isOn: $alsoDeleteFromFilesystem) {
+                Label("workspace.repository.alsoDelete", systemImage: "trash")
+                    .foregroundStyle(alsoDeleteFromFilesystem ? .red : .primary)
+            }
+            .toggleStyle(.checkbox)
+            .padding(.top, 8)
+
+            HStack(spacing: 12) {
+                Button(String(localized: "worktree.create.cancel")) {
+                    onCancel()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button(String(localized: "workspace.repository.removeButton"), role: .destructive) {
+                    onRemove()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(.top, 8)
+        }
+        .padding(24)
+        .frame(width: 340)
     }
 }
 
