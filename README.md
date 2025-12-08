@@ -43,7 +43,7 @@ Aizen is a macOS workspace for developers who work on multiple branches in paral
 ## Requirements
 
 - macOS 13.5+
-- Apple Silicon
+- Apple Silicon or Intel Mac
 
 ### Building from Source
 
