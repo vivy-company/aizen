@@ -4,10 +4,33 @@
 <dict>
 	<key>SchemeUserState</key>
 	<dict>
+		<key>aizen debug.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>6</integer>
+		</dict>
 		<key>aizen.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>0</integer>
+			<integer>5</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>CCB04B412EA241B30007DBB1</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>CCB04B532EA241B50007DBB1</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>CCB04B5D2EA241B50007DBB1</key>
+		<dict>
+			<key>primary</key>
+			<true/>
 		</dict>
 	</dict>
 </dict>
