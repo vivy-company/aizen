@@ -153,6 +153,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = CCB04B682EA241B50007DBB1 /* Build configuration list for PBXNativeTarget "aizen" */;
 			buildPhases = (
+				CC0F0F0F0F0F0F0F0F0F0F0F /* Ensure libghostty Universal */, 
 				CCB04B3E2EA241B30007DBB1 /* Sources */,
 				CCB04B3F2EA241B30007DBB1 /* Frameworks */,
 				CCB04B402EA241B30007DBB1 /* Resources */,
@@ -330,6 +331,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${SRCROOT}/scripts/organize-resources.sh\"\n";
+		};
+		CC0F0F0F0F0F0F0F0F0F0F0F /* Ensure libghostty Universal */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/ensure-libghostty.sh",
+				"$(SRCROOT)/libghostty/VERSION",
+			);
+			name = "Ensure libghostty Universal";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/libghostty/libghostty.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"${SRCROOT}/scripts/ensure-libghostty.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
