@@ -249,6 +249,7 @@ struct AgentSetupDialog: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true
         panel.message = String(localized: "agentSetup.selectExecutable")
 
         panel.begin { response in
