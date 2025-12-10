@@ -8,6 +8,7 @@
 import SwiftUI
 import os.log
 
+@MainActor
 struct WorktreeGitOperations {
     let gitRepositoryService: GitRepositoryService
     let repositoryManager: RepositoryManager

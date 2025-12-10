@@ -239,12 +239,8 @@ struct WorktreeDetailView: View {
             }
         }
 
-        if #available(macOS 26.0, *) {
-            ToolbarSpacer(.fixed)
-        } else {
-            ToolbarItem(placement: .automatic) {
-                Spacer().frame(width: 16).fixedSize()
-            }
+        ToolbarItem(placement: .automatic) {
+            Spacer().frame(width: 16).fixedSize()
         }
 
         if showGitStatus {
@@ -453,12 +449,8 @@ struct WorktreeDetailView: View {
                     sessionToolbarItems
                 }
 
-                if #available(macOS 26.0, *) {
-                    ToolbarSpacer()
-                } else {
-                    ToolbarItem(placement: .automatic) {
-                        Spacer().frame(width: 16).fixedSize()
-                    }
+                ToolbarItem(placement: .automatic) {
+                    Spacer().frame(width: 16).fixedSize()
                 }
 
                 trailingToolbarItems

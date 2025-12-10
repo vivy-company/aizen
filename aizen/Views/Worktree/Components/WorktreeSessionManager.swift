@@ -8,6 +8,7 @@
 import SwiftUI
 import os.log
 
+@MainActor
 struct WorktreeSessionManager {
     let worktree: Worktree
     let viewModel: WorktreeViewModel
