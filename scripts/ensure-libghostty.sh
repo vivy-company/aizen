@@ -84,12 +84,30 @@ else
     trap cleanup EXIT
 fi
 
+sync_ref() {
+    local ref="$1"
+    local repo="$2"
+    local dir="$3"
+
+    if [ ! -d "${dir}/.git" ]; then
+        git clone --filter=blob:none --no-checkout --depth 1 "${repo}" "${dir}" >/dev/null
+    fi
+
+    (cd "${dir}" && git fetch --depth 1 origin "${ref}" >/dev/null)
+    # FETCH_HEAD points to the requested ref (branch, tag, or commit SHA).
+    (cd "${dir}" && git checkout --detach FETCH_HEAD >/dev/null && git reset --hard FETCH_HEAD >/dev/null)
+}
+
 if [ -d "${WORKDIR}/ghostty/.git" ]; then
     echo "Updating existing libghostty workdir at ${WORKDIR}/ghostty"
-    (cd "${WORKDIR}/ghostty" && git fetch --depth 1 origin "${DESIRED_REF}" && git reset --hard "origin/${DESIRED_REF}" >/dev/null)
 else
-    echo "Fetching libghostty @ ${DESIRED_REF} into ${WORKDIR}/ghostty"
-    git clone --depth 1 --branch "${DESIRED_REF}" "${GHOSTTY_REPO}" "${WORKDIR}/ghostty" >/dev/null
+    echo "Preparing libghostty workdir at ${WORKDIR}/ghostty"
+fi
+
+if ! sync_ref "${DESIRED_REF}" "${GHOSTTY_REPO}" "${WORKDIR}/ghostty"; then
+    echo "Error: unable to fetch ref ${DESIRED_REF} from ${GHOSTTY_REPO}." >&2
+    echo "Ensure the ref exists (tag/branch/SHA) and network access is available." >&2
+    exit 1
 fi
 
 # Patch build.zig to always install libs on macOS (upstream skips install on darwin)

@@ -62,7 +62,10 @@ cd aizen
 ```
 
 Notes:
-- libghostty ref lives in `libghostty/VERSION` (override with `LIBGHOSTTY_REF=<tag|branch>`)
+- libghostty ref lives in `libghostty/VERSION` (override with `LIBGHOSTTY_REF=<tag|branch|sha>`)
+- Quick pin + rebuild flow:
+	- `./scripts/pin-libghostty.sh <tag|branch|sha>` (omit the arg to reuse VERSION or main HEAD)
+	- `./scripts/release-package.sh`
 - Current pinned libghostty commit: `cf06417b7dfbd0daeb58a9143f9b6ee194cbce26`
 - Package + DMG (unsigned) for release flows: `./scripts/release-package.sh` (uses the same universal build under the hood)
 - Manual libghostty rebuild only (rare): `./scripts/build-libghostty.sh [ref]`
