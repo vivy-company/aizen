@@ -221,6 +221,7 @@ struct CustomAgentFormView: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true
         panel.message = "Select ACP executable"
         panel.prompt = "Select"
 
