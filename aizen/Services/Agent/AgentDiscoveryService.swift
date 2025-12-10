@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Darwin
 
 /// Service for discovering and validating agent executables
 extension AgentRegistry {
@@ -152,6 +153,11 @@ extension AgentRegistry {
             "/usr/local/lib/node_modules/.bin",
         ]
 
+        // Merge PATH entries to honor user shell configuration.
+        if let pathEnv = ProcessInfo.processInfo.environment["PATH"] {
+            paths.append(contentsOf: pathEnv.split(separator: ":").map(String.init))
+        }
+
         // Add NVM paths for Node.js based agents
         if let nvmDir = ProcessInfo.processInfo.environment["NVM_DIR"] {
             paths.append(contentsOf: [
@@ -167,7 +173,7 @@ extension AgentRegistry {
             homeDir.appendingPathComponent(".nvm/versions/node/*/bin").path
         ])
 
-        return paths
+        return expandPaths(paths)
     }
 
     /// Find executable in given paths
@@ -182,5 +188,37 @@ extension AgentRegistry {
         }
 
         return nil
+    }
+
+    /// Expand tildes and glob patterns, deduplicate, and preserve order.
+    private func expandPaths(_ paths: [String]) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+
+        for raw in paths {
+            let expandedTilde = (raw as NSString).expandingTildeInPath
+
+            if expandedTilde.contains("*") {
+                var globResult = glob_t()
+                if glob(expandedTilde, GLOB_TILDE, nil, &globResult) == 0 {
+                    let count = Int(globResult.gl_matchc)
+                    for i in 0..<count {
+                        if let cPath = globResult.gl_pathv?[i], let path = String(validatingUTF8: cPath) {
+                            if seen.insert(path).inserted {
+                                result.append(path)
+                            }
+                        }
+                    }
+                }
+                globfree(&globResult)
+                continue
+            }
+
+            if seen.insert(expandedTilde).inserted {
+                result.append(expandedTilde)
+            }
+        }
+
+        return result
     }
 }
