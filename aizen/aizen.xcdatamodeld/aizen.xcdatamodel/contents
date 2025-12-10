@@ -35,6 +35,7 @@
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="splitLayout" optional="YES" attributeType="String"/>
         <attribute name="focusedPaneId" optional="YES" attributeType="String"/>
+        <attribute name="initialCommand" optional="YES" attributeType="String"/>
         <relationship name="worktree" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Worktree" inverseName="terminalSessions" inverseEntity="Worktree"/>
     </entity>
     <entity name="ChatSession" representedClassName="ChatSession" syncable="YES" codeGenerationType="class">

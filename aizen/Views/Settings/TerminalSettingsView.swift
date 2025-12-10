@@ -16,8 +16,11 @@ struct TerminalSettingsView: View {
     @AppStorage("terminalNotificationsEnabled") private var terminalNotificationsEnabled = true
     @AppStorage("terminalProgressEnabled") private var terminalProgressEnabled = true
 
+    @StateObject private var presetManager = TerminalPresetManager.shared
     @State private var availableFonts: [String] = []
     @State private var themeNames: [String] = []
+    @State private var showingAddPreset = false
+    @State private var editingPreset: TerminalPreset?
 
     private static var themesPath: String? {
         guard let resourcePath = Bundle.main.resourcePath else { return nil }
@@ -87,6 +90,63 @@ struct TerminalSettingsView: View {
                 Toggle("Enable terminal notifications", isOn: $terminalNotificationsEnabled)
                 Toggle("Show progress overlays", isOn: $terminalProgressEnabled)
             }
+
+            Section {
+                ForEach(presetManager.presets) { preset in
+                    HStack(spacing: 12) {
+                        Image(systemName: preset.icon)
+                            .frame(width: 20)
+                            .foregroundStyle(.secondary)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(preset.name)
+                                .fontWeight(.medium)
+                            Text(preset.command)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            editingPreset = preset
+                        } label: {
+                            Image(systemName: "pencil")
+                        }
+                        .buttonStyle(.borderless)
+
+                        Button {
+                            presetManager.deletePreset(id: preset.id)
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .onMove { source, destination in
+                    presetManager.movePreset(from: source, to: destination)
+                }
+
+                Button {
+                    showingAddPreset = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(Color.accentColor)
+                        Text("Add Preset")
+                    }
+                }
+                .buttonStyle(.plain)
+            } header: {
+                Text("Terminal Presets")
+            } footer: {
+                Text("Presets appear in the empty terminal state and when long-pressing the + button")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()
@@ -97,6 +157,19 @@ struct TerminalSettingsView: View {
             if themeNames.isEmpty {
                 themeNames = loadThemeNames()
             }
+        }
+        .sheet(isPresented: $showingAddPreset) {
+            TerminalPresetFormView(
+                onSave: { _ in },
+                onCancel: {}
+            )
+        }
+        .sheet(item: $editingPreset) { preset in
+            TerminalPresetFormView(
+                existingPreset: preset,
+                onSave: { _ in },
+                onCancel: {}
+            )
         }
     }
 }

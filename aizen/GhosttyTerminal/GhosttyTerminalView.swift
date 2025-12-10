@@ -26,6 +26,7 @@ class GhosttyTerminalView: NSView {
     internal var surface: Ghostty.Surface?
     private var surfaceReference: Ghostty.SurfaceReference?
     private let worktreePath: String
+    private let initialCommand: String?
 
     /// Callback invoked when the terminal process exits
     var onProcessExit: (() -> Void)?
@@ -60,10 +61,12 @@ class GhosttyTerminalView: NSView {
     ///   - worktreePath: Working directory for the terminal session
     ///   - ghosttyApp: The shared Ghostty app instance (C pointer)
     ///   - appWrapper: The Ghostty.App wrapper for surface tracking (optional)
-    init(frame: NSRect, worktreePath: String, ghosttyApp: ghostty_app_t, appWrapper: Ghostty.App? = nil) {
+    ///   - command: Optional command to run instead of default shell
+    init(frame: NSRect, worktreePath: String, ghosttyApp: ghostty_app_t, appWrapper: Ghostty.App? = nil, command: String? = nil) {
         self.worktreePath = worktreePath
         self.ghosttyApp = ghosttyApp
         self.ghosttyAppWrapper = appWrapper
+        self.initialCommand = command
 
         // Use a reasonable default size if frame is zero
         let initialFrame = frame.width > 0 && frame.height > 0 ? frame : NSRect(x: 0, y: 0, width: 800, height: 600)
@@ -120,7 +123,8 @@ class GhosttyTerminalView: NSView {
             ghosttyApp: app,
             worktreePath: worktreePath,
             initialBounds: bounds,
-            window: window
+            window: window,
+            command: initialCommand
         ) else {
             return
         }

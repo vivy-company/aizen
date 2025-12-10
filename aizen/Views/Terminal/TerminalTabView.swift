@@ -14,6 +14,7 @@ struct TerminalTabView: View {
     @ObservedObject var repositoryManager: RepositoryManager
 
     private let sessionManager = TerminalSessionManager.shared
+    @StateObject private var presetManager = TerminalPresetManager.shared
     private let logger = Logger.terminal
 
     var sessions: [TerminalSession] {
@@ -80,6 +81,7 @@ struct TerminalTabView: View {
                 }
             }
 
+            // New terminal button
             Button {
                 createNewSession()
             } label: {
@@ -95,23 +97,59 @@ struct TerminalTabView: View {
             }
             .buttonStyle(.plain)
 
+            // Presets section
+            if !presetManager.presets.isEmpty {
+                VStack(spacing: 12) {
+                    Text("Or launch a preset")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+
+                    HStack(spacing: 12) {
+                        ForEach(presetManager.presets.prefix(4)) { preset in
+                            Button {
+                                createNewSession(withPreset: preset)
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Image(systemName: preset.icon)
+                                        .font(.system(size: 20))
+                                    Text(preset.name)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                }
+                                .frame(width: 72, height: 56)
+                                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    private func createNewSession() {
+    private func createNewSession(withPreset preset: TerminalPreset? = nil) {
         guard let context = worktree.managedObjectContext else { return }
 
         let session = TerminalSession(context: context)
         session.id = UUID()
-        session.title = String(localized: "worktree.session.terminalTitle", defaultValue: "Terminal \(sessions.count + 1)", bundle: .main)
         session.createdAt = Date()
         session.worktree = worktree
 
+        if let preset = preset {
+            session.title = preset.name
+            session.initialCommand = preset.command
+            logger.info("Creating session with preset: \(preset.name), command: \(preset.command)")
+        } else {
+            session.title = String(localized: "worktree.session.terminalTitle", defaultValue: "Terminal \(sessions.count + 1)", bundle: .main)
+        }
+
         do {
             try context.save()
+            logger.info("Session saved, initialCommand: \(session.initialCommand ?? "nil")")
             selectedSessionId = session.id
         } catch {
             logger.error("Failed to create terminal session: \(error.localizedDescription)")

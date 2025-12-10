@@ -55,7 +55,8 @@ class GhosttyRenderingSetup {
         ghosttyApp: ghostty_app_t,
         worktreePath: String,
         initialBounds: NSRect,
-        window: NSWindow?
+        window: NSWindow?,
+        command: String? = nil
     ) -> ghostty_surface_t? {
         // Configure surface with working directory
         var surfaceConfig = ghostty_surface_config_new()
@@ -74,17 +75,34 @@ class GhosttyRenderingSetup {
         surfaceConfig.font_size = Float(terminalFontSize)
 
         // Set working directory
+        var workingDirPtr: UnsafeMutablePointer<CChar>?
+        var initialInputPtr: UnsafeMutablePointer<CChar>?
+
         if let workingDir = strdup(worktreePath) {
+            workingDirPtr = workingDir
             surfaceConfig.working_directory = UnsafePointer(workingDir)
         }
 
-        // DO NOT set command - let Ghostty handle shell integration
-        // Ghostty will detect shell, wrap it with proper env vars, and launch via /usr/bin/login
+        // Let Ghostty handle shell integration
         surfaceConfig.command = nil
 
+        // Set initial_input if command provided (for presets)
+        // This sends input to the shell after it starts
+        if let command = command, !command.isEmpty {
+            let inputWithNewline = command + "\n"
+            if let input = strdup(inputWithNewline) {
+                initialInputPtr = input
+                surfaceConfig.initial_input = UnsafePointer(input)
+                Self.logger.info("Setting initial_input for preset: \(command)")
+            }
+        }
+
         defer {
-            if let wd = surfaceConfig.working_directory {
-                free(UnsafeMutableRawPointer(mutating: wd))
+            if let wd = workingDirPtr {
+                free(wd)
+            }
+            if let input = initialInputPtr {
+                free(input)
             }
         }
 

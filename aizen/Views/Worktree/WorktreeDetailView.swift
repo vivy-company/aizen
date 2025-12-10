@@ -175,7 +175,10 @@ struct WorktreeDetailView: View {
                 onCloseChatSession: sessionManager.closeChatSession,
                 onCloseTerminalSession: sessionManager.closeTerminalSession,
                 onCreateChatSession: sessionManager.createNewChatSession,
-                onCreateTerminalSession: sessionManager.createNewTerminalSession
+                onCreateTerminalSession: sessionManager.createNewTerminalSession,
+                onCreateTerminalWithPreset: { preset in
+                    sessionManager.createNewTerminalSession(withPreset: preset)
+                }
             )
         }
     }

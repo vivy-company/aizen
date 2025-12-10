@@ -100,11 +100,17 @@ struct TerminalViewWrapper: NSViewRepresentable {
         }
 
         // Create new Ghostty terminal
+        // Apply initial command only for the first terminal created in a session
+        // (subsequent splits shouldn't re-run the command)
+        let isFirstTerminalInSession = sessionManager.getTerminalCount(for: sessionId) == 0
+        let initialCommand = isFirstTerminalInSession ? session.initialCommand : nil
+        Logger.terminal.info("makeNSView: session.id=\(session.id?.uuidString ?? "nil"), paneId=\(paneId), isFirst=\(isFirstTerminalInSession), initialCommand=\(initialCommand ?? "nil")")
         let terminalView = GhosttyTerminalView(
             frame: .zero,
             worktreePath: path,
             ghosttyApp: app,
-            appWrapper: ghosttyApp
+            appWrapper: ghosttyApp,
+            command: initialCommand
         )
         terminalView.onReady = onReady
         terminalView.onTitleChange = onTitleChange
@@ -123,6 +129,7 @@ struct TerminalViewWrapper: NSViewRepresentable {
 
         // Start monitoring for process exit
         context.coordinator.startMonitoring(terminal: terminalView)
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             onReady()
         }

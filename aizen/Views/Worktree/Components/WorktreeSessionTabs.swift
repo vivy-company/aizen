@@ -55,6 +55,7 @@ struct SessionTabsScrollView: View {
     let onCloseTerminalSession: (TerminalSession) -> Void
     let onCreateChatSession: () -> Void
     let onCreateTerminalSession: () -> Void
+    var onCreateTerminalWithPreset: ((TerminalPreset) -> Void)?
 
     @State private var scrollViewProxy: ScrollViewProxy?
 
@@ -113,7 +114,8 @@ struct SessionTabsScrollView: View {
             NewTabButton(
                 selectedTab: selectedTab,
                 onCreateChatSession: onCreateChatSession,
-                onCreateTerminalSession: onCreateTerminalSession
+                onCreateTerminalSession: onCreateTerminalSession,
+                onCreateTerminalWithPreset: onCreateTerminalWithPreset
             )
             .padding(.trailing, 8)
         }
@@ -337,37 +339,79 @@ struct NewTabButton: View {
     let selectedTab: String
     let onCreateChatSession: () -> Void
     let onCreateTerminalSession: () -> Void
+    var onCreateTerminalWithPreset: ((TerminalPreset) -> Void)?
 
+    @StateObject private var presetManager = TerminalPresetManager.shared
     @State private var isHovering = false
     @State private var clickTrigger = 0
 
     var body: some View {
-        let button = Button {
-            clickTrigger += 1
-            if selectedTab == "chat" {
-                onCreateChatSession()
-            } else {
+        // Use Menu with primaryAction when presets exist for terminal tab
+        if selectedTab == "terminal" && !presetManager.presets.isEmpty {
+            Menu {
+                Button {
+                    onCreateTerminalSession()
+                } label: {
+                    Label("New Terminal", systemImage: "terminal")
+                }
+
+                Divider()
+
+                ForEach(presetManager.presets) { preset in
+                    Button {
+                        onCreateTerminalWithPreset?(preset)
+                    } label: {
+                        Label(preset.name, systemImage: preset.icon)
+                    }
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 11))
+                    .frame(width: 24, height: 24)
+                    .background(
+                        isHovering ? Color(nsColor: .separatorColor).opacity(0.5) : Color.clear,
+                        in: Circle()
+                    )
+            } primaryAction: {
+                clickTrigger += 1
                 onCreateTerminalSession()
             }
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 11))
-                .frame(width: 24, height: 24)
-                .background(
-                    isHovering ? Color(nsColor: .separatorColor).opacity(0.5) : Color.clear,
-                    in: Circle()
-                )
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            isHovering = hovering
-        }
-        .help("New \(selectedTab == "chat" ? "Chat" : "Terminal") Session")
-        
-        if #available(macOS 14.0, *) {
-            button.symbolEffect(.bounce, value: clickTrigger)
+            .menuStyle(.button)
+            .menuIndicator(.visible)
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                isHovering = hovering
+            }
+            .help("Click for new terminal, or click arrow for presets")
         } else {
-            button
+            // Simple button for chat or when no presets
+            let button = Button {
+                clickTrigger += 1
+                if selectedTab == "chat" {
+                    onCreateChatSession()
+                } else {
+                    onCreateTerminalSession()
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 11))
+                    .frame(width: 24, height: 24)
+                    .background(
+                        isHovering ? Color(nsColor: .separatorColor).opacity(0.5) : Color.clear,
+                        in: Circle()
+                    )
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                isHovering = hovering
+            }
+            .help("New \(selectedTab == "chat" ? "Chat" : "Terminal") Session")
+
+            if #available(macOS 14.0, *) {
+                button.symbolEffect(.bounce, value: clickTrigger)
+            } else {
+                button
+            }
         }
     }
 }

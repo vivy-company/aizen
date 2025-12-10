@@ -102,15 +102,25 @@ struct WorktreeSessionManager {
     }
 
     func createNewTerminalSession() {
+        createNewTerminalSession(withPreset: nil)
+    }
+
+    func createNewTerminalSession(withPreset preset: TerminalPreset?) {
         guard let context = worktree.managedObjectContext else { return }
 
         let terminalSessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
 
         let session = TerminalSession(context: context)
         session.id = UUID()
-        session.title = String(localized: "worktree.session.terminalTitle \(terminalSessions.count + 1)")
         session.createdAt = Date()
         session.worktree = worktree
+
+        if let preset = preset {
+            session.title = preset.name
+            session.initialCommand = preset.command
+        } else {
+            session.title = String(localized: "worktree.session.terminalTitle \(terminalSessions.count + 1)")
+        }
 
         do {
             try context.save()

@@ -34,6 +34,11 @@ class TerminalSessionManager {
         terminals = terminals.filter { !$0.key.hasPrefix(prefix) }
     }
 
+    func getTerminalCount(for sessionId: UUID) -> Int {
+        let prefix = sessionId.uuidString
+        return terminals.keys.filter { $0.hasPrefix(prefix) }.count
+    }
+
     /// Check if any terminal pane needs confirmation before closing
     @MainActor
     func hasRunningProcess(for sessionId: UUID, paneIds: [String]) -> Bool {
