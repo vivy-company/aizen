@@ -421,6 +421,12 @@ struct WorktreeDetailView: View {
         guard let worktreeId = worktree.id else { return }
         let state = tabStateManager.getState(for: worktreeId)
         selectedTab = state.viewType
+
+        // Restore session selections
+        viewModel.selectedChatSessionId = state.chatSessionId
+        viewModel.selectedTerminalSessionId = state.terminalSessionId
+        viewModel.selectedBrowserSessionId = state.browserSessionId
+        viewModel.selectedFileSessionId = state.fileSessionId
     }
 
     private func saveTabState() {
