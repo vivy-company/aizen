@@ -17,7 +17,15 @@ struct WorktreeListView: View {
     @State private var searchText = ""
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
 
-    @State private var sortedWorktrees: [Worktree] = []
+    private var sortedWorktrees: [Worktree] {
+        let wts = (repository.worktrees as? Set<Worktree>) ?? []
+        return wts.sorted { wt1, wt2 in
+            if wt1.isPrimary != wt2.isPrimary {
+                return wt1.isPrimary
+            }
+            return (wt1.branch ?? "") < (wt2.branch ?? "")
+        }
+    }
 
     private var worktrees: [Worktree] {
         if searchText.isEmpty {
@@ -27,16 +35,6 @@ struct WorktreeListView: View {
                 (worktree.branch ?? "").localizedCaseInsensitiveContains(searchText) ||
                 (worktree.path ?? "").localizedCaseInsensitiveContains(searchText)
             }
-        }
-    }
-
-    private func updateSortedWorktrees() {
-        let wts = (repository.worktrees as? Set<Worktree>) ?? []
-        sortedWorktrees = wts.sorted { wt1, wt2 in
-            if wt1.isPrimary != wt2.isPrimary {
-                return wt1.isPrimary
-            }
-            return (wt1.branch ?? "") < (wt2.branch ?? "")
         }
     }
 
@@ -104,12 +102,6 @@ struct WorktreeListView: View {
                 repository: repository,
                 repositoryManager: repositoryManager
             )
-        }
-        .onAppear {
-            updateSortedWorktrees()
-        }
-        .onChange(of: repository.worktrees) { _ in
-            updateSortedWorktrees()
         }
     }
 }
