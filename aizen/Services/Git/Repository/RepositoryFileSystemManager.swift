@@ -9,6 +9,7 @@ import Foundation
 import AppKit
 
 /// Manages file system operations for repositories and worktrees
+@MainActor
 class RepositoryFileSystemManager {
 
     // MARK: - File System Operations

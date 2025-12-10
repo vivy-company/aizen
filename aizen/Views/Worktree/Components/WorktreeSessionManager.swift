@@ -11,6 +11,7 @@ import os.log
 // NOTE: TmuxSessionManager lives outside Views; keep a lightweight reference here.
 private let tmuxManager = TmuxSessionManager.shared
 
+@MainActor
 struct WorktreeSessionManager {
     let worktree: Worktree
     let viewModel: WorktreeViewModel
