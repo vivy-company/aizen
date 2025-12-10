@@ -18,6 +18,20 @@ if [ "${SKIP_INSTALL_DEPS:-0}" != "1" ]; then
   ./scripts/install-deps.sh
 fi
 
+# Pre-fetch/build libghostty so the archive phase doesn't stall on the run script.
+./scripts/ensure-libghostty.sh
+
+# Optionally skip SwiftLint plugin execution (set SKIP_SWIFTLINT=1). Useful for release packaging
+# where lint failures in dependencies would otherwise break the archive.
+if [ "${SKIP_SWIFTLINT:-0}" = "1" ]; then
+  export SWIFTLINT_PATH="/usr/bin/true"
+  echo "Skipping SwiftLint plugin execution (SWIFTLINT_PATH=/usr/bin/true)"
+else
+  if command -v swiftlint >/dev/null 2>&1; then
+    export SWIFTLINT_PATH="$(command -v swiftlint)"
+  fi
+fi
+
 # Clean and archive universal (arm64 + x86_64) without signing
 xcodebuild clean archive \
   -scheme "${SCHEME}" \
