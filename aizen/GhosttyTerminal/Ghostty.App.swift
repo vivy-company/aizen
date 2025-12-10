@@ -79,7 +79,9 @@ extension Ghostty {
                 action_cb: { app, target, action in App.action(app!, target: target, action: action) },
                 read_clipboard_cb: { userdata, loc, state in App.readClipboard(userdata, location: loc, state: state) },
                 confirm_read_clipboard_cb: { userdata, str, state, request in App.confirmReadClipboard(userdata, string: str, state: state, request: request) },
-                write_clipboard_cb: { userdata, str, loc, confirm in App.writeClipboard(userdata, string: str, location: loc, confirm: confirm) },
+                write_clipboard_cb: { userdata, loc, content, count, confirm in
+                    App.writeClipboard(userdata, location: loc, contents: content, count: count, confirm: confirm)
+                },
                 close_surface_cb: { userdata, processAlive in App.closeSurface(userdata, processAlive: processAlive) }
             )
 
@@ -346,19 +348,29 @@ extension Ghostty {
 
         static func writeClipboard(
             _ userdata: UnsafeMutableRawPointer?,
-            string: UnsafePointer<CChar>?,
             location: ghostty_clipboard_e,
+            contents: UnsafePointer<ghostty_clipboard_content_s>?,
+            count: Int,
             confirm: Bool
         ) {
-            guard let string = string,
-                  let str = String(cString: string, encoding: .utf8) else { return }
+            guard let contents = contents, count > 0 else { return }
 
-            // Write to macOS clipboard
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(str, forType: .string)
+            // The runtime passes an array of clipboard entries; prefer the first
+            // textual entry. The API does not supply a byte length, so we treat
+            // the data as a null-terminated UTF-8 C string.
+            for idx in 0..<count {
+                let entry = contents.advanced(by: idx).pointee
+                guard let dataPtr = entry.data else { continue }
 
-            Ghostty.logger.debug("Wrote to clipboard: \(str.prefix(50))...")
+                let string = String(cString: dataPtr)
+                if !string.isEmpty {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(string, forType: .string)
+                    Ghostty.logger.debug("Wrote to clipboard: \(string.prefix(50))...")
+                    return
+                }
+            }
         }
 
         static func closeSurface(_ userdata: UnsafeMutableRawPointer?, processAlive: Bool) {

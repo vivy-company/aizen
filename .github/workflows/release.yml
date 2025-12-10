@@ -44,34 +44,15 @@ jobs:
           chmod +x scripts/bump-version.sh
           scripts/bump-version.sh "${{ github.event.inputs.marketing_version }}" "${{ github.event.inputs.build_version }}"
 
-      - name: Install dependencies
+      - name: Build package (archive + DMG)
+        env:
+          MARKETING_VERSION: ${{ github.event.inputs.marketing_version }}
+          BUILD_VERSION: ${{ github.event.inputs.build_version }}
+          RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+          SKIP_INSTALL_DEPS: 1
         run: |
-          # Install create-dmg for DMG creation
-          brew install create-dmg
-
-          # Install AWS CLI for R2 uploads
-          brew install awscli
-
-          # Install Sparkle tools
-          brew install sparkle
-
-      - name: Build and archive app
-        run: |
-          xcodebuild clean archive \
-            -scheme "${{ env.SCHEME }}" \
-            -configuration "${{ env.CONFIGURATION }}" \
-            -archivePath build/aizen.xcarchive \
-            -arch arm64 \
-            -skipPackagePluginValidation \
-            -skipMacroValidation \
-            ONLY_ACTIVE_ARCH=NO \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO
-
-      - name: Export app bundle
-        run: |
-          mkdir -p build/dmg
-          cp -R build/aizen.xcarchive/Products/Applications/aizen.app build/dmg/
+          chmod +x scripts/release-package.sh
+          scripts/release-package.sh
 
       # Conditional code signing
       - name: Import signing certificate
@@ -115,24 +96,7 @@ jobs:
             --entitlements aizen/aizen.entitlements \
             build/dmg/aizen.app
 
-      - name: Create DMG
-        run: |
-          create-dmg \
-            --volname "aizen" \
-            --window-pos 200 120 \
-            --window-size 800 400 \
-            --icon-size 100 \
-            --icon "aizen.app" 200 190 \
-            --hide-extension "aizen.app" \
-            --app-drop-link 600 185 \
-            "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" \
-            "build/dmg/" || true
-
-          # create-dmg sometimes fails with exit code 2 even on success
-          if [ ! -f "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" ]; then
-            echo "Error: DMG creation failed"
-            exit 1
-          fi
+      # DMG already created by release-package.sh
 
       - name: Sign DMG
         env:
