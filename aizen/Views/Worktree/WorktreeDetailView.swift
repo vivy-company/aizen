@@ -454,10 +454,10 @@ struct WorktreeDetailView: View {
                 }
 
                 if #available(macOS 26.0, *) {
-                    ToolbarSpacer(.fixed)
+                    ToolbarSpacer()
                 } else {
                     ToolbarItem(placement: .automatic) {
-                        Spacer().frame(width: 12).fixedSize()
+                        Spacer()
                     }
                 }
 
