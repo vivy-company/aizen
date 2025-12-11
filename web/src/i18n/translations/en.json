@@ -5,7 +5,7 @@
     "earlyAccess": "Early Access",
     "download": "Download",
     "viewOnGithub": "View on GitHub",
-    "requirements": "Requires macOS 13.5 Ventura or later (Apple Silicon only)"
+    "requirements": "Requires macOS 13.5 Ventura or later (Apple Silicon & Intel)"
   },
   "showcase": {
     "agents": "Agents",
@@ -87,7 +87,7 @@
     },
     "q6": {
       "question": "What are the requirements?",
-      "answer": "macOS 13.5 Ventura or later. Apple Silicon only."
+      "answer": "macOS 13.5 Ventura or later. Apple Silicon and Intel Macs supported."
     }
   },
   "footer": {

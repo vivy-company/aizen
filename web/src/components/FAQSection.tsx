@@ -17,7 +17,8 @@ export default function FAQSection() {
       .replace(/GitHub/g, '<span class="text-zinc-300">GitHub</span>')
       .replace(/Apache 2\.0/g, '<span class="text-zinc-300">Apache 2.0</span>')
       .replace(/macOS 13\.5 Ventura/g, '<span class="text-blue-500">macOS 13.5 Ventura</span>')
-      .replace(/Apple Silicon/g, '<span class="text-zinc-400">Apple Silicon</span>');
+      .replace(/Apple Silicon/g, '<span class="text-zinc-400">Apple Silicon</span>')
+      .replace(/Intel Macs/g, '<span class="text-zinc-400">Intel Macs</span>');
   };
 
   return (
