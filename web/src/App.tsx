@@ -13,6 +13,8 @@ import {
 import logo from "./logo.png";
 import demoScreenshot from "./demo.png";
 import terminalScreenshot from "./terminal.png";
+import filesScreenshot from "./files.png";
+import browserScreenshot from "./browser.png";
 import { useLanguage, LanguageProvider } from "./i18n/LanguageContext";
 
 declare global {
@@ -158,12 +160,11 @@ function AppContent() {
       });
   }, []);
 
-  // For now, reuse existing screenshots - you can add files.png and browser.png later
   const screenshots: Record<ShowcaseTab, string> = {
     agents: demoScreenshot,
     terminal: terminalScreenshot,
-    files: demoScreenshot, // TODO: add files screenshot
-    browser: demoScreenshot, // TODO: add browser screenshot
+    files: filesScreenshot,
+    browser: browserScreenshot,
   };
 
   const showcaseTabs: ShowcaseTab[] = ["agents", "terminal", "files", "browser"];
