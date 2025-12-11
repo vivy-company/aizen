@@ -12,15 +12,15 @@
 		CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = CCB04B732EA241B60007DBB1 /* Markdown */; };
 		CC8001752EC989600037DA4C /* SwiftTreeSitter in Frameworks */ = {isa = PBXBuildFile; productRef = CCFE00062EBF000000000006 /* SwiftTreeSitter */; };
 		CCA569F12ECB04E100955D13 /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CCA569F02ECB04E100955D13 /* CodeEditTextView */; };
-		CCA569F42ECB04F500955D13 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA569F32ECB04F500955D13 /* CodeEditSourceEditor */; };
-		CCA569FF2ECB12A600955D13 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA569FE2ECB12A600955D13 /* CodeEditSourceEditor */; };
-		CCA56A022ECB131C00955D13 /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A012ECB131C00955D13 /* CodeEditTextView */; };
 		CCA56A052ECB132E00955D13 /* CodeEditSymbols in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A042ECB132E00955D13 /* CodeEditSymbols */; };
-		CCA56A072ECB1E8D00955D13 /* CodeEditSymbols in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A062ECB1E8D00955D13 /* CodeEditSymbols */; };
-		CCA56A092ECB1E9D00955D13 /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A082ECB1E9D00955D13 /* CodeEditTextView */; };
 		CCA56A0B2ECB1EAF00955D13 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A0A2ECB1EAF00955D13 /* CodeEditSourceEditor */; };
-		CCA56A0D2ECB1F2800955D13 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A0C2ECB1F2800955D13 /* CodeEditSourceEditor */; };
 		CCA56A102ECB203200955D13 /* CodeEditLanguages in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A0F2ECB203200955D13 /* CodeEditLanguages */; };
+		CCB235112EEA7CA300041489 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA569F32ECB04F500955D13 /* CodeEditSourceEditor */; };
+		CCB235122EEA7CA300041489 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA569FE2ECB12A600955D13 /* CodeEditSourceEditor */; };
+		CCB235132EEA7CA300041489 /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A012ECB131C00955D13 /* CodeEditTextView */; };
+		CCB235142EEA7CA300041489 /* CodeEditSymbols in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A062ECB1E8D00955D13 /* CodeEditSymbols */; };
+		CCB235152EEA7CA300041489 /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A082ECB1E9D00955D13 /* CodeEditTextView */; };
+		CCB235162EEA7CA300041489 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A0C2ECB1F2800955D13 /* CodeEditSourceEditor */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -83,6 +83,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CCB235162EEA7CA300041489 /* CodeEditSourceEditor in Frameworks */,
+				CCB235152EEA7CA300041489 /* CodeEditTextView in Frameworks */,
+				CCB235142EEA7CA300041489 /* CodeEditSymbols in Frameworks */,
+				CCB235132EEA7CA300041489 /* CodeEditTextView in Frameworks */,
+				CCB235122EEA7CA300041489 /* CodeEditSourceEditor in Frameworks */,
+				CCB235112EEA7CA300041489 /* CodeEditSourceEditor in Frameworks */,
 				CCA569F12ECB04E100955D13 /* CodeEditTextView in Frameworks */,
 				CCA56A052ECB132E00955D13 /* CodeEditSymbols in Frameworks */,
 				CC8001752EC989600037DA4C /* SwiftTreeSitter in Frameworks */,
@@ -535,6 +541,9 @@
 				OTHER_LDFLAGS = (
 					"-lc++",
 					"-lgit2",
+					"-lssh2",
+					"-lssl",
+					"-lcrypto",
 					"-lz",
 					"-liconv",
 					"-framework",
@@ -610,6 +619,9 @@
 				OTHER_LDFLAGS = (
 					"-lc++",
 					"-lgit2",
+					"-lssh2",
+					"-lssl",
+					"-lcrypto",
 					"-lz",
 					"-liconv",
 					"-framework",

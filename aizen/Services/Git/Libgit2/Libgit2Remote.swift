@@ -99,17 +99,7 @@ extension Libgit2Repository {
         }
 
         // Setup callbacks for credential handling
-        opts.callbacks.credentials = { (cred, url, username_from_url, allowed_types, payload) -> Int32 in
-            // Try SSH agent first
-            if allowed_types & UInt32(GIT_CREDENTIAL_SSH_KEY.rawValue) != 0 {
-                return git_credential_ssh_key_from_agent(cred, username_from_url)
-            }
-            // For HTTPS, try default credentials
-            if allowed_types & UInt32(GIT_CREDENTIAL_DEFAULT.rawValue) != 0 {
-                return git_credential_default_new(cred)
-            }
-            return Int32(GIT_PASSTHROUGH.rawValue)
-        }
+        opts.callbacks.credentials = sshCredentialCallback
 
         let fetchError = git_remote_fetch(r, nil, &opts, nil)
         guard fetchError == 0 else {
@@ -137,15 +127,7 @@ extension Libgit2Repository {
         git_push_options_init(&opts, UInt32(GIT_PUSH_OPTIONS_VERSION))
 
         // Setup callbacks for credential handling
-        opts.callbacks.credentials = { (cred, url, username_from_url, allowed_types, payload) -> Int32 in
-            if allowed_types & UInt32(GIT_CREDENTIAL_SSH_KEY.rawValue) != 0 {
-                return git_credential_ssh_key_from_agent(cred, username_from_url)
-            }
-            if allowed_types & UInt32(GIT_CREDENTIAL_DEFAULT.rawValue) != 0 {
-                return git_credential_default_new(cred)
-            }
-            return Int32(GIT_PASSTHROUGH.rawValue)
-        }
+        opts.callbacks.credentials = sshCredentialCallback
 
         // Build refspecs
         var refs: [String]
