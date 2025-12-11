@@ -41,7 +41,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		CC1234562EA241B30007DBB1 /* libghostty.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libghostty.a; path = libghostty/libghostty.a; sourceTree = "<group>"; };
+		CC1234562EA241B30007DBB1 /* libghostty.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libghostty.a; path = Vendor/libghostty/lib/libghostty.a; sourceTree = "<group>"; };
 		CCB04B422EA241B30007DBB1 /* aizen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = aizen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCB04B542EA241B50007DBB1 /* aizenTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = aizenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCB04B5E2EA241B50007DBB1 /* aizenUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = aizenUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -153,7 +153,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = CCB04B682EA241B50007DBB1 /* Build configuration list for PBXNativeTarget "aizen" */;
 			buildPhases = (
-				CC0F0F0F0F0F0F0F0F0F0F0F /* Ensure libghostty Universal */, 
 				CCB04B3E2EA241B30007DBB1 /* Sources */,
 				CCB04B3F2EA241B30007DBB1 /* Frameworks */,
 				CCB04B402EA241B30007DBB1 /* Resources */,
@@ -331,27 +330,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${SRCROOT}/scripts/organize-resources.sh\"\n";
-		};
-		CC0F0F0F0F0F0F0F0F0F0F0F /* Ensure libghostty Universal */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/scripts/ensure-libghostty.sh",
-				"$(SRCROOT)/libghostty/VERSION",
-			);
-			name = "Ensure libghostty Universal";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/libghostty/libghostty.a",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/bash;
-			shellScript = "\"${SRCROOT}/scripts/ensure-libghostty.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -544,7 +522,7 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/libghostty/include",
+					"$(PROJECT_DIR)/Vendor/libghostty/include",
 					"$(PROJECT_DIR)/Vendor/libgit2/include",
 				);
 				INFOPLIST_FILE = aizen/Info.plist;
@@ -555,7 +533,7 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/libghostty",
+					"$(PROJECT_DIR)/Vendor/libghostty/lib",
 					"$(PROJECT_DIR)/Vendor/libgit2/lib",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
@@ -622,7 +600,7 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/libghostty/include",
+					"$(PROJECT_DIR)/Vendor/libghostty/include",
 					"$(PROJECT_DIR)/Vendor/libgit2/include",
 				);
 				INFOPLIST_FILE = aizen/Info.plist;
@@ -633,7 +611,7 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/libghostty",
+					"$(PROJECT_DIR)/Vendor/libghostty/lib",
 					"$(PROJECT_DIR)/Vendor/libgit2/lib",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.5;

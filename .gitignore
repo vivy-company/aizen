@@ -122,4 +122,4 @@ Vendor/libgit2/include/
 # Sparkle signing keys
 .sparkle-keys/
 *.pem
-libghostty/.built-ref
+Vendor/libghostty/.built-ref

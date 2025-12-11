@@ -45,30 +45,29 @@ Aizen is a macOS workspace for developers who work on multiple branches in paral
 - macOS 13.5+
 - Apple Silicon or Intel Mac
 
-git clone https://github.com/vivy-company/aizen.git
 ### Building from Source
 
 - Xcode 16.0+
 - Swift 5.0+
 - Git LFS
-
-Quick path (fetches universal libghostty, installs needed tools, then builds universal arm64 + x86_64):
+- Zig (for building libghostty): `brew install zig`
 
 ```bash
 git lfs install
 git clone https://github.com/vivy-company/aizen.git
 cd aizen
-./scripts/build-universal.sh          # primary build script
+
+# Build libghostty (universal arm64 + x86_64)
+./scripts/build-libghostty.sh
+
+# Open in Xcode and build
+open aizen.xcodeproj
 ```
 
-Notes:
-- libghostty ref lives in `libghostty/VERSION` (override with `LIBGHOSTTY_REF=<tag|branch|sha>`)
-- Quick pin + rebuild flow:
-	- `./scripts/pin-libghostty.sh <tag|branch|sha>` (omit the arg to reuse VERSION or main HEAD)
-	- `./scripts/release-package.sh`
-- Current pinned libghostty commit: `cf06417b7dfbd0daeb58a9143f9b6ee194cbce26`
-- Package + DMG (unsigned) for release flows: `./scripts/release-package.sh` (uses the same universal build under the hood)
-- Manual libghostty rebuild only (rare): `./scripts/build-libghostty.sh [ref]`
+To rebuild libghostty at a specific commit:
+```bash
+./scripts/build-libghostty.sh <commit-sha>
+```
 
 ## Installation
 
