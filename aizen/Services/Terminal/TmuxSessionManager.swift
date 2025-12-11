@@ -186,13 +186,11 @@ actor TmuxSessionManager {
 
     // MARK: - Command Generation
 
-    /// Generate the shell command to attach or create a tmux session
+    /// Generate the tmux command to attach or create a session
     ///
-    /// This command:
-    /// 1. Tries to attach to existing session
-    /// 2. If fails, creates new session with status bar disabled, then attaches
-    ///
-    /// Wrapped in /bin/sh -c to ensure POSIX compatibility (fish shell doesn't support && and subshells)
+    /// Uses `tmux new-session -A` which attaches to existing session or creates new one.
+    /// Command is executed directly by Ghostty (not through a shell), so it's shell-agnostic.
+    /// The user's configured shell runs inside the tmux session.
     nonisolated func attachOrCreateCommand(paneId: String, workingDirectory: String) -> String {
         guard let tmux = tmuxPath() else {
             // Fallback to default shell if tmux not available
@@ -202,13 +200,14 @@ actor TmuxSessionManager {
         let sessionName = sessionPrefix + paneId
         let escapedDir = workingDirectory.replacingOccurrences(of: "'", with: "'\\''")
 
-        // Wrap in /bin/sh -c for POSIX compatibility (works with fish, zsh, bash, etc.)
-        let shCommand = "\(tmux) attach-session -t '\(sessionName)' 2>/dev/null || (\(tmux) new-session -d -s '\(sessionName)' -c '\(escapedDir)' && \(tmux) set-option -t '\(sessionName)' status off && \(tmux) attach-session -t '\(sessionName)')"
+        // Smart mouse handling:
+        // - When TUI app is in alternate screen (#{alternate_on}): pass mouse through (send-keys -M)
+        // - When at shell prompt: enter copy-mode for scrollback
+        // - #{mouse_any_flag} detects if app requested mouse capture
+        let wheelUp = "if -F '#{||:#{mouse_any_flag},#{alternate_on}}' 'send-keys -M' 'copy-mode -eH; send-keys -M'"
+        let wheelDown = "if -F '#{||:#{mouse_any_flag},#{alternate_on}}' 'send-keys -M' 'send-keys -M'"
 
-        // Escape single quotes for the outer sh -c wrapper
-        let escapedShCommand = shCommand.replacingOccurrences(of: "'", with: "'\"'\"'")
-
-        return "/bin/sh -c '\(escapedShCommand)'"
+        return "\(tmux) new-session -A -s \(sessionName) -c '\(escapedDir)' \\; set status off \\; set mouse on \\; bind -n WheelUpPane \(wheelUp) \\; bind -n WheelDownPane \(wheelDown)"
     }
 }
 
