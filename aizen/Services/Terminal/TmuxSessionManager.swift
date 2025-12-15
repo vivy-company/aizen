@@ -18,7 +18,51 @@ actor TmuxSessionManager {
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "TmuxSessionManager")
     private let sessionPrefix = "aizen-"
 
-    private init() {}
+    private let configPath: String = {
+        let aizenDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".aizen")
+        let configFile = aizenDir.appendingPathComponent("tmux.conf")
+        return configFile.path
+    }()
+
+    private init() {
+        Task { await ensureConfigExists() }
+    }
+
+    /// Ensure tmux config exists in ~/.aizen/tmux.conf
+    private func ensureConfigExists() {
+        let aizenDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".aizen")
+
+        // Create ~/.aizen if needed
+        try? FileManager.default.createDirectory(at: aizenDir, withIntermediateDirectories: true)
+
+        let configFile = aizenDir.appendingPathComponent("tmux.conf")
+
+        // Always overwrite to ensure latest config
+        let config = """
+        # Aizen tmux configuration
+        # This file is auto-generated - changes will be overwritten
+
+        # Enable hyperlinks (OSC 8)
+        set -as terminal-features ",*:hyperlinks"
+
+        # Hide status bar
+        set -g status off
+
+        # Enable mouse support
+        set -g mouse on
+
+        # Set default terminal
+        set -g default-terminal "xterm-256color"
+
+        # Smart mouse scroll: copy-mode at shell, passthrough in TUI apps
+        bind -n WheelUpPane if -F '#{||:#{mouse_any_flag},#{alternate_on}}' 'send-keys -M' 'copy-mode -eH; send-keys -M'
+        bind -n WheelDownPane if -F '#{||:#{mouse_any_flag},#{alternate_on}}' 'send-keys -M' 'send-keys -M'
+        """
+
+        try? config.write(to: configFile, atomically: true, encoding: .utf8)
+    }
 
     // MARK: - tmux Availability
 
@@ -200,14 +244,7 @@ actor TmuxSessionManager {
         let sessionName = sessionPrefix + paneId
         let escapedDir = workingDirectory.replacingOccurrences(of: "'", with: "'\\''")
 
-        // Smart mouse handling:
-        // - When TUI app is in alternate screen (#{alternate_on}): pass mouse through (send-keys -M)
-        // - When at shell prompt: enter copy-mode for scrollback
-        // - #{mouse_any_flag} detects if app requested mouse capture
-        let wheelUp = "if -F '#{||:#{mouse_any_flag},#{alternate_on}}' 'send-keys -M' 'copy-mode -eH; send-keys -M'"
-        let wheelDown = "if -F '#{||:#{mouse_any_flag},#{alternate_on}}' 'send-keys -M' 'send-keys -M'"
-
-        return "\(tmux) new-session -A -s \(sessionName) -c '\(escapedDir)' \\; set status off \\; set mouse on \\; bind -n WheelUpPane \(wheelUp) \\; bind -n WheelDownPane \(wheelDown)"
+        return "\(tmux) -f '\(configPath)' new-session -A -s \(sessionName) -c '\(escapedDir)' \\; source-file '\(configPath)'"
     }
 }
 
