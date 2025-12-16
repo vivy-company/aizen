@@ -91,6 +91,16 @@ struct aizenApp: App {
                     chatActions?.cycleModeForward()
                 }
             }
+
+            CommandGroup(replacing: .help) {
+                Button {
+                    if let url = URL(string: "https://discord.gg/eKW7GNesuS") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    Label("Join Discord Community", image: "DiscordLogo")
+                }
+            }
         }
 
         Settings {

@@ -211,19 +211,34 @@ struct WorkspaceSidebarView: View {
 
             Divider()
 
-            // Add repository button
-            HStack {
+            // Footer buttons
+            HStack(spacing: 0) {
                 Button {
                     showingAddRepository = true
                 } label: {
                     Label("workspace.addRepository", systemImage: "plus")
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
 
                 Spacer()
+
+                Button {
+                    if let url = URL(string: "https://discord.gg/eKW7GNesuS") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    Image("DiscordLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 16, height: 16)
+                        .opacity(0.6)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .help("sidebar.joinDiscord")
             }
             .background(.background)
         }

@@ -13,40 +13,37 @@ struct OnboardingView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header section with app icon and title
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 Image(nsImage: NSImage(named: "AppIcon") ?? NSImage())
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 80, height: 80)
-                    .cornerRadius(16)
+                    .frame(width: 72, height: 72)
+                    .cornerRadius(14)
 
                 Text("onboarding.welcome", bundle: .main)
-                    .font(.system(size: 32, weight: .bold))
+                    .font(.system(size: 28, weight: .bold))
 
-                Text("onboarding.subtitle", bundle: .main)
-                    .font(.system(size: 14))
+                Text("onboarding.tagline", bundle: .main)
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 500)
             }
-            .padding(.top, 48)
-            .padding(.bottom, 32)
+            .padding(.top, 40)
+            .padding(.bottom, 28)
 
-            // Features grid
-            VStack(spacing: 24) {
+            // Features grid - 3 items
+            VStack(spacing: 20) {
                 FeatureRow(
-                    icon: "arrow.triangle.branch",
+                    icon: "rectangle.stack",
                     iconColor: .blue,
-                    title: String(localized: "onboarding.feature.worktree.title"),
-                    description: String(localized: "onboarding.feature.worktree.description")
+                    title: String(localized: "onboarding.feature.workspaces.title"),
+                    description: String(localized: "onboarding.feature.workspaces.description")
                 )
 
                 FeatureRow(
-                    icon: "terminal",
+                    icon: "square.grid.2x2",
                     iconColor: .green,
-                    title: String(localized: "onboarding.feature.terminal.title"),
-                    description: String(localized: "onboarding.feature.terminal.description")
+                    title: String(localized: "onboarding.feature.sessions.title"),
+                    description: String(localized: "onboarding.feature.sessions.description")
                 )
 
                 FeatureRow(
@@ -55,34 +52,45 @@ struct OnboardingView: View {
                     title: String(localized: "onboarding.feature.agents.title"),
                     description: String(localized: "onboarding.feature.agents.description")
                 )
-
-                FeatureRow(
-                    icon: "play.circle",
-                    iconColor: .orange,
-                    title: String(localized: "onboarding.feature.setup.title"),
-                    description: String(localized: "onboarding.feature.setup.description")
-                )
             }
             .padding(.horizontal, 48)
-            .padding(.bottom, 32)
+            .padding(.bottom, 28)
 
-            Spacer()
+            // Action buttons
+            VStack(spacing: 16) {
+                Button {
+                    dismiss()
+                } label: {
+                    Text("onboarding.getStarted", bundle: .main)
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
 
-            // Get Started button
-            Button {
-                dismiss()
-            } label: {
-                Text("onboarding.getStarted", bundle: .main)
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                Button {
+                    if let url = URL(string: "https://discord.gg/eKW7GNesuS") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image("DiscordLogo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 18, height: 18)
+                        Text("onboarding.joinDiscord", bundle: .main)
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
             .padding(.horizontal, 48)
             .padding(.bottom, 32)
         }
-        .frame(width: 600, height: 650)
+        .frame(width: 520)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

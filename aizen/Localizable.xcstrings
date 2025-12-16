@@ -3558,7 +3558,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Connect with Claude, Codex, or Gemini through the Agent Client Protocol for intelligent assistance."
+            "value" : "Claude, Codex, Gemini, Kimi, and custom agents via Agent Client Protocol."
           }
         }
       }
@@ -3570,6 +3570,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Agents"
+          }
+        }
+      }
+    },
+    "onboarding.feature.sessions.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each worktree has its own terminal, file browser, web browser, and chat."
+          }
+        }
+      }
+    },
+    "onboarding.feature.sessions.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per-Worktree Sessions"
+          }
+        }
+      }
+    },
+    "onboarding.feature.workspaces.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organize repositories into workspaces. Create worktrees to work on multiple branches in parallel."
+          }
+        }
+      }
+    },
+    "onboarding.feature.workspaces.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Workspaces & Worktrees"
           }
         }
       }
@@ -3651,6 +3695,17 @@
         }
       }
     },
+    "onboarding.joinDiscord" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Join Discord Community"
+          }
+        }
+      }
+    },
     "onboarding.subtitle" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3658,6 +3713,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Your developer tool for Git worktrees with integrated terminal and AI agents"
+          }
+        }
+      }
+    },
+    "onboarding.tagline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch worktrees, not windows."
           }
         }
       }
@@ -4672,6 +4738,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminal"
+          }
+        }
+      }
+    },
+    "sidebar.joinDiscord" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Join Discord Community"
           }
         }
       }
