@@ -13,6 +13,8 @@
         <attribute name="name" attributeType="String"/>
         <attribute name="path" attributeType="String"/>
         <attribute name="lastUpdated" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="status" optional="YES" attributeType="String" defaultValueString="active"/>
+        <attribute name="note" optional="YES" attributeType="String"/>
         <relationship name="workspace" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Workspace" inverseName="repositories" inverseEntity="Workspace"/>
         <relationship name="worktrees" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Worktree" inverseName="repository" inverseEntity="Worktree"/>
     </entity>
@@ -23,6 +25,8 @@
         <attribute name="isPrimary" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="lastAccessed" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="selectedTab" optional="YES" attributeType="String"/>
+        <attribute name="status" optional="YES" attributeType="String" defaultValueString="active"/>
+        <attribute name="note" optional="YES" attributeType="String"/>
         <relationship name="repository" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Repository" inverseName="worktrees" inverseEntity="Repository"/>
         <relationship name="terminalSessions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="TerminalSession" inverseName="worktree" inverseEntity="TerminalSession"/>
         <relationship name="chatSessions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ChatSession" inverseName="worktree" inverseEntity="ChatSession"/>

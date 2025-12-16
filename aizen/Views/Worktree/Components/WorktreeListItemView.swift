@@ -60,11 +60,16 @@ struct WorktreeListItemView: View {
     @State private var showingBranchSelector = false
     @State private var branchSwitchError: String?
     @State private var selectedBranchForSwitch: BranchInfo?
+    @State private var showingNoteEditor = false
+
+    private var worktreeStatus: ItemStatus {
+        ItemStatus(rawValue: worktree.status ?? "active") ?? .active
+    }
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: worktree.isPrimary ? "arrow.triangle.branch" : "arrow.triangle.2.circlepath")
-                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                .foregroundStyle(isSelected ? Color.accentColor : worktreeStatus.color)
                 .imageScale(.medium)
                 .frame(width: 20, height: 20)
 
@@ -89,6 +94,14 @@ struct WorktreeListItemView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+
+                if let note = worktree.note, !note.isEmpty {
+                    Text(note)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
 
                 if let lastAccessed = worktree.lastAccessed {
                     Text(String(localized: "worktree.list.lastAccessed \(lastAccessed.formatted(.relative(presentation: .named)))"))
@@ -299,6 +312,36 @@ struct WorktreeListItemView: View {
                 Label("Switch Branch", systemImage: "arrow.triangle.swap")
             }
 
+            Divider()
+
+            // Status submenu
+            Menu {
+                ForEach(ItemStatus.allCases) { status in
+                    Button {
+                        setWorktreeStatus(status)
+                    } label: {
+                        HStack {
+                            Circle()
+                                .fill(status.color)
+                                .frame(width: 8, height: 8)
+                            Text(status.title)
+                            if worktreeStatus == status {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Label("worktree.setStatus", systemImage: "circle.fill")
+            }
+
+            Button {
+                showingNoteEditor = true
+            } label: {
+                Label("worktree.editNote", systemImage: "note.text")
+            }
+
             if !worktree.isPrimary {
                 Divider()
 
@@ -324,6 +367,18 @@ struct WorktreeListItemView: View {
                     }
                 )
             }
+        }
+        .sheet(isPresented: $showingNoteEditor) {
+            NoteEditorView(
+                note: Binding(
+                    get: { worktree.note ?? "" },
+                    set: { worktree.note = $0 }
+                ),
+                title: String(localized: "worktree.note.title \(worktree.branch ?? "")"),
+                onSave: {
+                    try? repositoryManager.updateWorktreeNote(worktree, note: worktree.note)
+                }
+            )
         }
         .onChange(of: selectedBranchForSwitch) { newBranch in
             if let branch = newBranch {
@@ -394,6 +449,14 @@ struct WorktreeListItemView: View {
     }
 
     // MARK: - Private Methods
+
+    private func setWorktreeStatus(_ status: ItemStatus) {
+        do {
+            try repositoryManager.updateWorktreeStatus(worktree, status: status)
+        } catch {
+            logger.error("Failed to update worktree status: \(error.localizedDescription)")
+        }
+    }
 
     private func checkUnsavedChanges() {
         Task {

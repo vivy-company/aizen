@@ -15,6 +15,7 @@ struct WorktreeListView: View {
 
     @State private var showingCreateWorktree = false
     @State private var searchText = ""
+    @State private var selectedStatusFilters: Set<ItemStatus> = Set(ItemStatus.allCases)
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
 
     private var sortedWorktrees: [Worktree] {
@@ -28,14 +29,25 @@ struct WorktreeListView: View {
     }
 
     private var worktrees: [Worktree] {
-        if searchText.isEmpty {
-            return sortedWorktrees
-        } else {
-            return sortedWorktrees.filter { worktree in
+        var result = sortedWorktrees
+
+        // Apply status filter
+        if !selectedStatusFilters.isEmpty && selectedStatusFilters.count < ItemStatus.allCases.count {
+            result = result.filter { worktree in
+                let status = ItemStatus(rawValue: worktree.status ?? "active") ?? .active
+                return selectedStatusFilters.contains(status)
+            }
+        }
+
+        // Apply search filter
+        if !searchText.isEmpty {
+            result = result.filter { worktree in
                 (worktree.branch ?? "").localizedCaseInsensitiveContains(searchText) ||
                 (worktree.path ?? "").localizedCaseInsensitiveContains(searchText)
             }
         }
+
+        return result
     }
 
     var body: some View {
@@ -56,31 +68,75 @@ struct WorktreeListView: View {
                     }
                     .buttonStyle(.plain)
                 }
+
+                StatusFilterDropdown(selectedStatuses: $selectedStatusFilters)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
             Divider()
 
-            List {
-                ForEach(worktrees, id: \.id) { worktree in
-                    WorktreeListItemView(
-                        worktree: worktree,
-                        isSelected: selectedWorktree?.id == worktree.id,
-                        repositoryManager: repositoryManager,
-                        allWorktrees: worktrees,
-                        selectedWorktree: $selectedWorktree,
-                        tabStateManager: tabStateManager
-                    )
-                    .onTapGesture {
-                        selectedWorktree = worktree
+            if worktrees.isEmpty {
+                VStack(spacing: 12) {
+                    Spacer()
+                    if selectedStatusFilters.count < ItemStatus.allCases.count && !selectedStatusFilters.isEmpty {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.tertiary)
+                        Text("worktree.list.empty.filtered")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Button {
+                            selectedStatusFilters = Set(ItemStatus.allCases)
+                        } label: {
+                            Text("filter.clearAll")
+                        }
+                        .buttonStyle(.bordered)
+                    } else if !searchText.isEmpty {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.tertiary)
+                        Text("worktree.list.empty.search")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.tertiary)
+                        Text("worktree.list.empty.noWorktrees")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Button {
+                            showingCreateWorktree = true
+                        } label: {
+                            Text("worktree.list.add")
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
+                    Spacer()
                 }
+                .frame(maxWidth: .infinity)
+            } else {
+                List {
+                    ForEach(worktrees, id: \.id) { worktree in
+                        WorktreeListItemView(
+                            worktree: worktree,
+                            isSelected: selectedWorktree?.id == worktree.id,
+                            repositoryManager: repositoryManager,
+                            allWorktrees: worktrees,
+                            selectedWorktree: $selectedWorktree,
+                            tabStateManager: tabStateManager
+                        )
+                        .onTapGesture {
+                            selectedWorktree = worktree
+                        }
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                    }
+                }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
         }
         .navigationTitle(repository.name ?? "Unknown")
         .toolbar {

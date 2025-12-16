@@ -161,6 +161,30 @@ class RepositoryManager: ObservableObject {
         workspace?.objectWillChange.send()
     }
 
+    // MARK: - Repository Status and Note Operations
+
+    func updateRepositoryStatus(_ repository: Repository, status: ItemStatus) throws {
+        repository.status = status.rawValue
+        try viewContext.save()
+    }
+
+    func updateRepositoryNote(_ repository: Repository, note: String?) throws {
+        repository.note = note
+        try viewContext.save()
+    }
+
+    // MARK: - Worktree Status and Note Operations
+
+    func updateWorktreeStatus(_ worktree: Worktree, status: ItemStatus) throws {
+        worktree.status = status.rawValue
+        try viewContext.save()
+    }
+
+    func updateWorktreeNote(_ worktree: Worktree, note: String?) throws {
+        worktree.note = note
+        try viewContext.save()
+    }
+
     func refreshRepository(_ repository: Repository) async throws {
         guard let repositoryPath = repository.path else {
             throw Libgit2Error.invalidPath("Repository path is nil")

@@ -23,6 +23,7 @@ struct WorkspaceSidebarView: View {
     @State private var showingWorkspaceSwitcher = false
     @State private var workspaceToEdit: Workspace?
     @State private var refreshTask: Task<Void, Never>?
+    @State private var selectedStatusFilters: Set<ItemStatus> = Set(ItemStatus.allCases)
 
     private let refreshInterval: TimeInterval = 30.0
 
@@ -45,8 +46,15 @@ struct WorkspaceSidebarView: View {
         let repos = (workspace.repositories as? Set<Repository>) ?? []
 
         // Filter out deleted Core Data objects
-        let validRepos = repos.filter { !$0.isDeleted }
+        var validRepos = repos.filter { !$0.isDeleted }
 
+        // Apply status filter
+        if !selectedStatusFilters.isEmpty && selectedStatusFilters.count < ItemStatus.allCases.count {
+            validRepos = validRepos.filter { repo in
+                let status = ItemStatus(rawValue: repo.status ?? "active") ?? .active
+                return selectedStatusFilters.contains(status)
+            }
+        }
 
         if searchText.isEmpty {
             return validRepos.sorted { ($0.name ?? "") < ($1.name ?? "") }
@@ -173,6 +181,8 @@ struct WorkspaceSidebarView: View {
                     }
                     .buttonStyle(.plain)
                 }
+
+                StatusFilterDropdown(selectedStatuses: $selectedStatusFilters)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -180,34 +190,76 @@ struct WorkspaceSidebarView: View {
             Divider()
 
             // Repository list
-            List {
-                ForEach(filteredRepositories, id: \.id) { repository in
-                    RepositoryRow(
-                        repository: repository,
-                        isSelected: selectedRepository?.id == repository.id,
-                        repositoryManager: repositoryManager,
-                        onSelect: {
-                            selectedRepository = repository
-                            // Auto-select primary worktree if no worktree is selected
-                            if selectedWorktree == nil {
-                                let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-                                selectedWorktree = worktrees.first(where: { $0.isPrimary })
-                            }
-                        },
-                        onRemove: {
-                            if selectedRepository?.id == repository.id {
-                                selectedRepository = nil
-                                selectedWorktree = nil
-                            }
+            if filteredRepositories.isEmpty {
+                VStack(spacing: 12) {
+                    Spacer()
+                    if selectedStatusFilters.count < ItemStatus.allCases.count && !selectedStatusFilters.isEmpty {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.tertiary)
+                        Text("sidebar.empty.filtered")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Button {
+                            selectedStatusFilters = Set(ItemStatus.allCases)
+                        } label: {
+                            Text("filter.clearAll")
                         }
-                    )
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
+                        .buttonStyle(.bordered)
+                    } else if !searchText.isEmpty {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.tertiary)
+                        Text("sidebar.empty.search")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.tertiary)
+                        Text("sidebar.empty.noRepos")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Button {
+                            showingAddRepository = true
+                        } label: {
+                            Text("workspace.addRepository")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    Spacer()
                 }
+                .frame(maxWidth: .infinity)
+            } else {
+                List {
+                    ForEach(filteredRepositories, id: \.id) { repository in
+                        RepositoryRow(
+                            repository: repository,
+                            isSelected: selectedRepository?.id == repository.id,
+                            repositoryManager: repositoryManager,
+                            onSelect: {
+                                selectedRepository = repository
+                                // Auto-select primary worktree if no worktree is selected
+                                if selectedWorktree == nil {
+                                    let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
+                                    selectedWorktree = worktrees.first(where: { $0.isPrimary })
+                                }
+                            },
+                            onRemove: {
+                                if selectedRepository?.id == repository.id {
+                                    selectedRepository = nil
+                                    selectedWorktree = nil
+                                }
+                            }
+                        )
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                    }
+                }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
+                .padding(.top, 12)
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-            .padding(.top, 12)
 
             Divider()
 
@@ -275,6 +327,7 @@ struct RepositoryRow: View {
 
     @State private var showingRemoveConfirmation = false
     @State private var alsoDeleteFromFilesystem = false
+    @State private var showingNoteEditor = false
 
     @AppStorage("defaultTerminalBundleId") private var defaultTerminalBundleId: String?
     @AppStorage("defaultEditorBundleId") private var defaultEditorBundleId: String?
@@ -409,6 +462,36 @@ struct RepositoryRow: View {
 
                 Divider()
 
+                // Status submenu
+                Menu {
+                    ForEach(ItemStatus.allCases) { status in
+                        Button {
+                            setStatus(status)
+                        } label: {
+                            HStack {
+                                Circle()
+                                    .fill(status.color)
+                                    .frame(width: 8, height: 8)
+                                Text(status.title)
+                                if repositoryStatus == status {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("repository.setStatus", systemImage: "circle.fill")
+                }
+
+                Button {
+                    showingNoteEditor = true
+                } label: {
+                    Label("repository.editNote", systemImage: "note.text")
+                }
+
+                Divider()
+
                 Button(role: .destructive) {
                     showingRemoveConfirmation = true
                 } label: {
@@ -429,12 +512,40 @@ struct RepositoryRow: View {
                     }
                 )
             }
+            .sheet(isPresented: $showingNoteEditor) {
+                NoteEditorView(
+                    note: Binding(
+                        get: { repository.note ?? "" },
+                        set: { repository.note = $0 }
+                    ),
+                    title: String(localized: "repository.note.title \(repository.name ?? "")"),
+                    onSave: {
+                        try? repositoryManager.updateRepositoryNote(repository, note: repository.note)
+                    }
+                )
+            }
+    }
+
+    private func setStatus(_ status: ItemStatus) {
+        do {
+            try repositoryManager.updateRepositoryStatus(repository, status: status)
+        } catch {
+            logger.error("Failed to update repository status: \(error.localizedDescription)")
+        }
+    }
+
+    private var repositoryStatus: ItemStatus {
+        ItemStatus(rawValue: repository.status ?? "active") ?? .active
     }
 
     private var repositoryLabel: some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: "folder.badge.gearshape")
-                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(
+                    repositoryStatus.color,
+                    isSelected ? Color.accentColor : .secondary
+                )
                 .imageScale(.medium)
                 .frame(width: 18, height: 18)
 
@@ -450,6 +561,14 @@ struct RepositoryRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                }
+
+                if let note = repository.note, !note.isEmpty {
+                    Text(note)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
 
