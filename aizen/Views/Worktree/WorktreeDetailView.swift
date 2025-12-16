@@ -34,6 +34,7 @@ struct WorktreeDetailView: View {
     @State private var lastOpenedApp: DetectedApp?
     @StateObject private var gitRepositoryService: GitRepositoryService
     @StateObject private var xcodeBuildManager = XcodeBuildManager()
+    @StateObject private var tabConfig = TabConfigurationManager.shared
     @State private var gitIndexWatcher: GitIndexWatcher?
     @State private var fileSearchWindowController: FileSearchWindowController?
     @State private var fileToOpenFromSearch: String?
@@ -145,21 +146,25 @@ struct WorktreeDetailView: View {
     var tabPickerToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .automatic) {
             Picker(String(localized: "worktree.session.tab"), selection: $selectedTab) {
-                if showChatTab {
-                    Label(String(localized: "worktree.session.chat"), systemImage: "message").tag("chat")
-                }
-                if showTerminalTab {
-                    Label(String(localized: "worktree.session.terminal"), systemImage: "terminal").tag("terminal")
-                }
-                if showFilesTab {
-                    Label(String(localized: "worktree.session.files"), systemImage: "folder").tag("files")
-                }
-                if showBrowserTab {
-                    Label(String(localized: "worktree.session.browser"), systemImage: "globe").tag("browser")
+                ForEach(tabConfig.tabOrder) { tab in
+                    if isTabVisible(tab.id) {
+                        Label(LocalizedStringKey(tab.localizedKey), systemImage: tab.icon)
+                            .tag(tab.id)
+                    }
                 }
             }
             .pickerStyle(.segmented)
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
+        }
+    }
+
+    private func isTabVisible(_ tabId: String) -> Bool {
+        switch tabId {
+        case "chat": return showChatTab
+        case "terminal": return showTerminalTab
+        case "files": return showFilesTab
+        case "browser": return showBrowserTab
+        default: return false
         }
     }
 
@@ -341,13 +346,9 @@ struct WorktreeDetailView: View {
     }
 
     private func validateSelectedTab() {
-        var available: [String] = []
-        if showChatTab { available.append("chat") }
-        if showTerminalTab { available.append("terminal") }
-        if showFilesTab { available.append("files") }
-        if showBrowserTab { available.append("browser") }
-        if !available.contains(selectedTab) {
-            selectedTab = available.first ?? "files"
+        let visibleTabs = tabConfig.tabOrder.filter { isTabVisible($0.id) }
+        if !visibleTabs.contains(where: { $0.id == selectedTab }) {
+            selectedTab = visibleTabs.first?.id ?? "files"
         }
     }
 
@@ -500,14 +501,24 @@ struct WorktreeDetailView: View {
 
     private func loadTabState() {
         guard let worktreeId = worktree.id else { return }
-        let state = tabStateManager.getState(for: worktreeId)
-        selectedTab = state.viewType
 
-        // Restore session selections
-        viewModel.selectedChatSessionId = state.chatSessionId
-        viewModel.selectedTerminalSessionId = state.terminalSessionId
-        viewModel.selectedBrowserSessionId = state.browserSessionId
-        viewModel.selectedFileSessionId = state.fileSessionId
+        if tabStateManager.hasStoredState(for: worktreeId) {
+            // Restore saved state
+            let state = tabStateManager.getState(for: worktreeId)
+            selectedTab = state.viewType
+            viewModel.selectedChatSessionId = state.chatSessionId
+            viewModel.selectedTerminalSessionId = state.terminalSessionId
+            viewModel.selectedBrowserSessionId = state.browserSessionId
+            viewModel.selectedFileSessionId = state.fileSessionId
+        } else {
+            // Fresh worktree - use configured default tab
+            selectedTab = tabConfig.effectiveDefaultTab(
+                showChat: showChatTab,
+                showTerminal: showTerminalTab,
+                showFiles: showFilesTab,
+                showBrowser: showBrowserTab
+            )
+        }
     }
 
     private func saveTabState() {

@@ -109,4 +109,8 @@ class WorktreeTabStateManager: ObservableObject {
             return nil
         }
     }
+
+    func hasStoredState(for worktreeId: UUID) -> Bool {
+        return tabStates[worktreeId.uuidString] != nil
+    }
 }

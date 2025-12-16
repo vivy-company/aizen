@@ -9,22 +9,62 @@ struct AppearanceSettingsView: View {
     @AppStorage("showGitStatus") private var showGitStatus = true
     @AppStorage("showXcodeBuild") private var showXcodeBuild = true
 
+    @StateObject private var tabConfig = TabConfigurationManager.shared
+
     var body: some View {
         Form {
             Section {
-                Toggle("Chat", isOn: $showChatTab)
-                    .help("Hide the Chat tab in worktree views")
+                List {
+                    ForEach(tabConfig.tabOrder) { tab in
+                        HStack(spacing: 12) {
+                            Image(systemName: "line.3.horizontal")
+                                .foregroundStyle(.tertiary)
+                                .font(.system(size: 12))
 
-                Toggle("Terminal", isOn: $showTerminalTab)
-                    .help("Hide the Terminal tab in worktree views")
+                            Image(systemName: tab.icon)
+                                .frame(width: 20)
+                                .foregroundStyle(.secondary)
 
-                Toggle("Files", isOn: $showFilesTab)
-                    .help("Hide the Files tab in worktree views")
+                            Text(LocalizedStringKey(tab.localizedKey))
 
-                Toggle("Browser", isOn: $showBrowserTab)
-                    .help("Hide the Browser tab in worktree views")
+                            Spacer()
+
+                            Toggle("", isOn: visibilityBinding(for: tab.id))
+                                .labelsHidden()
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .onMove { source, destination in
+                        tabConfig.moveTab(from: source, to: destination)
+                    }
+                }
+                .scrollDisabled(true)
+                .fixedSize(horizontal: false, vertical: true)
             } header: {
-                Text("Worktree Tabs")
+                Text("Tab Order & Visibility")
+            } footer: {
+                Text("Drag to reorder. Toggle to show or hide.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Picker("Default Tab", selection: Binding(
+                    get: { tabConfig.defaultTab },
+                    set: { tabConfig.setDefaultTab($0) }
+                )) {
+                    ForEach(tabConfig.tabOrder.filter { isTabVisible($0.id) }) { tab in
+                        Label(LocalizedStringKey(tab.localizedKey), systemImage: tab.icon)
+                            .tag(tab.id)
+                    }
+                }
+                .help("Tab shown when opening a worktree for the first time")
+
+                Button("Reset Tab Order") {
+                    tabConfig.resetToDefaults()
+                }
+            } header: {
+                Text("Default Behavior")
             }
 
             Section {
@@ -42,6 +82,26 @@ struct AppearanceSettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Appearance")
+    }
+
+    private func visibilityBinding(for tabId: String) -> Binding<Bool> {
+        switch tabId {
+        case "chat": return $showChatTab
+        case "terminal": return $showTerminalTab
+        case "files": return $showFilesTab
+        case "browser": return $showBrowserTab
+        default: return .constant(true)
+        }
+    }
+
+    private func isTabVisible(_ tabId: String) -> Bool {
+        switch tabId {
+        case "chat": return showChatTab
+        case "terminal": return showTerminalTab
+        case "files": return showFilesTab
+        case "browser": return showBrowserTab
+        default: return false
+        }
     }
 }
 
