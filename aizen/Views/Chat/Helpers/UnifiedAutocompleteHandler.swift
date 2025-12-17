@@ -23,6 +23,7 @@ class UnifiedAutocompleteHandler: ObservableObject {
     weak var agentSession: AgentSession?
     var worktreePath: String = ""
     private var lastSearchedText: String = ""
+    private var isNavigating = false  // Prevents search from resetting selection during navigation
 
     // MARK: - Index Management
 
@@ -185,9 +186,16 @@ class UnifiedAutocompleteHandler: ObservableObject {
             newItems = filtered.prefix(10).map { .command($0) }
         }
 
-        // Capture current selection AFTER async work (user may have navigated during await)
+        // If user is actively navigating, don't update items or selection
+        // This prevents search from interfering with keyboard navigation
+        guard !isNavigating else {
+            logger.debug("Skipping search update - user is navigating")
+            return
+        }
+
+        // Capture current selection for preservation attempt
         let currentSelectedItem = state.selectedItem
-        let previousItemIds = state.items.map { $0.id }
+        let currentSelectedIndex = state.selectedIndex
 
         // Update items
         state.items = newItems
@@ -196,12 +204,12 @@ class UnifiedAutocompleteHandler: ObservableObject {
         if let currentItem = currentSelectedItem,
            let newIndex = newItems.firstIndex(where: { $0.id == currentItem.id }) {
             state.selectedIndex = newIndex
+        } else if !newItems.isEmpty {
+            // Clamp selection to valid range instead of always resetting to 0
+            // This preserves approximate position when items change
+            state.selectedIndex = min(currentSelectedIndex, newItems.count - 1)
         } else {
-            // Only reset to 0 if items actually changed
-            let newItemIds = newItems.map { $0.id }
-            if previousItemIds != newItemIds {
-                state.selectedIndex = 0
-            }
+            state.selectedIndex = 0
         }
     }
 
@@ -209,20 +217,53 @@ class UnifiedAutocompleteHandler: ObservableObject {
 
     func navigateUp() -> Bool {
         guard state.isActive, !state.items.isEmpty else { return false }
+        // Cancel pending search to prevent it from resetting selection
+        searchTask?.cancel()
+        isNavigating = true
+        let oldIndex = state.selectedIndex
+        // Force SwiftUI to recognize the change
+        objectWillChange.send()
         state.selectPrevious()
+        logger.debug("navigateUp: \(oldIndex) -> \(self.state.selectedIndex) (items=\(self.state.items.count))")
+        // Reset navigation flag after a short delay
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            self.isNavigating = false
+        }
         return true
     }
 
     func navigateDown() -> Bool {
         guard state.isActive, !state.items.isEmpty else { return false }
+        // Cancel pending search to prevent it from resetting selection
+        searchTask?.cancel()
+        isNavigating = true
+        let oldIndex = state.selectedIndex
+        // Force SwiftUI to recognize the change
+        objectWillChange.send()
         state.selectNext()
+        logger.debug("navigateDown: \(oldIndex) -> \(self.state.selectedIndex) (items=\(self.state.items.count))")
+        // Reset navigation flag after a short delay
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            self.isNavigating = false
+        }
         return true
     }
 
     func selectCurrent() -> (replacement: String, range: NSRange)? {
-        guard state.isActive,
-              let item = state.selectedItem,
-              let range = state.triggerRange else { return nil }
+        guard state.isActive else {
+            logger.debug("selectCurrent: autocomplete not active")
+            return nil
+        }
+        guard let item = state.selectedItem else {
+            logger.debug("selectCurrent: no selected item (index=\(self.state.selectedIndex), items=\(self.state.items.count))")
+            return nil
+        }
+        guard let range = state.triggerRange else {
+            logger.debug("selectCurrent: no trigger range")
+            return nil
+        }
 
         let replacement: String
         switch item {
@@ -232,13 +273,17 @@ class UnifiedAutocompleteHandler: ObservableObject {
             replacement = "/\(command.name) "
         }
 
+        logger.debug("selectCurrent: selecting '\(replacement)' at range \(range.location)-\(range.location + range.length)")
         dismissAutocomplete()
         return (replacement, range)
     }
 
     func dismissAutocomplete() {
         searchTask?.cancel()
-        state.reset()
+        // Defer state reset to avoid "Publishing changes from within view updates" warning
+        Task { @MainActor in
+            self.state.reset()
+        }
         lastSearchedText = ""
     }
 

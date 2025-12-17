@@ -327,11 +327,14 @@ class ChatSessionViewModel: ObservableObject {
     func handleAutocompleteSelection() {
         guard let (replacement, range) = autocompleteHandler.selectCurrent() else { return }
 
-        let nsString = inputText as NSString
-        inputText = nsString.replacingCharacters(in: range, with: replacement)
+        // Defer state changes to avoid "Publishing changes from within view updates" warning
+        Task { @MainActor in
+            let nsString = self.inputText as NSString
+            self.inputText = nsString.replacingCharacters(in: range, with: replacement)
 
-        // Set cursor position to end of inserted text
-        pendingCursorPosition = range.location + replacement.count
+            // Set cursor position to end of inserted text
+            self.pendingCursorPosition = range.location + replacement.count
+        }
     }
 
     // MARK: - Markdown Rendering

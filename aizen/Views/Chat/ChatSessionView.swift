@@ -274,20 +274,23 @@ struct ChatSessionView: View {
 
         // Show window when active (even if items empty - shows "no matches")
         if state.isActive, let parentWindow = parentWindow {
-            // Only set content once - @ObservedObject handles updates
-            if !window.hasContent {
-                let contentView = InlineAutocompleteView(
-                    handler: viewModel.autocompleteHandler,
-                    onTap: { item in
+            // Always recreate content view - NSHostingView doesn't propagate ObservableObject changes reliably
+            let contentView = InlineAutocompleteView(
+                items: state.items,
+                selectedIndex: state.selectedIndex,
+                trigger: state.trigger,
+                onTap: { item in
+                    // Defer to avoid "Publishing changes from within view updates" warning
+                    Task { @MainActor in
                         viewModel.autocompleteHandler.selectItem(item)
                         viewModel.handleAutocompleteSelection()
-                    },
-                    onSelect: {
-                        viewModel.handleAutocompleteSelection()
                     }
-                )
-                window.setContent(contentView)
-            }
+                },
+                onSelect: {
+                    viewModel.handleAutocompleteSelection()
+                }
+            )
+            window.setContent(contentView)
             // Update window size based on item count
             window.updateWindowSize(itemCount: state.items.count)
             window.show(at: state.cursorRect, attachedTo: parentWindow)
