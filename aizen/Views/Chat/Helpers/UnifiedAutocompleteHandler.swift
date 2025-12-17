@@ -159,6 +159,9 @@ class UnifiedAutocompleteHandler: ObservableObject {
     }
 
     private func performSearch(for trigger: AutocompleteTrigger) async {
+        let previousItems = state.items
+        let previousSelectedItem = state.selectedItem
+
         switch trigger {
         case .file(let query):
             // Index on-demand if fileIndex is empty
@@ -182,27 +185,45 @@ class UnifiedAutocompleteHandler: ObservableObject {
             state.items = filtered.prefix(10).map { .command($0) }
         }
 
-        state.selectedIndex = 0
+        // Try to preserve selection if the previously selected item is still in results
+        if let previousItem = previousSelectedItem,
+           let newIndex = state.items.firstIndex(where: { $0.id == previousItem.id }) {
+            state.selectedIndex = newIndex
+        } else {
+            // Only reset to 0 if items actually changed
+            if previousItems.map({ $0.id }) != state.items.map({ $0.id }) {
+                state.selectedIndex = 0
+            }
+        }
     }
 
     // MARK: - Navigation
 
     func navigateUp() -> Bool {
         guard state.isActive, !state.items.isEmpty else { return false }
+        let oldIndex = state.selectedIndex
         state.selectPrevious()
+        logger.debug("navigateUp: \(oldIndex) -> \(self.state.selectedIndex), item=\(self.state.selectedItem?.displayName ?? "nil")")
         return true
     }
 
     func navigateDown() -> Bool {
         guard state.isActive, !state.items.isEmpty else { return false }
+        let oldIndex = state.selectedIndex
         state.selectNext()
+        logger.debug("navigateDown: \(oldIndex) -> \(self.state.selectedIndex), item=\(self.state.selectedItem?.displayName ?? "nil")")
         return true
     }
 
     func selectCurrent() -> (replacement: String, range: NSRange)? {
         guard state.isActive,
               let item = state.selectedItem,
-              let range = state.triggerRange else { return nil }
+              let range = state.triggerRange else {
+            logger.debug("selectCurrent: guard failed - isActive:\(self.state.isActive), selectedItem:\(String(describing: self.state.selectedItem)), range:\(String(describing: self.state.triggerRange))")
+            return nil
+        }
+
+        logger.debug("selectCurrent: selectedIndex=\(self.state.selectedIndex), item=\(item.displayName), total items=\(self.state.items.count)")
 
         let replacement: String
         switch item {
