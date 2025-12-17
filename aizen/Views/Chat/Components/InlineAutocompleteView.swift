@@ -76,9 +76,7 @@ private struct AutocompleteListView: View {
             .scrollDisabled(items.count <= 5)
             .onChange(of: selectedIndex) { newIndex in
                 if newIndex >= 0 && newIndex < items.count {
-                    withAnimation(.easeOut(duration: 0.1)) {
-                        proxy.scrollTo(newIndex, anchor: nil)
-                    }
+                    proxy.scrollTo(newIndex, anchor: nil)
                 }
             }
         }
