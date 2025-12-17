@@ -130,7 +130,7 @@ struct MessageBubbleView: View {
                         }
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
-                .fixedSize(horizontal: message.role == .system, vertical: false)
+                .fixedSize(horizontal: message.role == .system || message.role == .user, vertical: false)
                 .frame(maxWidth: message.role == .user ? 500 : .infinity, alignment: bubbleAlignment)
 
                 if message.role == .agent {
