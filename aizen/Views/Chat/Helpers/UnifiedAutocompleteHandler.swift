@@ -22,6 +22,7 @@ class UnifiedAutocompleteHandler: ObservableObject {
     // Dependencies
     weak var agentSession: AgentSession?
     var worktreePath: String = ""
+    private var lastSearchedText: String = ""
 
     // MARK: - Index Management
 
@@ -131,6 +132,7 @@ class UnifiedAutocompleteHandler: ObservableObject {
     func handleTextChange(text: String, cursorPosition: Int, cursorRect: NSRect) {
         guard let (trigger, range) = detectTrigger(in: text, cursorPosition: cursorPosition) else {
             dismissAutocomplete()
+            lastSearchedText = ""
             return
         }
 
@@ -138,6 +140,14 @@ class UnifiedAutocompleteHandler: ObservableObject {
         state.triggerRange = range
         state.cursorRect = cursorRect
         state.isActive = true
+
+        // Only search if text actually changed (avoid re-searching on cursor-only changes)
+        let textToSearch = text
+        if textToSearch == lastSearchedText && !state.items.isEmpty {
+            // Text hasn't changed, just update cursor position
+            return
+        }
+        lastSearchedText = textToSearch
 
         // Debounced search
         searchTask?.cancel()
@@ -209,6 +219,7 @@ class UnifiedAutocompleteHandler: ObservableObject {
     func dismissAutocomplete() {
         searchTask?.cancel()
         state.reset()
+        lastSearchedText = ""
     }
 
     // MARK: - Direct Update
