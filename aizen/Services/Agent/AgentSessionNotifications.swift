@@ -93,6 +93,13 @@ extension AgentSession {
                 let (text, blockContent) = textAndContent(from: block)
                 guard !text.isEmpty else { break }
 
+                // Debug: log why we're creating vs appending
+                if let lastMessage = messages.last {
+                    logger.debug("agentMessageChunk: lastMessage.role=\(lastMessage.role.rawValue), isComplete=\(lastMessage.isComplete), text=\(text.prefix(20))")
+                } else {
+                    logger.debug("agentMessageChunk: no last message, creating new. text=\(text.prefix(20))")
+                }
+
                 if let lastMessage = messages.last,
                    lastMessage.role == .agent,
                    !lastMessage.isComplete {

@@ -159,8 +159,8 @@ class UnifiedAutocompleteHandler: ObservableObject {
     }
 
     private func performSearch(for trigger: AutocompleteTrigger) async {
-        let previousItems = state.items
-        let previousSelectedItem = state.selectedItem
+        // Compute new items based on trigger
+        let newItems: [AutocompleteItem]
 
         switch trigger {
         case .file(let query):
@@ -169,7 +169,7 @@ class UnifiedAutocompleteHandler: ObservableObject {
                 await indexWorktree(forceRefresh: true)
             }
             let results = await fileSearchService.search(query: query, in: fileIndex, worktreePath: worktreePath)
-            state.items = results.prefix(10).map { .file($0) }
+            newItems = results.prefix(10).map { .file($0) }
 
         case .command(let query):
             let commands = agentSession?.availableCommands ?? []
@@ -182,16 +182,24 @@ class UnifiedAutocompleteHandler: ObservableObject {
                     $0.description.lowercased().contains(query.lowercased())
                 }
             }
-            state.items = filtered.prefix(10).map { .command($0) }
+            newItems = filtered.prefix(10).map { .command($0) }
         }
 
-        // Try to preserve selection if the previously selected item is still in results
-        if let previousItem = previousSelectedItem,
-           let newIndex = state.items.firstIndex(where: { $0.id == previousItem.id }) {
+        // Capture current selection AFTER async work (user may have navigated during await)
+        let currentSelectedItem = state.selectedItem
+        let previousItemIds = state.items.map { $0.id }
+
+        // Update items
+        state.items = newItems
+
+        // Try to preserve selection if the currently selected item is still in new results
+        if let currentItem = currentSelectedItem,
+           let newIndex = newItems.firstIndex(where: { $0.id == currentItem.id }) {
             state.selectedIndex = newIndex
         } else {
             // Only reset to 0 if items actually changed
-            if previousItems.map({ $0.id }) != state.items.map({ $0.id }) {
+            let newItemIds = newItems.map { $0.id }
+            if previousItemIds != newItemIds {
                 state.selectedIndex = 0
             }
         }
@@ -201,29 +209,20 @@ class UnifiedAutocompleteHandler: ObservableObject {
 
     func navigateUp() -> Bool {
         guard state.isActive, !state.items.isEmpty else { return false }
-        let oldIndex = state.selectedIndex
         state.selectPrevious()
-        logger.debug("navigateUp: \(oldIndex) -> \(self.state.selectedIndex), item=\(self.state.selectedItem?.displayName ?? "nil")")
         return true
     }
 
     func navigateDown() -> Bool {
         guard state.isActive, !state.items.isEmpty else { return false }
-        let oldIndex = state.selectedIndex
         state.selectNext()
-        logger.debug("navigateDown: \(oldIndex) -> \(self.state.selectedIndex), item=\(self.state.selectedItem?.displayName ?? "nil")")
         return true
     }
 
     func selectCurrent() -> (replacement: String, range: NSRange)? {
         guard state.isActive,
               let item = state.selectedItem,
-              let range = state.triggerRange else {
-            logger.debug("selectCurrent: guard failed - isActive:\(self.state.isActive), selectedItem:\(String(describing: self.state.selectedItem)), range:\(String(describing: self.state.triggerRange))")
-            return nil
-        }
-
-        logger.debug("selectCurrent: selectedIndex=\(self.state.selectedIndex), item=\(item.displayName), total items=\(self.state.items.count)")
+              let range = state.triggerRange else { return nil }
 
         let replacement: String
         switch item {
