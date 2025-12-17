@@ -181,6 +181,9 @@ struct WorktreeDetailView: View {
                 onCloseTerminalSession: sessionManager.closeTerminalSession,
                 onCreateChatSession: sessionManager.createNewChatSession,
                 onCreateTerminalSession: sessionManager.createNewTerminalSession,
+                onCreateChatWithAgent: { agentId in
+                    sessionManager.createNewChatSession(withAgent: agentId)
+                },
                 onCreateTerminalWithPreset: { preset in
                     sessionManager.createNewTerminalSession(withPreset: preset)
                 }
