@@ -62,6 +62,9 @@ actor TmuxSessionManager {
         # Hide status bar
         set -g status off
 
+        # Increase scrollback buffer (default is 2000)
+        set -g history-limit 500000
+
         # Enable mouse support
         set -g mouse on
 
