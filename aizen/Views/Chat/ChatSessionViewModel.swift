@@ -24,7 +24,7 @@ class ChatSessionViewModel: ObservableObject {
     // MARK: - Handlers
 
     private let agentSwitcher: AgentSwitcher
-    private let commandHandler = CommandAutocompleteHandler()
+    let autocompleteHandler = UnifiedAutocompleteHandler()
 
     // MARK: - Services
 
@@ -37,7 +37,6 @@ class ChatSessionViewModel: ObservableObject {
     @Published var currentAgentSession: AgentSession?
     @Published var currentPermissionRequest: RequestPermissionRequest?
     @Published var attachments: [ChatAttachment] = []
-    @Published var commandSuggestions: [AvailableCommand] = []
     @Published var timelineItems: [TimelineItem] = []
 
     // Track previous IDs for incremental sync (avoids storing full duplicate arrays)
@@ -67,7 +66,6 @@ class ChatSessionViewModel: ObservableObject {
     @Published var showingPermissionAlert: Bool = false
     @Published var showingAgentSwitchWarning = false
     @Published var pendingAgentSwitch: String?
-    @Published var showingCommandAutocomplete: Bool = false
 
     // MARK: - Derived State (bridges nested AgentSession properties for reliable observation)
     @Published var needsAuth: Bool = false
@@ -165,10 +163,19 @@ class ChatSessionViewModel: ObservableObject {
         prefillInputTextIfNeeded()
         loadPendingAttachmentsIfNeeded()
 
+        // Configure autocomplete handler
+        autocompleteHandler.worktreePath = worktree.path ?? ""
+
         if let existingSession = sessionManager.getAgentSession(for: sessionId) {
             currentAgentSession = existingSession
+            autocompleteHandler.agentSession = existingSession
             updateDerivedState(from: existingSession)
             setupSessionObservers(session: existingSession)
+
+            // Index worktree files for autocomplete
+            Task {
+                await autocompleteHandler.indexWorktree()
+            }
 
             if !existingSession.isActive {
                 Task { [self] in
@@ -194,7 +201,11 @@ class ChatSessionViewModel: ObservableObject {
             let newSession = AgentSession(agentName: self.selectedAgent, workingDirectory: worktree.path ?? "")
             sessionManager.setAgentSession(newSession, for: sessionId)
             currentAgentSession = newSession
+            autocompleteHandler.agentSession = newSession
             updateDerivedState(from: newSession)
+
+            // Index worktree files for autocomplete
+            await autocompleteHandler.indexWorktree()
 
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 // Reset previous IDs and rebuild timeline from new session
@@ -310,16 +321,13 @@ class ChatSessionViewModel: ObservableObject {
         pendingAgentSwitch = nil
     }
 
-    // MARK: - Command Autocomplete
+    // MARK: - Autocomplete
 
-    func updateCommandSuggestions(_ text: String) {
-        commandSuggestions = commandHandler.updateCommandSuggestions(text, currentAgentSession: currentAgentSession)
-    }
+    func handleAutocompleteSelection() {
+        guard let (replacement, range) = autocompleteHandler.selectCurrent() else { return }
 
-    func selectCommand(_ command: AvailableCommand) {
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-            inputText = "/\(command.name) "
-        }
+        let nsString = inputText as NSString
+        inputText = nsString.replacingCharacters(in: range, with: replacement)
     }
 
     // MARK: - Markdown Rendering
@@ -364,23 +372,7 @@ class ChatSessionViewModel: ObservableObject {
     }
 
     private func setupInputTextObserver() {
-        $inputText
-            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
-            .sink { [weak self] newText in
-                guard let self = self else { return }
-                self.updateCommandSuggestions(newText)
-            }
-            .store(in: &notificationCancellables)
-
-        $commandSuggestions
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] suggestions in
-                guard let self = self else { return }
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-                    self.showingCommandAutocomplete = !suggestions.isEmpty
-                }
-            }
-            .store(in: &notificationCancellables)
+        // Input text observer - autocomplete is now handled by cursor change callbacks in CustomTextEditor
     }
 
     private func setupSessionObservers(session: AgentSession) {

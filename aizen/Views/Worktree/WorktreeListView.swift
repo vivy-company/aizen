@@ -15,8 +15,19 @@ struct WorktreeListView: View {
 
     @State private var showingCreateWorktree = false
     @State private var searchText = ""
-    @State private var selectedStatusFilters: Set<ItemStatus> = Set(ItemStatus.allCases)
+    @AppStorage("worktreeStatusFilters") private var storedStatusFilters: String = ""
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
+
+    private var selectedStatusFilters: Set<ItemStatus> {
+        ItemStatus.decode(storedStatusFilters)
+    }
+
+    private var selectedStatusFiltersBinding: Binding<Set<ItemStatus>> {
+        Binding(
+            get: { ItemStatus.decode(storedStatusFilters) },
+            set: { storedStatusFilters = ItemStatus.encode($0) }
+        )
+    }
 
     private var sortedWorktrees: [Worktree] {
         let wts = (repository.worktrees as? Set<Worktree>) ?? []
@@ -69,7 +80,7 @@ struct WorktreeListView: View {
                     .buttonStyle(.plain)
                 }
 
-                StatusFilterDropdown(selectedStatuses: $selectedStatusFilters)
+                StatusFilterDropdown(selectedStatuses: selectedStatusFiltersBinding)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -87,7 +98,7 @@ struct WorktreeListView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Button {
-                            selectedStatusFilters = Set(ItemStatus.allCases)
+                            storedStatusFilters = ""
                         } label: {
                             Text("filter.clearAll")
                         }

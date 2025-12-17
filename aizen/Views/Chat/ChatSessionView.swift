@@ -24,6 +24,7 @@ struct ChatSessionView: View {
     @State private var permissionErrorMessage = ""
     @State private var selectedToolCall: ToolCall?
     @State private var fileToOpenInEditor: String?
+    @State private var autocompleteWindow: AutocompleteWindowController?
 
     init(worktree: Worktree, session: ChatSession, sessionManager: ChatSessionManager, viewContext: NSManagedObjectContext) {
         self.worktree = worktree
@@ -118,18 +119,17 @@ struct ChatSessionView: View {
                             isProcessing: $viewModel.isProcessing,
                             showingVoiceRecording: $showingVoiceRecording,
                             showingAttachmentPicker: $showingAttachmentPicker,
-                            showingCommandAutocomplete: $viewModel.showingCommandAutocomplete,
                             showingPermissionError: $showingPermissionError,
                             permissionErrorMessage: $permissionErrorMessage,
-                            commandSuggestions: viewModel.commandSuggestions,
                             session: viewModel.currentAgentSession,
                             currentModeId: viewModel.currentModeId,
                             selectedAgent: viewModel.selectedAgent,
                             isSessionReady: viewModel.isSessionReady,
                             audioService: viewModel.audioService,
+                            autocompleteHandler: viewModel.autocompleteHandler,
                             onSend: viewModel.sendMessage,
                             onCancel: viewModel.cancelCurrentPrompt,
-                            onCommandSelect: viewModel.selectCommand
+                            onAutocompleteSelect: viewModel.handleAutocompleteSelection
                         )
                         .padding(.horizontal, 20)
                     }
@@ -142,10 +142,15 @@ struct ChatSessionView: View {
         .focusedSceneValue(\.chatActions, ChatActions(cycleModeForward: viewModel.cycleModeForward))
         .onAppear {
             viewModel.setupAgentSession()
+            setupAutocompleteWindow()
             NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
         }
         .onDisappear {
+            autocompleteWindow?.dismiss()
             NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
+        }
+        .onReceive(viewModel.autocompleteHandler.$state) { state in
+            updateAutocompleteWindow(state: state)
         }
         .onChange(of: fileToOpenInEditor) { path in
             guard let path = path else { return }
@@ -253,4 +258,27 @@ struct ChatSessionView: View {
         }
     }
 
+    // MARK: - Autocomplete Window
+
+    private func setupAutocompleteWindow() {
+        autocompleteWindow = AutocompleteWindowController()
+    }
+
+    private func updateAutocompleteWindow(state: AutocompleteState) {
+        guard let window = autocompleteWindow,
+              let parentWindow = NSApp.keyWindow else { return }
+
+        if state.isActive && !state.items.isEmpty {
+            let contentView = InlineAutocompleteView(
+                handler: viewModel.autocompleteHandler,
+                onSelect: { _ in
+                    viewModel.handleAutocompleteSelection()
+                }
+            )
+            window.setContent(contentView)
+            window.show(at: state.cursorRect, attachedTo: parentWindow)
+        } else {
+            window.dismiss()
+        }
+    }
 }

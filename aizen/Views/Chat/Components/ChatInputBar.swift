@@ -16,20 +16,19 @@ struct ChatInputBar: View {
     @Binding var isProcessing: Bool
     @Binding var showingVoiceRecording: Bool
     @Binding var showingAttachmentPicker: Bool
-    @Binding var showingCommandAutocomplete: Bool
     @Binding var showingPermissionError: Bool
     @Binding var permissionErrorMessage: String
 
-    let commandSuggestions: [AvailableCommand]
     let session: AgentSession?
     let currentModeId: String?
     let selectedAgent: String
     let isSessionReady: Bool
     let audioService: AudioService
+    @ObservedObject var autocompleteHandler: UnifiedAutocompleteHandler
 
     let onSend: () -> Void
     let onCancel: () -> Void
-    let onCommandSelect: (AvailableCommand) -> Void
+    let onAutocompleteSelect: () -> Void
 
     @State private var isHoveringInput = false
     @State private var dashPhase: CGFloat = 0
@@ -86,6 +85,16 @@ struct ChatInputBar: View {
                             if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 onSend()
                             }
+                        },
+                        onCursorChange: { cursorPosition, cursorRect in
+                            autocompleteHandler.handleTextChange(
+                                text: inputText,
+                                cursorPosition: cursorPosition,
+                                cursorRect: cursorRect
+                            )
+                        },
+                        onAutocompleteNavigate: { action in
+                            handleAutocompleteNavigation(action)
                         }
                     )
                     .font(.system(size: 14))
@@ -205,13 +214,6 @@ struct ChatInputBar: View {
                 isHoveringInput = hovering
             }
         }
-        .overlay(alignment: .bottom) {
-            if showingCommandAutocomplete && !commandSuggestions.isEmpty {
-                CommandAutocompleteView(suggestions: commandSuggestions, onSelect: onCommandSelect)
-                    .offset(y: -60)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
-        }
         .fileImporter(
             isPresented: $showingAttachmentPicker,
             allowedContentTypes: [.item],
@@ -222,6 +224,26 @@ struct ChatInputBar: View {
                     attachments.append(contentsOf: urls.map { .file($0) })
                 }
             }
+        }
+    }
+
+    private func handleAutocompleteNavigation(_ action: AutocompleteNavigationAction) -> Bool {
+        guard autocompleteHandler.state.isActive else { return false }
+
+        switch action {
+        case .up:
+            return autocompleteHandler.navigateUp()
+        case .down:
+            return autocompleteHandler.navigateDown()
+        case .select:
+            if autocompleteHandler.state.selectedItem != nil {
+                onAutocompleteSelect()
+                return true
+            }
+            return false
+        case .dismiss:
+            autocompleteHandler.dismissAutocomplete()
+            return true
         }
     }
 

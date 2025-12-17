@@ -14,6 +14,10 @@ struct CustomTextEditor: NSViewRepresentable {
     @Binding var text: String
     let onSubmit: () -> Void
 
+    // Autocomplete callbacks
+    var onCursorChange: ((Int, NSRect) -> Void)?
+    var onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?
+
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
         let textView = scrollView.documentView as! NSTextView
@@ -32,36 +36,110 @@ struct CustomTextEditor: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: 0, height: 6)
         textView.textContainer?.lineFragmentPadding = 0
 
+        context.coordinator.textView = textView
+
         return scrollView
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         let textView = nsView.documentView as! NSTextView
         if textView.string != text {
+            let selectedRange = textView.selectedRange()
             textView.string = text
+            // Restore cursor position if valid
+            if selectedRange.location <= text.count {
+                textView.setSelectedRange(selectedRange)
+            }
         }
+        context.coordinator.onCursorChange = onCursorChange
+        context.coordinator.onAutocompleteNavigate = onAutocompleteNavigate
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, onSubmit: onSubmit)
+        Coordinator(text: $text, onSubmit: onSubmit, onCursorChange: onCursorChange, onAutocompleteNavigate: onAutocompleteNavigate)
     }
 
     class Coordinator: NSObject, NSTextViewDelegate {
         @Binding var text: String
         let onSubmit: () -> Void
+        var onCursorChange: ((Int, NSRect) -> Void)?
+        var onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?
+        weak var textView: NSTextView?
 
-        init(text: Binding<String>, onSubmit: @escaping () -> Void) {
+        init(
+            text: Binding<String>,
+            onSubmit: @escaping () -> Void,
+            onCursorChange: ((Int, NSRect) -> Void)?,
+            onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?
+        ) {
             _text = text
             self.onSubmit = onSubmit
+            self.onCursorChange = onCursorChange
+            self.onAutocompleteNavigate = onAutocompleteNavigate
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             text = textView.string
+            notifyCursorChange(textView)
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            notifyCursorChange(textView)
+        }
+
+        private func notifyCursorChange(_ textView: NSTextView) {
+            let cursorPosition = textView.selectedRange().location
+            let cursorRect = cursorScreenRect(for: cursorPosition, in: textView)
+            onCursorChange?(cursorPosition, cursorRect)
+        }
+
+        private func cursorScreenRect(for position: Int, in textView: NSTextView) -> NSRect {
+            guard let layoutManager = textView.layoutManager,
+                  let textContainer = textView.textContainer else {
+                return .zero
+            }
+
+            let range = NSRange(location: position, length: 0)
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+
+            // Add text container inset
+            rect.origin.x += textView.textContainerInset.width
+            rect.origin.y += textView.textContainerInset.height
+
+            // Convert to window coordinates
+            rect = textView.convert(rect, to: nil)
+
+            // Convert to screen coordinates
+            if let window = textView.window {
+                rect = window.convertToScreen(rect)
+            }
+
+            return rect
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            // Handle autocomplete navigation first
+            if let navigate = onAutocompleteNavigate {
+                if commandSelector == #selector(NSTextView.moveUp(_:)) {
+                    if navigate(.up) { return true }
+                }
+                if commandSelector == #selector(NSTextView.moveDown(_:)) {
+                    if navigate(.down) { return true }
+                }
+                if commandSelector == #selector(NSTextView.cancelOperation(_:)) {
+                    if navigate(.dismiss) { return true }
+                }
+            }
+
             if commandSelector == #selector(NSTextView.insertNewline(_:)) {
+                // Check autocomplete selection first
+                if let navigate = onAutocompleteNavigate, navigate(.select) {
+                    return true
+                }
+
                 if NSEvent.modifierFlags.contains(.shift) {
                     textView.insertNewlineIgnoringFieldEditor(nil)
                     return true
@@ -70,12 +148,28 @@ struct CustomTextEditor: NSViewRepresentable {
                     return true
                 }
             }
+
             // Allow Shift+Tab to be handled by the app (for mode cycling)
             if commandSelector == #selector(NSTextView.insertTab(_:)) && NSEvent.modifierFlags.contains(.shift) {
-                // Don't handle it here, let the system handle it
                 return false
             }
+
             return false
+        }
+
+        // Replace text at range and position cursor after
+        func replaceText(in range: NSRange, with replacement: String) {
+            guard let textView = textView else { return }
+
+            let nsString = textView.string as NSString
+            let newText = nsString.replacingCharacters(in: range, with: replacement)
+            textView.string = newText
+            text = newText
+
+            // Position cursor after replacement
+            let newPosition = range.location + replacement.count
+            textView.setSelectedRange(NSRange(location: newPosition, length: 0))
+            notifyCursorChange(textView)
         }
     }
 }
