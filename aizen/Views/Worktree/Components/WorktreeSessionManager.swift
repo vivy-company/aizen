@@ -19,16 +19,21 @@ struct WorktreeSessionManager {
 
     var chatSessions: [ChatSession] {
         let sessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
-        return sessions.sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
+        return sessions
+            .filter { !$0.isDeleted }
+            .sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
     }
 
     var terminalSessions: [TerminalSession] {
         let sessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
-        return sessions.sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
+        return sessions
+            .filter { !$0.isDeleted }
+            .sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
     }
 
     func closeChatSession(_ session: ChatSession) {
         guard let context = worktree.managedObjectContext else { return }
+        guard !session.isDeleted else { return }
 
         if let id = session.id {
             ChatSessionManager.shared.removeAgentSession(for: id)

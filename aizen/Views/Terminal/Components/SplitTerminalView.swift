@@ -175,6 +175,7 @@ struct SplitTerminalView: View {
             // Use a small delay to allow SwiftUI to process the deletion gracefully
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak session] in
                 guard let session = session,
+                      !session.isDeleted,
                       let context = session.managedObjectContext else { return }
                 context.delete(session)
                 do {
@@ -276,6 +277,7 @@ struct SplitTerminalView: View {
         // Delete the terminal session
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak session] in
             guard let session = session,
+                  !session.isDeleted,
                   let context = session.managedObjectContext else { return }
             context.delete(session)
             do {
@@ -287,7 +289,8 @@ struct SplitTerminalView: View {
     }
 
     private func saveContext() {
-        guard let context = session.managedObjectContext else { return }
+        guard !session.isDeleted,
+              let context = session.managedObjectContext else { return }
         do {
             try context.save()
         } catch {
@@ -316,6 +319,7 @@ struct SplitTerminalView: View {
     }
 
     private func persistLayout(_ layoutToSave: SplitNode? = nil) {
+        guard !session.isDeleted else { return }
         let node = layoutToSave ?? layout
         if let json = SplitLayoutHelper.encode(node) {
             session.splitLayout = json
@@ -324,6 +328,7 @@ struct SplitTerminalView: View {
     }
 
     private func persistFocus(_ paneId: String? = nil) {
+        guard !session.isDeleted else { return }
         let id = paneId ?? focusedPaneId
         session.focusedPaneId = id
         saveContext()
@@ -340,6 +345,7 @@ struct SplitTerminalView: View {
     }
 
     private func applyTitleForFocusedPane() {
+        guard !session.isDeleted else { return }
         if let title = paneTitles[focusedPaneId] {
             session.title = title
             saveContext()

@@ -19,7 +19,9 @@ struct TerminalTabView: View {
 
     var sessions: [TerminalSession] {
         let sessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
-        return sessions.sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
+        return sessions
+            .filter { !$0.isDeleted }
+            .sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
     }
 
     // Derive valid selection declaratively
