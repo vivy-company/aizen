@@ -12,6 +12,7 @@ import os.log
 struct ChatInputBar: View {
     private let logger = Logger.chat
     @Binding var inputText: String
+    @Binding var pendingCursorPosition: Int?
     @Binding var attachments: [ChatAttachment]
     @Binding var isProcessing: Bool
     @Binding var showingVoiceRecording: Bool
@@ -86,16 +87,17 @@ struct ChatInputBar: View {
                                 onSend()
                             }
                         },
-                        onCursorChange: { cursorPosition, cursorRect in
+                        onCursorChange: { text, cursorPosition, cursorRect in
                             autocompleteHandler.handleTextChange(
-                                text: inputText,
+                                text: text,
                                 cursorPosition: cursorPosition,
                                 cursorRect: cursorRect
                             )
                         },
                         onAutocompleteNavigate: { action in
                             handleAutocompleteNavigation(action)
-                        }
+                        },
+                        pendingCursorPosition: $pendingCursorPosition
                     )
                     .font(.system(size: 14))
                     .scrollContentBackground(.hidden)

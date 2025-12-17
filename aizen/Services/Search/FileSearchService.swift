@@ -26,16 +26,24 @@ actor FileSearchService {
 
     private init() {}
 
-    // Index files in directory recursively
+    // Index files in directory recursively with gitignore support
     func indexDirectory(_ path: String) async throws -> [FileSearchIndexResult] {
         // Check cache first
         if let cached = cachedResults[path] {
             return cached
         }
 
-        // Load gitignore patterns
+        // Load gitignore patterns and index manually
         await loadGitignorePatterns(at: path)
+        let results = await indexDirectoryManually(path)
 
+        // Cache results
+        cachedResults[path] = results
+        return results
+    }
+
+    // Directory indexing with gitignore patterns
+    private func indexDirectoryManually(_ path: String) async -> [FileSearchIndexResult] {
         var results: [FileSearchIndexResult] = []
         let fileManager = FileManager.default
 
@@ -85,107 +93,72 @@ actor FileSearchService {
             results.append(result)
         }
 
-        // Cache results
-        cachedResults[path] = results
         return results
     }
 
     // Load gitignore patterns from .gitignore file
     private func loadGitignorePatterns(at path: String) async {
-        gitignorePatterns = []
+        // Start with common patterns that should always be ignored
+        gitignorePatterns = [
+            ".git",
+            "node_modules",
+            ".build",
+            "DerivedData",
+            ".swiftpm",
+            "Pods",
+            "Carthage",
+            ".DS_Store",
+            "*.xcodeproj",
+            "*.xcworkspace",
+            "xcuserdata",
+            "__pycache__",
+            ".venv",
+            "venv",
+            ".env",
+            "dist",
+            "build",
+            ".next",
+            ".nuxt",
+            "target",
+            "vendor"
+        ]
+
         let gitignorePath = (path as NSString).appendingPathComponent(".gitignore")
 
-        guard let content = try? String(contentsOfFile: gitignorePath, encoding: .utf8) else {
-            // If no .gitignore, add minimal essential patterns
-            gitignorePatterns = [".git"]
-            return
-        }
+        if let content = try? String(contentsOfFile: gitignorePath, encoding: .utf8) {
+            let filePatterns = content
+                .components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty && !$0.hasPrefix("#") && !$0.hasPrefix("!") }
 
-        gitignorePatterns = content
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && !$0.hasPrefix("#") }
-
-        // Always ignore .git directory even if not in .gitignore
-        if !gitignorePatterns.contains(".git") {
-            gitignorePatterns.append(".git")
+            gitignorePatterns.append(contentsOf: filePatterns)
         }
     }
 
-    // Check if path matches gitignore patterns
+    // Check if path matches gitignore patterns - simplified matching
     private func matchesGitignore(_ path: String) -> Bool {
+        let pathComponents = path.components(separatedBy: "/")
+
         for pattern in gitignorePatterns {
-            // Handle negation patterns (start with !)
-            if pattern.hasPrefix("!") {
-                continue // Skip negation for now (would need more complex logic)
-            }
+            var cleanPattern = pattern
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
-            var workingPattern = pattern
-            var matchAnywhere = true
-
-            // If pattern starts with /, it's anchored to root
-            if workingPattern.hasPrefix("/") {
-                workingPattern = String(workingPattern.dropFirst())
-                matchAnywhere = false
-            }
-
-            // If pattern ends with /, it only matches directories
-            let dirOnly = workingPattern.hasSuffix("/")
-            if dirOnly {
-                workingPattern = String(workingPattern.dropLast())
-            }
-
-            // Convert gitignore pattern to regex
-            var regexPattern = "^"
-
-            // If not anchored, match anywhere in path
-            if matchAnywhere {
-                regexPattern = "(^|.*/)"
-            }
-
-            // Build regex pattern
-            for char in workingPattern {
-                switch char {
-                case "*":
-                    // ** matches across directories, * matches within directory
-                    if workingPattern.contains("**") {
-                        regexPattern += ".*"
-                    } else {
-                        regexPattern += "[^/]*"
-                    }
-                case "?":
-                    regexPattern += "[^/]"
-                case ".":
-                    regexPattern += "\\."
-                case "+", "(", ")", "[", "]", "{", "}", "^", "$", "|", "\\":
-                    regexPattern += "\\\(char)"
-                default:
-                    regexPattern.append(char)
-                }
-            }
-
-            // Handle ** properly
-            regexPattern = regexPattern.replacingOccurrences(of: "[^/]*[^/]*", with: ".*")
-
-            // End pattern
-            if dirOnly {
-                regexPattern += "(/|$)"
-            } else {
-                regexPattern += "(/.*)?$"
-            }
-
-            // Try to match
-            if let regex = try? NSRegularExpression(pattern: regexPattern, options: []) {
-                let range = NSRange(path.startIndex..., in: path)
-                if regex.firstMatch(in: path, range: range) != nil {
+            // Handle glob patterns like *.log
+            if cleanPattern.hasPrefix("*") {
+                let suffix = String(cleanPattern.dropFirst())
+                if path.hasSuffix(suffix) || pathComponents.last?.hasSuffix(suffix) == true {
                     return true
                 }
+                continue
             }
 
-            // Simple fallback: exact component match
-            let pathComponents = path.components(separatedBy: "/")
-            let cleanPattern = workingPattern.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            // Check if any path component matches the pattern exactly
             if pathComponents.contains(cleanPattern) {
+                return true
+            }
+
+            // Check if path starts with pattern (for directory patterns)
+            if path.hasPrefix(cleanPattern + "/") || path == cleanPattern {
                 return true
             }
         }

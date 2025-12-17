@@ -8,19 +8,26 @@
 import SwiftUI
 
 struct InlineAutocompleteView: View {
-    @ObservedObject var handler: UnifiedAutocompleteHandler
-    let onSelect: (AutocompleteItem) -> Void
+    let state: AutocompleteState
+    let onTap: (Int) -> Void
+    let onSelect: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let trigger = handler.state.trigger {
+            if let trigger = state.trigger {
                 AutocompleteHeader(trigger: trigger)
             }
 
-            if handler.state.items.isEmpty {
+            if state.items.isEmpty {
                 emptyStateView
             } else {
-                itemsList
+                AutocompleteListView(
+                    items: state.items,
+                    selectedIndex: state.selectedIndex,
+                    onTap: { index in
+                        onTap(index)
+                    }
+                )
             }
         }
         .frame(width: 350)
@@ -41,31 +48,36 @@ struct InlineAutocompleteView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
     }
+}
 
-    private var itemsList: some View {
+// Separate view to ensure proper re-rendering when selectedIndex changes
+private struct AutocompleteListView: View {
+    let items: [AutocompleteItem]
+    let selectedIndex: Int
+    let onTap: (Int) -> Void
+
+    var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(handler.state.items.enumerated()), id: \.element.id) { index, item in
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                         AutocompleteRow(
                             item: item,
-                            isSelected: index == handler.state.selectedIndex
+                            isSelected: index == selectedIndex
                         )
-                        .id(item.id)
+                        .id(index)
                         .onTapGesture {
-                            handler.state.selectedIndex = index
-                            onSelect(item)
+                            onTap(index)
                         }
                     }
                 }
             }
             .frame(maxHeight: 250)
-            .onChange(of: handler.state.selectedIndex) { newIndex in
-                if newIndex >= 0, newIndex < handler.state.items.count {
-                    let item = handler.state.items[newIndex]
-                    withAnimation(.easeOut(duration: 0.1)) {
-                        proxy.scrollTo(item.id, anchor: .center)
-                    }
+            .scrollDisabled(items.count <= 5)
+            .onAppear {
+                // Scroll to selected item when view appears/recreates
+                if selectedIndex >= 0 && selectedIndex < items.count {
+                    proxy.scrollTo(selectedIndex, anchor: nil)
                 }
             }
         }

@@ -14,9 +14,12 @@ struct CustomTextEditor: NSViewRepresentable {
     @Binding var text: String
     let onSubmit: () -> Void
 
-    // Autocomplete callbacks
-    var onCursorChange: ((Int, NSRect) -> Void)?
+    // Autocomplete callbacks - passes (text, cursorPosition, cursorRect)
+    var onCursorChange: ((String, Int, NSRect) -> Void)?
     var onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?
+
+    // Cursor position control - when set, moves cursor to this position after text update
+    @Binding var pendingCursorPosition: Int?
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
@@ -44,11 +47,19 @@ struct CustomTextEditor: NSViewRepresentable {
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         let textView = nsView.documentView as! NSTextView
         if textView.string != text {
-            let selectedRange = textView.selectedRange()
             textView.string = text
-            // Restore cursor position if valid
-            if selectedRange.location <= text.count {
-                textView.setSelectedRange(selectedRange)
+
+            // Apply mention highlighting
+            context.coordinator.applyHighlighting(to: textView)
+
+            // If we have a pending cursor position, use it
+            if let cursorPos = pendingCursorPosition {
+                let safePos = min(cursorPos, text.count)
+                textView.setSelectedRange(NSRange(location: safePos, length: 0))
+                // Clear the pending position after applying
+                DispatchQueue.main.async {
+                    self.pendingCursorPosition = nil
+                }
             }
         }
         context.coordinator.onCursorChange = onCursorChange
@@ -62,14 +73,14 @@ struct CustomTextEditor: NSViewRepresentable {
     class Coordinator: NSObject, NSTextViewDelegate {
         @Binding var text: String
         let onSubmit: () -> Void
-        var onCursorChange: ((Int, NSRect) -> Void)?
+        var onCursorChange: ((String, Int, NSRect) -> Void)?
         var onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?
         weak var textView: NSTextView?
 
         init(
             text: Binding<String>,
             onSubmit: @escaping () -> Void,
-            onCursorChange: ((Int, NSRect) -> Void)?,
+            onCursorChange: ((String, Int, NSRect) -> Void)?,
             onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?
         ) {
             _text = text
@@ -81,7 +92,44 @@ struct CustomTextEditor: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             text = textView.string
+            highlightMentions(in: textView)
             notifyCursorChange(textView)
+        }
+
+        func applyHighlighting(to textView: NSTextView) {
+            highlightMentions(in: textView)
+        }
+
+        private func highlightMentions(in textView: NSTextView) {
+            let text = textView.string
+            let fullRange = NSRange(location: 0, length: text.utf16.count)
+
+            // Store current selection
+            let selectedRange = textView.selectedRange()
+
+            // Create attributed string with default styling
+            let attributedString = NSMutableAttributedString(string: text)
+            attributedString.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: fullRange)
+            attributedString.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
+
+            // Find and highlight @mentions (pattern: @followed by non-whitespace until space)
+            let pattern = "@[^\\s]+"
+            if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
+                let matches = regex.matches(in: text, options: [], range: fullRange)
+                for match in matches {
+                    attributedString.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: match.range)
+                }
+            }
+
+            // Only update if there are actual mentions to highlight
+            if textView.textStorage?.string != attributedString.string ||
+               !attributedString.isEqual(to: textView.attributedString()) {
+                textView.textStorage?.setAttributedString(attributedString)
+                // Restore selection
+                if selectedRange.location <= text.count {
+                    textView.setSelectedRange(selectedRange)
+                }
+            }
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -90,9 +138,10 @@ struct CustomTextEditor: NSViewRepresentable {
         }
 
         private func notifyCursorChange(_ textView: NSTextView) {
+            let currentText = textView.string
             let cursorPosition = textView.selectedRange().location
             let cursorRect = cursorScreenRect(for: cursorPosition, in: textView)
-            onCursorChange?(cursorPosition, cursorRect)
+            onCursorChange?(currentText, cursorPosition, cursorRect)
         }
 
         private func cursorScreenRect(for position: Int, in textView: NSTextView) -> NSRect {

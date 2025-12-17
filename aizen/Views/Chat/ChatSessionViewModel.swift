@@ -33,6 +33,7 @@ class ChatSessionViewModel: ObservableObject {
     // MARK: - State
 
     @Published var inputText = ""
+    @Published var pendingCursorPosition: Int?
     @Published var isProcessing = false
     @Published var currentAgentSession: AgentSession?
     @Published var currentPermissionRequest: RequestPermissionRequest?
@@ -328,6 +329,9 @@ class ChatSessionViewModel: ObservableObject {
 
         let nsString = inputText as NSString
         inputText = nsString.replacingCharacters(in: range, with: replacement)
+
+        // Set cursor position to end of inserted text
+        pendingCursorPosition = range.location + replacement.count
     }
 
     // MARK: - Markdown Rendering

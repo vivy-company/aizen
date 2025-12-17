@@ -115,6 +115,7 @@ struct ChatSessionView: View {
 
                         ChatInputBar(
                             inputText: $viewModel.inputText,
+                            pendingCursorPosition: $viewModel.pendingCursorPosition,
                             attachments: $viewModel.attachments,
                             isProcessing: $viewModel.isProcessing,
                             showingVoiceRecording: $showingVoiceRecording,
@@ -265,17 +266,25 @@ struct ChatSessionView: View {
     }
 
     private func updateAutocompleteWindow(state: AutocompleteState) {
-        guard let window = autocompleteWindow,
-              let parentWindow = NSApp.keyWindow else { return }
+        guard let window = autocompleteWindow else { return }
 
-        if state.isActive && !state.items.isEmpty {
+        // Find parent window - try keyWindow, mainWindow, or any window
+        let parentWindow = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible })
+
+        // Show window when active (even if items empty - shows "no matches")
+        if state.isActive, let parentWindow = parentWindow {
+            // Pass state directly to ensure items/selection sync
             let contentView = InlineAutocompleteView(
-                handler: viewModel.autocompleteHandler,
-                onSelect: { _ in
+                state: state,
+                onTap: { index in
+                    viewModel.autocompleteHandler.state.selectedIndex = index
+                    viewModel.handleAutocompleteSelection()
+                },
+                onSelect: {
                     viewModel.handleAutocompleteSelection()
                 }
             )
-            window.setContent(contentView)
+            window.setContent(contentView, itemCount: state.items.count)
             window.show(at: state.cursorRect, attachedTo: parentWindow)
         } else {
             window.dismiss()

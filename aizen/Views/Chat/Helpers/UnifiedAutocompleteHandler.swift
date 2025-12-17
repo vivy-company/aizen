@@ -25,12 +25,16 @@ class UnifiedAutocompleteHandler: ObservableObject {
 
     // MARK: - Index Management
 
-    func indexWorktree() async {
+    func indexWorktree(forceRefresh: Bool = false) async {
         guard !worktreePath.isEmpty, !isIndexing else { return }
         isIndexing = true
         defer { isIndexing = false }
 
         do {
+            // Clear cache to pick up gitignore changes
+            if forceRefresh || fileIndex.isEmpty {
+                await fileSearchService.clearCache(for: worktreePath)
+            }
             fileIndex = try await fileSearchService.indexDirectory(worktreePath)
             logger.debug("Indexed \(self.fileIndex.count) files in worktree")
         } catch {
@@ -147,6 +151,10 @@ class UnifiedAutocompleteHandler: ObservableObject {
     private func performSearch(for trigger: AutocompleteTrigger) async {
         switch trigger {
         case .file(let query):
+            // Index on-demand if fileIndex is empty
+            if fileIndex.isEmpty && !worktreePath.isEmpty {
+                await indexWorktree(forceRefresh: true)
+            }
             let results = await fileSearchService.search(query: query, in: fileIndex, worktreePath: worktreePath)
             state.items = results.prefix(10).map { .file($0) }
 
