@@ -13,7 +13,7 @@ import os.log
 @MainActor
 extension AgentSession {
     /// Helper to create session directly without authentication
-    func createSessionDirectly(workingDir: String, client: ACPClient, timeout: TimeInterval = 30.0) async throws {
+    func createSessionDirectly(workingDir: String, client: ACPClient, timeout: TimeInterval = 60.0) async throws {
         logger.info("[\(self.agentName)] createSessionDirectly with timeout \(timeout)s...")
         let sessionResponse = try await client.newSession(
             workingDirectory: workingDir,

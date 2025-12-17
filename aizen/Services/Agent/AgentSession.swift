@@ -206,27 +206,43 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         if let authMethods = initResponse.authMethods, !authMethods.isEmpty {
             self.authMethods = authMethods
 
-            // Always try session first - agent may already be authenticated externally (e.g., claude /login)
-            do {
-                logger.info("[\(agentName)] Trying session without auth first...")
-                try await createSessionDirectly(workingDir: workingDir, client: client, timeout: 5.0)
-                // Success! Save skip preference for future sessions
-                AgentRegistry.shared.saveSkipAuth(for: agentName)
-                return
-            } catch {
-                logger.info("[\(agentName)] Session without auth failed: \(error.localizedDescription)")
-                // Fall through to try saved auth or show dialog
-            }
+            // Check if we should skip authentication (previously succeeded without explicit auth)
+            let shouldSkipAuth = AgentRegistry.shared.shouldSkipAuth(for: agentName)
 
-            // Check saved auth preference (non-skip methods only)
-            if let savedAuthMethod = AgentRegistry.shared.getAuthPreference(for: agentName),
-               savedAuthMethod != "skip" {
+            if shouldSkipAuth {
+                // User has previously authenticated externally (e.g., claude /login)
+                // Try session directly with normal timeout
+                logger.info("[\(agentName)] Skipping auth (previously succeeded without explicit auth)...")
+                do {
+                    try await createSessionDirectly(workingDir: workingDir, client: client)
+                    return
+                } catch {
+                    // Auth may have expired, clear skip preference and show dialog
+                    logger.info("[\(agentName)] Session failed despite skip preference: \(error.localizedDescription)")
+                    AgentRegistry.shared.clearAuthPreference(for: agentName)
+                    // Fall through to show auth dialog
+                }
+            } else if let savedAuthMethod = AgentRegistry.shared.getAuthPreference(for: agentName) {
+                // Try saved auth method
                 do {
                     try await performAuthentication(client: client, authMethodId: savedAuthMethod, workingDir: workingDir)
                     return
                 } catch {
                     logger.error("Saved auth method '\(savedAuthMethod)' failed: \(error.localizedDescription)")
                     addSystemMessage("⚠️ Saved authentication method failed. Please re-authenticate.")
+                    AgentRegistry.shared.clearAuthPreference(for: agentName)
+                    // Fall through to show auth dialog
+                }
+            } else {
+                // No saved preference - try session without auth first (user may have logged in externally)
+                do {
+                    logger.info("[\(agentName)] Trying session without auth first...")
+                    try await createSessionDirectly(workingDir: workingDir, client: client)
+                    // Success! Save skip preference for future sessions
+                    AgentRegistry.shared.saveSkipAuth(for: agentName)
+                    return
+                } catch {
+                    logger.info("[\(agentName)] Session without auth failed: \(error.localizedDescription)")
                     // Fall through to show auth dialog
                 }
             }
