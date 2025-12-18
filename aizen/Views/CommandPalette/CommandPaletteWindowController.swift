@@ -11,6 +11,7 @@ import SwiftUI
 
 class CommandPaletteWindowController: NSWindowController {
     private var appDeactivationObserver: NSObjectProtocol?
+    private var eventMonitor: Any?
 
     convenience init(
         managedObjectContext: NSManagedObjectContext,
@@ -21,6 +22,9 @@ class CommandPaletteWindowController: NSWindowController {
             onNavigate: onNavigate
         )
         self.init(window: panel)
+        panel.requestClose = { [weak self] in
+            self?.closeWindow()
+        }
         setupAppObservers()
     }
 
@@ -43,14 +47,44 @@ class CommandPaletteWindowController: NSWindowController {
             NotificationCenter.default.removeObserver(observer)
             appDeactivationObserver = nil
         }
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
     }
 
     override func showWindow(_ sender: Any?) {
         guard let panel = window as? CommandPalettePanel else { return }
         positionPanel(panel)
         panel.makeKeyAndOrderFront(nil)
+        setupEventMonitor(for: panel)
         DispatchQueue.main.async {
             panel.makeKey()
+        }
+    }
+
+    private func setupEventMonitor(for panel: CommandPalettePanel) {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
+
+        eventMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .mouseMoved]
+        ) { [weak self, weak panel] event in
+            guard let self, let panel else { return event }
+            guard panel.isVisible else { return event }
+
+            if event.type == .mouseMoved {
+                panel.interaction.didMoveMouse()
+                return event
+            }
+
+            let mouseLocation = NSEvent.mouseLocation
+            if !panel.frame.contains(mouseLocation) {
+                self.closeWindow()
+            }
+            return event
         }
     }
 
@@ -81,6 +115,9 @@ class CommandPaletteWindowController: NSWindowController {
 }
 
 class CommandPalettePanel: NSPanel {
+    let interaction = PaletteInteractionState()
+    var requestClose: (() -> Void)?
+
     init(
         managedObjectContext: NSManagedObjectContext,
         onNavigate: @escaping (UUID, UUID, UUID) -> Void
@@ -102,15 +139,21 @@ class CommandPalettePanel: NSPanel {
         self.titlebarAppearsTransparent = true
         self.becomesKeyOnlyIfNeeded = true
         self.isFloatingPanel = true
+        self.acceptsMouseMovedEvents = true
 
         let hostingView = NSHostingView(
             rootView: CommandPaletteContent(
                 onNavigate: onNavigate,
                 onClose: { [weak self] in
-                    self?.close()
+                    if let close = self?.requestClose {
+                        close()
+                    } else {
+                        self?.close()
+                    }
                 }
             )
             .environment(\.managedObjectContext, managedObjectContext)
+            .environmentObject(interaction)
         )
 
         hostingView.wantsLayer = true
@@ -140,6 +183,7 @@ struct CommandPaletteContent: View {
     @State private var selectedIndex = 0
     @State private var displayedWorktrees: [Worktree] = []
     @FocusState private var isSearchFocused: Bool
+    @EnvironmentObject private var interaction: PaletteInteractionState
 
     private func refreshDisplayedWorktrees() {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -177,7 +221,7 @@ struct CommandPaletteContent: View {
     }
 
     var body: some View {
-        LiquidGlassCard {
+        LiquidGlassCard(tint: .black.opacity(0.30), sheenOpacity: 0.28, scrimOpacity: 0.14) {
             VStack(spacing: 0) {
                 SpotlightSearchField(
                     placeholder: "Switch to worktree…",
@@ -320,6 +364,7 @@ struct CommandPaletteContent: View {
         }
         .onHover { hovering in
             if hovering {
+                guard interaction.allowHoverSelection else { return }
                 selectedIndex = index
             }
         }
@@ -358,18 +403,21 @@ struct CommandPaletteContent: View {
     }
 
     private func moveSelectionDown() {
+        interaction.didUseKeyboard()
         if selectedIndex < displayedWorktrees.count - 1 {
             selectedIndex += 1
         }
     }
 
     private func moveSelectionUp() {
+        interaction.didUseKeyboard()
         if selectedIndex > 0 {
             selectedIndex -= 1
         }
     }
 
     private func selectCurrent() {
+        interaction.didUseKeyboard()
         guard selectedIndex < displayedWorktrees.count else { return }
         selectWorktree(displayedWorktrees[selectedIndex])
     }

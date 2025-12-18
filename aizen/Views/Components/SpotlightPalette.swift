@@ -6,55 +6,75 @@
 //
 
 import SwiftUI
+import Combine
+
+@MainActor
+final class PaletteInteractionState: ObservableObject {
+    @Published var allowHoverSelection: Bool = true
+
+    func didUseKeyboard() {
+        allowHoverSelection = false
+    }
+
+    func didMoveMouse() {
+        allowHoverSelection = true
+    }
+}
 
 struct LiquidGlassCard<Content: View>: View {
     var cornerRadius: CGFloat = 24
     var shadowOpacity: Double = 0.45
     var tint: Color = .black.opacity(0.22)
     var sheenOpacity: Double = 0.22
+    var scrimOpacity: Double = 0.12
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-        Group {
-            if #available(macOS 26.0, *) {
-                GlassEffectContainer {
-                    ZStack {
-                        shape
-                            .fill(.white.opacity(0.001))
-                            .glassEffect(.regular.tint(tint), in: shape)
-
-                        content()
-                    }
-                }
-            } else {
-                content()
-                    .background(.regularMaterial, in: shape)
-            }
-        }
-        .clipShape(shape)
+        content()
+            .background { glassBackground(shape: shape) }
+            .clipShape(shape)
         .overlay {
             shape.strokeBorder(.white.opacity(0.14), lineWidth: 1)
         }
-        .overlay {
-            if #available(macOS 26.0, *) {
-                LinearGradient(
-                    colors: [
-                        .white.opacity(0.28 * sheenOpacity),
-                        .white.opacity(0.10 * sheenOpacity),
-                        .clear,
-                        .white.opacity(0.08 * sheenOpacity),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .blendMode(.plusLighter)
-                .allowsHitTesting(false)
-                .clipShape(shape)
-            }
-        }
         .shadow(color: .black.opacity(shadowOpacity), radius: 40, x: 0, y: 22)
+    }
+
+    @ViewBuilder
+    private func glassBackground(shape: RoundedRectangle) -> some View {
+        if #available(macOS 26.0, *) {
+            ZStack {
+                GlassEffectContainer {
+                    shape
+                        .fill(.white.opacity(0.001))
+                        .glassEffect(.regular.tint(tint), in: shape)
+                }
+                .allowsHitTesting(false)
+
+                shape
+                    .fill(.black.opacity(scrimOpacity))
+                    .allowsHitTesting(false)
+
+                if sheenOpacity > 0 {
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(0.28 * sheenOpacity),
+                            .white.opacity(0.10 * sheenOpacity),
+                            .clear,
+                            .white.opacity(0.08 * sheenOpacity),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .blendMode(.plusLighter)
+                    .allowsHitTesting(false)
+                    .clipShape(shape)
+                }
+            }
+        } else {
+            shape.fill(.regularMaterial)
+        }
     }
 }
 

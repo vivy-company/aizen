@@ -15,6 +15,9 @@ class FileSearchWindowController: NSWindowController {
     convenience init(worktreePath: String, onFileSelected: @escaping (String) -> Void) {
         let panel = FileSearchPanel(worktreePath: worktreePath, onFileSelected: onFileSelected)
         self.init(window: panel)
+        panel.requestClose = { [weak self] in
+            self?.closeWindow()
+        }
         setupAppObservers()
     }
 
@@ -38,6 +41,10 @@ class FileSearchWindowController: NSWindowController {
             NotificationCenter.default.removeObserver(observer)
             appDeactivationObserver = nil
         }
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
     }
 
     override func showWindow(_ sender: Any?) {
@@ -48,10 +55,36 @@ class FileSearchWindowController: NSWindowController {
 
         // Show panel and make it key to enable proper focus handling
         panel.makeKeyAndOrderFront(nil)
+        setupEventMonitor(for: panel)
 
         // Ensure focus is possible by making panel the key window
         DispatchQueue.main.async {
             panel.makeKey()
+        }
+    }
+
+    private func setupEventMonitor(for panel: FileSearchPanel) {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
+
+        eventMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .mouseMoved]
+        ) { [weak self, weak panel] event in
+            guard let self, let panel else { return event }
+            guard panel.isVisible else { return event }
+
+            if event.type == .mouseMoved {
+                panel.interaction.didMoveMouse()
+                return event
+            }
+
+            let mouseLocation = NSEvent.mouseLocation
+            if !panel.frame.contains(mouseLocation) {
+                self.closeWindow()
+            }
+            return event
         }
     }
 
@@ -85,6 +118,9 @@ class FileSearchWindowController: NSWindowController {
 }
 
 class FileSearchPanel: NSPanel {
+    let interaction = PaletteInteractionState()
+    var requestClose: (() -> Void)?
+
     init(worktreePath: String, onFileSelected: @escaping (String) -> Void) {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
@@ -102,6 +138,7 @@ class FileSearchPanel: NSPanel {
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         self.titleVisibility = .hidden
         self.titlebarAppearsTransparent = true
+        self.acceptsMouseMovedEvents = true
 
         // Critical for NSPanel - proper keyboard focus handling
         self.becomesKeyOnlyIfNeeded = true
@@ -112,9 +149,14 @@ class FileSearchPanel: NSPanel {
                 worktreePath: worktreePath,
                 onFileSelected: onFileSelected,
                 onClose: { [weak self] in
-                    self?.close()
+                    if let close = self?.requestClose {
+                        close()
+                    } else {
+                        self?.close()
+                    }
                 }
             )
+            .environmentObject(interaction)
         )
 
         // Ensure hosting view doesn't add any background
@@ -141,6 +183,7 @@ struct FileSearchWindowContent: View {
 
     @StateObject private var viewModel: FileSearchViewModel
     @FocusState private var isSearchFocused: Bool
+    @EnvironmentObject private var interaction: PaletteInteractionState
 
     init(worktreePath: String, onFileSelected: @escaping (String) -> Void, onClose: @escaping () -> Void) {
         self.worktreePath = worktreePath
@@ -150,7 +193,7 @@ struct FileSearchWindowContent: View {
     }
 
     var body: some View {
-        LiquidGlassCard {
+        LiquidGlassCard(tint: .black.opacity(0.30), sheenOpacity: 0.28, scrimOpacity: 0.14) {
             VStack(spacing: 0) {
                 SpotlightSearchField(
                     placeholder: "Search files…",
@@ -191,13 +234,20 @@ struct FileSearchWindowContent: View {
         // Keyboard shortcuts for file search - use hidden buttons for compatibility
         .background {
             Group {
-                Button("") { viewModel.moveSelectionDown() }
+                Button("") {
+                    interaction.didUseKeyboard()
+                    viewModel.moveSelectionDown()
+                }
                     .keyboardShortcut(.downArrow, modifiers: [])
 
-                Button("") { viewModel.moveSelectionUp() }
+                Button("") {
+                    interaction.didUseKeyboard()
+                    viewModel.moveSelectionUp()
+                }
                     .keyboardShortcut(.upArrow, modifiers: [])
 
                 Button("") {
+                    interaction.didUseKeyboard()
                     if let result = viewModel.getSelectedResult() {
                         selectFile(result)
                     }
@@ -317,6 +367,7 @@ struct FileSearchWindowContent: View {
         }
         .onHover { hovering in
             if hovering {
+                guard interaction.allowHoverSelection else { return }
                 viewModel.selectedIndex = index
             }
         }
