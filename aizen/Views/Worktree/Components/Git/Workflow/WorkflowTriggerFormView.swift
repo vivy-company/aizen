@@ -173,7 +173,7 @@ struct WorkflowTriggerFormView: View {
             } label: {
                 if isSubmitting {
                     ProgressView()
-                        .scaleEffect(0.7)
+                        .controlSize(.small)
                 } else {
                     Text("Run Workflow")
                 }

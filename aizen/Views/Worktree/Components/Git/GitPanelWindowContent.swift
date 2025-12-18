@@ -440,7 +440,7 @@ struct GitPanelWindowContent: View {
 
     private var resizableDivider: some View {
         Rectangle()
-            .fill(Color(NSColor.separatorColor))
+            .fill(Color.black)
             .frame(width: 1)
             .overlay(
                 Rectangle()

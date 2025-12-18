@@ -196,8 +196,9 @@ actor GitLabWorkflowProvider: WorkflowProviderProtocol {
         let result = try await executeGLab(["api", "projects/:id/jobs/\(jobId)/trace"], workingDirectory: repoPath)
         let rawLogs = result.stdout
 
-        let lines = rawLogs.components(separatedBy: .newlines).map { line in
+        let lines = rawLogs.components(separatedBy: .newlines).enumerated().map { index, line in
             WorkflowLogLine(
+                id: index,
                 stepName: "Job Output",
                 content: line
             )

@@ -12,11 +12,36 @@ struct WorkflowRunDetailView: View {
 
     @State private var selectedJobId: String?
     @State private var showLogs: Bool = true
+    @State private var showCancelConfirmation: Bool = false
 
     @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
 
     private var run: WorkflowRun? { service.selectedRun }
     private var jobs: [WorkflowJob] { service.selectedRunJobs }
+
+    /// Check if runLogs contains a status message rather than actual logs
+    private var isStatusMessage: Bool {
+        let logs = service.runLogs
+        return logs.contains("Waiting for job") ||
+               logs.contains("Job is running") ||
+               logs.contains("Workflow is running") ||
+               logs.contains("Cancelling workflow") ||
+               logs.contains("Workflow run cancelled") ||
+               logs.contains("Failed to cancel") ||
+               logs.contains("Failed to load logs")
+    }
+
+    private var statusMessageIcon: String {
+        let logs = service.runLogs
+        if logs.contains("cancelled") || logs.contains("Cancelling") {
+            return "stop.circle"
+        } else if logs.contains("Failed") {
+            return "exclamationmark.triangle"
+        } else if logs.contains("Waiting") {
+            return "clock"
+        }
+        return "hourglass"
+    }
 
     var body: some View {
         if let run = run {
@@ -84,15 +109,27 @@ struct WorkflowRunDetailView: View {
             // Actions
             if run.isInProgress {
                 Button {
-                    Task {
-                        _ = await service.cancelRun(run)
-                    }
+                    showCancelConfirmation = true
                 } label: {
                     Label("Cancel", systemImage: "stop.fill")
                 }
                 .buttonStyle(.bordered)
                 .tint(.red)
                 .controlSize(.small)
+                .confirmationDialog(
+                    "Cancel Workflow Run?",
+                    isPresented: $showCancelConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Cancel Run", role: .destructive) {
+                        Task {
+                            _ = await service.cancelRun(run)
+                        }
+                    }
+                    Button("Keep Running", role: .cancel) {}
+                } message: {
+                    Text("This will stop the workflow run #\(run.runNumber). This action cannot be undone.")
+                }
             }
 
             if let url = run.url, let urlObj = URL(string: url) {
@@ -147,6 +184,16 @@ struct WorkflowRunDetailView: View {
                     .foregroundStyle(.secondary)
 
                 Spacer()
+
+                Button {
+                    Task {
+                        await service.refresh()
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help("Refresh")
             }
             .frame(height: 32)
             .padding(.horizontal, 12)
@@ -205,10 +252,9 @@ struct WorkflowRunDetailView: View {
 
                 if run?.isInProgress == true {
                     HStack(spacing: 4) {
-                        Circle()
-                            .fill(.green)
-                            .frame(width: 6, height: 6)
-                        Text("Live")
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("Running")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -259,6 +305,24 @@ struct WorkflowRunDetailView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else if isStatusMessage {
+                // Show status messages (in-progress, cancelled, etc.) centered
+                VStack(spacing: 12) {
+                    if run?.isInProgress == true {
+                        ProgressView()
+                            .controlSize(.regular)
+                    } else {
+                        Image(systemName: statusMessageIcon)
+                            .font(.system(size: 32))
+                            .foregroundStyle(.tertiary)
+                    }
+                    Text(service.runLogs)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .padding()
             } else {
                 WorkflowLogView(service.runLogs, structuredLogs: service.structuredLogs, fontSize: 11, showStepNavigation: true)
             }
@@ -488,18 +552,7 @@ struct JobRowSelectionModifier: ViewModifier {
     let isSelected: Bool
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .background {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(.clear)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 4))
-                    }
-                }
-        } else {
-            content
-                .background(isSelected ? Color(nsColor: .selectedContentBackgroundColor) : Color.clear)
-        }
+        content
+            .background(isSelected ? Color.white.opacity(0.1) : Color.clear)
     }
 }

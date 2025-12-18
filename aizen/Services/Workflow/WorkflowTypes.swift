@@ -220,10 +220,8 @@ struct WorkflowLogLine: Identifiable, Hashable, Sendable {
     let isGroupEnd: Bool
     let groupName: String?
 
-    private static var idCounter = 0
-    private static let lock = NSLock()
-
     init(
+        id: Int,
         stepName: String,
         stepNumber: Int? = nil,
         content: String,
@@ -233,11 +231,7 @@ struct WorkflowLogLine: Identifiable, Hashable, Sendable {
         isGroupEnd: Bool = false,
         groupName: String? = nil
     ) {
-        Self.lock.lock()
-        Self.idCounter += 1
-        self.id = Self.idCounter
-        Self.lock.unlock()
-
+        self.id = id
         self.stepName = stepName
         self.stepNumber = stepNumber
         self.content = content

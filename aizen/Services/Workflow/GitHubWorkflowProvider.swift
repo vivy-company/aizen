@@ -185,8 +185,17 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
         return result.stdout
     }
 
+    // Pre-compiled regex patterns for log parsing
+    private static let timestampRegex = try? NSRegularExpression(pattern: #"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"#)
+    private static let dateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
     func getStructuredLogs(repoPath: String, runId: String, jobId: String, steps: [WorkflowStep]) async throws -> WorkflowLogs {
         // Use gh api to get raw logs for the job
+        // Note: This only works after job completion - returns 404 for in-progress jobs
         let result = try await executeGH(["api", "repos/{owner}/{repo}/actions/jobs/\(jobId)/logs"], workingDirectory: repoPath)
         let rawLogs = result.stdout
 
@@ -200,43 +209,34 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
 
         // Parse log lines and correlate with steps
         var logLines: [WorkflowLogLine] = []
+        logLines.reserveCapacity(rawLogs.count / 80)
+
         let lines = rawLogs.components(separatedBy: .newlines)
+        var lineIndex = 0
 
         for line in lines {
             guard !line.isEmpty else { continue }
 
-            // Parse timestamp from line (format: 2025-12-17T07:30:39.5778140Z ...)
-            let timestampPattern = #"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"#
-            let timestampRegex = try? NSRegularExpression(pattern: timestampPattern)
             let range = NSRange(line.startIndex..<line.endIndex, in: line)
-
             var timestamp: Date?
             var content = line
 
-            if let match = timestampRegex?.firstMatch(in: line, range: range),
+            // Parse timestamp from line (format: 2025-12-17T07:30:39.5778140Z ...)
+            if let match = Self.timestampRegex?.firstMatch(in: line, range: range),
                let timestampRange = Range(match.range(at: 1), in: line) {
                 let timestampStr = String(line[timestampRange])
-                let formatter = ISO8601DateFormatter()
-                formatter.formatOptions = [.withInternetDateTime]
-                timestamp = formatter.date(from: timestampStr + "Z")
+                timestamp = Self.dateFormatter.date(from: timestampStr + "Z")
 
                 // Remove timestamp from content
                 if let fullRange = Range(match.range, in: line) {
                     content = String(line[fullRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-                    // Also remove the microseconds part if present
+                    // Remove microseconds suffix (e.g., ".5778140Z ")
                     if content.hasPrefix(".") {
                         if let spaceIndex = content.firstIndex(of: " ") {
                             content = String(content[content.index(after: spaceIndex)...])
                         }
                     }
                 }
-            }
-
-            // Remove timestamp suffix (e.g., ".5778140Z ")
-            let cleanPattern = #"^\.\d+Z\s*"#
-            if let cleanRegex = try? NSRegularExpression(pattern: cleanPattern) {
-                let cleanRange = NSRange(content.startIndex..<content.endIndex, in: content)
-                content = cleanRegex.stringByReplacingMatches(in: content, range: cleanRange, withTemplate: "")
             }
 
             // Find matching step by timestamp (checking newest first)
@@ -273,6 +273,7 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
                 .replacingOccurrences(of: "##[endgroup]", with: "")
 
             logLines.append(WorkflowLogLine(
+                id: lineIndex,
                 stepName: stepName,
                 stepNumber: stepNumber,
                 content: content,
@@ -282,6 +283,7 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
                 isGroupEnd: isGroupEnd,
                 groupName: groupName
             ))
+            lineIndex += 1
         }
 
         return WorkflowLogs(

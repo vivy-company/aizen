@@ -255,17 +255,62 @@ class WorkflowService: ObservableObject {
     }
 
     func cancelRun(_ run: WorkflowRun) async -> Bool {
+        // Stop polling immediately
+        stopLogPolling()
+
+        // Optimistically update the UI to show cancelling state
+        if selectedRun?.id == run.id {
+            runLogs = "Cancelling workflow run...\n\nThis may take a moment."
+            structuredLogs = nil
+        }
+
         isLoading = true
         error = nil
 
         do {
             try await currentProvider?.cancelRun(repoPath: repoPath, runId: run.id)
 
-            // Refresh to get updated status
-            await loadRuns()
-
+            // Optimistically mark as cancelled in UI while GitHub processes
             if selectedRun?.id == run.id {
-                await selectRun(run)
+                var cancelledRun = run
+                cancelledRun = WorkflowRun(
+                    id: run.id,
+                    workflowId: run.workflowId,
+                    workflowName: run.workflowName,
+                    runNumber: run.runNumber,
+                    status: .completed,
+                    conclusion: .cancelled,
+                    branch: run.branch,
+                    commit: run.commit,
+                    commitMessage: run.commitMessage,
+                    event: run.event,
+                    actor: run.actor,
+                    startedAt: run.startedAt,
+                    completedAt: Date(),
+                    url: run.url
+                )
+                selectedRun = cancelledRun
+
+                // Update in runs list
+                if let index = runs.firstIndex(where: { $0.id == run.id }) {
+                    runs[index] = cancelledRun
+                }
+
+                runLogs = "Workflow run cancelled."
+            }
+
+            // Refresh in background to get actual status
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                await loadRuns()
+                if let updatedRun = try? await currentProvider?.getRun(repoPath: repoPath, runId: run.id) {
+                    await MainActor.run {
+                        selectedRun = updatedRun
+                        if let index = runs.firstIndex(where: { $0.id == run.id }) {
+                            runs[index] = updatedRun
+                        }
+                    }
+                }
             }
 
             isLoading = false
@@ -273,9 +318,11 @@ class WorkflowService: ObservableObject {
         } catch let workflowError as WorkflowError {
             error = workflowError
             logger.error("Failed to cancel run: \(workflowError.localizedDescription)")
+            runLogs = "Failed to cancel: \(workflowError.localizedDescription)"
         } catch {
             self.error = .executionFailed(error.localizedDescription)
             logger.error("Failed to cancel run: \(error.localizedDescription)")
+            runLogs = "Failed to cancel."
         }
 
         isLoading = false
@@ -298,6 +345,25 @@ class WorkflowService: ObservableObject {
         let provider = currentProvider
         let path = repoPath
         let jobs = selectedRunJobs
+
+        // Check if job/run is still in progress (logs only available after completion)
+        if let jobId = jobId, let job = jobs.first(where: { $0.id == jobId }) {
+            if job.status == .queued || job.status == .waiting || job.status == .pending {
+                runLogs = "Waiting for job to start...\n\nLogs will be available when the job completes."
+                isLoadingLogs = false
+                return
+            }
+            if job.status == .inProgress || job.conclusion == nil {
+                runLogs = "Job is running...\n\nLogs will be available when the job completes."
+                isLoadingLogs = false
+                return
+            }
+        } else if selectedRun?.isInProgress == true {
+            // No job found but run is in progress
+            runLogs = "Workflow is running...\n\nLogs will be available when jobs complete."
+            isLoadingLogs = false
+            return
+        }
 
         do {
             // Try to get structured logs if we have a job ID and steps
@@ -323,7 +389,7 @@ class WorkflowService: ObservableObject {
             runLogs = logs
         } catch {
             logger.error("Failed to load logs: \(error.localizedDescription)")
-            runLogs = "Failed to load logs: \(error.localizedDescription)"
+            runLogs = "Failed to load logs."
         }
 
         isLoadingLogs = false
@@ -332,6 +398,70 @@ class WorkflowService: ObservableObject {
     func refreshLogs() async {
         guard let run = selectedRun else { return }
         await loadLogs(runId: run.id)
+    }
+
+    /// Load logs during polling - only fetches for completed jobs
+    private func loadLogsForPolling(runId: String, jobId: String) async {
+        // Capture values for background task
+        let provider = currentProvider
+        let path = repoPath
+        let jobs = selectedRunJobs
+        let currentContent = runLogs
+
+        // Check job status - logs only available after completion
+        if let job = jobs.first(where: { $0.id == jobId }) {
+            if job.status == .queued || job.status == .waiting || job.status == .pending {
+                if !runLogs.contains("Waiting for job") {
+                    runLogs = "Waiting for job to start...\n\nLogs will be available when the job completes."
+                    structuredLogs = nil
+                }
+                return
+            }
+            if job.status == .inProgress || job.conclusion == nil {
+                if !runLogs.contains("Job is running") {
+                    runLogs = "Job is running...\n\nLogs will be available when the job completes."
+                    structuredLogs = nil
+                }
+                return
+            }
+        } else if selectedRun?.isInProgress == true {
+            if !runLogs.contains("Workflow is running") {
+                runLogs = "Workflow is running...\n\nLogs will be available when jobs complete."
+                structuredLogs = nil
+            }
+            return
+        }
+
+        // Job is completed - fetch logs
+        do {
+            if let job = jobs.first(where: { $0.id == jobId }), !job.steps.isEmpty {
+                let structured = try await Task.detached {
+                    try await provider?.getStructuredLogs(repoPath: path, runId: runId, jobId: jobId, steps: job.steps)
+                }.value
+
+                if let structured = structured {
+                    if structured.rawContent != currentContent {
+                        structuredLogs = structured
+                        runLogs = structured.rawContent
+                        currentLogJobId = jobId
+                    }
+                    return
+                }
+            }
+
+            // Fallback to plain text logs
+            let logs = try await Task.detached {
+                try await provider?.getRunLogs(repoPath: path, runId: runId, jobId: jobId) ?? ""
+            }.value
+
+            if logs != currentContent {
+                runLogs = logs
+                structuredLogs = nil
+            }
+        } catch {
+            // Error fetching completed job logs
+            logger.error("Failed to fetch logs: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Auto Refresh
@@ -359,20 +489,25 @@ class WorkflowService: ObservableObject {
         // Capture values for background polling
         let provider = currentProvider
         let path = repoPath
+        let jobId = currentLogJobId
 
         logPollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.loadLogs(runId: runId)
-
-                // Also refresh run status in background
+                // Refresh run status first
                 if let provider = provider {
                     do {
                         let updatedRun = try await Task.detached {
                             try await provider.getRun(repoPath: path, runId: runId)
                         }.value
 
+                        // Refresh jobs
+                        let jobs = try await Task.detached {
+                            try await provider.getRunJobs(repoPath: path, runId: runId)
+                        }.value
+
                         await MainActor.run { [weak self] in
                             self?.selectedRun = updatedRun
+                            self?.selectedRunJobs = jobs
 
                             // Update in runs list
                             if let index = self?.runs.firstIndex(where: { $0.id == runId }) {
@@ -385,13 +520,15 @@ class WorkflowService: ObservableObject {
                             }
                         }
 
-                        // Refresh jobs in background
-                        let jobs = try await Task.detached {
-                            try await provider.getRunJobs(repoPath: path, runId: runId)
-                        }.value
+                        // Reload logs with jobId to get updated content
+                        // Use first failed job or first job, or the captured jobId
+                        let targetJobId = jobs.first(where: { $0.conclusion == .failure })?.id
+                            ?? jobs.first(where: { $0.status == .inProgress })?.id
+                            ?? jobId
+                            ?? jobs.first?.id
 
-                        await MainActor.run { [weak self] in
-                            self?.selectedRunJobs = jobs
+                        if let targetJobId = targetJobId {
+                            await self?.loadLogsForPolling(runId: runId, jobId: targetJobId)
                         }
                     } catch {
                         // Continue polling on error
