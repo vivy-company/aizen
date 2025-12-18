@@ -23,7 +23,7 @@ actor GitStatusService {
 
     func getDetailedStatus(at path: String) async throws -> DetailedGitStatus {
         // Run libgit2 operations on background thread to avoid blocking
-        return try await Task.detached {
+        return try await Task.detached(priority: .utility) {
             let repo = try Libgit2Repository(path: path)
             let status = try repo.status()
 
@@ -31,18 +31,9 @@ actor GitStatusService {
             let currentBranch = try? repo.currentBranchName()
 
             // Get ahead/behind counts
-            var aheadBy = 0
-            var behindBy = 0
-
-            if let branchName = currentBranch {
-                let branches = try repo.listBranches(type: .local)
-                if let branch = branches.first(where: { $0.name == branchName }) {
-                    if let aheadBehind = branch.aheadBehind {
-                        aheadBy = aheadBehind.ahead
-                        behindBy = aheadBehind.behind
-                    }
-                }
-            }
+            let aheadBehind = (try? repo.headAheadBehind()) ?? (ahead: 0, behind: 0)
+            let aheadBy = aheadBehind.ahead
+            let behindBy = aheadBehind.behind
 
             // Calculate additions/deletions from diff
             let diffStats = try repo.diffStats()
@@ -78,21 +69,14 @@ actor GitStatusService {
     }
 
     func getBranchStatus(at path: String) async throws -> (ahead: Int, behind: Int) {
-        return try await Task.detached {
+        return try await Task.detached(priority: .utility) {
             let repo = try Libgit2Repository(path: path)
 
-            guard let branchName = try repo.currentBranchName() else {
+            guard (try? repo.currentBranchName()) != nil else {
                 return (0, 0)
             }
 
-            let branches = try repo.listBranches(type: .local)
-            if let branch = branches.first(where: { $0.name == branchName }) {
-                if let aheadBehind = branch.aheadBehind {
-                    return (aheadBehind.ahead, aheadBehind.behind)
-                }
-            }
-
-            return (0, 0)
+            return (try? repo.headAheadBehind()) ?? (0, 0)
         }.value
     }
 

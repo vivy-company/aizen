@@ -211,11 +211,24 @@ struct DiffView: NSViewRepresentable {
         private var rawLines: [String] = []
         private var parsedRows: [Int: DiffRow] = [:]
         private var lineParser: DiffLineParser?
+        private var parseTask: Task<ParsedDiffMetadata, Never>?
 
         enum DiffRow {
             case fileHeader(path: String)
             case line(DiffLine)
             case lazyLine(rawIndex: Int)
+        }
+
+        private enum RowKind: Sendable {
+            case fileHeader(path: String)
+            case lazyLine(rawIndex: Int)
+        }
+
+        private struct ParsedDiffMetadata: Sendable {
+            let rawLines: [String]
+            let rowKinds: [RowKind]
+            let fileRowIndices: [String: Int]
+            let rowToFilePath: [Int: String]
         }
 
         init(
@@ -237,6 +250,7 @@ struct DiffView: NSViewRepresentable {
             if let observer = scrollObserver {
                 NotificationCenter.default.removeObserver(observer)
             }
+            parseTask?.cancel()
         }
 
         func setupScrollObserver(for scrollView: NSScrollView) {
@@ -254,34 +268,33 @@ struct DiffView: NSViewRepresentable {
             guard let tableView = tableView else { return }
             let visibleRect = tableView.visibleRect
 
-            // Constants for visibility thresholds
-            let headerAboveThreshold: CGFloat = 20
-            let headerNearTopThreshold: CGFloat = 50
+            let firstVisibleRow = max(0, tableView.row(at: NSPoint(x: 0, y: visibleRect.minY + 1)))
+            guard firstVisibleRow >= 0, firstVisibleRow < rows.count else { return }
 
-            var currentFile: String?
-            var lastFileBeforeVisible: String?
+            var file = rowToFilePath[firstVisibleRow]
 
-            for (index, row) in rows.enumerated() {
-                if case .fileHeader(let path) = row {
-                    let rowRect = tableView.rect(ofRow: index)
-
-                    if rowRect.maxY <= visibleRect.minY + headerAboveThreshold {
-                        lastFileBeforeVisible = path
-                    } else if rowRect.minY < visibleRect.maxY {
-                        if rowRect.minY <= visibleRect.minY + headerNearTopThreshold {
-                            currentFile = path
-                        } else if currentFile == nil {
-                            currentFile = path
+            if file == nil {
+                let lastVisibleRow = min(rows.count - 1, max(firstVisibleRow, tableView.row(at: NSPoint(x: 0, y: visibleRect.maxY - 1))))
+                if lastVisibleRow >= firstVisibleRow {
+                    for row in firstVisibleRow...lastVisibleRow {
+                        if let path = rowToFilePath[row] {
+                            file = path
+                            break
                         }
                     }
                 }
             }
 
-            if currentFile == nil {
-                currentFile = lastFileBeforeVisible
+            if file == nil, firstVisibleRow > 0 {
+                for row in stride(from: firstVisibleRow - 1, through: 0, by: -1) {
+                    if let path = rowToFilePath[row] {
+                        file = path
+                        break
+                    }
+                }
             }
 
-            if let file = currentFile, file != lastVisibleFile {
+            if let file, file != lastVisibleFile {
                 lastVisibleFile = file
                 onFileVisible?(file)
             }
@@ -326,57 +339,105 @@ struct DiffView: NSViewRepresentable {
             let font = NSFont(name: fontFamily, size: fontSize) ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
             rowHeight = ceil(font.ascender - font.descender + font.leading) + 6
 
-            // Store raw lines for lazy parsing
-            rawLines = []
-            rawLines.reserveCapacity(diffOutput.count / 40)
-            diffOutput.enumerateLines { [self] line, _ in
+            parseTask?.cancel()
+            let showFileHeaders = self.showFileHeaders
+
+            let task = Task.detached(priority: .utility) {
+                Self.parseDiffOutput(diffOutput: diffOutput, showFileHeaders: showFileHeaders)
+            }
+            parseTask = task
+
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let parsed = await task.value
+                guard !Task.isCancelled, self.lastDataHash == newHash else { return }
+
+                self.rawLines = parsed.rawLines
+                self.lineParser = DiffLineParser(rawLines: parsed.rawLines)
+
+                self.parsedRows.removeAll(keepingCapacity: true)
+                self.fileRowIndices = parsed.fileRowIndices
+                self.rowToFilePath = parsed.rowToFilePath
+                self.rows = parsed.rowKinds.map { kind in
+                    switch kind {
+                    case .fileHeader(let path):
+                        return .fileHeader(path: path)
+                    case .lazyLine(let rawIndex):
+                        return .lazyLine(rawIndex: rawIndex)
+                    }
+                }
+
+                self.tableView?.reloadData()
+            }
+        }
+
+        private static func parseDiffOutput(diffOutput: String, showFileHeaders: Bool) -> ParsedDiffMetadata {
+            var rawLines: [String] = []
+            rawLines.reserveCapacity(max(128, diffOutput.count / 48))
+            diffOutput.enumerateLines { line, _ in
                 rawLines.append(line)
             }
 
-            // Initialize parser
-            lineParser = DiffLineParser(rawLines: rawLines)
+            var rowKinds: [RowKind] = []
+            rowKinds.reserveCapacity(rawLines.count)
 
-            // Clear parsed cache
-            parsedRows.removeAll(keepingCapacity: true)
-            fileRowIndices.removeAll()
-            rows.removeAll(keepingCapacity: true)
+            var fileRowIndices: [String: Int] = [:]
+            var rowToFilePath: [Int: String] = [:]
 
-            // Build row metadata quickly (just count and identify file headers)
-            buildRowMetadata()
-
-            tableView?.reloadData()
-        }
-
-        private func buildRowMetadata() {
             var rowIndex = 0
             var currentFilePath: String?
-            rowToFilePath.removeAll()
 
             for (lineIndex, line) in rawLines.enumerated() {
-                let firstChar = line.first
-
                 if line.hasPrefix("diff --git ") {
-                    continue
-                } else if line.hasPrefix("+++ b/") {
-                    let path = String(line.dropFirst(6))
-                    currentFilePath = path
-                    if showFileHeaders {
+                    currentFilePath = parseFilePathFromDiffHeader(line)
+                    if showFileHeaders, let path = currentFilePath, !path.isEmpty {
                         fileRowIndices[path] = rowIndex
-                        rows.append(.fileHeader(path: path))
+                        rowKinds.append(.fileHeader(path: path))
+                        rowToFilePath[rowIndex] = path
                         rowIndex += 1
                     }
-                } else if firstChar == "-" && line.hasPrefix("--- ") {
                     continue
-                } else if line.hasPrefix("index ") || line.hasPrefix("new file") || line.hasPrefix("deleted file") {
+                }
+
+                if line.hasPrefix("--- ") ||
+                    line.hasPrefix("+++ ") ||
+                    line.hasPrefix("index ") ||
+                    line.hasPrefix("new file") ||
+                    line.hasPrefix("deleted file") ||
+                    line.hasPrefix("similarity index") ||
+                    line.hasPrefix("rename from") ||
+                    line.hasPrefix("rename to") {
                     continue
-                } else if firstChar == "@" || firstChar == "+" || firstChar == "-" || firstChar == " " {
-                    rows.append(.lazyLine(rawIndex: lineIndex))
+                }
+
+                guard let firstChar = line.first else { continue }
+
+                if firstChar == "@" || firstChar == "+" || firstChar == "-" || firstChar == " " {
+                    rowKinds.append(.lazyLine(rawIndex: lineIndex))
                     if let path = currentFilePath {
                         rowToFilePath[rowIndex] = path
                     }
                     rowIndex += 1
                 }
             }
+
+            return ParsedDiffMetadata(
+                rawLines: rawLines,
+                rowKinds: rowKinds,
+                fileRowIndices: fileRowIndices,
+                rowToFilePath: rowToFilePath
+            )
+        }
+
+        private static func parseFilePathFromDiffHeader(_ line: String) -> String? {
+            // Format: "diff --git a/<path> b/<path>"
+            let parts = line.split(separator: " ")
+            guard parts.count >= 4 else { return nil }
+            let bPart = parts[3]
+            if bPart.hasPrefix("b/") {
+                return String(bPart.dropFirst(2))
+            }
+            return String(bPart)
         }
 
         func getRow(at index: Int) -> DiffRow {

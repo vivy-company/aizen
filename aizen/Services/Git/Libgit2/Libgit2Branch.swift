@@ -30,7 +30,7 @@ struct Libgit2BranchInfo: Sendable {
 extension Libgit2Repository {
 
     /// List all branches
-    func listBranches(type: Libgit2BranchType = .all) throws -> [Libgit2BranchInfo] {
+    func listBranches(type: Libgit2BranchType = .all, includeUpstreamInfo: Bool = false) throws -> [Libgit2BranchInfo] {
         guard let ptr = pointer else {
             throw Libgit2Error.notARepository(path)
         }
@@ -63,7 +63,7 @@ extension Libgit2Repository {
             var upstream: String? = nil
             var aheadBehind: (ahead: Int, behind: Int)? = nil
 
-            if !isRemote {
+            if includeUpstreamInfo, !isRemote {
                 var upstreamRef: OpaquePointer?
                 if git_branch_upstream(&upstreamRef, reference) == 0, let ur = upstreamRef {
                     defer { git_reference_free(ur) }
@@ -98,6 +98,72 @@ extension Libgit2Repository {
         }
 
         return result
+    }
+
+    func shortOid(forReferenceFullName fullName: String) throws -> String {
+        guard let ptr = pointer else {
+            throw Libgit2Error.notARepository(path)
+        }
+
+        var oid = git_oid()
+        let err = git_reference_name_to_id(&oid, ptr, fullName)
+        guard err == 0 else {
+            throw Libgit2Error.from(err, context: "reference name to id")
+        }
+
+        var buffer = [CChar](repeating: 0, count: Int(GIT_OID_HEXSZ) + 1)
+        _ = buffer.withUnsafeMutableBufferPointer { buf in
+            git_oid_tostr(buf.baseAddress, buf.count, &oid)
+        }
+        let hex = String(cString: buffer)
+        return String(hex.prefix(7))
+    }
+
+    /// Calculate ahead/behind for the current HEAD's upstream (fast path).
+    /// Returns (0, 0) if HEAD is detached or no upstream is configured.
+    func headAheadBehind() throws -> (ahead: Int, behind: Int) {
+        guard let ptr = pointer else {
+            throw Libgit2Error.notARepository(path)
+        }
+
+        guard git_repository_head_detached(ptr) == 0 else {
+            return (0, 0)
+        }
+
+        var headRef: OpaquePointer?
+        let headError = git_repository_head(&headRef, ptr)
+        guard headError == 0, let head = headRef else {
+            return (0, 0)
+        }
+        defer { git_reference_free(head) }
+
+        var upstreamRef: OpaquePointer?
+        let upstreamError = git_branch_upstream(&upstreamRef, head)
+        guard upstreamError == 0, let upstream = upstreamRef else {
+            return (0, 0)
+        }
+        defer { git_reference_free(upstream) }
+
+        guard let headFullName = git_reference_name(head),
+              let upstreamFullName = git_reference_name(upstream) else {
+            return (0, 0)
+        }
+
+        var localOid = git_oid()
+        var upstreamOid = git_oid()
+
+        guard git_reference_name_to_id(&localOid, ptr, headFullName) == 0,
+              git_reference_name_to_id(&upstreamOid, ptr, upstreamFullName) == 0 else {
+            return (0, 0)
+        }
+
+        var ahead: Int = 0
+        var behind: Int = 0
+        guard git_graph_ahead_behind(&ahead, &behind, ptr, &localOid, &upstreamOid) == 0 else {
+            return (0, 0)
+        }
+
+        return (ahead, behind)
     }
 
     /// Create a new branch

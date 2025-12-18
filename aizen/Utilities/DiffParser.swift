@@ -10,32 +10,33 @@ import Foundation
 enum DiffParser {
     /// Parse unified diff output into DiffLine array
     static func parseUnifiedDiff(_ diffOutput: String) -> [DiffLine] {
-        var lines: [DiffLine] = []
+        var parsed: [DiffLine] = []
+        parsed.reserveCapacity(max(256, diffOutput.count / 48))
+
         var lineCounter = 0
         var oldLineNum = 0
         var newLineNum = 0
 
-        let diffLines = diffOutput.components(separatedBy: .newlines)
-
-        for line in diffLines {
+        diffOutput.enumerateLines { line, _ in
             if line.hasPrefix("@@") {
                 // Hunk header
-                let components = line.components(separatedBy: " ")
-                for component in components {
+                for component in line.split(separator: " ") {
                     if component.hasPrefix("-") && !component.hasPrefix("---") {
-                        let rangeStr = String(component.dropFirst())
-                        if let num = rangeStr.components(separatedBy: ",").first, let start = Int(num) {
+                        let rangeStr = component.dropFirst()
+                        if let numPart = rangeStr.split(separator: ",").first,
+                           let start = Int(numPart) {
                             oldLineNum = start - 1
                         }
                     } else if component.hasPrefix("+") && !component.hasPrefix("+++") {
-                        let rangeStr = String(component.dropFirst())
-                        if let num = rangeStr.components(separatedBy: ",").first, let start = Int(num) {
+                        let rangeStr = component.dropFirst()
+                        if let numPart = rangeStr.split(separator: ",").first,
+                           let start = Int(numPart) {
                             newLineNum = start - 1
                         }
                     }
                 }
 
-                lines.append(DiffLine(
+                parsed.append(DiffLine(
                     lineNumber: lineCounter,
                     oldLineNumber: nil,
                     newLineNumber: nil,
@@ -43,14 +44,18 @@ enum DiffParser {
                     type: .header
                 ))
                 lineCounter += 1
-            } else if line.hasPrefix("+++") || line.hasPrefix("---") ||
-                      line.hasPrefix("diff ") || line.hasPrefix("index ") {
+                return
+            }
+
+            if line.hasPrefix("+++") || line.hasPrefix("---") ||
+                line.hasPrefix("diff ") || line.hasPrefix("index ") {
                 // Skip file headers
-                continue
-            } else if line.hasPrefix("+") {
-                // Added line
+                return
+            }
+
+            if line.hasPrefix("+") {
                 newLineNum += 1
-                lines.append(DiffLine(
+                parsed.append(DiffLine(
                     lineNumber: lineCounter,
                     oldLineNumber: nil,
                     newLineNumber: String(newLineNum),
@@ -58,10 +63,12 @@ enum DiffParser {
                     type: .added
                 ))
                 lineCounter += 1
-            } else if line.hasPrefix("-") {
-                // Deleted line
+                return
+            }
+
+            if line.hasPrefix("-") {
                 oldLineNum += 1
-                lines.append(DiffLine(
+                parsed.append(DiffLine(
                     lineNumber: lineCounter,
                     oldLineNumber: String(oldLineNum),
                     newLineNumber: nil,
@@ -69,11 +76,13 @@ enum DiffParser {
                     type: .deleted
                 ))
                 lineCounter += 1
-            } else if line.hasPrefix(" ") {
-                // Context line
+                return
+            }
+
+            if line.hasPrefix(" ") {
                 oldLineNum += 1
                 newLineNum += 1
-                lines.append(DiffLine(
+                parsed.append(DiffLine(
                     lineNumber: lineCounter,
                     oldLineNumber: String(oldLineNum),
                     newLineNumber: String(newLineNum),
@@ -84,39 +93,58 @@ enum DiffParser {
             }
         }
 
-        return lines
+        return parsed
     }
 
     /// Split multi-file diff output by file path
     static func splitDiffByFile(_ diffOutput: String) -> [String: [DiffLine]] {
         var result: [String: [DiffLine]] = [:]
 
-        // Split by "diff --git" boundaries
-        let chunks = diffOutput.components(separatedBy: "\ndiff --git ")
+        var currentFilePath: String?
+        var currentChunkLines: [String] = []
+        currentChunkLines.reserveCapacity(256)
 
-        for (index, chunk) in chunks.enumerated() {
-            let diffChunk = index == 0 ? chunk : "diff --git " + chunk
-
-            // Skip if not a valid diff chunk
-            guard diffChunk.hasPrefix("diff --git ") else { continue }
-
-            // Extract file path from "+++ b/<path>" line - more reliable than diff --git line
-            var filePath: String?
-            for line in diffChunk.components(separatedBy: .newlines) {
-                if line.hasPrefix("+++ b/") {
-                    filePath = String(line.dropFirst(6))
-                    break
-                }
+        func flushCurrentChunk() {
+            guard let path = currentFilePath, !path.isEmpty, !currentChunkLines.isEmpty else {
+                currentFilePath = nil
+                currentChunkLines.removeAll(keepingCapacity: true)
+                return
             }
 
-            guard let path = filePath else { continue }
-
-            let lines = parseUnifiedDiff(diffChunk)
+            let chunkText = currentChunkLines.joined(separator: "\n")
+            let lines = parseUnifiedDiff(chunkText)
             if !lines.isEmpty {
                 result[path] = lines
             }
+
+            currentFilePath = nil
+            currentChunkLines.removeAll(keepingCapacity: true)
         }
 
+        diffOutput.enumerateLines { line, _ in
+            if line.hasPrefix("diff --git ") {
+                flushCurrentChunk()
+                currentChunkLines.append(line)
+                currentFilePath = parseFilePathFromDiffHeader(line)
+                return
+            }
+
+            guard currentFilePath != nil else { return }
+            currentChunkLines.append(line)
+        }
+
+        flushCurrentChunk()
         return result
+    }
+
+    private static func parseFilePathFromDiffHeader(_ line: String) -> String? {
+        // Format: "diff --git a/<path> b/<path>"
+        let parts = line.split(separator: " ")
+        guard parts.count >= 4 else { return nil }
+        let bPart = parts[3]
+        if bPart.hasPrefix("b/") {
+            return String(bPart.dropFirst(2))
+        }
+        return String(bPart)
     }
 }

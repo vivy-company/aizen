@@ -26,6 +26,7 @@ class GitRepositoryService: ObservableObject {
     private var statusReloadTask: Task<Void, Never>?
     private var isStatusReloadPending = false
     private let statusReloadDebounceInterval: TimeInterval = 0.3
+    private var inFlightStatusTask: Task<Void, Never>?
 
     init(worktreePath: String) {
         self.worktreePath = worktreePath
@@ -325,49 +326,26 @@ class GitRepositoryService: ObservableObject {
     // MARK: - Status Loading
 
     func reloadStatus() {
-        // If reload already pending, just mark that we need another one after
-        if isStatusReloadPending {
-            return
-        }
-        isStatusReloadPending = true
-
-        // Cancel any existing debounce task
-        statusReloadTask?.cancel()
-
-        statusReloadTask = Task.detached { [weak self] in
-            guard let self = self else { return }
-
-            // Debounce - wait before actually reloading
-            do {
-                try await Task.sleep(for: .seconds(self.statusReloadDebounceInterval))
-            } catch {
-                return  // Cancelled
-            }
-
-            guard !Task.isCancelled else { return }
-
-            // Clear pending flag on MainActor
-            await MainActor.run {
-                self.isStatusReloadPending = false
-            }
-
-            await self.reloadStatusInternal()
+        Task { @MainActor [weak self] in
+            self?.reloadStatusDebouncedOnMain()
         }
     }
 
     /// Force immediate status reload without debouncing (for use after operations)
     private func reloadStatusImmediate() {
-        Task.detached { [weak self] in
-            guard let self = self else { return }
-            await self.reloadStatusInternal()
+        Task { @MainActor [weak self] in
+            await self?.reloadStatusNowOnMain()
         }
     }
 
     func updateWorktreePath(_ newPath: String) {
-        guard newPath != worktreePath else { return }
-        worktreePath = newPath
-        currentStatus = .empty
-        reloadStatus()
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard newPath != self.worktreePath else { return }
+            self.worktreePath = newPath
+            self.currentStatus = .empty
+            self.reloadStatusDebouncedOnMain()
+        }
     }
 
     // MARK: - Private Methods
@@ -378,7 +356,7 @@ class GitRepositoryService: ObservableObject {
                 await MainActor.run { original?() }
                 return
             }
-            await self.reloadStatusInternal()
+            await self.reloadStatusNow()
             await MainActor.run {
                 original?()
             }
@@ -409,19 +387,12 @@ class GitRepositoryService: ObservableObject {
     }
 
     private func reloadStatusInternal() async {
-        do {
-            let status = try await loadGitStatus()
-            await MainActor.run {
-                self.currentStatus = status
-            }
-        } catch {
-            logger.error("Failed to reload Git status: \(error)")
-        }
+        await reloadStatusNow()
     }
 
     nonisolated
-    private func loadGitStatus() async throws -> GitStatus {
-        let detailedStatus = try await statusService.getDetailedStatus(at: worktreePath)
+    private func loadGitStatus(at path: String) async throws -> GitStatus {
+        let detailedStatus = try await statusService.getDetailedStatus(at: path)
 
         return GitStatus(
             stagedFiles: detailedStatus.stagedFiles,
@@ -434,5 +405,62 @@ class GitRepositoryService: ObservableObject {
             additions: detailedStatus.additions,
             deletions: detailedStatus.deletions
         )
+    }
+
+    private func reloadStatusNow() async {
+        let task = await MainActor.run { () -> Task<Void, Never>? in
+            statusReloadTask?.cancel()
+            isStatusReloadPending = false
+
+            let path = worktreePath
+
+            inFlightStatusTask?.cancel()
+            let task = Task(priority: .utility) { [weak self] in
+                guard let self else { return }
+                do {
+                    let status = try await self.loadGitStatus(at: path)
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        // Guard against path changes while loading (e.g. worktree switch).
+                        guard self.worktreePath == path else { return }
+                        self.currentStatus = status
+                    }
+                } catch {
+                    self.logger.error("Failed to reload Git status for \(path): \(error)")
+                }
+            }
+            inFlightStatusTask = task
+            return task
+        }
+        await task?.value
+    }
+
+    @MainActor
+    private func reloadStatusDebouncedOnMain() {
+        if isStatusReloadPending {
+            return
+        }
+        isStatusReloadPending = true
+
+        statusReloadTask?.cancel()
+        statusReloadTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(for: .seconds(self.statusReloadDebounceInterval))
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                self.isStatusReloadPending = false
+            }
+            await self.reloadStatusNow()
+        }
+    }
+
+    @MainActor
+    private func reloadStatusNowOnMain() async {
+        await reloadStatusNow()
     }
 }

@@ -35,7 +35,8 @@ struct WorktreeDetailView: View {
     @StateObject private var gitRepositoryService: GitRepositoryService
     @StateObject private var xcodeBuildManager = XcodeBuildManager()
     @StateObject private var tabConfig = TabConfigurationManager.shared
-    @State private var gitIndexWatcher: GitIndexWatcher?
+    @State private var gitIndexWatchToken: UUID?
+    @State private var gitIndexWatchPath: String?
     @State private var fileSearchWindowController: FileSearchWindowController?
     @State private var fileToOpenFromSearch: String?
     @State private var cachedTerminalBackgroundColor: Color?
@@ -503,7 +504,13 @@ struct WorktreeDetailView: View {
                 tabStateManager.saveSessionId(newValue, for: "files", worktreeId: worktreeId)
             }
             .onDisappear {
-                gitIndexWatcher?.stopWatching()
+                if let token = gitIndexWatchToken, let path = gitIndexWatchPath {
+                    Task {
+                        await GitIndexWatchCenter.shared.removeSubscriber(worktreePath: path, id: token)
+                    }
+                }
+                gitIndexWatchToken = nil
+                gitIndexWatchPath = nil
             }
     }
 
@@ -540,12 +547,20 @@ struct WorktreeDetailView: View {
         // Update service path and reload status
         gitRepositoryService.updateWorktreePath(worktreePath)
 
-        // Setup file system watcher (now a regular class, non-blocking)
-        let watcher = GitIndexWatcher(worktreePath: worktreePath)
-        watcher.startWatching { [weak gitRepositoryService] in
-            gitRepositoryService?.reloadStatus()
+        // Dedupe polling per worktree path
+        if let token = gitIndexWatchToken, let path = gitIndexWatchPath {
+            await GitIndexWatchCenter.shared.removeSubscriber(worktreePath: path, id: token)
+            gitIndexWatchToken = nil
+            gitIndexWatchPath = nil
         }
-        gitIndexWatcher = watcher
+
+        let token = await GitIndexWatchCenter.shared.addSubscriber(worktreePath: worktreePath) { [weak gitRepositoryService] in
+            Task { @MainActor in
+                gitRepositoryService?.reloadStatus()
+            }
+        }
+        gitIndexWatchToken = token
+        gitIndexWatchPath = worktreePath
     }
 
 

@@ -61,7 +61,10 @@ class GitDiffViewModel: ObservableObject {
                     if diffOutput == nil {
                         diffOutput = await self.runGitDiff(["diff", "--", file])
                     }
-                    lines = DiffParser.parseUnifiedDiff(diffOutput ?? "")
+                    // Parse off the main actor to avoid blocking UI on large diffs
+                    lines = await Task.detached(priority: .utility) {
+                        DiffParser.parseUnifiedDiff(diffOutput ?? "")
+                    }.value
                 }
 
                 guard !Task.isCancelled else { return }
@@ -122,7 +125,10 @@ class GitDiffViewModel: ObservableObject {
                     diffOutput = await runGitDiff(["diff"])
                 }
 
-                let parsedByFile = DiffParser.splitDiffByFile(diffOutput ?? "")
+                // Parse off the main actor to avoid blocking UI on large diffs
+                let parsedByFile = await Task.detached(priority: .utility) {
+                    DiffParser.splitDiffByFile(diffOutput ?? "")
+                }.value
 
                 for file in filesToLoad {
                     let lines = parsedByFile[file] ?? []

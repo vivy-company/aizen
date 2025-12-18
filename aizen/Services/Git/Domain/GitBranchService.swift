@@ -17,10 +17,10 @@ struct BranchInfo: Hashable, Identifiable {
 actor GitBranchService {
 
     func listBranches(at repoPath: String, includeRemote: Bool = true) async throws -> [BranchInfo] {
-        return try await Task.detached {
+        return try await Task.detached(priority: .utility) {
             let repo = try Libgit2Repository(path: repoPath)
             let type: Libgit2BranchType = includeRemote ? .all : .local
-            let branches = try repo.listBranches(type: type)
+            let branches = try repo.listBranches(type: type, includeUpstreamInfo: false)
 
             // Get commits for branches
             var result: [BranchInfo] = []
@@ -31,10 +31,7 @@ actor GitBranchService {
                 }
 
                 // Get short commit hash
-                var commit = ""
-                if let log = try? repo.log(limit: 1), let first = log.first {
-                    commit = first.shortOid
-                }
+                let commit = (try? repo.shortOid(forReferenceFullName: branch.fullName)) ?? ""
 
                 result.append(BranchInfo(
                     name: branch.name,

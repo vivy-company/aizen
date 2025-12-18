@@ -38,7 +38,7 @@ struct GitPanelWindowContent: View {
     @State private var commentPopoverFilePath: String?
     @State private var showAgentPicker: Bool = false
     @State private var cachedChangedFiles: [String] = []
-    @State private var gitIndexWatcher: GitIndexWatcher?
+    @State private var gitIndexWatchToken: UUID?
     @State private var diffReloadTask: Task<Void, Never>?
 
     @StateObject private var reviewManager = ReviewSessionManager()
@@ -93,8 +93,12 @@ struct GitPanelWindowContent: View {
             setupGitWatcher()
         }
         .onDisappear {
-            gitIndexWatcher?.stopWatching()
-            gitIndexWatcher = nil
+            if let token = gitIndexWatchToken {
+                Task {
+                    await GitIndexWatchCenter.shared.removeSubscriber(worktreePath: worktreePath, id: token)
+                }
+            }
+            gitIndexWatchToken = nil
         }
         .onChange(of: gitStatus) { _ in
             updateChangedFilesCache()
@@ -376,11 +380,17 @@ struct GitPanelWindowContent: View {
     // MARK: - Helper Methods
 
     private func setupGitWatcher() {
-        let watcher = GitIndexWatcher(worktreePath: worktreePath)
-        watcher.startWatching { [weak gitRepositoryService] in
-            gitRepositoryService?.reloadStatus()
+        guard gitIndexWatchToken == nil else { return }
+        Task {
+            let token = await GitIndexWatchCenter.shared.addSubscriber(worktreePath: worktreePath) { [weak gitRepositoryService] in
+                Task { @MainActor in
+                    gitRepositoryService?.reloadStatus()
+                }
+            }
+            await MainActor.run {
+                gitIndexWatchToken = token
+            }
         }
-        gitIndexWatcher = watcher
     }
 
     private func updateChangedFilesCache() {
