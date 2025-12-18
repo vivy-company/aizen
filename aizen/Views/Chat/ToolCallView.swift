@@ -266,41 +266,10 @@ struct ToolCallView: View {
             if toolCall.title.contains("/") || toolCall.title.contains(".") {
                 FileIconView(path: toolCall.title, size: 12)
             } else {
-                fallbackIcon
+                Image(systemName: toolCall.kind.symbolName)
             }
-        case .search:
-            Image(systemName: "magnifyingglass")
-        case .execute:
-            Image(systemName: "terminal")
-        case .think:
-            Image(systemName: "brain")
-        case .fetch:
-            Image(systemName: "arrow.down.circle")
-        case .switchMode:
-            Image(systemName: "arrow.left.arrow.right")
-        case .plan:
-            Image(systemName: "list.bullet.clipboard")
-        case .exitPlanMode:
-            Image(systemName: "checkmark.circle")
-        case .other:
-            Image(systemName: "wrench.and.screwdriver")
-        }
-    }
-
-    private var fallbackIcon: some View {
-        Group {
-            switch toolCall.kind {
-            case .read:
-                Image(systemName: "doc.text")
-            case .edit:
-                Image(systemName: "pencil")
-            case .delete:
-                Image(systemName: "trash")
-            case .move:
-                Image(systemName: "arrow.right.doc.on.clipboard")
-            default:
-                Image(systemName: "doc")
-            }
+        default:
+            Image(systemName: toolCall.kind.symbolName)
         }
     }
 

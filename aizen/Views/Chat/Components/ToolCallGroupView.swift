@@ -72,7 +72,7 @@ struct ToolCallGroupView: View {
         let kinds = Array(group.toolKinds.prefix(4))
         HStack(spacing: 4) {
             ForEach(kinds.sorted(by: { $0.rawValue < $1.rawValue }), id: \.rawValue) { kind in
-                ToolKindIcon(kind: kind)
+                Image(systemName: kind.symbolName)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .frame(width: 12, height: 12)
@@ -114,40 +114,5 @@ struct ToolCallGroupView: View {
 
     private var backgroundColor: Color {
         Color(.controlBackgroundColor).opacity(0.2)
-    }
-}
-
-// MARK: - Tool Kind Icon Helper
-
-struct ToolKindIcon: View {
-    let kind: ToolKind
-
-    var body: some View {
-        switch kind {
-        case .read:
-            Image(systemName: "doc.text")
-        case .edit:
-            Image(systemName: "pencil")
-        case .delete:
-            Image(systemName: "trash")
-        case .move:
-            Image(systemName: "arrow.right.doc.on.clipboard")
-        case .search:
-            Image(systemName: "magnifyingglass")
-        case .execute:
-            Image(systemName: "terminal")
-        case .think:
-            Image(systemName: "brain")
-        case .fetch:
-            Image(systemName: "arrow.down.circle")
-        case .switchMode:
-            Image(systemName: "arrow.left.arrow.right")
-        case .plan:
-            Image(systemName: "list.bullet.clipboard")
-        case .exitPlanMode:
-            Image(systemName: "checkmark.circle")
-        case .other:
-            Image(systemName: "wrench.and.screwdriver")
-        }
     }
 }
