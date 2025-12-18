@@ -46,44 +46,39 @@ struct BrowserTabView: View {
 
                 Divider()
 
-                // WebViews - render all sessions but only show active one
+                // WebView - only keep the active tab alive to avoid WKWebView-per-tab memory spikes
                 ZStack {
-                    ForEach(manager.sessions, id: \.id) { session in
-                        if let sessionId = session.id {
-                            let sessionURL = session.url ?? ""
-                            let isActive = sessionId == manager.activeSessionId
+                    if let sessionId = manager.activeSessionId,
+                       let session = manager.sessions.first(where: { $0.id == sessionId }) {
+                        let sessionURL = session.url ?? ""
 
-                            if !sessionURL.isEmpty {
-                                WebViewWrapper(
-                                    url: sessionURL,
-                                    canGoBack: $manager.canGoBack,
-                                    canGoForward: $manager.canGoForward,
-                                    onURLChange: { newURL in
-                                        manager.handleURLChange(sessionId: sessionId, url: newURL)
-                                    },
-                                    onTitleChange: { newTitle in
-                                        manager.handleTitleChange(sessionId: sessionId, title: newTitle)
-                                    },
-                                    isLoading: $manager.isLoading,
-                                    loadingProgress: $manager.loadingProgress,
-                                    onNewTab: { url in
-                                        manager.createSessionWithURL(url)
-                                    },
-                                    onWebViewCreated: { webView in
-                                        manager.registerWebView(webView, for: sessionId)
-                                    },
-                                    onLoadError: { error in
-                                        manager.handleLoadError(error)
-                                    }
-                                )
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .opacity(isActive ? 1 : 0)
-                                .allowsHitTesting(isActive)
-                                .id(sessionId)
-                            } else if isActive {
-                                // Show empty state for active tab with no URL
-                                emptyTabState
-                            }
+                        if !sessionURL.isEmpty {
+                            WebViewWrapper(
+                                url: sessionURL,
+                                canGoBack: $manager.canGoBack,
+                                canGoForward: $manager.canGoForward,
+                                onURLChange: { newURL in
+                                    manager.handleURLChange(sessionId: sessionId, url: newURL)
+                                },
+                                onTitleChange: { newTitle in
+                                    manager.handleTitleChange(sessionId: sessionId, title: newTitle)
+                                },
+                                isLoading: $manager.isLoading,
+                                loadingProgress: $manager.loadingProgress,
+                                onNewTab: { url in
+                                    manager.createSessionWithURL(url)
+                                },
+                                onWebViewCreated: { webView in
+                                    manager.registerActiveWebView(webView, for: sessionId)
+                                },
+                                onLoadError: { error in
+                                    manager.handleLoadError(error)
+                                }
+                            )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .id(sessionId)
+                        } else {
+                            emptyTabState
                         }
                     }
 

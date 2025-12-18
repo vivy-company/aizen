@@ -20,6 +20,7 @@ class FileSearchViewModel: ObservableObject {
     private let worktreePath: String
     private var allResults: [FileSearchIndexResult] = []
     private var cancellables = Set<AnyCancellable>()
+    private var searchTask: Task<Void, Never>?
 
     init(worktreePath: String) {
         self.worktreePath = worktreePath
@@ -28,7 +29,7 @@ class FileSearchViewModel: ObservableObject {
 
     private func setupSearchDebounce() {
         $searchQuery
-            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(120), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.performSearch()
             }
@@ -40,6 +41,7 @@ class FileSearchViewModel: ObservableObject {
         guard !isIndexing else { return }
 
         isIndexing = true
+        searchTask?.cancel()
 
         Task {
             do {
@@ -48,7 +50,8 @@ class FileSearchViewModel: ObservableObject {
                 let initialResults = await searchService.search(
                     query: "",
                     in: allResults,
-                    worktreePath: worktreePath
+                    worktreePath: worktreePath,
+                    limit: 50
                 )
                 results = mapToDisplayResults(initialResults)
                 isIndexing = false
@@ -61,15 +64,23 @@ class FileSearchViewModel: ObservableObject {
 
     // Perform search (debouncing handled by Combine in init)
     func performSearch() {
-        Task {
-            let searchResults = await searchService.search(
-                query: searchQuery,
-                in: allResults,
-                worktreePath: worktreePath
+        searchTask?.cancel()
+        let query = searchQuery
+        let snapshot = allResults
+        let path = worktreePath
+
+        searchTask = Task { [weak self] in
+            guard let self else { return }
+            let searchResults = await self.searchService.search(
+                query: query,
+                in: snapshot,
+                worktreePath: path,
+                limit: 50
             )
 
-            // Update results on main thread
-            self.results = Array(mapToDisplayResults(searchResults).prefix(50))
+            guard !Task.isCancelled else { return }
+            guard query == self.searchQuery else { return }
+            self.results = self.mapToDisplayResults(searchResults)
             self.selectedIndex = 0
         }
     }

@@ -226,7 +226,16 @@ class FileBrowserViewModel: ObservableObject {
 
         // Load file content
         let fileURL = URL(fileURLWithPath: path)
+        let maxOpenFileBytes = 5 * 1024 * 1024
+        if let size = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize,
+           size > maxOpenFileBytes {
+            let mb = Double(size) / 1024.0 / 1024.0
+            ToastManager.shared.show(String(format: "File too large to open (%.1f MB). Open in external editor.", mb), type: .info)
+            return
+        }
+
         guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else {
+            ToastManager.shared.show("Unable to open file (not UTF-8 text).", type: .info)
             return
         }
 

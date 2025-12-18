@@ -9,7 +9,6 @@ class BrowserSessionManager: ObservableObject {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "BrowserSession")
     @Published var sessions: [BrowserSession] = []
     @Published var activeSessionId: UUID?
-    @Published var webViews: [UUID: WKWebView] = [:]
 
     // WebView state bindings
     @Published var canGoBack: Bool = false
@@ -23,6 +22,7 @@ class BrowserSessionManager: ObservableObject {
     private let viewContext: NSManagedObjectContext
     private let worktree: Worktree
     private var saveTask: Task<Void, Never>?
+    private var activeWebView: WKWebView?
 
     init(viewContext: NSManagedObjectContext, worktree: Worktree) {
         self.viewContext = viewContext
@@ -97,8 +97,10 @@ class BrowserSessionManager: ObservableObject {
     func closeSession(_ sessionId: UUID) {
         guard let session = sessions.first(where: { $0.id == sessionId }) else { return }
 
-        // Remove webview
-        webViews.removeValue(forKey: sessionId)
+        // If this tab is currently active, drop the active webview reference so it can deallocate.
+        if activeSessionId == sessionId {
+            activeWebView = nil
+        }
 
         // Check if we need to switch to another tab BEFORE deleting
         let needsNewActiveTab = activeSessionId == sessionId
@@ -140,16 +142,11 @@ class BrowserSessionManager: ObservableObject {
         currentURL = session.url ?? ""
         pageTitle = session.title ?? ""
 
-        // Update webview state if exists
-        if let webView = webViews[sessionId] {
-            canGoBack = webView.canGoBack
-            canGoForward = webView.canGoForward
-            isLoading = webView.isLoading
-        } else {
-            canGoBack = false
-            canGoForward = false
-            isLoading = false
-        }
+        // New tab selection creates a new WKWebView; reset state until the view is ready.
+        activeWebView = nil
+        canGoBack = false
+        canGoForward = false
+        isLoading = false
     }
 
     func handleURLChange(sessionId: UUID, url: String) {
@@ -221,28 +218,20 @@ class BrowserSessionManager: ObservableObject {
     }
 
     func goBack() {
-        guard let sessionId = activeSessionId,
-              let webView = webViews[sessionId] else { return }
-
-        webView.goBack()
+        activeWebView?.goBack()
     }
 
     func goForward() {
-        guard let sessionId = activeSessionId,
-              let webView = webViews[sessionId] else { return }
-
-        webView.goForward()
+        activeWebView?.goForward()
     }
 
     func reload() {
-        guard let sessionId = activeSessionId,
-              let webView = webViews[sessionId] else { return }
-
-        webView.reload()
+        activeWebView?.reload()
     }
 
-    func registerWebView(_ webView: WKWebView, for sessionId: UUID) {
-        webViews[sessionId] = webView
+    func registerActiveWebView(_ webView: WKWebView, for sessionId: UUID) {
+        guard activeSessionId == sessionId else { return }
+        activeWebView = webView
     }
 
     // MARK: - Computed Properties

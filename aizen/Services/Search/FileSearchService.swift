@@ -8,21 +8,26 @@
 import Foundation
 
 struct FileSearchIndexResult: Identifiable, Sendable {
-    let path: String
+    let basePath: String
     let relativePath: String
     let isDirectory: Bool
     var matchScore: Double = 0
 
-    var id: String { path }
+    var path: String {
+        (basePath as NSString).appendingPathComponent(relativePath)
+    }
+
+    var id: String { relativePath }
 }
 
 actor FileSearchService {
     static let shared = FileSearchService()
 
     private var cachedResults: [String: [FileSearchIndexResult]] = [:]
+    private var cacheOrder: [String] = []
+    private let maxCachedDirectories = 4
     private var recentFiles: [String: [String]] = [:]
     private let maxRecentFiles = 10
-    private var gitignorePatterns: [String] = []
 
     private init() {}
 
@@ -30,15 +35,24 @@ actor FileSearchService {
     func indexDirectory(_ path: String) async throws -> [FileSearchIndexResult] {
         // Check cache first
         if let cached = cachedResults[path] {
+            touchCacheKey(path)
             return cached
         }
 
-        // Load gitignore patterns and index manually
-        await loadGitignorePatterns(at: path)
-        let results = await indexDirectoryManually(path)
+        let results: [FileSearchIndexResult]
+
+        // Prefer git-aware indexing for speed + correctness (respects .gitignore).
+        if FileManager.default.fileExists(atPath: (path as NSString).appendingPathComponent(".git")),
+           let gitResults = await indexDirectoryWithGitLsFiles(path) {
+            results = gitResults
+        } else {
+            results = await indexDirectoryManually(path)
+        }
 
         // Cache results
         cachedResults[path] = results
+        touchCacheKey(path)
+        evictCacheIfNeeded()
         return results
     }
 
@@ -46,6 +60,7 @@ actor FileSearchService {
     private func indexDirectoryManually(_ path: String) async -> [FileSearchIndexResult] {
         var results: [FileSearchIndexResult] = []
         let fileManager = FileManager.default
+        let gitignorePatterns = loadGitignorePatterns(at: path)
 
         guard let enumerator = fileManager.enumerator(
             at: URL(fileURLWithPath: path),
@@ -70,7 +85,7 @@ actor FileSearchService {
             if isDirectory {
                 let dirName = fileURL.lastPathComponent
                 let dirRelativePath = fileURL.path.replacingOccurrences(of: basePath + "/", with: "")
-                if matchesGitignore(dirRelativePath) || matchesGitignore(dirName) {
+                if matchesGitignore(dirRelativePath, patterns: gitignorePatterns) || matchesGitignore(dirName, patterns: gitignorePatterns) {
                     enumerator.skipDescendants()
                 }
                 continue
@@ -81,12 +96,12 @@ actor FileSearchService {
             let relativePath = fullPath.replacingOccurrences(of: basePath + "/", with: "")
 
             // Skip if matches gitignore patterns
-            if matchesGitignore(relativePath) || matchesGitignore(fileName) {
+            if matchesGitignore(relativePath, patterns: gitignorePatterns) || matchesGitignore(fileName, patterns: gitignorePatterns) {
                 continue
             }
 
             let result = FileSearchIndexResult(
-                path: fullPath,
+                basePath: basePath,
                 relativePath: relativePath,
                 isDirectory: false
             )
@@ -96,10 +111,35 @@ actor FileSearchService {
         return results
     }
 
-    // Load gitignore patterns from .gitignore file
-    private func loadGitignorePatterns(at path: String) async {
+    private func indexDirectoryWithGitLsFiles(_ path: String) async -> [FileSearchIndexResult]? {
+        do {
+            let result = try await ProcessExecutor.shared.executeWithOutput(
+                executable: "/usr/bin/git",
+                arguments: ["-C", path, "ls-files", "--cached", "--others", "--exclude-standard"]
+            )
+
+            guard result.succeeded else { return nil }
+
+            let basePath = path
+            var items: [FileSearchIndexResult] = []
+            items.reserveCapacity(min(50_000, max(128, result.stdout.count / 48)))
+
+            result.stdout.enumerateLines { line, _ in
+                let rel = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !rel.isEmpty else { return }
+                items.append(FileSearchIndexResult(basePath: basePath, relativePath: rel, isDirectory: false))
+            }
+
+            return items
+        } catch {
+            return nil
+        }
+    }
+
+    // Load gitignore patterns from .gitignore file (manual indexing fallback)
+    private func loadGitignorePatterns(at path: String) -> [String] {
         // Start with common patterns that should always be ignored
-        gitignorePatterns = [
+        var gitignorePatterns: [String] = [
             ".git",
             "node_modules",
             ".build",
@@ -133,13 +173,15 @@ actor FileSearchService {
 
             gitignorePatterns.append(contentsOf: filePatterns)
         }
+
+        return gitignorePatterns
     }
 
     // Check if path matches gitignore patterns - simplified matching
-    private func matchesGitignore(_ path: String) -> Bool {
+    private func matchesGitignore(_ path: String, patterns: [String]) -> Bool {
         let pathComponents = path.components(separatedBy: "/")
 
-        for pattern in gitignorePatterns {
+        for pattern in patterns {
             var cleanPattern = pattern
                 .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
@@ -167,22 +209,21 @@ actor FileSearchService {
     }
 
     // Fuzzy search with scoring
-    func search(query: String, in results: [FileSearchIndexResult], worktreePath: String) async -> [FileSearchIndexResult] {
+    func search(query: String, in results: [FileSearchIndexResult], worktreePath: String, limit: Int = 200) async -> [FileSearchIndexResult] {
         guard !query.isEmpty else {
             // Return recent files when query is empty, or all results if no recent files
             let recent = getRecentFileResults(for: worktreePath, from: results)
-            return recent.isEmpty ? results : recent
+            if !recent.isEmpty { return Array(recent.prefix(limit)) }
+            return Array(results.prefix(limit))
         }
 
         let lowercaseQuery = query.lowercased()
         var scoredResults: [FileSearchIndexResult] = []
+        scoredResults.reserveCapacity(min(limit * 4, 1000))
 
         for var result in results {
-            let fileName = result.path
-                .split(separator: "/")
-                .last
-                .map { String($0).lowercased() } ?? ""
             let relativePath = result.relativePath.lowercased()
+            let fileName = lastPathComponentLowercased(relativePath)
 
             // Score filename match (higher weight)
             let fileNameScore = fuzzyMatch(query: lowercaseQuery, target: fileName)
@@ -195,10 +236,17 @@ actor FileSearchService {
                 result.matchScore = totalScore
                 scoredResults.append(result)
             }
+
+            // Keep memory and sort cost bounded for very large repos.
+            if scoredResults.count >= max(limit * 6, 600) {
+                scoredResults.sort { $0.matchScore > $1.matchScore }
+                scoredResults = Array(scoredResults.prefix(limit))
+            }
         }
 
         // Sort by score (higher is better)
-        return scoredResults.sorted { $0.matchScore > $1.matchScore }
+        scoredResults.sort { $0.matchScore > $1.matchScore }
+        return Array(scoredResults.prefix(limit))
     }
 
     // Track recently opened files
@@ -228,16 +276,39 @@ actor FileSearchService {
     // Clear cache for specific path
     func clearCache(for path: String) {
         cachedResults.removeValue(forKey: path)
+        cacheOrder.removeAll { $0 == path }
         recentFiles.removeValue(forKey: path)
     }
 
     // Clear all caches
     func clearAllCaches() {
         cachedResults.removeAll()
+        cacheOrder.removeAll()
         recentFiles.removeAll()
     }
 
     // MARK: - Private Helpers
+
+    private func touchCacheKey(_ key: String) {
+        cacheOrder.removeAll { $0 == key }
+        cacheOrder.append(key)
+    }
+
+    private func evictCacheIfNeeded() {
+        while cacheOrder.count > maxCachedDirectories {
+            guard let evictKey = cacheOrder.first else { break }
+            cacheOrder.removeFirst()
+            cachedResults.removeValue(forKey: evictKey)
+            recentFiles.removeValue(forKey: evictKey)
+        }
+    }
+
+    private func lastPathComponentLowercased(_ path: String) -> String {
+        if let slash = path.lastIndex(of: "/") {
+            return String(path[path.index(after: slash)...])
+        }
+        return path
+    }
 
     // Fuzzy matching algorithm with scoring
     private func fuzzyMatch(query: String, target: String) -> Double {
@@ -258,14 +329,16 @@ actor FileSearchService {
             return 500.0 + Double(query.count)
         }
 
-        // Fuzzy matching
-        for (targetIndex, targetChar) in target.enumerated() {
+        // Fuzzy matching (avoid O(n^2) String indexing)
+        var targetIndex = target.startIndex
+        while targetIndex < target.endIndex {
+            let targetChar = target[targetIndex]
             if queryIndex < query.endIndex && targetChar == query[queryIndex] {
                 // Base score for match
                 score += 10.0
 
                 // Bonus for consecutive matches
-                if let last = lastMatchIndex, target.index(after: last) == target.index(target.startIndex, offsetBy: targetIndex) {
+                if let last = lastMatchIndex, target.index(after: last) == targetIndex {
                     consecutiveMatches += 1
                     score += Double(consecutiveMatches) * 5.0
                 } else {
@@ -273,18 +346,22 @@ actor FileSearchService {
                 }
 
                 // Bonus for matching start of word
-                if targetIndex == 0 || target[target.index(target.startIndex, offsetBy: targetIndex - 1)] == "/" || target[target.index(target.startIndex, offsetBy: targetIndex - 1)] == "." {
+                if targetIndex == target.startIndex {
                     score += 15.0
+                } else {
+                    let prev = target[target.index(before: targetIndex)]
+                    if prev == "/" || prev == "." {
+                        score += 15.0
+                    }
                 }
 
-                // Bonus for uppercase match (camelCase)
-                if targetChar.isUppercase {
-                    score += 10.0
-                }
+                // Uppercase bonus intentionally omitted here; the target is lowercased for speed.
 
-                lastMatchIndex = target.index(target.startIndex, offsetBy: targetIndex)
+                lastMatchIndex = targetIndex
                 queryIndex = query.index(after: queryIndex)
             }
+
+            targetIndex = target.index(after: targetIndex)
         }
 
         // Check if all query characters were matched

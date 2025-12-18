@@ -278,6 +278,9 @@ struct WebViewWrapper: NSViewRepresentable {
     static func dismantleNSView(_ nsView: NSView, coordinator: WebViewCoordinator) {
         // Find WKWebView in container and remove all observers
         if let webView = nsView.subviews.first(where: { $0 is WKWebView }) as? WKWebView {
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.uiDelegate = nil
             webView.removeObserver(coordinator, forKeyPath: "estimatedProgress")
             webView.removeObserver(coordinator, forKeyPath: "URL")
             webView.removeObserver(coordinator, forKeyPath: "title")

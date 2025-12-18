@@ -169,7 +169,7 @@ class UnifiedAutocompleteHandler: ObservableObject {
             if fileIndex.isEmpty && !worktreePath.isEmpty {
                 await indexWorktree(forceRefresh: true)
             }
-            let results = await fileSearchService.search(query: query, in: fileIndex, worktreePath: worktreePath)
+            let results = await fileSearchService.search(query: query, in: fileIndex, worktreePath: worktreePath, limit: 20)
             newItems = results.prefix(10).map { .file($0) }
 
         case .command(let query):
