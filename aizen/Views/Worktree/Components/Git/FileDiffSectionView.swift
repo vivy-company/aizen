@@ -163,7 +163,7 @@ struct FileDiffSectionView: View {
         HStack(spacing: 8) {
             Image(systemName: "doc.text")
                 .foregroundStyle(.secondary)
-            Text("No changes")
+            Text(String(localized: "git.diff.noChanges"))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
@@ -174,7 +174,7 @@ struct FileDiffSectionView: View {
         HStack(spacing: 8) {
             ProgressView()
                 .scaleEffect(0.7)
-            Text("Loading diff...")
+            Text(String(localized: "git.diff.loading"))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }

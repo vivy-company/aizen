@@ -25,7 +25,7 @@ struct GitSidebarHeader: View {
 
             Spacer()
 
-            Button(hasUnstagedChanges ? "Stage All" : "Unstage All") {
+            Button(hasUnstagedChanges ? String(localized: "git.sidebar.stageAll") : String(localized: "git.sidebar.unstageAll")) {
                 if hasUnstagedChanges {
                     onStageAll({})
                 } else {
@@ -40,14 +40,14 @@ struct GitSidebarHeader: View {
                 Button {
                     showDiscardConfirmation = true
                 } label: {
-                    Label("Discard All Changes", systemImage: "arrow.uturn.backward")
+                    Label(String(localized: "git.sidebar.discardAll"), systemImage: "arrow.uturn.backward")
                 }
                 .disabled(gitStatus.stagedFiles.isEmpty && gitStatus.modifiedFiles.isEmpty)
 
                 Button {
                     showCleanConfirmation = true
                 } label: {
-                    Label("Remove Untracked Files", systemImage: "trash")
+                    Label(String(localized: "git.sidebar.removeUntracked"), systemImage: "trash")
                 }
                 .disabled(gitStatus.untrackedFiles.isEmpty)
             } label: {
@@ -62,26 +62,32 @@ struct GitSidebarHeader: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 44)
-        .alert("Discard All Changes?", isPresented: $showDiscardConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Discard", role: .destructive) {
+        .alert(String(localized: "git.sidebar.discardAllTitle"), isPresented: $showDiscardConfirmation) {
+            Button(String(localized: "general.cancel"), role: .cancel) {}
+            Button(String(localized: "git.sidebar.discard"), role: .destructive) {
                 onDiscardAll()
             }
         } message: {
-            Text("This will reset all staged and modified files to HEAD. This cannot be undone.")
+            Text(String(localized: "git.sidebar.discardAllMessage"))
         }
-        .alert("Remove Untracked Files?", isPresented: $showCleanConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Remove", role: .destructive) {
+        .alert(String(localized: "git.sidebar.removeUntrackedTitle"), isPresented: $showCleanConfirmation) {
+            Button(String(localized: "general.cancel"), role: .cancel) {}
+            Button(String(localized: "git.sidebar.remove"), role: .destructive) {
                 onCleanUntracked()
             }
         } message: {
-            Text("This will permanently delete \(gitStatus.untrackedFiles.count) untracked file(s). This cannot be undone.")
+            Text(String(localized: "git.sidebar.removeUntrackedMessage \(gitStatus.untrackedFiles.count)"))
         }
     }
 
     private var headerTitle: String {
         let total = gitStatus.stagedFiles.count + gitStatus.modifiedFiles.count + gitStatus.untrackedFiles.count
-        return total == 0 ? "No Changes" : "\(total) Change\(total == 1 ? "" : "s")"
+        if total == 0 {
+            return String(localized: "git.sidebar.noChanges")
+        } else if total == 1 {
+            return String(localized: "git.sidebar.changesSingular")
+        } else {
+            return String(localized: "git.sidebar.changes \(total)")
+        }
     }
 }

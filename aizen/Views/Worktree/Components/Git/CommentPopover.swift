@@ -39,7 +39,7 @@ struct CommentPopover: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
             HStack {
-                Text(existingComment != nil ? "Edit Comment" : "Add Comment")
+                Text(existingComment != nil ? String(localized: "git.comment.edit") : String(localized: "git.comment.add"))
                     .font(.system(size: 13, weight: .semibold))
 
                 Spacer()
@@ -93,12 +93,12 @@ struct CommentPopover: View {
 
                 Spacer()
 
-                Button("Cancel") {
+                Button(String(localized: "general.cancel")) {
                     onCancel()
                 }
                 .keyboardShortcut(.escape, modifiers: [])
 
-                Button("Save") {
+                Button(String(localized: "general.save")) {
                     guard !commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
                     onSave(commentText.trimmingCharacters(in: .whitespacesAndNewlines))
                 }

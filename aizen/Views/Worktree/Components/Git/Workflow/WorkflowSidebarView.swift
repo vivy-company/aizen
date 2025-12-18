@@ -72,7 +72,7 @@ struct WorkflowSidebarView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .buttonStyle(.borderless)
-            .help("Refresh")
+            .help(String(localized: "general.refresh"))
         }
         .frame(height: 44)
         .padding(.horizontal, 12)
@@ -82,7 +82,7 @@ struct WorkflowSidebarView: View {
 
     private var workflowsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Workflows")
+            Text(String(localized: "git.workflow.title"))
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
@@ -91,7 +91,7 @@ struct WorkflowSidebarView: View {
                 HStack(spacing: 6) {
                     ProgressView()
                         .controlSize(.mini)
-                    Text("Loading...")
+                    Text(String(localized: "general.loading"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -101,7 +101,7 @@ struct WorkflowSidebarView: View {
                 HStack {
                     Image(systemName: "doc.badge.gearshape")
                         .foregroundStyle(.tertiary)
-                    Text("No workflows found")
+                    Text(String(localized: "git.workflow.noWorkflows"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -124,7 +124,7 @@ struct WorkflowSidebarView: View {
 
     private var runsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Recent Runs")
+            Text(String(localized: "git.workflow.recentRuns"))
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
@@ -133,7 +133,7 @@ struct WorkflowSidebarView: View {
                 HStack(spacing: 6) {
                     ProgressView()
                         .controlSize(.mini)
-                    Text("Loading...")
+                    Text(String(localized: "general.loading"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -143,7 +143,7 @@ struct WorkflowSidebarView: View {
                 HStack {
                     Image(systemName: "clock.badge.questionmark")
                         .foregroundStyle(.tertiary)
-                    Text("No runs found")
+                    Text(String(localized: "git.workflow.noRuns"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -176,7 +176,7 @@ struct WorkflowSidebarView: View {
         VStack(spacing: 8) {
             ProgressView()
                 .controlSize(.small)
-            Text("Checking CLI...")
+            Text(String(localized: "git.workflow.checkingCLI"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -189,11 +189,11 @@ struct WorkflowSidebarView: View {
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
 
-            Text("No CI/CD Provider")
+            Text(String(localized: "git.workflow.noProvider"))
                 .font(.subheadline)
                 .fontWeight(.medium)
 
-            Text("Add workflow files to get started")
+            Text(String(localized: "git.workflow.addFiles"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -207,7 +207,7 @@ struct WorkflowSidebarView: View {
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
 
-            Text("\(service.provider.cliCommand) Not Installed")
+            Text(String(localized: "git.workflow.cliNotInstalled \(service.provider.cliCommand)"))
                 .font(.subheadline)
                 .fontWeight(.medium)
 
@@ -227,7 +227,7 @@ struct WorkflowSidebarView: View {
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
 
-            Text("Not Authenticated")
+            Text(String(localized: "git.workflow.notAuthenticated"))
                 .font(.subheadline)
                 .fontWeight(.medium)
 
@@ -325,13 +325,13 @@ struct WorkflowSidebarRow: View {
                         .onChanged { _ in isButtonPressed = true }
                         .onEnded { _ in isButtonPressed = false }
                 )
-                .help("Run workflow")
+                .help(String(localized: "git.workflow.run"))
             } else {
                 Image(systemName: "pause.circle")
                     .font(.system(size: 16))
                     .foregroundStyle(.tertiary)
                     .frame(width: 32, height: 32)
-                    .help("Workflow is disabled")
+                    .help(String(localized: "git.workflow.disabled"))
             }
         }
         .padding(.horizontal, 10)
@@ -396,56 +396,58 @@ struct RunSidebarRow: View {
     @State private var isHovered: Bool = false
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 8) {
-                // Status icon
-                statusIcon
-                    .frame(width: 14)
+        HStack(spacing: 8) {
+            // Status icon
+            statusIcon
+                .frame(width: 14)
 
-                // Run info
-                VStack(alignment: .leading, spacing: 1) {
-                    HStack(spacing: 4) {
-                        Text("#\(run.runNumber)")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            // Run info
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text("#\(run.runNumber)")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
 
-                        Text(run.workflowName)
-                            .font(.system(size: 11))
-                            .lineLimit(1)
-                    }
-
-                    HStack(spacing: 4) {
-                        Text(run.commit)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-
-                        if let startedAt = run.startedAt {
-                            Text(relativeTime(from: startedAt))
-                                .font(.system(size: 10))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
+                    Text(run.workflowName)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
                 }
 
-                Spacer()
+                HStack(spacing: 4) {
+                    Text(run.commit)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.tertiary)
 
-                // Cancel button
-                if run.isInProgress && isHovered {
-                    Button {
-                        onCancel()
-                    } label: {
-                        Image(systemName: "stop.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.red)
+                    if let startedAt = run.startedAt {
+                        Text(relativeTime(from: startedAt))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
                     }
-                    .buttonStyle(.borderless)
-                    .help("Cancel run")
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .modifier(SelectableRowModifier(isSelected: isSelected, isHovered: isHovered))
+
+            Spacer()
+
+            // Cancel button
+            if run.isInProgress && isHovered {
+                Button {
+                    onCancel()
+                } label: {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.borderless)
+                .help(String(localized: "git.workflow.cancelRun"))
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .modifier(SelectableRowModifier(isSelected: isSelected, isHovered: isHovered))
+        .onTapGesture {
+            onSelect()
+        }
         .onHover { hovering in
             isHovered = hovering
         }

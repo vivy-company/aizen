@@ -138,7 +138,7 @@ struct GitPanelWindowContentWithToolbar: View {
              ToolbarItem(placement: .navigation) {
                     Picker("", selection: $selectedTab) {
                         ForEach(GitPanelTab.allCases, id: \.self) { tab in
-                            Label(tab.rawValue, systemImage: tab.icon).tag(tab)
+                            Label(tab.displayName, systemImage: tab.icon).tag(tab)
                         }
                     }
                     .pickerStyle(.segmented)

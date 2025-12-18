@@ -28,7 +28,7 @@ struct BranchSelectorView: View {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
 
-                    TextField(allowCreation ? "Search or create new one" : "Search branches", text: $searchText)
+                    TextField(allowCreation ? String(localized: "git.branch.searchOrCreate") : String(localized: "git.branch.search"), text: $searchText)
                         .textFieldStyle(.plain)
                         .onSubmit {
                             if allowCreation && !searchText.isEmpty && filteredBranches.isEmpty {
@@ -69,7 +69,7 @@ struct BranchSelectorView: View {
                 VStack(spacing: 12) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("Loading branches...")
+                    Text(String(localized: "git.branch.loading"))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -91,7 +91,7 @@ struct BranchSelectorView: View {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 24))
                         .foregroundStyle(.tertiary)
-                    Text(searchText.isEmpty ? "No branches found" : "No branches match '\(searchText)'")
+                    Text(searchText.isEmpty ? String(localized: "git.branch.noBranches") : String(localized: "git.branch.noMatch \(searchText)"))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -101,7 +101,7 @@ struct BranchSelectorView: View {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         // Count label
                         HStack {
-                            Text("\(filteredBranches.count) branches")
+                            Text(String(localized: "git.branch.count \(filteredBranches.count)"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -124,7 +124,7 @@ struct BranchSelectorView: View {
                                         .font(.system(size: 12))
                                         .foregroundStyle(Color.accentColor)
 
-                                    Text("Create branch: \(searchText)")
+                                    Text(String(localized: "git.branch.create \(searchText)"))
                                         .font(.system(size: 12))
                                         .foregroundStyle(.primary)
 
@@ -143,7 +143,7 @@ struct BranchSelectorView: View {
                                     displayedCount = min(displayedCount + pageSize, filteredBranches.count)
                                 }
                             } label: {
-                                Text("Load more (\(filteredBranches.count - displayedCount) remaining)")
+                                Text(String(localized: "git.branch.loadMore \(filteredBranches.count - displayedCount)"))
                                     .font(.caption)
                                     .foregroundStyle(Color.accentColor)
                                     .padding(.vertical, 12)
@@ -220,7 +220,7 @@ struct BranchSelectorView: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Failed to load branches: \(error.localizedDescription)"
+                    errorMessage = String(localized: "git.branch.loadFailed \(error.localizedDescription)")
                     isLoading = false
                 }
             }

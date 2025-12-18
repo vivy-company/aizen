@@ -14,7 +14,7 @@ struct GitCommitSection: View {
             // Commit message
             ZStack(alignment: .topLeading) {
                 if commitMessage.isEmpty {
-                    Text("Enter commit message")
+                    Text(String(localized: "git.commit.placeholder"))
                         .font(.system(size: 12))
                         .foregroundStyle(.tertiary)
                         .padding(.leading, 8)
@@ -44,7 +44,7 @@ struct GitCommitSection: View {
                 onCommit(commitMessage)
                 commitMessage = ""
             } label: {
-                Text("Commit")
+                Text(String(localized: "git.commit.button"))
                     .font(.system(size: 12, weight: .medium))
                     .frame(maxWidth: .infinity)
                     .frame(height: 32)
@@ -61,16 +61,16 @@ struct GitCommitSection: View {
 
             // Dropdown menu
             Menu {
-                Button("Commit All") {
+                Button(String(localized: "git.commit.commitAll")) {
                     commitAllAction()
                 }
                 Divider()
-                Button("Amend Last Commit") {
+                Button(String(localized: "git.commit.amend")) {
                     onAmendCommit(commitMessage)
                     commitMessage = ""
                 }
                 .disabled(gitStatus.stagedFiles.isEmpty)
-                Button("Commit with Sign-off") {
+                Button(String(localized: "git.commit.signoff")) {
                     onCommitWithSignoff(commitMessage)
                     commitMessage = ""
                 }

@@ -66,7 +66,7 @@ struct SendToAgentSheet: View {
 
     private var header: some View {
         HStack {
-            Text("Send to Agent")
+            Text(String(localized: "git.sendToAgent.title"))
                 .font(.system(size: 14, weight: .semibold))
             Spacer()
             Button {
@@ -86,7 +86,7 @@ struct SendToAgentSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 // Existing chats section
                 if !chatSessions.isEmpty {
-                    sectionHeader("Active Chats")
+                    sectionHeader(String(localized: "git.sendToAgent.activeChats"))
 
                     ForEach(chatSessions, id: \.id) { session in
                         chatSessionRow(session)
@@ -94,7 +94,7 @@ struct SendToAgentSheet: View {
                 }
 
                 // New chat section
-                sectionHeader("Start New Chat")
+                sectionHeader(String(localized: "git.sendToAgent.startNewChat"))
 
                 ForEach(availableAgents, id: \.name) { agent in
                     newChatRow(agent)
@@ -123,7 +123,7 @@ struct SendToAgentSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(session.title ?? "Chat")
+                    Text(session.title ?? String(localized: "git.sendToAgent.chat"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.primary)
 
@@ -158,11 +158,11 @@ struct SendToAgentSheet: View {
                 AgentIconView(agent: agent.id, size: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("New \(agent.name) Chat")
+                    Text(String(localized: "git.sendToAgent.newChat \(agent.name)"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.primary)
 
-                    Text("Start a new conversation")
+                    Text(String(localized: "git.sendToAgent.startNewConversation"))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
@@ -183,14 +183,14 @@ struct SendToAgentSheet: View {
 
     private var footer: some View {
         HStack {
-            Button("Cancel") {
+            Button(String(localized: "general.cancel")) {
                 onDismiss()
             }
             .keyboardShortcut(.escape, modifiers: [])
 
             Spacer()
 
-            Button("Send") {
+            Button(String(localized: "git.sendToAgent.send")) {
                 sendToAgent()
             }
             .keyboardShortcut(.return, modifiers: .command)

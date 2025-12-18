@@ -28,7 +28,7 @@ struct GitFileList: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.tertiary)
 
-            Text("No changes to commit")
+            Text(String(localized: "git.fileList.noChanges"))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }

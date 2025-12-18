@@ -184,7 +184,7 @@ struct WorktreeListItemView: View {
 
             // Open in... submenu
             Menu {
-                Text("Terminals")
+                Text(String(localized: "worktree.openIn.terminals"))
                     .font(.caption)
 
                 ForEach(sortedApps(AppDetector.shared.getTerminals(), defaultBundleId: defaultTerminalBundleId)) { terminal in
@@ -205,7 +205,7 @@ struct WorktreeListItemView: View {
 
                 Divider()
 
-                Text("Editors")
+                Text(String(localized: "worktree.openIn.editors"))
                     .font(.caption)
 
                 ForEach(sortedApps(AppDetector.shared.getEditors(), defaultBundleId: defaultEditorBundleId)) { editor in
@@ -224,7 +224,7 @@ struct WorktreeListItemView: View {
                     }
                 }
             } label: {
-                Label("Open in...", systemImage: "arrow.up.forward.app")
+                Label(String(localized: "worktree.openIn.title"), systemImage: "arrow.up.forward.app")
             }
 
             Button {
@@ -253,18 +253,18 @@ struct WorktreeListItemView: View {
                     }
                 }
             } label: {
-                Label("Pull from", systemImage: "arrow.down.circle")
+                Label(String(localized: "worktree.merge.pullFrom"), systemImage: "arrow.down.circle")
             }
 
             Divider()
 
             Menu {
                 if availableBranches.isEmpty && !isLoadingBranches {
-                    Text("Loading...")
+                    Text(String(localized: "general.loading"))
                         .foregroundStyle(.secondary)
                         .onAppear { loadAvailableBranches() }
                 } else if isLoadingBranches {
-                    Text("Loading...")
+                    Text(String(localized: "general.loading"))
                         .foregroundStyle(.secondary)
                 } else {
                     // Show top local branches (excluding current)
@@ -292,7 +292,7 @@ struct WorktreeListItemView: View {
                                     Image(systemName: "arrow.triangle.branch")
                                         .font(.caption)
                                     Text(branch.name)
-                                    Text("(remote)")
+                                    Text(String(localized: "worktree.branch.remote"))
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                 }
@@ -305,11 +305,11 @@ struct WorktreeListItemView: View {
                     Button {
                         showingBranchSelector = true
                     } label: {
-                        Label("Browse or Create Branch...", systemImage: "ellipsis.circle")
+                        Label(String(localized: "worktree.branch.browseOrCreate"), systemImage: "ellipsis.circle")
                     }
                 }
             } label: {
-                Label("Switch Branch", systemImage: "arrow.triangle.swap")
+                Label(String(localized: "worktree.branch.switch"), systemImage: "arrow.triangle.swap")
             }
 
             Divider()
@@ -407,26 +407,26 @@ struct WorktreeListItemView: View {
                 Text(error)
             }
         }
-        .alert("Merge Conflict", isPresented: $showingMergeConflict) {
-            Button("OK") {
+        .alert(String(localized: "worktree.merge.conflict"), isPresented: $showingMergeConflict) {
+            Button(String(localized: "worktree.list.ok")) {
                 mergeConflictFiles = []
             }
         } message: {
             VStack(alignment: .leading) {
-                Text("Merge conflicts detected in the following files:")
+                Text(String(localized: "worktree.merge.conflictMessage"))
                 ForEach(mergeConflictFiles, id: \.self) { file in
                     Text("• \(file)")
                 }
-                Text("\nResolve conflicts manually and commit the changes.")
+                Text(String(localized: "worktree.merge.resolveHint"))
             }
         }
-        .alert("Merge Successful", isPresented: $showingMergeSuccess) {
-            Button("OK") {}
+        .alert(String(localized: "worktree.merge.successful"), isPresented: $showingMergeSuccess) {
+            Button(String(localized: "worktree.list.ok")) {}
         } message: {
             Text(mergeSuccessMessage)
         }
-        .alert("Merge Error", isPresented: .constant(mergeErrorMessage != nil)) {
-            Button("OK") {
+        .alert(String(localized: "worktree.merge.error"), isPresented: .constant(mergeErrorMessage != nil)) {
+            Button(String(localized: "worktree.list.ok")) {
                 mergeErrorMessage = nil
             }
         } message: {
@@ -434,8 +434,8 @@ struct WorktreeListItemView: View {
                 Text(error)
             }
         }
-        .alert("Branch Switch Error", isPresented: .constant(branchSwitchError != nil)) {
-            Button("OK") {
+        .alert(String(localized: "worktree.branch.switchError"), isPresented: .constant(branchSwitchError != nil)) {
+            Button(String(localized: "worktree.list.ok")) {
                 branchSwitchError = nil
             }
         } message: {

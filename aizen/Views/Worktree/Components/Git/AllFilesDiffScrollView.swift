@@ -53,11 +53,11 @@ struct AllFilesDiffEmptyView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.green.opacity(0.6))
 
-            Text("No changes")
+            Text(String(localized: "git.diff.noChanges"))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.secondary)
 
-            Text("Working tree is clean")
+            Text(String(localized: "git.diff.cleanWorkingTree"))
                 .font(.system(size: 13))
                 .foregroundStyle(.tertiary)
         }

@@ -43,7 +43,7 @@ struct GitHistoryView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Text("History")
+            Text(String(localized: "git.history.title"))
                 .font(.system(size: 13, weight: .medium))
 
             Spacer()
@@ -65,7 +65,7 @@ struct GitHistoryView: View {
                     .font(.system(size: 11))
             }
             .buttonStyle(.plain)
-            .help("Refresh history")
+            .help(String(localized: "git.history.refresh"))
             .disabled(isLoading)
         }
         .padding(.horizontal, 12)
@@ -76,7 +76,7 @@ struct GitHistoryView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.small)
-            Text("Loading commits...")
+            Text(String(localized: "git.history.loading"))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
@@ -89,7 +89,7 @@ struct GitHistoryView: View {
                 .font(.system(size: 32))
                 .foregroundStyle(.orange)
 
-            Text("Failed to load history")
+            Text(String(localized: "git.history.loadFailed"))
                 .font(.system(size: 13, weight: .medium))
 
             Text(message)
@@ -97,7 +97,7 @@ struct GitHistoryView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button("Retry") {
+            Button(String(localized: "general.retry")) {
                 Task { await loadCommits() }
             }
             .buttonStyle(.bordered)
@@ -112,7 +112,7 @@ struct GitHistoryView: View {
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
 
-            Text("No commits yet")
+            Text(String(localized: "git.history.empty"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
         }
@@ -144,7 +144,7 @@ struct GitHistoryView: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                        Text("Loading more...")
+                        Text(String(localized: "git.history.loadingMore"))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -157,7 +157,7 @@ struct GitHistoryView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.down.circle")
                                 .font(.system(size: 11))
-                            Text("Load more commits")
+                            Text(String(localized: "git.history.loadMore"))
                                 .font(.system(size: 11))
                         }
                         .foregroundStyle(.blue)
@@ -178,11 +178,11 @@ struct GitHistoryView: View {
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Working Changes")
+                Text(String(localized: "git.history.workingChanges"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.primary)
 
-                Text("View uncommitted changes")
+                Text(String(localized: "git.history.viewUncommitted"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }

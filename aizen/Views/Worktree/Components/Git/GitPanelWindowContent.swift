@@ -9,10 +9,19 @@ import SwiftUI
 import os.log
 
 enum GitPanelTab: String, CaseIterable {
-    case git = "Git"
-    case history = "History"
-    case comments = "Comments"
-    case workflows = "Workflows"
+    case git
+    case history
+    case comments
+    case workflows
+
+    var displayName: String {
+        switch self {
+        case .git: return String(localized: "git.panel.git")
+        case .history: return String(localized: "git.panel.history")
+        case .comments: return String(localized: "git.panel.comments")
+        case .workflows: return String(localized: "git.panel.workflows")
+        }
+    }
 
     var icon: String {
         switch self {
@@ -301,7 +310,7 @@ struct GitPanelWindowContent: View {
 
                 Spacer()
 
-                Button("Back to Changes") {
+                Button(String(localized: "git.panel.backToChanges")) {
                     selectedHistoryCommit = nil
                 }
                 .buttonStyle(.bordered)
@@ -342,7 +351,7 @@ struct GitPanelWindowContent: View {
                     Spacer()
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("Loading diff...")
+                    Text(String(localized: "git.diff.loading"))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .padding(.top, 8)
@@ -414,11 +423,11 @@ struct GitPanelWindowContent: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.tertiary)
 
-            Text("Select a workflow run")
+            Text(String(localized: "git.workflow.selectRun"))
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Text("Choose a run from the list to view details, jobs, and logs.")
+            Text(String(localized: "git.workflow.selectRunHint"))
                 .font(.subheadline)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
