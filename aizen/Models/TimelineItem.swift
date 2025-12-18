@@ -10,6 +10,7 @@ import Foundation
 enum TimelineItem {
     case message(MessageItem)
     case toolCall(ToolCall)
+    case toolCallGroup(ToolCallGroup)
 
     /// Dynamic id that changes when content changes - used by SwiftUI ForEach to force re-renders
     var id: String {
@@ -20,6 +21,10 @@ enum TimelineItem {
         case .toolCall(let tool):
             // Include status so SwiftUI re-renders when tool status changes
             return "\(tool.id)-\(tool.status.rawValue)"
+        case .toolCallGroup(let group):
+            // Include count and status so SwiftUI re-renders when group changes
+            let statusKey = group.hasFailed ? "failed" : (group.isInProgress ? "progress" : "done")
+            return "group-\(group.id)-\(group.toolCalls.count)-\(statusKey)"
         }
     }
 
@@ -30,6 +35,8 @@ enum TimelineItem {
             return msg.id
         case .toolCall(let tool):
             return tool.id
+        case .toolCallGroup(let group):
+            return "group-\(group.id)"
         }
     }
 
@@ -39,6 +46,8 @@ enum TimelineItem {
             return msg.timestamp
         case .toolCall(let tool):
             return tool.timestamp
+        case .toolCallGroup(let group):
+            return group.timestamp
         }
     }
 }
