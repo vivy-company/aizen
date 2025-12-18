@@ -87,7 +87,7 @@ class FileSearchWindowController: NSWindowController {
 class FileSearchPanel: NSPanel {
     init(worktreePath: String, onFileSelected: @escaping (String) -> Void) {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 70),
+            contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
             styleMask: [.nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -156,64 +156,43 @@ struct FileSearchWindowContent: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            // Search input - circular/pill shaped
-            HStack(spacing: 14) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 16, weight: .medium))
-
-                TextField("Search files...", text: $viewModel.searchQuery)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 16))
-                    .focused($isSearchFocused)
-
-                if !viewModel.searchQuery.isEmpty {
-                    Button(action: {
-                        viewModel.searchQuery = ""
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                            .font(.system(size: 14))
+        LiquidGlassCard {
+            VStack(spacing: 0) {
+                SpotlightSearchField(
+                    placeholder: "Search files…",
+                    text: $viewModel.searchQuery,
+                    isFocused: $isSearchFocused,
+                    onSubmit: {
+                        if let result = viewModel.getSelectedResult() {
+                            selectFile(result)
+                        }
+                    },
+                    trailing: {
+                        Button(action: onClose) {
+                            KeyCap(text: "esc")
+                        }
+                        .buttonStyle(.plain)
+                        .help("Close")
                     }
-                    .buttonStyle(.plain)
-                }
+                )
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 14)
 
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .buttonStyle(.plain)
-                .help("Close (Esc)")
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
-            .background(
-                Capsule()
-                    .fill(.ultraThinMaterial)
-            )
-            .shadow(color: .black.opacity(0.3), radius: 30, x: 0, y: 15)
+                Divider().opacity(0.25)
 
-            // Results - only show when typing
-            if !viewModel.searchQuery.isEmpty {
                 resultsCard
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+
+                footer
             }
         }
-        .frame(width: 700)
-        .fixedSize(horizontal: false, vertical: true)
-        .background(Color.clear)
-        .compositingGroup()
+        .frame(width: 760, height: 520)
         .onAppear {
             viewModel.indexFiles()
             // Small delay to ensure view hierarchy and panel are fully ready
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isSearchFocused = true
             }
-        }
-        .onChange(of: viewModel.results) { _ in
-            updateWindowHeight()
         }
         // Keyboard shortcuts for file search - use hidden buttons for compatibility
         .background {
@@ -248,13 +227,6 @@ struct FileSearchWindowContent: View {
                 resultsListView
             }
         }
-        .frame(width: 700)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(.regularMaterial)
-        )
-        .shadow(color: .black.opacity(0.25), radius: 25, x: 0, y: 15)
-        .compositingGroup()
     }
 
     private var indexingView: some View {
@@ -292,14 +264,13 @@ struct FileSearchWindowContent: View {
                             .id(index)
                     }
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
+                .padding(.horizontal, 10)
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-            .frame(maxHeight: 450)
+            .frame(maxHeight: 380)
             .onChange(of: viewModel.selectedIndex) { newIndex in
                 // No animation for smoother single-item navigation
-                proxy.scrollTo(newIndex, anchor: .top)
+                proxy.scrollTo(newIndex, anchor: .center)
             }
         }
     }
@@ -311,26 +282,46 @@ struct FileSearchWindowContent: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(result.name)
-                    .font(.system(size: 14))
-                    .foregroundColor(isSelected ? .white : .primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
 
                 Text(result.relativePath)
                     .font(.system(size: 12))
-                    .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
 
             Spacer()
+
+            if isSelected {
+                HStack(spacing: 6) {
+                    KeyCap(text: "↩")
+                    Text("Open")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor : Color.clear)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isSelected ? Color.white.opacity(0.12) : Color.clear)
+                .overlay {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                    }
+                }
         )
         .contentShape(Rectangle())
         .onTapGesture {
             selectFile(result)
+        }
+        .onHover { hovering in
+            if hovering {
+                viewModel.selectedIndex = index
+            }
         }
     }
 
@@ -341,22 +332,27 @@ struct FileSearchWindowContent: View {
         onClose()
     }
 
-    private func updateWindowHeight() {
-        guard let window = NSApp.keyWindow else { return }
+    private var footer: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                KeyCap(text: "↑")
+                KeyCap(text: "↓")
+                Text("Navigate")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
 
-        let baseHeight: CGFloat = 70
-        let resultsHeight: CGFloat = viewModel.searchQuery.isEmpty ? 0 : min(CGFloat(viewModel.results.count) * 50 + 120, 450)
-        let newHeight = baseHeight + resultsHeight + (viewModel.searchQuery.isEmpty ? 0 : 12)
+            Spacer()
 
-        var frame = window.frame
-        let oldHeight = frame.height
-        frame.size.height = newHeight
-        frame.origin.y += (oldHeight - newHeight)
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            window.animator().setFrame(frame, display: true)
+            HStack(spacing: 6) {
+                KeyCap(text: "↩")
+                Text("Open")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.clear)
     }
 }
