@@ -157,6 +157,24 @@ enum ToolKind: String, Codable {
     case plan
     case exitPlanMode = "exit_plan_mode"
     case other
+
+    /// SF Symbol name for this tool kind
+    var symbolName: String {
+        switch self {
+        case .read: return "doc.text"
+        case .edit: return "pencil"
+        case .delete: return "trash"
+        case .move: return "arrow.right.doc.on.clipboard"
+        case .search: return "magnifyingglass"
+        case .execute: return "terminal"
+        case .think: return "brain"
+        case .fetch: return "arrow.down.circle"
+        case .switchMode: return "arrow.left.arrow.right"
+        case .plan: return "list.bullet.clipboard"
+        case .exitPlanMode: return "checkmark.circle"
+        case .other: return "wrench.and.screwdriver"
+        }
+    }
 }
 
 enum ToolStatus: String, Codable {

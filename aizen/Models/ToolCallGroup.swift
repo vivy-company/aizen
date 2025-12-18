@@ -17,7 +17,7 @@ struct ToolCallGroup: Identifiable {
         self.id = iterationId
         self.iterationId = iterationId
         self.toolCalls = toolCalls.sorted { $0.timestamp < $1.timestamp }
-        self.timestamp = toolCalls.first?.timestamp ?? Date()
+        self.timestamp = toolCalls.first?.timestamp ?? Date.distantPast
     }
 
     /// Tool kinds used in this group (for icon display)
@@ -28,7 +28,7 @@ struct ToolCallGroup: Identifiable {
     /// Summary text (e.g., "5 tool calls")
     var summaryText: String {
         let count = toolCalls.count
-        return count == 1 ? "1 tool call" : "\(count) tool calls"
+        return String(localized: "chat.toolcalls.summary \(count)")
     }
 
     /// All tool calls completed successfully
