@@ -12,11 +12,9 @@ class GitIndexWatcher {
     private let worktreePath: String
     private let gitIndexPath: String
     private let pollInterval: TimeInterval = 1.0  // Poll every 1 second
-    private let workdirCheckInterval: TimeInterval = 3.0  // Check workdir less frequently
     private let debounceInterval: TimeInterval = 0.5  // Debounce rapid changes
     private var pollingTask: Task<Void, Never>?
     private var debounceTask: Task<Void, Never>?
-    private var pollCount: Int = 0
     private let lastIndexModificationDateLock = NSLock()
     private var _lastIndexModificationDate: Date?
     private var lastIndexModificationDate: Date? {
@@ -112,18 +110,22 @@ class GitIndexWatcher {
             return
         }
 
-        // Get initial modification date and checksum
+        // Get initial modification dates (cheap file stats only)
         lastIndexModificationDate = try? FileManager.default.attributesOfItem(atPath: gitIndexPath)[.modificationDate] as? Date
-        Task {
-            self.lastWorkdirChecksum = await self.computeWorkdirChecksum()
+
+        // Get initial HEAD modification date
+        let headPath = (gitIndexPath as NSString).deletingLastPathComponent
+        let headFilePath = (headPath as NSString).appendingPathComponent("HEAD")
+        if let headAttrs = try? FileManager.default.attributesOfItem(atPath: headFilePath),
+           let headModDate = headAttrs[.modificationDate] as? Date {
+            lastWorkdirChecksum = String(headModDate.timeIntervalSince1970)
         }
 
         // Start polling task on BACKGROUND thread
+        // Only monitor index file changes - avoid expensive git status calls
+        // that can contend with libgit2 operations
         pollingTask = Task.detached { [weak self] in
             guard let self = self else { return }
-
-            // Calculate how many polls equal the workdir check interval
-            let workdirCheckFrequency = max(1, Int(self.workdirCheckInterval / self.pollInterval))
 
             while !Task.isCancelled {
                 do {
@@ -131,33 +133,33 @@ class GitIndexWatcher {
 
                     guard !Task.isCancelled else { break }
 
-                    self.pollCount += 1
                     var hasChanges = false
-                    var indexChanged = false
 
                     // Check if index was modified (cheap file stat)
+                    // This detects: staging, unstaging, commits, branch switches, etc.
                     if let attrs = try? FileManager.default.attributesOfItem(atPath: self.gitIndexPath),
                        let modDate = attrs[.modificationDate] as? Date {
 
                         if let lastDate = self.lastIndexModificationDate, modDate > lastDate {
                             self.lastIndexModificationDate = modDate
                             hasChanges = true
-                            indexChanged = true
                         } else if self.lastIndexModificationDate == nil {
                             self.lastIndexModificationDate = modDate
                         }
                     }
 
-                    // Only check working directory status when:
-                    // 1. The index file changed (indicating a git operation)
-                    // 2. OR periodically (every workdirCheckFrequency polls)
-                    let shouldCheckWorkdir = indexChanged || (self.pollCount % workdirCheckFrequency == 0)
+                    // Also check HEAD file for branch switches
+                    let headPath = (self.gitIndexPath as NSString).deletingLastPathComponent
+                    let headFilePath = (headPath as NSString).appendingPathComponent("HEAD")
+                    if let headAttrs = try? FileManager.default.attributesOfItem(atPath: headFilePath),
+                       let headModDate = headAttrs[.modificationDate] as? Date {
 
-                    if shouldCheckWorkdir {
-                        let currentChecksum = await self.computeWorkdirChecksum()
-                        if currentChecksum != self.lastWorkdirChecksum {
-                            self.lastWorkdirChecksum = currentChecksum
+                        if let lastDate = self.lastWorkdirChecksum.flatMap({ Double($0) }).map({ Date(timeIntervalSince1970: $0) }),
+                           headModDate > lastDate {
+                            self.lastWorkdirChecksum = String(headModDate.timeIntervalSince1970)
                             hasChanges = true
+                        } else if self.lastWorkdirChecksum == nil {
+                            self.lastWorkdirChecksum = String(headModDate.timeIntervalSince1970)
                         }
                     }
 
@@ -180,7 +182,6 @@ class GitIndexWatcher {
         lastIndexModificationDate = nil
         lastWorkdirChecksum = nil
         hasPendingCallback = false
-        pollCount = 0
     }
 
     private func scheduleDebounceCallback() {
@@ -209,36 +210,4 @@ class GitIndexWatcher {
         }
     }
 
-    private func computeWorkdirChecksum() async -> String {
-        // Get git status output hash to detect working directory changes
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .background).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                process.arguments = ["status", "--porcelain"]
-                process.currentDirectoryURL = URL(fileURLWithPath: self.worktreePath)
-
-                let pipe = Pipe()
-                let errorPipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = errorPipe
-
-                defer {
-                    try? pipe.fileHandleForReading.close()
-                    try? errorPipe.fileHandleForReading.close()
-                }
-
-                do {
-                    try process.run()
-                    process.waitUntilExit()
-
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    let result = String(data: data, encoding: .utf8) ?? ""
-                    continuation.resume(returning: result)
-                } catch {
-                    continuation.resume(returning: "")
-                }
-            }
-        }
-    }
 }
