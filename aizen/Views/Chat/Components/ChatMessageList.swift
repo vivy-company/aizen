@@ -124,6 +124,16 @@ struct ChatMessageList: View {
                                 .id(item.id)  // Use dynamic id to force re-render when status changes
                                 .transition(.opacity.combined(with: .move(edge: .leading)))
                             }
+                        case .toolCallGroup(let group):
+                            ToolCallGroupView(
+                                group: group,
+                                currentIterationId: currentIterationId,
+                                agentSession: agentSession,
+                                onOpenInEditor: onOpenFileInEditor,
+                                childToolCallsProvider: childToolCallsProvider
+                            )
+                            .id(item.id)
+                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
                         }
                     }
 

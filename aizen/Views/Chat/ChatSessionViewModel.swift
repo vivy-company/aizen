@@ -492,7 +492,19 @@ class ChatSessionViewModel: ObservableObject {
         session.$isStreaming
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isStreaming in
-                self?.isProcessing = isStreaming
+                guard let self = self else { return }
+                self.isProcessing = isStreaming
+
+                // When streaming ends, rebuild timeline with grouping
+                if !isStreaming {
+                    Task { @MainActor in
+                        // Delay to ensure all tool calls are synced
+                        try? await Task.sleep(for: .milliseconds(150))
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            self.rebuildTimelineWithGrouping(isStreaming: false)
+                        }
+                    }
+                }
             }
             .store(in: &cancellables)
 
