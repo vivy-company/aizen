@@ -32,6 +32,14 @@ class AizenAppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        DispatchQueue.main.async {
+            for url in urls {
+                DeepLinkHandler.shared.handle(url)
+            }
+        }
+    }
 }
 
 @main
@@ -47,7 +55,6 @@ struct aizenApp: App {
     private let updaterController: SPUStandardUpdaterController
     private let shortcutManager = KeyboardShortcutManager()
     @State private var aboutWindow: NSWindow?
-    @State private var settingsWindow: NSWindow?
 
     // Terminal settings observers
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
@@ -83,6 +90,9 @@ struct aizenApp: App {
             RootView(context: persistenceController.container.viewContext)
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .environmentObject(ghosttyApp)
+                .task {
+                    LicenseManager.shared.start()
+                }
                 .task(id: "\(terminalFontName)\(terminalFontSize)\(terminalThemeName)") {
                     ghosttyApp.reloadConfig()
                     await TmuxSessionManager.shared.updateConfig()
@@ -107,7 +117,7 @@ struct aizenApp: App {
 
             CommandGroup(replacing: .appSettings) {
                 Button("Settings...") {
-                    showSettingsWindow()
+                    SettingsWindowManager.shared.show()
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
@@ -182,31 +192,7 @@ struct aizenApp: App {
     // MARK: - Settings Window
 
     private func showSettingsWindow() {
-        if let existingWindow = settingsWindow, existingWindow.isVisible {
-            existingWindow.makeKeyAndOrderFront(nil)
-            return
-        }
-
-        let settingsView = SettingsView()
-        let hostingController = NSHostingController(rootView: settingsView)
-
-        let window = NSWindow(contentViewController: hostingController)
-        window.title = "Settings"
-        window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
-        window.titlebarAppearsTransparent = true
-        window.isReleasedWhenClosed = false
-        window.toolbarStyle = .unified
-        window.setContentSize(NSSize(width: 800, height: 550))
-
-        // Add toolbar for unified style
-        let toolbar = NSToolbar(identifier: "SettingsToolbar")
-        toolbar.displayMode = .iconAndLabel
-        window.toolbar = toolbar
-
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-
-        settingsWindow = window
+        SettingsWindowManager.shared.show()
     }
 
     // MARK: - tmux Session Cleanup
