@@ -116,8 +116,10 @@ struct aizenApp: App {
             }
 
             CommandGroup(replacing: .appSettings) {
-                Button("Settings...") {
+                Button {
                     SettingsWindowManager.shared.show()
+                } label: {
+                    Label("Settings...", systemImage: "gearshape")
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }

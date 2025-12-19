@@ -332,9 +332,19 @@ struct WorkspaceSidebarView: View {
                         .opacity(0.6)
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .help("sidebar.joinDiscord")
+
+                Button {
+                    SettingsWindowManager.shared.show()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .help("settings.title")
             }
             .background(Color.primary.opacity(0.04))
         }

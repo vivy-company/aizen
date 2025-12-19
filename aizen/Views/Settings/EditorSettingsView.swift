@@ -131,11 +131,6 @@ struct EditorSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Color.clear.frame(width: 1, height: 1)
-            }
-        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             if availableThemes.isEmpty {

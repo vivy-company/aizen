@@ -180,11 +180,6 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Color.clear.frame(width: 1, height: 1)
-            }
-        }
         .alert(LocalizedStringKey("settings.advanced.reset.alert.title"), isPresented: $showingResetConfirmation) {
             Button(LocalizedStringKey("settings.advanced.reset.alert.cancel"), role: .cancel) {}
             Button(LocalizedStringKey("settings.advanced.reset.alert.confirm"), role: .destructive) {

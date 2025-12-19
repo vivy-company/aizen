@@ -148,10 +148,9 @@ struct SettingsView: View {
                         .navigationSubtitle("Default apps, layout, and toolbar")
                 }
             }
-            .toolbarBackground(.visible, for: .windowToolbar)
         }
         .navigationSplitViewStyle(.balanced)
-        .frame(width: 800, height: 550)
+        .frame(minWidth: 750, minHeight: 500)
         .onAppear {
             loadAgents()
         }

@@ -68,11 +68,6 @@ struct GitSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Color.clear.frame(width: 1, height: 1)
-            }
-        }
         .sheet(isPresented: $showingAddTemplate) {
             BranchTemplateFormView(
                 onSave: { _ in },

@@ -26,14 +26,15 @@ final class SettingsWindowManager {
 
         let window = NSWindow(contentViewController: hostingController)
         window.title = "Settings"
-        window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         window.toolbarStyle = .unified
-        window.setContentSize(NSSize(width: 800, height: 550))
+        window.setContentSize(NSSize(width: 800, height: 600))
+        window.minSize = NSSize(width: 750, height: 500)
 
         let toolbar = NSToolbar(identifier: "SettingsToolbar")
-        toolbar.displayMode = .iconAndLabel
+        toolbar.showsBaselineSeparator = false
         window.toolbar = toolbar
 
         window.center()
