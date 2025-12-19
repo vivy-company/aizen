@@ -122,7 +122,6 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .padding()
     }
 
     private func addTemplate() {

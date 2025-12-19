@@ -81,7 +81,6 @@ struct AppearanceSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Appearance")
     }
 
     private func visibilityBinding(for tabId: String) -> Binding<Bool> {

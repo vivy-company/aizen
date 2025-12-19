@@ -47,6 +47,7 @@ struct aizenApp: App {
     private let updaterController: SPUStandardUpdaterController
     private let shortcutManager = KeyboardShortcutManager()
     @State private var aboutWindow: NSWindow?
+    @State private var settingsWindow: NSWindow?
 
     // Terminal settings observers
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
@@ -104,6 +105,13 @@ struct aizenApp: App {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
 
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings...") {
+                    showSettingsWindow()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+
             CommandGroup(after: .newItem) {
                 Button("Split Right") {
                     splitActions?.splitHorizontal()
@@ -148,11 +156,6 @@ struct aizenApp: App {
             }
         }
 
-        Settings {
-            SettingsView()
-        }
-        .windowStyle(.hiddenTitleBar)
-        .windowToolbarStyle(.unified)
     }
 
     // MARK: - About Window
@@ -174,6 +177,35 @@ struct aizenApp: App {
         window.makeKeyAndOrderFront(nil)
 
         aboutWindow = window
+    }
+
+    // MARK: - Settings Window
+
+    private func showSettingsWindow() {
+        if let existingWindow = settingsWindow, existingWindow.isVisible {
+            existingWindow.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let settingsView = SettingsView()
+        let hostingController = NSHostingController(rootView: settingsView)
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Settings"
+        window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.isReleasedWhenClosed = false
+        window.toolbarStyle = .unified
+
+        // Add toolbar for unified style
+        let toolbar = NSToolbar(identifier: "SettingsToolbar")
+        toolbar.displayMode = .iconOnly
+        window.toolbar = toolbar
+
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+
+        settingsWindow = window
     }
 
     // MARK: - tmux Session Cleanup

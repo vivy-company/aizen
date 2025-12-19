@@ -7,6 +7,17 @@
 
 import SwiftUI
 
+private extension View {
+    @ViewBuilder
+    func removingSidebarToggle() -> some View {
+        if #available(macOS 14.0, *) {
+            self.toolbar(removing: .sidebarToggle)
+        } else {
+            self
+        }
+    }
+}
+
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general = "general"
     case terminal = "terminal"
@@ -44,47 +55,48 @@ struct SettingsView: View {
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
 
+    @State private var selectedSection: SettingsSection? = .general
+
     var body: some View {
-        TabView {
-            GeneralSettingsView(defaultEditor: $defaultEditor)
-                .tabItem {
-                    Label(SettingsSection.general.title, systemImage: SettingsSection.general.systemImage)
-                }
-                .tag(SettingsSection.general)
-
-            TerminalSettingsView(
-                fontName: $terminalFontName,
-                fontSize: $terminalFontSize
-            )
-            .tabItem {
-                Label(SettingsSection.terminal.title, systemImage: SettingsSection.terminal.systemImage)
+        NavigationSplitView {
+            List(SettingsSection.allCases, selection: $selectedSection) { section in
+                Label(section.title, systemImage: section.systemImage)
+                    .tag(section)
             }
-            .tag(SettingsSection.terminal)
-
-            EditorSettingsView()
-                .tabItem {
-                    Label(SettingsSection.editor.title, systemImage: SettingsSection.editor.systemImage)
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 220)
+            .removingSidebarToggle()
+        } detail: {
+            Group {
+                switch selectedSection {
+                case .general:
+                    GeneralSettingsView(defaultEditor: $defaultEditor)
+                        .navigationTitle(SettingsSection.general.title)
+                case .terminal:
+                    TerminalSettingsView(
+                        fontName: $terminalFontName,
+                        fontSize: $terminalFontSize
+                    )
+                    .navigationTitle(SettingsSection.terminal.title)
+                case .editor:
+                    EditorSettingsView()
+                        .navigationTitle(SettingsSection.editor.title)
+                case .appearance:
+                    AppearanceSettingsView()
+                        .navigationTitle(SettingsSection.appearance.title)
+                case .agents:
+                    AgentsSettingsView(defaultACPAgent: $defaultACPAgent)
+                        .navigationTitle(SettingsSection.agents.title)
+                case .advanced:
+                    AdvancedSettingsView()
+                        .navigationTitle(SettingsSection.advanced.title)
+                case .none:
+                    GeneralSettingsView(defaultEditor: $defaultEditor)
+                        .navigationTitle(SettingsSection.general.title)
                 }
-                .tag(SettingsSection.editor)
-
-            AppearanceSettingsView()
-                .tabItem {
-                    Label(SettingsSection.appearance.title, systemImage: SettingsSection.appearance.systemImage)
-                }
-                .tag(SettingsSection.appearance)
-
-            AgentsSettingsView(defaultACPAgent: $defaultACPAgent)
-                .tabItem {
-                    Label(SettingsSection.agents.title, systemImage: SettingsSection.agents.systemImage)
-                }
-                .tag(SettingsSection.agents)
-
-            AdvancedSettingsView()
-                .tabItem {
-                    Label(SettingsSection.advanced.title, systemImage: SettingsSection.advanced.systemImage)
-                }
-                .tag(SettingsSection.advanced)
+            }
         }
-        .frame(width: 600, height: 500)
+        .navigationSplitViewStyle(.balanced)
+        .frame(width: 750, height: 550)
     }
 }
