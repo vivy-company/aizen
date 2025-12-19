@@ -206,6 +206,8 @@ struct SettingsView: View {
                     .padding(.vertical, 2)
                     .foregroundStyle(proBadgeColor)
                     .background(Capsule().fill(proBadgeColor.opacity(0.18)))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
         .buttonStyle(.plain)
@@ -226,9 +228,9 @@ struct SettingsView: View {
         case .active, .offlineGrace:
             return "PRO"
         case .checking:
-            return "CHECKING"
+            return "CHECK"
         case .unlicensed, .expired, .invalid, .error:
-            return "NOT ACTIVE"
+            return "OFF"
         }
     }
 

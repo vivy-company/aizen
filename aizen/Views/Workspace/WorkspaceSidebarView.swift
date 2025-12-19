@@ -19,6 +19,7 @@ struct WorkspaceSidebarView: View {
     @Binding var showingAddRepository: Bool
 
     @ObservedObject var repositoryManager: RepositoryManager
+    @StateObject private var licenseManager = LicenseManager.shared
     @State private var showingWorkspaceSheet = false
     @State private var showingWorkspaceSwitcher = false
     @State private var workspaceToEdit: Workspace?
@@ -34,6 +35,15 @@ struct WorkspaceSidebarView: View {
             get: { ItemStatus.decode(storedStatusFilters) },
             set: { storedStatusFilters = ItemStatus.encode($0) }
         )
+    }
+
+    private var isLicenseActive: Bool {
+        switch licenseManager.status {
+        case .active, .offlineGrace:
+            return true
+        default:
+            return false
+        }
     }
 
     private let refreshInterval: TimeInterval = 30.0
@@ -274,6 +284,29 @@ struct WorkspaceSidebarView: View {
 
             Divider()
 
+            // Upgrade to Pro (only when not licensed)
+            if !isLicenseActive {
+                Button {
+                    SettingsWindowManager.shared.show()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        NotificationCenter.default.post(name: .openSettingsPro, object: nil)
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.orange)
+                        Text("sidebar.upgradeToPro")
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                .background(Color.primary.opacity(0.08))
+            }
+
             // Footer buttons
             HStack(spacing: 0) {
                 Button {
@@ -303,7 +336,7 @@ struct WorkspaceSidebarView: View {
                 .padding(.vertical, 8)
                 .help("sidebar.joinDiscord")
             }
-            .background(.background)
+            .background(Color.primary.opacity(0.04))
         }
         .navigationTitle(LocalizedStringKey("workspace.repositories.title"))
         .sheet(isPresented: $showingWorkspaceSheet) {

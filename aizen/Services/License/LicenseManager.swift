@@ -40,6 +40,15 @@ final class LicenseManager: ObservableObject {
         currentDeviceAuth != nil
     }
 
+    var hasActivePlan: Bool {
+        switch status {
+        case .active, .offlineGrace:
+            return true
+        case .checking, .unlicensed, .expired, .invalid, .error:
+            return false
+        }
+    }
+
     struct PendingDeepLink {
         let token: String?
         let autoActivate: Bool
