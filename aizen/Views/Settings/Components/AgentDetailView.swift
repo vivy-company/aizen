@@ -28,6 +28,17 @@ struct AgentDetailView: View {
     @State private var authMethodName: String?
     @State private var showingAuthClearedMessage = false
     @State private var installedVersion: String?
+    @State private var showingRulesEditor = false
+    @State private var showingConfigEditor = false
+    @State private var selectedConfigFile: AgentConfigFile?
+    @State private var rulesPreview: String?
+    @State private var commands: [AgentCommand] = []
+    @State private var showingCommandEditor = false
+    @State private var selectedCommand: AgentCommand?
+
+    private var configSpec: AgentConfigSpec {
+        AgentConfigRegistry.spec(for: metadata.id)
+    }
 
     var body: some View {
         Form {
@@ -190,6 +201,114 @@ struct AgentDetailView: View {
                         Text("Auth cleared. New chat sessions will prompt for authentication.")
                             .font(.caption)
                             .foregroundColor(.green)
+                    }
+                }
+
+                // MARK: - Configuration
+
+                if !configSpec.configFiles.isEmpty {
+                    Section("Configuration") {
+                        // Rules file
+                        if let rulesFile = configSpec.rulesFile {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(rulesFile.name)
+                                            .font(.headline)
+                                        if let desc = rulesFile.description {
+                                            Text(desc)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+
+                                    Spacer()
+
+                                    Button(rulesFile.exists ? "Edit" : "Create") {
+                                        showingRulesEditor = true
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
+
+                                if let preview = rulesPreview, !preview.isEmpty {
+                                    Text(preview)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(3)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(8)
+                                        .background(Color.secondary.opacity(0.1))
+                                        .cornerRadius(6)
+                                }
+                            }
+                        }
+
+                        // Settings files
+                        ForEach(configSpec.settingsFiles) { configFile in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(configFile.name)
+                                        .font(.headline)
+                                    if let desc = configFile.description {
+                                        Text(desc)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+
+                                Spacer()
+
+                                Button(configFile.exists ? "Edit" : "Create") {
+                                    selectedConfigFile = configFile
+                                    showingConfigEditor = true
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+
+                    }
+                }
+
+                // MARK: - Custom Commands
+
+                if configSpec.commandsDirectory != nil {
+                    Section {
+                        ForEach(commands) { command in
+                            HStack {
+                                Image(systemName: "terminal")
+                                    .foregroundColor(.secondary)
+                                    .frame(width: 20)
+
+                                Text("/\(command.name)")
+                                    .font(.system(.body, design: .monospaced))
+
+                                Spacer()
+
+                                Button("Edit") {
+                                    selectedCommand = command
+                                    showingCommandEditor = true
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+
+                        Button {
+                            selectedCommand = nil
+                            showingCommandEditor = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(Color.accentColor)
+                                Text("Add Command")
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    } header: {
+                        Text("Custom Commands")
+                    } footer: {
+                        Text("Slash commands available in chat sessions")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -360,6 +479,33 @@ struct AgentDetailView: View {
             canUpdate = await AgentInstaller.shared.canUpdate(metadata)
             loadAuthStatus()
             await loadVersion()
+            loadRulesPreview()
+            loadCommands()
+        }
+        .sheet(isPresented: $showingRulesEditor) {
+            if let rulesFile = configSpec.rulesFile {
+                AgentRulesEditorSheet(
+                    configFile: rulesFile,
+                    agentName: metadata.name,
+                    onDismiss: { loadRulesPreview() }
+                )
+            }
+        }
+        .sheet(isPresented: $showingConfigEditor) {
+            if let configFile = selectedConfigFile {
+                AgentConfigEditorSheet(
+                    configFile: configFile,
+                    agentName: metadata.name
+                )
+            }
+        }
+        .sheet(isPresented: $showingCommandEditor) {
+            AgentCommandEditorSheet(
+                command: selectedCommand,
+                commandsDirectory: configSpec.expandedCommandsDirectory ?? "",
+                agentName: metadata.name,
+                onDismiss: { loadCommands() }
+            )
         }
         .onDisappear {
             testTask?.cancel()
@@ -529,5 +675,51 @@ struct AgentDetailView: View {
                 }
             }
         }
+    }
+
+    private func loadRulesPreview() {
+        guard let rulesFile = configSpec.rulesFile else {
+            rulesPreview = nil
+            return
+        }
+
+        let path = rulesFile.expandedPath
+        guard FileManager.default.fileExists(atPath: path),
+              let content = try? String(contentsOfFile: path, encoding: .utf8) else {
+            rulesPreview = nil
+            return
+        }
+
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            rulesPreview = nil
+        } else {
+            let lines = trimmed.components(separatedBy: .newlines)
+            let previewLines = lines.prefix(5).joined(separator: "\n")
+            rulesPreview = previewLines
+        }
+    }
+
+    private func loadCommands() {
+        guard let commandsDir = configSpec.expandedCommandsDirectory else {
+            commands = []
+            return
+        }
+
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: commandsDir),
+              let files = try? fm.contentsOfDirectory(atPath: commandsDir) else {
+            commands = []
+            return
+        }
+
+        commands = files
+            .filter { $0.hasSuffix(".md") }
+            .map { filename in
+                let name = String(filename.dropLast(3)) // Remove .md
+                let path = (commandsDir as NSString).appendingPathComponent(filename)
+                return AgentCommand(name: name, path: path)
+            }
+            .sorted { $0.name < $1.name }
     }
 }
