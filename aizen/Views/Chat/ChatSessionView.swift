@@ -138,7 +138,7 @@ struct ChatSessionView: View {
                     .padding(.horizontal, 20)
                 }
                 .padding(.top, 16)
-                .padding(.bottom, 8)
+                .padding(.bottom, 20)
             }
             .frame(maxWidth: 1100)
             .frame(maxWidth: .infinity)
