@@ -24,8 +24,18 @@ struct MCPServerRowView: View {
             // Info
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(server.displayName)
+                    Text(server.displayTitle)
                         .font(.headline)
+
+                    if let version = server.version {
+                        Text("v\(version)")
+                            .font(.caption2)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.15))
+                            .foregroundColor(.secondary)
+                            .cornerRadius(4)
+                    }
 
                     if isInstalled {
                         Text("Installed")

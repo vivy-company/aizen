@@ -11,13 +11,24 @@ import Foundation
 
 struct MCPServer: Codable, Identifiable {
     let name: String
+    let title: String?
     let description: String?
     let version: String?
+    let websiteUrl: String?
+    let icons: [MCPIcon]?
     let repository: MCPRepository?
     let packages: [MCPPackage]?
     let remotes: [MCPRemote]?
 
     var id: String { name }
+
+    var displayTitle: String {
+        title ?? displayName
+    }
+
+    var primaryIcon: MCPIcon? {
+        icons?.first
+    }
 
     var displayName: String {
         String(name.split(separator: "/").last ?? Substring(name))
@@ -33,6 +44,21 @@ struct MCPServer: Codable, Identifiable {
 
     var primaryRemote: MCPRemote? {
         remotes?.first
+    }
+}
+
+// MARK: - Icon
+
+struct MCPIcon: Codable, Identifiable {
+    let url: String?
+    let src: String?  // Alternative field name used by some servers
+    let type: String?
+    let size: String?
+
+    var id: String { iconUrl ?? UUID().uuidString }
+
+    var iconUrl: String? {
+        url ?? src
     }
 }
 

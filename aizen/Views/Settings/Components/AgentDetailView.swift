@@ -318,39 +318,41 @@ struct AgentDetailView: View {
 
                 // MARK: - MCP Servers
 
-                Section {
-                    if mcpManager.isSyncingServers(for: metadata.id) {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Loading MCP servers...")
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        ForEach(mcpManager.servers(for: metadata.id)) { server in
-                            MCPInstalledServerRow(server: server) {
-                                mcpServerToRemove = server
-                                showingMCPRemoveConfirmation = true
+                if MCPManager.supportsMCPManagement(agentId: metadata.id) {
+                    Section {
+                        if mcpManager.isSyncingServers(for: metadata.id) {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Loading MCP servers...")
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            ForEach(mcpManager.servers(for: metadata.id)) { server in
+                                MCPInstalledServerRow(server: server) {
+                                    mcpServerToRemove = server
+                                    showingMCPRemoveConfirmation = true
+                                }
                             }
                         }
-                    }
 
-                    Button {
-                        showingMCPMarketplace = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(Color.accentColor)
-                            Text("Browse MCP Servers")
+                        Button {
+                            showingMCPMarketplace = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(Color.accentColor)
+                                Text("Browse MCP Servers")
+                            }
                         }
+                        .buttonStyle(.plain)
+                    } header: {
+                        Text("MCP Servers")
+                    } footer: {
+                        Text("Extend agent capabilities with MCP servers")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
-                } header: {
-                    Text("MCP Servers")
-                } footer: {
-                    Text("Extend agent capabilities with MCP servers")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
 
                 // MARK: - Danger Zone (custom agents only)

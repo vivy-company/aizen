@@ -72,18 +72,78 @@ struct MCPInstallConfigSheet: View {
         return true
     }
 
+    private var serverIcon: some View {
+        Image(systemName: server.isRemoteOnly ? "globe" : "shippingbox.fill")
+            .font(.title)
+            .foregroundStyle(server.isRemoteOnly ? .blue : .orange)
+            .frame(width: 40, height: 40)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Install: \(server.displayName)")
-                        .font(.headline)
+            // Header with icon and basic info
+            HStack(alignment: .top, spacing: 12) {
+                // Icon
+                if let icon = server.primaryIcon, let iconUrl = icon.iconUrl, let url = URL(string: iconUrl) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 40, height: 40)
+                                .cornerRadius(8)
+                        default:
+                            serverIcon
+                        }
+                    }
+                } else {
+                    serverIcon
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(server.displayTitle)
+                            .font(.headline)
+
+                        if let version = server.version {
+                            Text("v\(version)")
+                                .font(.caption)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.secondary.opacity(0.15))
+                                .foregroundColor(.secondary)
+                                .cornerRadius(4)
+                        }
+                    }
+
                     Text("Installing to \(agentName)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+
                 Spacer()
+
+                // Links
+                HStack(spacing: 8) {
+                    if let websiteUrl = server.websiteUrl, let url = URL(string: websiteUrl) {
+                        Link(destination: url) {
+                            Image(systemName: "globe")
+                                .foregroundColor(.blue)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open Website")
+                    }
+
+                    if let repoUrl = server.repository?.url, let url = URL(string: repoUrl) {
+                        Link(destination: url) {
+                            Image(systemName: "link")
+                                .foregroundColor(.blue)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open Repository")
+                    }
+                }
             }
             .padding()
             .background(Color(NSColor.controlBackgroundColor))
@@ -92,7 +152,24 @@ struct MCPInstallConfigSheet: View {
 
             // Content
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Description
+                    if let description = server.description {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("About")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundColor(.secondary)
+
+                            Text(description)
+                                .font(.callout)
+                                .foregroundColor(.primary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.bottom, 4)
+                    }
+
+                    Divider()
+
                     // Install type picker (if both available)
                     if hasPackages && hasRemotes {
                         Picker("Install Type", selection: $installType) {
@@ -164,7 +241,7 @@ struct MCPInstallConfigSheet: View {
             .padding()
             .background(Color(NSColor.controlBackgroundColor))
         }
-        .frame(width: 500, height: 450)
+        .frame(width: 520, height: 520)
         .onAppear {
             setupInitialState()
         }
@@ -174,23 +251,51 @@ struct MCPInstallConfigSheet: View {
 
     @ViewBuilder
     private var packageSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Package")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Package")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.secondary)
 
-            if server.packages!.count > 1 {
-                Picker("Package", selection: $selectedPackageIndex) {
-                    ForEach(Array(server.packages!.enumerated()), id: \.offset) { index, pkg in
-                        Text("\(pkg.registryBadge): \(pkg.packageName)").tag(index)
+                if server.packages!.count > 1 {
+                    Picker("Package", selection: $selectedPackageIndex) {
+                        ForEach(Array(server.packages!.enumerated()), id: \.offset) { index, pkg in
+                            Text("\(pkg.registryBadge): \(pkg.packageName)").tag(index)
+                        }
+                    }
+                    .labelsHidden()
+                } else if let package = selectedPackage {
+                    HStack(spacing: 8) {
+                        Badge(text: package.registryBadge, color: .purple)
+                        Badge(text: package.transportType, color: .gray)
+                        Text(package.packageName)
+                            .font(.system(.body, design: .monospaced))
                     }
                 }
-                .labelsHidden()
-            } else if let package = selectedPackage {
-                HStack {
-                    Badge(text: package.registryBadge, color: .purple)
-                    Text(package.packageName)
-                        .font(.system(.body, design: .monospaced))
+            }
+
+            // Runtime info
+            if let package = selectedPackage {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Runtime")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 4) {
+                        Text(package.runtimeHint)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.primary)
+
+                        if let runtimeArgs = package.runtimeArguments, !runtimeArgs.isEmpty {
+                            Text(runtimeArgs.joined(separator: " "))
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(NSColor.textBackgroundColor))
+                    .cornerRadius(4)
                 }
             }
         }
@@ -198,25 +303,54 @@ struct MCPInstallConfigSheet: View {
 
     @ViewBuilder
     private var remoteSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Remote")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Remote")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.secondary)
 
-            if server.remotes!.count > 1 {
-                Picker("Remote", selection: $selectedRemoteIndex) {
-                    ForEach(Array(server.remotes!.enumerated()), id: \.offset) { index, remote in
-                        Text("\(remote.transportBadge): \(remote.url)").tag(index)
+                if server.remotes!.count > 1 {
+                    Picker("Remote", selection: $selectedRemoteIndex) {
+                        ForEach(Array(server.remotes!.enumerated()), id: \.offset) { index, remote in
+                            Text("\(remote.transportBadge): \(remote.url)").tag(index)
+                        }
+                    }
+                    .labelsHidden()
+                } else if let remote = selectedRemote {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Badge(text: remote.transportBadge, color: .blue)
+                            Badge(text: "Remote", color: .teal)
+                        }
+
+                        Text(remote.url)
+                            .font(.system(.caption, design: .monospaced))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(NSColor.textBackgroundColor))
+                            .cornerRadius(4)
+                            .textSelection(.enabled)
                     }
                 }
-                .labelsHidden()
-            } else if let remote = selectedRemote {
-                HStack {
-                    Badge(text: remote.transportBadge, color: .blue)
-                    Text(remote.url)
-                        .font(.system(.caption, design: .monospaced))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+            }
+
+            // Headers info (if any)
+            if let remote = selectedRemote, let headers = remote.headers, !headers.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Required Headers")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    ForEach(headers, id: \.name) { header in
+                        HStack {
+                            Text(header.name)
+                                .font(.system(.caption, design: .monospaced))
+                            if header.isRequired == true {
+                                Text("*")
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -224,24 +358,28 @@ struct MCPInstallConfigSheet: View {
 
     @ViewBuilder
     private var envVarsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             if !requiredEnvVars.isEmpty {
-                Text("Required")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Required Environment Variables")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(.secondary)
 
-                ForEach(requiredEnvVars) { envVar in
-                    envVarField(envVar)
+                    ForEach(requiredEnvVars) { envVar in
+                        envVarField(envVar)
+                    }
                 }
             }
 
             if !optionalEnvVars.isEmpty {
-                Text("Optional")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Optional Environment Variables")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(.secondary)
 
-                ForEach(optionalEnvVars) { envVar in
-                    envVarField(envVar)
+                    ForEach(optionalEnvVars) { envVar in
+                        envVarField(envVar)
+                    }
                 }
             }
         }

@@ -3,99 +3,13 @@
 //  aizen
 //
 //  Orchestrates MCP server installation, removal, and status tracking
+//  Uses config file-based management for all agents
 //
 
 import Combine
 import Foundation
 
-// MARK: - Process Executor (Background)
-
-/// Executes MCP commands on a background thread to avoid blocking the main thread.
-private actor MCPProcessExecutor {
-    private var cachedShellEnv: [String: String]?
-
-    func run(_ command: MCPInstallCommand) async throws {
-        let environment = await getShellEnvironment()
-        try await executeProcess(command: command, environment: environment, captureOutput: false)
-    }
-
-    func runWithOutput(_ command: MCPInstallCommand) async throws -> String {
-        let environment = await getShellEnvironment()
-        return try await executeProcess(command: command, environment: environment, captureOutput: true)
-    }
-
-    private func getShellEnvironment() async -> [String: String] {
-        if let cached = cachedShellEnv {
-            return cached
-        }
-        let env = await ShellEnvironmentLoader.shared.loadShellEnvironment()
-        cachedShellEnv = env
-        return env
-    }
-
-    private func executeProcess(
-        command: MCPInstallCommand,
-        environment: [String: String],
-        captureOutput: Bool
-    ) async throws -> String {
-        // Run process execution on a detached task to avoid blocking actor
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-
-                // Use /usr/bin/env to search PATH if executable is not a full path
-                if command.executable.hasPrefix("/") {
-                    process.executableURL = URL(fileURLWithPath: command.executable)
-                    process.arguments = command.arguments
-                } else {
-                    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                    process.arguments = [command.executable] + command.arguments
-                }
-
-                // Merge shell environment with command environment
-                var processEnv = environment
-                for (key, value) in command.environment {
-                    processEnv[key] = value
-                }
-                process.environment = processEnv
-
-                let outputPipe = Pipe()
-                let errorPipe = Pipe()
-                process.standardOutput = outputPipe
-                process.standardError = errorPipe
-
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: MCPManagerError.processLaunchFailed(error.localizedDescription))
-                    return
-                }
-
-                process.waitUntilExit()
-
-                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: outputData, encoding: .utf8) ?? ""
-
-                if process.terminationStatus != 0 {
-                    let errorOutput = String(data: errorData, encoding: .utf8) ?? "Unknown error"
-                    if captureOutput {
-                        // For list commands, return output even on error (some agents exit non-zero but still output)
-                        print("[MCPManager] Command exited with status \(process.terminationStatus): \(errorOutput)")
-                        continuation.resume(returning: output)
-                    } else {
-                        continuation.resume(throwing: MCPManagerError.commandFailed(Int(process.terminationStatus), errorOutput))
-                    }
-                    return
-                }
-
-                continuation.resume(returning: output)
-            }
-        }
-    }
-}
-
-// MARK: - MCP Manager (Main Actor)
+// MARK: - MCP Manager
 
 @MainActor
 class MCPManager: ObservableObject {
@@ -107,7 +21,7 @@ class MCPManager: ObservableObject {
     @Published var isRemoving = false
     @Published var lastError: MCPManagerError?
 
-    private let executor = MCPProcessExecutor()
+    private let configManager = MCPConfigManager.shared
 
     private init() {}
 
@@ -125,17 +39,14 @@ class MCPManager: ObservableObject {
         defer { isInstalling = false }
 
         let serverName = extractServerName(from: server.name)
-        let command = MCPInstallCommandBuilder.buildInstallCommand(
-            for: agentId,
-            agentPath: agentPath,
-            serverName: serverName,
-            package: package,
-            env: env
-        )
 
-        try await executor.run(command)
+        // Build stdio config for package
+        let (command, args) = runtimeCommand(for: package)
+        let config = MCPServerEntry.stdio(command: command, args: args, env: env)
 
-        // Refresh installed list from agent
+        try await configManager.addServer(name: serverName, config: config, agentId: agentId)
+
+        // Refresh installed list
         await syncInstalled(agentId: agentId, agentPath: agentPath)
     }
 
@@ -153,17 +64,18 @@ class MCPManager: ObservableObject {
         defer { isInstalling = false }
 
         let serverName = extractServerName(from: server.name)
-        let command = MCPInstallCommandBuilder.buildRemoteInstallCommand(
-            for: agentId,
-            agentPath: agentPath,
-            serverName: serverName,
-            remote: remote,
-            env: env
-        )
 
-        try await executor.run(command)
+        // Build http/sse config for remote
+        let config: MCPServerEntry
+        if remote.type == "sse" {
+            config = MCPServerEntry.sse(url: remote.url)
+        } else {
+            config = MCPServerEntry.http(url: remote.url)
+        }
 
-        // Refresh installed list from agent
+        try await configManager.addServer(name: serverName, config: config, agentId: agentId)
+
+        // Refresh installed list
         await syncInstalled(agentId: agentId, agentPath: agentPath)
     }
 
@@ -174,42 +86,32 @@ class MCPManager: ObservableObject {
         lastError = nil
         defer { isRemoving = false }
 
-        let command = MCPInstallCommandBuilder.buildRemoveCommand(
-            for: agentId,
-            agentPath: agentPath,
-            serverName: serverName
-        )
+        try await configManager.removeServer(name: serverName, agentId: agentId)
 
-        try await executor.run(command)
-
-        // Refresh installed list from agent
+        // Refresh installed list
         await syncInstalled(agentId: agentId, agentPath: agentPath)
     }
 
-    // MARK: - Sync (Source of Truth: agent mcp list)
+    // MARK: - Sync
 
     func syncInstalled(agentId: String, agentPath: String?) async {
         isSyncing.insert(agentId)
         defer { isSyncing.remove(agentId) }
 
-        let command = MCPInstallCommandBuilder.buildListCommand(
-            for: agentId,
-            agentPath: agentPath
-        )
+        let servers = await configManager.listServers(agentId: agentId)
 
-        print("[MCPManager] Syncing installed servers for \(agentId)")
-        print("[MCPManager] Command: \(command.executable) \(command.arguments.joined(separator: " "))")
-
-        do {
-            let output = try await executor.runWithOutput(command)
-            print("[MCPManager] Output:\n\(output)")
-            let parsedServers = parseListOutput(output, agentId: agentId)
-            print("[MCPManager] Parsed \(parsedServers.count) servers: \(parsedServers.map { $0.serverName })")
-            installedServers[agentId] = parsedServers
-        } catch {
-            print("[MCPManager] Failed to sync MCP servers for \(agentId): \(error)")
-            // Don't clear on error, keep previous state
+        let installed = servers.map { (name, config) in
+            MCPInstalledServer(
+                serverName: name,
+                displayName: name,
+                agentId: agentId,
+                packageType: config.command != nil ? "stdio" : nil,
+                transportType: config.type,
+                configuredEnv: config.env ?? [:]
+            )
         }
+
+        installedServers[agentId] = installed
     }
 
     func isSyncingServers(for agentId: String) -> Bool {
@@ -227,52 +129,18 @@ class MCPManager: ObservableObject {
         installedServers[agentId] ?? []
     }
 
-    // MARK: - Private
+    // MARK: - Support Check
 
-    /// Parse output like: "context7: https://mcp.context7.com/mcp (HTTP) - ✓ Connected"
-    private func parseListOutput(_ output: String, agentId: String) -> [MCPInstalledServer] {
-        var servers: [MCPInstalledServer] = []
-
-        for line in output.components(separatedBy: .newlines) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-            // Skip empty lines and status messages
-            guard !trimmed.isEmpty,
-                  !trimmed.lowercased().hasPrefix("checking"),
-                  !trimmed.lowercased().hasPrefix("no mcp"),
-                  trimmed.contains(":") else {
-                continue
-            }
-
-            // Parse format: "<name>: <url/command> (<type>) - <status>"
-            let parts = trimmed.split(separator: ":", maxSplits: 1)
-            guard parts.count >= 1 else { continue }
-
-            let serverName = String(parts[0]).trimmingCharacters(in: .whitespaces)
-            guard !serverName.isEmpty else { continue }
-
-            // Try to extract transport type from parentheses
-            var transportType: String? = nil
-            if let openParen = trimmed.firstIndex(of: "("),
-               let closeParen = trimmed.firstIndex(of: ")"),
-               openParen < closeParen {
-                let startIndex = trimmed.index(after: openParen)
-                transportType = String(trimmed[startIndex..<closeParen])
-            }
-
-            let installed = MCPInstalledServer(
-                serverName: serverName,
-                displayName: serverName,
-                agentId: agentId,
-                packageType: nil,
-                transportType: transportType?.lowercased(),
-                configuredEnv: [:]
-            )
-            servers.append(installed)
+    static func supportsMCPManagement(agentId: String) -> Bool {
+        switch agentId {
+        case "claude", "codex", "gemini", "opencode", "kimi":
+            return true
+        default:
+            return false
         }
-
-        return servers
     }
+
+    // MARK: - Private Helpers
 
     private func extractServerName(from fullName: String) -> String {
         if let lastComponent = fullName.split(separator: "/").last {
@@ -280,21 +148,56 @@ class MCPManager: ObservableObject {
         }
         return fullName
     }
+
+    private func runtimeCommand(for package: MCPPackage) -> (String, [String]) {
+        var args: [String] = []
+
+        switch package.registryType {
+        case "npm":
+            args.append("-y")
+            args.append(package.identifier)
+            if let runtimeArgs = package.runtimeArguments {
+                args.append(contentsOf: runtimeArgs)
+            }
+            return (package.runtimeHint, args)  // npx
+
+        case "pypi":
+            args.append(package.identifier)
+            if let runtimeArgs = package.runtimeArguments {
+                args.append(contentsOf: runtimeArgs)
+            }
+            return (package.runtimeHint, args)  // uvx
+
+        case "oci":
+            args.append("run")
+            args.append("-i")
+            args.append("--rm")
+            args.append(package.identifier)
+            if let runtimeArgs = package.runtimeArguments {
+                args.append(contentsOf: runtimeArgs)
+            }
+            return ("docker", args)
+
+        default:
+            args.append(package.identifier)
+            if let runtimeArgs = package.runtimeArguments {
+                args.append(contentsOf: runtimeArgs)
+            }
+            return (package.runtimeHint, args)
+        }
+    }
 }
 
 // MARK: - Errors
 
 enum MCPManagerError: LocalizedError {
-    case processLaunchFailed(String)
-    case commandFailed(Int, String)
+    case configError(String)
     case agentNotFound(String)
 
     var errorDescription: String? {
         switch self {
-        case .processLaunchFailed(let reason):
-            return "Failed to launch process: \(reason)"
-        case .commandFailed(let code, let output):
-            return "Command failed (\(code)): \(output)"
+        case .configError(let reason):
+            return "Config error: \(reason)"
         case .agentNotFound(let agentId):
             return "Agent not found: \(agentId)"
         }
