@@ -39,4 +39,12 @@ extension Notification.Name {
 
     /// Posted when a file should be opened in the editor (from tool calls, etc.)
     static let openFileInEditor = Notification.Name("OpenFileInEditor")
+
+    // MARK: - Settings
+
+    /// Posted when the Settings view should open the Pro tab
+    static let openSettingsPro = Notification.Name("OpenSettingsPro")
+
+    /// Posted when a license deep link is received (token + auto-activate)
+    static let openLicenseDeepLink = Notification.Name("OpenLicenseDeepLink")
 }

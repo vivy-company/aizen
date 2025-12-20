@@ -9,6 +9,7 @@ import {
   Github,
   FolderOpen,
   Globe,
+  Check,
 } from "lucide-react";
 import logo from "./logo.png";
 import demoScreenshot from "./demo.png";
@@ -133,10 +134,13 @@ const FAQSection = lazy(() => import("./components/FAQSection"));
 
 type ShowcaseTab = "agents" | "terminal" | "files" | "browser";
 
+type BillingCycle = "monthly" | "yearly";
+
 function AppContent() {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<ShowcaseTab>("agents");
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
 
   const trackEvent = (eventName: string) => {
     if (typeof window !== "undefined" && window.umami) {
@@ -299,6 +303,101 @@ function AppContent() {
         </div>
       </section>
 
+      {/* Pricing */}
+      <section className="py-20 px-6">
+        <div className="max-w-[1200px] mx-auto">
+          <h2 className="text-[56px] font-semibold text-center mb-4 tracking-tight">Pricing</h2>
+          <p className="text-[#86868b] text-center text-lg mb-16">Start free, upgrade when you need more</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Free Tier */}
+            <div className="bg-white/[0.03] border border-white/8 rounded-3xl p-8 flex flex-col">
+              <h3 className="text-2xl font-semibold mb-2">Free</h3>
+              <p className="text-[#86868b] mb-6">Full-featured, forever free</p>
+              <div className="text-4xl font-bold mb-6">$0<span className="text-lg font-normal text-[#86868b]">/forever</span></div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {["Unlimited workspaces & worktrees", "Agents (via ACP)", "GPU terminal (libghostty)", "File & Web browser", "Voice input", "Visual Git interface", "GitHub Actions & GitLab CI", "Xcode integration"].map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-[#86868b]">
+                    <Check size={18} className="text-green-500 flex-shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={versionInfo?.downloadUrl || "https://github.com/vivy-company/aizen/releases"}
+                className="block w-full py-3 text-center text-[17px] font-normal border border-white/20 text-white rounded-full hover:bg-white/5 transition-all duration-200"
+              >
+                Download Free
+              </a>
+            </div>
+            {/* Pro */}
+            <div className="bg-white/[0.03] border border-white/8 rounded-3xl p-8 flex flex-col">
+              <h3 className="text-2xl font-semibold mb-2">Pro</h3>
+              <p className="text-[#86868b] mb-4">Support the developer</p>
+              {/* Billing Toggle */}
+              <div className="flex bg-white/[0.05] rounded-full p-1 mb-6">
+                <button
+                  onClick={() => setBillingCycle("monthly")}
+                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-full transition-all duration-200 ${billingCycle === "monthly" ? "bg-white/10 text-white" : "text-[#86868b] hover:text-white"}`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingCycle("yearly")}
+                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-full transition-all duration-200 relative ${billingCycle === "yearly" ? "bg-white/10 text-white" : "text-[#86868b] hover:text-white"}`}
+                >
+                  Yearly
+                  <span className="absolute -top-2 -right-2 px-1.5 py-0.5 text-[10px] font-semibold bg-green-500 text-white rounded-full">-20%</span>
+                </button>
+              </div>
+              <div className="text-4xl font-bold mb-6">
+                {billingCycle === "monthly" ? "$5.99" : "$59"}
+                <span className="text-lg font-normal text-[#86868b]">{billingCycle === "monthly" ? "/mo" : "/yr"}</span>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {["Everything in Free", "Support continued development", "Priority support", "Future exclusive features"].map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-[#86868b]">
+                    <Check size={18} className="text-blue-500 flex-shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={billingCycle === "monthly" ? "https://buy.stripe.com/dRmdR1dOI9eHfyW0LA3Ru00" : "https://buy.stripe.com/eVqfZ9bGAduXaeC9i63Ru02"}
+                className="block w-full py-3 text-center text-[17px] font-normal border border-white/20 text-white rounded-full hover:bg-white/5 transition-all duration-200"
+              >
+                Subscribe {billingCycle === "monthly" ? "Monthly" : "Yearly"}
+              </a>
+            </div>
+            {/* Lifetime */}
+            <div className="bg-gradient-to-b from-blue-500/10 to-transparent border border-blue-500/30 rounded-3xl p-8 relative flex flex-col">
+              <div className="absolute top-4 right-4 px-3 py-1 text-xs font-medium bg-blue-500 text-white rounded-full">
+                Best Value
+              </div>
+              <h3 className="text-2xl font-semibold mb-2">Lifetime</h3>
+              <p className="text-[#86868b] mb-6">One-time purchase</p>
+              <div className="text-4xl font-bold mb-6">$179<span className="text-lg font-normal text-[#86868b]"></span></div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {["Everything in Free", "Support continued development", "Priority support forever", "Future exclusive features"].map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-[#86868b]">
+                    <Check size={18} className="text-blue-500 flex-shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <div>
+                <a
+                  href="https://buy.stripe.com/8x23cn7qk2QjgD0gKy3Ru01"
+                  className="block w-full py-3 text-center text-[17px] font-normal bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all duration-200"
+                >
+                  Buy Lifetime
+                </a>
+                <p className="text-xs text-[#86868b] text-center mt-4">30-day money-back guarantee</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FAQ */}
       <Suspense fallback={<div className="py-20 px-6"><div className="max-w-[720px] mx-auto text-center text-zinc-500">Loading...</div></div>}>
         <FAQSection />
@@ -317,6 +416,16 @@ function AppContent() {
             </a>
             <a href="https://github.com/vivy-company/aizen" className="text-sm text-zinc-500 hover:text-blue-500 transition-colors duration-200" target="_blank" rel="noopener noreferrer">
               {t("footer.github")}
+            </a>
+            <span className="text-zinc-700 hidden sm:inline">|</span>
+            <a href="/privacy" className="text-sm text-zinc-500 hover:text-blue-500 transition-colors duration-200">
+              Privacy
+            </a>
+            <a href="/terms" className="text-sm text-zinc-500 hover:text-blue-500 transition-colors duration-200">
+              Terms
+            </a>
+            <a href="/refund" className="text-sm text-zinc-500 hover:text-blue-500 transition-colors duration-200">
+              Refunds
             </a>
           </div>
         </div>

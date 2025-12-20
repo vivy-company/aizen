@@ -197,7 +197,6 @@ struct TerminalSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .padding()
         .onAppear {
             if availableFonts.isEmpty {
                 availableFonts = loadSystemFonts()

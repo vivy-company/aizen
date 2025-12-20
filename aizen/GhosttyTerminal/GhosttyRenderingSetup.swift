@@ -87,7 +87,11 @@ class GhosttyRenderingSetup {
         }
 
         // Check if session persistence is enabled and tmux is available
+        var isRestoringTmuxSession = false
         if sessionPersistence, let paneId = paneId, TmuxSessionManager.shared.isTmuxAvailable() {
+            // Check if we're restoring an existing tmux session
+            isRestoringTmuxSession = TmuxSessionManager.shared.sessionExistsSync(paneId: paneId)
+
             // Use tmux for session persistence - set as the command directly
             // This makes tmux the shell process, not something running inside a shell
             let tmuxCommand = TmuxSessionManager.shared.attachOrCreateCommand(
@@ -97,13 +101,13 @@ class GhosttyRenderingSetup {
             if let cmd = strdup(tmuxCommand) {
                 commandPtr = cmd
                 surfaceConfig.command = UnsafePointer(cmd)
-                Self.logger.info("Using tmux persistence for pane: \(paneId)")
+                Self.logger.info("Using tmux persistence for pane: \(paneId), restoring: \(isRestoringTmuxSession)")
             }
         }
 
         // Set initial_input if command provided (for presets)
-        // Works for both tmux and non-tmux modes
-        if let command = command, !command.isEmpty {
+        // Skip if we're restoring an existing tmux session - the command was already run before
+        if let command = command, !command.isEmpty, !isRestoringTmuxSession {
             let inputWithNewline = command + "\n"
             if let input = strdup(inputWithNewline) {
                 initialInputPtr = input

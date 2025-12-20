@@ -236,6 +236,15 @@ struct WorktreeListItemView: View {
                 Label(String(localized: "worktree.detail.copyBranchName"), systemImage: "doc.on.doc")
             }
 
+            Button {
+                if let path = worktree.path {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(path, forType: .string)
+                }
+            } label: {
+                Label(String(localized: "worktree.detail.copyPath"), systemImage: "doc.on.clipboard")
+            }
+
             Divider()
 
             Menu {

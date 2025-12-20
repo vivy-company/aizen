@@ -13,6 +13,7 @@ struct RootView: View {
 
     @State private var gitChangesContext: GitChangesContext?
     @State private var gitPanelController: GitPanelWindowController?
+    @State private var showingLicenseDeepLinkSheet = false
     @StateObject private var repositoryManager: RepositoryManager
 
     // Persist open Git panel worktree for restoration
@@ -31,6 +32,9 @@ struct RootView: View {
         )
         .onAppear {
             restoreGitPanelIfNeeded()
+            if LicenseManager.shared.hasPendingDeepLink {
+                showingLicenseDeepLinkSheet = true
+            }
         }
         .onChange(of: gitChangesContext) { newContext in
             if let ctx = newContext, !ctx.worktree.isDeleted {
@@ -57,6 +61,18 @@ struct RootView: View {
                 gitPanelController?.close()
                 gitPanelController = nil
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openLicenseDeepLink)) { _ in
+            showingLicenseDeepLinkSheet = true
+        }
+        .sheet(isPresented: $showingLicenseDeepLinkSheet) {
+            LicenseDeepLinkSheet(
+                licenseManager: LicenseManager.shared,
+                onOpenSettings: {
+                    SettingsWindowManager.shared.show()
+                    NotificationCenter.default.post(name: .openSettingsPro, object: nil)
+                }
+            )
         }
     }
 

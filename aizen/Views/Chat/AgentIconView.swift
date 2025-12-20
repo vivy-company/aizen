@@ -102,6 +102,16 @@ struct AgentIconView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: size, height: size)
+        case "vibe", "mistral":
+            Image("mistral")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+        case "qwen":
+            Image("qwen")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
         default:
             defaultIcon
         }

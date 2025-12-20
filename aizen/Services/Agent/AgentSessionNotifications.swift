@@ -104,7 +104,12 @@ extension AgentSession {
                    lastMessage.role == .agent,
                    !lastMessage.isComplete {
                     // Append to existing message
-                    let newContent = lastMessage.content + text
+                    var newContent = lastMessage.content
+                    newContent.append(text)
+                    var newBlocks = lastMessage.contentBlocks
+                    if !blockContent.isEmpty {
+                        newBlocks.append(contentsOf: blockContent)
+                    }
                     logger.debug("agentMessageChunk: APPENDING to existing, newContent='\(newContent)'")
                     // Force SwiftUI to recognize the change by explicitly notifying
                     objectWillChange.send()
@@ -114,7 +119,7 @@ extension AgentSession {
                         content: newContent,
                         timestamp: lastMessage.timestamp,
                         toolCalls: lastMessage.toolCalls,
-                        contentBlocks: lastMessage.contentBlocks + blockContent,
+                        contentBlocks: newBlocks,
                         isComplete: false,
                         startTime: lastMessage.startTime,
                         executionTime: lastMessage.executionTime,

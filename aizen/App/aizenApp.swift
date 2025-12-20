@@ -32,6 +32,14 @@ class AizenAppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        DispatchQueue.main.async {
+            for url in urls {
+                DeepLinkHandler.shared.handle(url)
+            }
+        }
+    }
 }
 
 @main
@@ -82,6 +90,9 @@ struct aizenApp: App {
             RootView(context: persistenceController.container.viewContext)
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .environmentObject(ghosttyApp)
+                .task {
+                    LicenseManager.shared.start()
+                }
                 .task(id: "\(terminalFontName)\(terminalFontSize)\(terminalThemeName)") {
                     ghosttyApp.reloadConfig()
                     await TmuxSessionManager.shared.updateConfig()
@@ -104,7 +115,23 @@ struct aizenApp: App {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
 
+            CommandGroup(replacing: .appSettings) {
+                Button {
+                    SettingsWindowManager.shared.show()
+                } label: {
+                    Label("Settings...", systemImage: "gearshape")
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+
             CommandGroup(after: .newItem) {
+                Button("Active Worktrees...") {
+                    ActiveWorktreesWindowManager.shared.show(context: persistenceController.container.viewContext)
+                }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
+
+                Divider()
+
                 Button("Split Right") {
                     splitActions?.splitHorizontal()
                 }
@@ -148,11 +175,6 @@ struct aizenApp: App {
             }
         }
 
-        Settings {
-            SettingsView()
-        }
-        .windowStyle(.hiddenTitleBar)
-        .windowToolbarStyle(.unified)
     }
 
     // MARK: - About Window
@@ -174,6 +196,12 @@ struct aizenApp: App {
         window.makeKeyAndOrderFront(nil)
 
         aboutWindow = window
+    }
+
+    // MARK: - Settings Window
+
+    private func showSettingsWindow() {
+        SettingsWindowManager.shared.show()
     }
 
     // MARK: - tmux Session Cleanup

@@ -179,41 +179,11 @@ struct CommandPaletteContent: View {
     )
     private var allWorktrees: FetchedResults<Worktree>
 
-    @State private var searchQuery = ""
-    @State private var selectedIndex = 0
-    @State private var displayedWorktrees: [Worktree] = []
+    @StateObject private var viewModel = WorktreeSearchViewModel()
     @FocusState private var isSearchFocused: Bool
     @EnvironmentObject private var interaction: PaletteInteractionState
     @State private var hoveredIndex: Int?
-
-    private func refreshDisplayedWorktrees() {
-        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        let filtered = allWorktrees.filter { worktree in
-            guard !worktree.isDeleted else { return false }
-            guard worktree.repository?.workspace != nil else { return false }
-            if query.isEmpty { return true }
-
-            let branch = worktree.branch ?? ""
-            let repoName = worktree.repository?.name ?? ""
-            let workspaceName = worktree.repository?.workspace?.name ?? ""
-            return branch.localizedCaseInsensitiveContains(query) ||
-                   repoName.localizedCaseInsensitiveContains(query) ||
-                   workspaceName.localizedCaseInsensitiveContains(query)
-        }
-
-        let sorted = filtered.sorted { a, b in
-            let aActive = hasActiveSessions(a)
-            let bActive = hasActiveSessions(b)
-            if aActive != bActive { return aActive }
-            return (a.lastAccessed ?? .distantPast) > (b.lastAccessed ?? .distantPast)
-        }
-
-        displayedWorktrees = Array(sorted.prefix(50))
-        if selectedIndex >= displayedWorktrees.count {
-            selectedIndex = max(0, displayedWorktrees.count - 1)
-        }
-    }
+    @AppStorage("selectedWorktreeId") private var currentWorktreeId: String?
 
     private func hasActiveSessions(_ worktree: Worktree) -> Bool {
         let chats = (worktree.chatSessions as? Set<ChatSession>)?.count ?? 0
@@ -231,9 +201,13 @@ struct CommandPaletteContent: View {
             VStack(spacing: 0) {
                 SpotlightSearchField(
                     placeholder: "Switch to worktree…",
-                    text: $searchQuery,
+                    text: $viewModel.searchQuery,
                     isFocused: $isSearchFocused,
-                    onSubmit: { selectCurrent() },
+                    onSubmit: {
+                        if let worktree = viewModel.getSelectedResult() {
+                            selectWorktree(worktree)
+                        }
+                    },
                     trailing: {
                         Button(action: onClose) {
                             KeyCap(text: "esc")
@@ -248,7 +222,7 @@ struct CommandPaletteContent: View {
 
                 Divider().opacity(0.25)
 
-                if displayedWorktrees.isEmpty {
+                if viewModel.results.isEmpty {
                     emptyResultsView
                 } else {
                     resultsList
@@ -259,25 +233,35 @@ struct CommandPaletteContent: View {
         }
         .frame(width: 760, height: 520)
         .onAppear {
-            refreshDisplayedWorktrees()
+            viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isSearchFocused = true
             }
         }
         .onChange(of: allWorktrees.count) { _ in
-            refreshDisplayedWorktrees()
+            viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
         }
-        .onChange(of: searchQuery) { _ in
-            selectedIndex = 0
-            refreshDisplayedWorktrees()
+        .onChange(of: currentWorktreeId) { _ in
+            viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
         }
         .background {
             Group {
-                Button("") { moveSelectionDown() }
+                Button("") {
+                    interaction.didUseKeyboard()
+                    viewModel.moveSelectionDown()
+                }
                     .keyboardShortcut(.downArrow, modifiers: [])
-                Button("") { moveSelectionUp() }
+                Button("") {
+                    interaction.didUseKeyboard()
+                    viewModel.moveSelectionUp()
+                }
                     .keyboardShortcut(.upArrow, modifiers: [])
-                Button("") { selectCurrent() }
+                Button("") {
+                    interaction.didUseKeyboard()
+                    if let worktree = viewModel.getSelectedResult() {
+                        selectWorktree(worktree)
+                    }
+                }
                     .keyboardShortcut(.return, modifiers: [])
                 Button("") { onClose() }
                     .keyboardShortcut(.escape, modifiers: [])
@@ -290,11 +274,12 @@ struct CommandPaletteContent: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(displayedWorktrees.enumerated()), id: \.element.objectID) { index, worktree in
+                    ForEach(viewModel.results.indices, id: \.self) { index in
+                        let worktree = viewModel.results[index]
                         worktreeRow(
                             worktree: worktree,
                             index: index,
-                            isSelected: index == selectedIndex,
+                            isSelected: index == viewModel.selectedIndex,
                             isHovered: hoveredIndex == index
                         )
                             .id(index)
@@ -307,7 +292,7 @@ struct CommandPaletteContent: View {
             .background(Color.clear)
             .scrollIndicators(.hidden)
             .frame(maxHeight: 380)
-            .onChange(of: selectedIndex) { newIndex in
+            .onChange(of: viewModel.selectedIndex) { newIndex in
                 proxy.scrollTo(newIndex, anchor: .center)
             }
         }
@@ -414,32 +399,14 @@ struct CommandPaletteContent: View {
         }
     }
 
-    private func moveSelectionDown() {
-        interaction.didUseKeyboard()
-        if selectedIndex < displayedWorktrees.count - 1 {
-            selectedIndex += 1
-        }
-    }
-
-    private func moveSelectionUp() {
-        interaction.didUseKeyboard()
-        if selectedIndex > 0 {
-            selectedIndex -= 1
-        }
-    }
-
-    private func selectCurrent() {
-        interaction.didUseKeyboard()
-        guard selectedIndex < displayedWorktrees.count else { return }
-        selectWorktree(displayedWorktrees[selectedIndex])
-    }
-
     private func selectWorktree(_ worktree: Worktree) {
         guard let worktreeId = worktree.id,
               let repoId = worktree.repository?.id,
               let workspaceId = worktree.repository?.workspace?.id else {
             return
         }
+        worktree.lastAccessed = Date()
+        try? viewContext.save()
         onNavigate(workspaceId, repoId, worktreeId)
         onClose()
     }

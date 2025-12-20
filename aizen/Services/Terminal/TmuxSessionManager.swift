@@ -149,6 +149,12 @@ actor TmuxSessionManager {
 
     /// Check if a tmux session exists for the given pane ID
     func sessionExists(paneId: String) async -> Bool {
+        sessionExistsSync(paneId: paneId)
+    }
+
+    /// Synchronous check if a tmux session exists for the given pane ID
+    /// Use this when you need to check from non-async context
+    nonisolated func sessionExistsSync(paneId: String) -> Bool {
         guard let tmux = tmuxPath() else {
             return false
         }

@@ -14,6 +14,7 @@ private struct TerminalState {
     var outputByteLimit: Int?
     var lastReadIndex: Int = 0
     var isReleased: Bool = false
+    var wasTruncated: Bool = false
     var exitWaiters: [CheckedContinuation<(exitCode: Int?, signal: String?), Never>] = []
 }
 
@@ -52,6 +53,9 @@ actor AgentTerminalDelegate {
 
     private var terminals: [String: TerminalState] = [:]
     private var releasedOutputs: [String: ReleasedTerminalOutput] = [:]
+    private var releasedOutputOrder: [String] = []
+    private let defaultOutputByteLimit = 1_000_000
+    private let maxReleasedOutputEntries = 50
 
     // MARK: - Private Cleanup
 
@@ -59,9 +63,11 @@ actor AgentTerminalDelegate {
     private func cleanupProcessPipes(_ process: Process) {
         if let outputPipe = process.standardOutput as? Pipe {
             outputPipe.fileHandleForReading.readabilityHandler = nil
+            try? outputPipe.fileHandleForReading.close()
         }
         if let errorPipe = process.standardError as? Pipe {
             errorPipe.fileHandleForReading.readabilityHandler = nil
+            try? errorPipe.fileHandleForReading.close()
         }
     }
 
@@ -118,12 +124,17 @@ actor AgentTerminalDelegate {
         let terminalIdValue = UUID().uuidString
         let terminalId = TerminalId(terminalIdValue)
 
-        let state = TerminalState(process: process, outputByteLimit: outputByteLimit)
+        let state = TerminalState(process: process, outputByteLimit: outputByteLimit ?? defaultOutputByteLimit)
         terminals[terminalIdValue] = state
 
         // Capture output asynchronously
         outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
+            if data.isEmpty {
+                handle.readabilityHandler = nil
+                try? handle.close()
+                return
+            }
             if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
                 Task {
                     await self?.appendOutput(terminalId: terminalIdValue, output: output)
@@ -133,6 +144,11 @@ actor AgentTerminalDelegate {
 
         errorPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
+            if data.isEmpty {
+                handle.readabilityHandler = nil
+                try? handle.close()
+                return
+            }
             if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
                 Task {
                     await self?.appendOutput(terminalId: terminalIdValue, output: output)
@@ -169,7 +185,7 @@ actor AgentTerminalDelegate {
         return TerminalOutputResponse(
             output: output,
             exitStatus: exitStatus,
-            truncated: false,
+            truncated: state.wasTruncated,
             _meta: nil
         )
     }
@@ -261,7 +277,8 @@ actor AgentTerminalDelegate {
         }
 
         // Cache output for UI display before removing
-        releasedOutputs[terminalId.value] = ReleasedTerminalOutput(
+        cacheReleasedOutput(
+            terminalId: terminalId.value,
             output: state.outputBuffer,
             exitCode: exitCode
         )
@@ -290,6 +307,8 @@ actor AgentTerminalDelegate {
             }
         }
         terminals.removeAll()
+        releasedOutputs.removeAll()
+        releasedOutputOrder.removeAll()
     }
 
     // MARK: - Public Helpers
@@ -323,9 +342,22 @@ actor AgentTerminalDelegate {
                 offsetBy: state.outputBuffer.count - limit
             )
             state.outputBuffer = String(state.outputBuffer[startIndex...])
+            state.wasTruncated = true
         }
 
         terminals[terminalId] = state
+    }
+
+    private func cacheReleasedOutput(terminalId: String, output: String, exitCode: Int) {
+        releasedOutputs[terminalId] = ReleasedTerminalOutput(output: output, exitCode: exitCode)
+        releasedOutputOrder.removeAll { $0 == terminalId }
+        releasedOutputOrder.append(terminalId)
+
+        while releasedOutputOrder.count > maxReleasedOutputEntries,
+              let oldest = releasedOutputOrder.first {
+            releasedOutputOrder.removeFirst()
+            releasedOutputs.removeValue(forKey: oldest)
+        }
     }
 
     private func monitorProcessExit(terminalId: TerminalId) async {

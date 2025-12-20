@@ -50,7 +50,53 @@ actor UVAgentInstaller {
             throw AgentInstallError.installFailed(message: "uv install failed: \(errorMessage)")
         }
 
-        logger.info("Installed \(package) to \(targetDir)")
+        // Get and save installed version
+        if let version = await getInstalledVersion(package: package, shellEnv: shellEnv) {
+            saveVersionManifest(version: version, targetDir: targetDir)
+            logger.info("Installed \(package) version \(version) to \(targetDir)")
+        } else {
+            logger.info("Installed \(package) to \(targetDir)")
+        }
+    }
+
+    // MARK: - Version Detection
+
+    /// Get installed package version using pip show
+    private func getInstalledVersion(package: String, shellEnv: [String: String]) async -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["uv", "pip", "show", package]
+        process.environment = shellEnv
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: data, encoding: .utf8) {
+                // Parse "Version: x.y.z" from pip show output
+                for line in output.components(separatedBy: "\n") {
+                    if line.hasPrefix("Version:") {
+                        let version = line.replacingOccurrences(of: "Version:", with: "").trimmingCharacters(in: .whitespaces)
+                        return version
+                    }
+                }
+            }
+        } catch {
+            logger.error("Failed to get version for \(package): \(error)")
+        }
+
+        return nil
+    }
+
+    /// Save version to manifest file
+    private func saveVersionManifest(version: String, targetDir: String) {
+        let manifestPath = (targetDir as NSString).appendingPathComponent(".version")
+        try? version.write(toFile: manifestPath, atomically: true, encoding: .utf8)
     }
 
     // MARK: - UV Installation

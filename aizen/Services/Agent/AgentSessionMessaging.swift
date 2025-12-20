@@ -274,6 +274,7 @@ extension AgentSession {
                 timestamp: Date(),
                 contentBlocks: contentBlocks
             ))
+        trimMessagesIfNeeded()
     }
 
     func markLastMessageComplete() {
@@ -316,6 +317,7 @@ extension AgentSession {
             requestId: requestId
         )
         messages.append(newMessage)
+        trimMessagesIfNeeded()
     }
 
     func addSystemMessage(_ content: String) {
@@ -326,5 +328,12 @@ extension AgentSession {
                 content: content,
                 timestamp: Date()
             ))
+        trimMessagesIfNeeded()
+    }
+
+    private func trimMessagesIfNeeded() {
+        let excess = messages.count - Self.maxMessageCount
+        guard excess > 0 else { return }
+        messages.removeFirst(excess)
     }
 }

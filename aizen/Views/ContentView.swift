@@ -200,6 +200,7 @@ struct ContentView: View {
 
             if let newWorktree = newValue, !newWorktree.isDeleted {
                 previousWorktree = newWorktree
+                try? repositoryManager.updateWorktreeAccess(newWorktree)
             } else if newValue?.isDeleted == true {
                 // Worktree was deleted, fall back to primary worktree
                 selectedWorktree = nil
@@ -211,6 +212,15 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .commandPaletteShortcut)) { _ in
             showCommandPalette()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToWorktree)) { notification in
+            guard let info = notification.userInfo,
+                  let workspaceId = info["workspaceId"] as? UUID,
+                  let repoId = info["repoId"] as? UUID,
+                  let worktreeId = info["worktreeId"] as? UUID else {
+                return
+            }
+            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
         }
     }
 

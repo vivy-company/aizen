@@ -23,7 +23,12 @@ actor AgentVersionChecker {
     private let cacheExpiration: TimeInterval = 3600 // 1 hour
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "AgentVersion")
 
-    private init() {}
+    private let baseInstallPath: String
+
+    private init() {
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        baseInstallPath = homeDir.appendingPathComponent(".aizen/agents").path
+    }
 
     /// Check if an agent's version is outdated
     func checkVersion(for agentName: String) async -> AgentVersionInfo {
@@ -35,24 +40,22 @@ actor AgentVersionChecker {
         }
 
         let metadata = AgentRegistry.shared.getMetadata(for: agentName)
-        guard let agentPath = metadata?.executablePath else {
+        guard let installMethod = metadata?.installMethod else {
             return AgentVersionInfo(current: nil, latest: nil, isOutdated: false, updateAvailable: false)
         }
 
-        // Detect actual install method by inspecting the binary
-        let actualInstallMethod = await detectInstallMethod(agentPath: agentPath, configuredMethod: metadata?.installMethod)
-
+        let agentDir = (baseInstallPath as NSString).appendingPathComponent(agentName)
         let info: AgentVersionInfo
 
-        switch actualInstallMethod {
+        switch installMethod {
         case .npm(let package):
-            info = await checkNpmVersion(package: package, agentPath: agentPath)
-        case .uv:
-            // For uv packages, just get version from --version flag
-            info = await checkBinaryVersion(agentPath: agentPath)
+            info = await checkNpmVersion(package: package, agentDir: agentDir)
+        case .uv(let package):
+            info = await checkUvVersion(package: package, agentDir: agentDir)
         case .githubRelease(let repo, _):
-            info = await checkGithubVersion(repo: repo, agentPath: agentPath)
-        default:
+            info = await checkGithubVersion(repo: repo, agentDir: agentDir)
+        case .binary:
+            // Binary installs don't have version tracking
             info = AgentVersionInfo(current: nil, latest: nil, isOutdated: false, updateAvailable: false)
         }
 
@@ -60,34 +63,17 @@ actor AgentVersionChecker {
         versionCache[agentName] = info
         lastCheckTime[agentName] = Date()
 
+        logger.info("Version check for \(agentName): current=\(info.current ?? "nil"), latest=\(info.latest ?? "nil"), outdated=\(info.isOutdated)")
+
         return info
     }
 
-    /// Detect actual install method by inspecting the binary
-    private func detectInstallMethod(agentPath: String, configuredMethod: AgentInstallMethod?) async -> AgentInstallMethod? {
-        // Check if it's a symlink to node_modules (npm install)
-        if let resolvedPath = try? FileManager.default.destinationOfSymbolicLink(atPath: agentPath),
-           resolvedPath.contains("node_modules") {
-            // Extract package name from path like: ../lib/node_modules/@scope/package/dist/index.js
-            if let packageMatch = resolvedPath.range(of: #"node_modules/([^/]+(?:/[^/]+)?)"#, options: .regularExpression) {
-                let packagePath = String(resolvedPath[packageMatch])
-                let packageName = packagePath.replacingOccurrences(of: "node_modules/", with: "")
-                return .npm(package: packageName)
-            }
-            // Fallback to configured method if we found node_modules but couldn't extract package
-            if case .npm(let package) = configuredMethod {
-                return .npm(package: package)
-            }
-        }
+    // MARK: - NPM Version Detection
 
-        // If not npm, return configured method
-        return configuredMethod
-    }
-
-    /// Check NPM package version
-    private func checkNpmVersion(package: String, agentPath: String?) async -> AgentVersionInfo {
-        // Get current installed version
-        let currentVersion = await getCurrentNpmVersion(package: package)
+    /// Check NPM package version using local package.json
+    private func checkNpmVersion(package: String, agentDir: String) async -> AgentVersionInfo {
+        // Get current version from local installation
+        let currentVersion = await getCurrentNpmVersion(package: package, agentDir: agentDir)
 
         // Get latest version from npm registry
         let latestVersion = await getLatestNpmVersion(package: package)
@@ -102,40 +88,25 @@ actor AgentVersionChecker {
         )
     }
 
-    /// Get current installed NPM package version
-    private func getCurrentNpmVersion(package: String) async -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["npm", "list", "-g", package, "--json"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let dependencies = json["dependencies"] as? [String: Any],
-               let packageInfo = dependencies[package] as? [String: Any],
-               let version = packageInfo["version"] as? String {
-                return version
-            }
-        } catch {
-            logger.error("Failed to get current npm version for \(package): \(error)")
+    /// Get current installed NPM package version from local package.json
+    private func getCurrentNpmVersion(package: String, agentDir: String) async -> String? {
+        // First try .version manifest file (written at install time)
+        if let version = readVersionManifest(agentDir: agentDir) {
+            return version
         }
 
-        return nil
+        // Fallback: read from local node_modules package.json
+        return await NPMAgentInstaller.shared.getInstalledVersion(package: package, targetDir: agentDir)
     }
 
     /// Get latest NPM package version from registry
     private func getLatestNpmVersion(package: String) async -> String? {
+        // Strip version specifiers like @latest before querying
+        let cleanPackage = stripVersionSpecifier(from: package)
+
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["npm", "view", package, "version"]
+        process.arguments = ["npm", "view", cleanPackage, "version"]
 
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -151,30 +122,42 @@ actor AgentVersionChecker {
                 return version
             }
         } catch {
-            logger.error("Failed to get latest npm version for \(package): \(error)")
+            logger.error("Failed to get latest npm version for \(cleanPackage): \(error)")
         }
 
         return nil
     }
 
-    /// Check binary version (for uv packages - just current version, no latest check)
-    private func checkBinaryVersion(agentPath: String?) async -> AgentVersionInfo {
-        let currentVersion = await getCurrentBinaryVersion(agentPath: agentPath)
-        return AgentVersionInfo(
-            current: currentVersion,
-            latest: nil,
-            isOutdated: false,
-            updateAvailable: false
-        )
+    /// Strip version specifier from package name (e.g., "opencode-ai@latest" -> "opencode-ai")
+    private func stripVersionSpecifier(from package: String) -> String {
+        // Handle scoped packages: @scope/name@version -> @scope/name
+        if package.hasPrefix("@") {
+            if let slashIndex = package.firstIndex(of: "/") {
+                let afterSlash = package[package.index(after: slashIndex)...]
+                if let atIndex = afterSlash.firstIndex(of: "@") {
+                    return String(package[..<atIndex])
+                }
+            }
+            return package
+        }
+
+        // Simple package: name@version -> name
+        if let atIndex = package.firstIndex(of: "@") {
+            return String(package[..<atIndex])
+        }
+
+        return package
     }
 
+    // MARK: - GitHub Version Detection
+
     /// Check GitHub release version
-    private func checkGithubVersion(repo: String, agentPath: String?) async -> AgentVersionInfo {
-        // Get current version from binary
-        let currentVersion = await getCurrentBinaryVersion(agentPath: agentPath)
+    private func checkGithubVersion(repo: String, agentDir: String) async -> AgentVersionInfo {
+        // Get current version from manifest or binary
+        let currentVersion = getCurrentGithubVersion(agentDir: agentDir)
 
         // Get latest version from GitHub API
-        let latestVersion = await getLatestGithubVersion(repo: repo)
+        let latestVersion = await GitHubReleaseInstaller.shared.getLatestVersion(repo: repo)
 
         let isOutdated = compareVersions(current: currentVersion, latest: latestVersion)
 
@@ -186,12 +169,117 @@ actor AgentVersionChecker {
         )
     }
 
-    /// Get current binary version by executing with --version flag
-    private func getCurrentBinaryVersion(agentPath: String?) async -> String? {
-        guard let agentPath = agentPath else { return nil }
+    /// Get current GitHub release version from manifest
+    private func getCurrentGithubVersion(agentDir: String) -> String? {
+        // First try .version manifest file (written at install time)
+        if let version = readVersionManifest(agentDir: agentDir) {
+            return version
+        }
 
+        // Fallback: try --version flag on binary
+        // Find the binary in the agent directory
+        let fileManager = FileManager.default
+        if let contents = try? fileManager.contentsOfDirectory(atPath: agentDir) {
+            for file in contents where !file.hasPrefix(".") {
+                let filePath = (agentDir as NSString).appendingPathComponent(file)
+                if fileManager.isExecutableFile(atPath: filePath) {
+                    if let version = getBinaryVersion(path: filePath) {
+                        return version
+                    }
+                }
+            }
+        }
+
+        return nil
+    }
+
+    // MARK: - UV (Python) Version Detection
+
+    /// Check UV package version
+    private func checkUvVersion(package: String, agentDir: String) async -> AgentVersionInfo {
+        // Get current version from manifest or binary
+        let currentVersion = getCurrentUvVersion(agentDir: agentDir)
+
+        // Get latest version from PyPI
+        let latestVersion = await getLatestPyPIVersion(package: package)
+
+        let isOutdated = compareVersions(current: currentVersion, latest: latestVersion)
+
+        return AgentVersionInfo(
+            current: currentVersion,
+            latest: latestVersion,
+            isOutdated: isOutdated,
+            updateAvailable: isOutdated
+        )
+    }
+
+    /// Get current UV package version from manifest or binary
+    private func getCurrentUvVersion(agentDir: String) -> String? {
+        // First try .version manifest file
+        if let version = readVersionManifest(agentDir: agentDir) {
+            return version
+        }
+
+        // Fallback: try --version on any executable in the directory
+        let fileManager = FileManager.default
+        if let contents = try? fileManager.contentsOfDirectory(atPath: agentDir) {
+            for file in contents where !file.hasPrefix(".") && !file.hasSuffix("-cli") {
+                let filePath = (agentDir as NSString).appendingPathComponent(file)
+                var isDir: ObjCBool = false
+                if fileManager.fileExists(atPath: filePath, isDirectory: &isDir),
+                   !isDir.boolValue,
+                   fileManager.isExecutableFile(atPath: filePath) {
+                    if let version = getBinaryVersion(path: filePath) {
+                        return version
+                    }
+                }
+            }
+        }
+
+        return nil
+    }
+
+    /// Get latest version from PyPI
+    private func getLatestPyPIVersion(package: String) async -> String? {
+        guard let url = URL(string: "https://pypi.org/pypi/\(package)/json") else {
+            return nil
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                return nil
+            }
+
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let info = json["info"] as? [String: Any],
+               let version = info["version"] as? String {
+                return version
+            }
+        } catch {
+            logger.error("Failed to get latest PyPI version for \(package): \(error)")
+        }
+
+        return nil
+    }
+
+    // MARK: - Helpers
+
+    /// Read version from manifest file
+    private func readVersionManifest(agentDir: String) -> String? {
+        let manifestPath = (agentDir as NSString).appendingPathComponent(".version")
+        guard let version = try? String(contentsOfFile: manifestPath, encoding: .utf8) else {
+            return nil
+        }
+        return version.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Get binary version by executing with --version flag
+    private func getBinaryVersion(path: String) -> String? {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: agentPath)
+        process.executableURL = URL(fileURLWithPath: path)
         process.arguments = ["--version"]
 
         let pipe = Pipe()
@@ -205,40 +293,10 @@ actor AgentVersionChecker {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !output.isEmpty {
-                // Extract version number from output (handles formats like "v1.2.3" or "agent version 1.2.3")
                 return extractVersionNumber(from: output)
             }
         } catch {
-            logger.error("Failed to get binary version for \(agentPath): \(error)")
-        }
-
-        return nil
-    }
-
-    /// Get latest GitHub release version via API
-    private func getLatestGithubVersion(repo: String) async -> String? {
-        guard let apiURL = URL(string: "https://api.github.com/repos/\(repo)/releases/latest") else {
-            return nil
-        }
-
-        var request = URLRequest(url: apiURL, timeoutInterval: 30)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
-                return nil
-            }
-
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let tagName = json["tag_name"] as? String {
-                // Remove 'v' prefix if present
-                return tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
-            }
-        } catch {
-            logger.error("Failed to get latest GitHub version for \(repo): \(error)")
+            // Binary doesn't support --version, that's ok
         }
 
         return nil
@@ -288,5 +346,12 @@ actor AgentVersionChecker {
     func clearAllCaches() {
         versionCache.removeAll()
         lastCheckTime.removeAll()
+    }
+
+    /// Write version manifest for an agent (for migration of existing installs)
+    func writeVersionManifest(for agentName: String, version: String) {
+        let agentDir = (baseInstallPath as NSString).appendingPathComponent(agentName)
+        let manifestPath = (agentDir as NSString).appendingPathComponent(".version")
+        try? version.write(toFile: manifestPath, atomically: true, encoding: .utf8)
     }
 }

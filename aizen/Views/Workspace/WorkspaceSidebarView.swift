@@ -19,8 +19,10 @@ struct WorkspaceSidebarView: View {
     @Binding var showingAddRepository: Bool
 
     @ObservedObject var repositoryManager: RepositoryManager
+    @StateObject private var licenseManager = LicenseManager.shared
     @State private var showingWorkspaceSheet = false
     @State private var showingWorkspaceSwitcher = false
+    @State private var showingSupportSheet = false
     @State private var workspaceToEdit: Workspace?
     @State private var refreshTask: Task<Void, Never>?
     @AppStorage("repositoryStatusFilters") private var storedStatusFilters: String = ""
@@ -34,6 +36,15 @@ struct WorkspaceSidebarView: View {
             get: { ItemStatus.decode(storedStatusFilters) },
             set: { storedStatusFilters = ItemStatus.encode($0) }
         )
+    }
+
+    private var isLicenseActive: Bool {
+        switch licenseManager.status {
+        case .active, .offlineGrace:
+            return true
+        default:
+            return false
+        }
     }
 
     private let refreshInterval: TimeInterval = 30.0
@@ -274,6 +285,29 @@ struct WorkspaceSidebarView: View {
 
             Divider()
 
+            // Support Aizen (only when not licensed)
+            if !isLicenseActive {
+                Button {
+                    SettingsWindowManager.shared.show()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        NotificationCenter.default.post(name: .openSettingsPro, object: nil)
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.orange)
+                        Text("sidebar.supportAizen")
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                .background(Color.primary.opacity(0.08))
+            }
+
             // Footer buttons
             HStack(spacing: 0) {
                 Button {
@@ -288,22 +322,27 @@ struct WorkspaceSidebarView: View {
                 Spacer()
 
                 Button {
-                    if let url = URL(string: "https://discord.gg/eKW7GNesuS") {
-                        NSWorkspace.shared.open(url)
-                    }
+                    showingSupportSheet = true
                 } label: {
-                    Image("DiscordLogo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 16, height: 16)
-                        .opacity(0.6)
+                    Image(systemName: "bubble.left.and.bubble.right")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 8)
+                .help("sidebar.support")
+
+                Button {
+                    SettingsWindowManager.shared.show()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .help("sidebar.joinDiscord")
+                .help("settings.title")
             }
-            .background(.background)
+            .background(Color.primary.opacity(0.04))
         }
         .navigationTitle(LocalizedStringKey("workspace.repositories.title"))
         .sheet(isPresented: $showingWorkspaceSheet) {
@@ -318,6 +357,9 @@ struct WorkspaceSidebarView: View {
         }
         .sheet(item: $workspaceToEdit) { workspace in
             WorkspaceEditSheet(workspace: workspace, repositoryManager: repositoryManager)
+        }
+        .sheet(isPresented: $showingSupportSheet) {
+            SupportSheet()
         }
         .onAppear {
             startPeriodicRefresh()
@@ -720,6 +762,140 @@ struct RepositoryRemoveSheet: View {
             .padding(.top, 8)
         }
         .padding(24)
+        .frame(width: 340)
+    }
+}
+
+struct SupportSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private struct ContactOption: Identifiable {
+        let id = UUID()
+        let title: String
+        let subtitle: String
+        let icon: String
+        let iconImage: String?
+        let iconText: String?
+        let color: Color
+        let url: String
+    }
+
+    private let contactOptions: [ContactOption] = [
+        ContactOption(title: "Aizen", subtitle: "@aizenwin", icon: "", iconImage: nil, iconText: "𝕏", color: .primary, url: "https://x.com/aizenwin"),
+        ContactOption(title: "Developer", subtitle: "@wiedymi", icon: "", iconImage: nil, iconText: "𝕏", color: .primary, url: "https://x.com/wiedymi"),
+        ContactOption(title: "Discord", subtitle: "Join Community", icon: "", iconImage: "DiscordLogo", iconText: nil, color: Color(red: 0.345, green: 0.396, blue: 0.949), url: "https://discord.gg/eKW7GNesuS"),
+        ContactOption(title: "Email", subtitle: "dev@aizen.win", icon: "envelope.fill", iconImage: nil, iconText: nil, color: .orange, url: "mailto:dev@aizen.win"),
+        ContactOption(title: "GitHub", subtitle: "Report Issue", icon: "exclamationmark.triangle.fill", iconImage: nil, iconText: nil, color: .red, url: "https://github.com/vivy-company/aizen/issues")
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 8) {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.blue)
+
+                    Text("sidebar.support.title")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+
+                    Text("sidebar.support.subtitle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 24)
+                .padding(.bottom, 20)
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(12)
+            }
+
+            Divider()
+
+            // Options
+            VStack(spacing: 0) {
+                ForEach(contactOptions) { option in
+                    Button {
+                        if let url = URL(string: option.url) {
+                            NSWorkspace.shared.open(url)
+                        }
+                    } label: {
+                        HStack(spacing: 14) {
+                            Group {
+                                if let imageName = option.iconImage {
+                                    Image(imageName)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                } else if let text = option.iconText {
+                                    Text(text)
+                                        .font(.system(size: 18, weight: .bold))
+                                } else {
+                                    Image(systemName: option.icon)
+                                }
+                            }
+                            .frame(width: 24, height: 24)
+                            .foregroundStyle(option.color)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(option.title)
+                                    .font(.body)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.primary)
+
+                                Text(option.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if option.id != contactOptions.last?.id {
+                        Divider()
+                            .padding(.leading, 58)
+                    }
+                }
+            }
+
+            // Company footer
+            Button {
+                if let url = URL(string: "https://x.com/vivytech") {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Vivy Technologies Co., Limited")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.quaternary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+        }
         .frame(width: 340)
     }
 }

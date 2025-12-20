@@ -6,12 +6,14 @@
 //
 
 import Foundation
+import os.log
 
 actor GitHubReleaseInstaller {
     static let shared = GitHubReleaseInstaller()
 
     private let urlSession: URLSession
     private let binaryInstaller: BinaryAgentInstaller
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "GitHubInstaller")
 
     init(urlSession: URLSession = .shared, binaryInstaller: BinaryAgentInstaller = .shared) {
         self.urlSession = urlSession
@@ -60,6 +62,48 @@ actor GitHubReleaseInstaller {
             agentId: agentId,
             targetDir: targetDir
         )
+
+        // Save installed version to manifest (strip 'v' prefix if present)
+        let version = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+        saveVersionManifest(version: version, targetDir: targetDir)
+        logger.info("Installed \(agentId) version \(version) from \(repo)")
+    }
+
+    // MARK: - Version Detection
+
+    /// Get latest release version from GitHub API
+    func getLatestVersion(repo: String) async -> String? {
+        guard let apiURL = URL(string: "https://api.github.com/repos/\(repo)/releases/latest") else {
+            return nil
+        }
+
+        var request = URLRequest(url: apiURL, timeoutInterval: 30)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                return nil
+            }
+
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let tagName = json["tag_name"] as? String {
+                // Remove 'v' prefix if present
+                return tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+            }
+        } catch {
+            logger.error("Failed to get latest GitHub version for \(repo): \(error.localizedDescription)")
+        }
+
+        return nil
+    }
+
+    /// Save version to manifest file for quick lookup
+    private func saveVersionManifest(version: String, targetDir: String) {
+        let manifestPath = (targetDir as NSString).appendingPathComponent(".version")
+        try? version.write(toFile: manifestPath, atomically: true, encoding: .utf8)
     }
 
     // MARK: - Helpers

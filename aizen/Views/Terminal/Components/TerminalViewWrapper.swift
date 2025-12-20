@@ -23,6 +23,7 @@ class TerminalViewCoordinator {
     }
 
     func startMonitoring(terminal: GhosttyTerminalView) {
+        stopMonitoring()
         // Poll for process exit every 500ms
         exitCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self, weak terminal] _ in
             guard let self = self, let terminal = terminal else { return }
@@ -33,6 +34,7 @@ class TerminalViewCoordinator {
                 self.onProcessExit()
             }
         }
+        exitCheckTimer?.tolerance = 0.1
     }
 
     func stopMonitoring() {

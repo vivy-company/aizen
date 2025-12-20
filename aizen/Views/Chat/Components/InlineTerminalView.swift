@@ -16,6 +16,7 @@ struct InlineTerminalView: View {
     @State private var output: String = ""
     @State private var isRunning: Bool = false
     @State private var loadTask: Task<Void, Never>?
+    private let maxDisplayChars = 20_000
 
     private var fontSize: CGFloat {
         max(terminalFontSize - 2, 9) // Slightly smaller for inline view
@@ -25,13 +26,16 @@ struct InlineTerminalView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Terminal output with ANSI colors
             ScrollView {
-                if output.isEmpty {
+                let displayOutput = output.count > maxDisplayChars
+                    ? String(output.suffix(maxDisplayChars))
+                    : output
+                if displayOutput.isEmpty {
                     Text("Waiting for output...")
                         .font(.custom(terminalFontName, size: fontSize))
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text(ANSIParser.parse(output))
+                    Text(ANSIParser.parse(displayOutput))
                         .font(.custom(terminalFontName, size: fontSize))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -77,10 +81,15 @@ struct InlineTerminalView: View {
 
                 let terminalOutput = await session.getTerminalOutput(terminalId: terminalId) ?? ""
                 let running = await session.isTerminalRunning(terminalId: terminalId)
-                
-                await MainActor.run {
-                    output = terminalOutput
-                    isRunning = running
+
+                let currentOutput = await MainActor.run { output }
+                let currentRunning = await MainActor.run { isRunning }
+
+                if terminalOutput != currentOutput || running != currentRunning {
+                    await MainActor.run {
+                        output = terminalOutput
+                        isRunning = running
+                    }
                 }
 
                 if !running && !terminalOutput.isEmpty {

@@ -52,7 +52,7 @@ struct ChatSessionView: View {
                         timelineItems: viewModel.timelineItems,
                         isProcessing: viewModel.isProcessing,
                         isSessionInitializing: viewModel.isSessionInitializing,
-                        selectedAgent: viewModel.selectedAgentDisplayName,
+                        selectedAgent: viewModel.selectedAgent,
                         currentThought: viewModel.currentAgentSession?.currentThought,
                         currentIterationId: viewModel.currentAgentSession?.currentIterationId,
                         onScrollProxyReady: { proxy in

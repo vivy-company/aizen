@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Darwin
 
 class GitIndexWatcher {
     private let worktreePath: String
@@ -15,6 +16,10 @@ class GitIndexWatcher {
     private let debounceInterval: TimeInterval = 0.5  // Debounce rapid changes
     private var pollingTask: Task<Void, Never>?
     private var debounceTask: Task<Void, Never>?
+    private var indexSource: DispatchSourceFileSystemObject?
+    private var headSource: DispatchSourceFileSystemObject?
+    private var indexFD: CInt = -1
+    private var headFD: CInt = -1
     private let lastIndexModificationDateLock = NSLock()
     private var _lastIndexModificationDate: Date?
     private var lastIndexModificationDate: Date? {
@@ -121,53 +126,55 @@ class GitIndexWatcher {
             lastWorkdirChecksum = String(headModDate.timeIntervalSince1970)
         }
 
-        // Start polling task on BACKGROUND thread
-        // Only monitor index file changes - avoid expensive git status calls
-        // that can contend with libgit2 operations
-        pollingTask = Task.detached { [weak self] in
-            guard let self = self else { return }
+        if !setupDispatchSources() {
+            // Start polling task on BACKGROUND thread (fallback)
+            // Only monitor index file changes - avoid expensive git status calls
+            // that can contend with libgit2 operations
+            pollingTask = Task.detached { [weak self] in
+                guard let self = self else { return }
 
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(for: .seconds(self.pollInterval))
+                while !Task.isCancelled {
+                    do {
+                        try await Task.sleep(for: .seconds(self.pollInterval))
 
-                    guard !Task.isCancelled else { break }
+                        guard !Task.isCancelled else { break }
 
-                    var hasChanges = false
+                        var hasChanges = false
 
-                    // Check if index was modified (cheap file stat)
-                    // This detects: staging, unstaging, commits, branch switches, etc.
-                    if let attrs = try? FileManager.default.attributesOfItem(atPath: self.gitIndexPath),
-                       let modDate = attrs[.modificationDate] as? Date {
+                        // Check if index was modified (cheap file stat)
+                        // This detects: staging, unstaging, commits, branch switches, etc.
+                        if let attrs = try? FileManager.default.attributesOfItem(atPath: self.gitIndexPath),
+                           let modDate = attrs[.modificationDate] as? Date {
 
-                        if let lastDate = self.lastIndexModificationDate, modDate > lastDate {
-                            self.lastIndexModificationDate = modDate
-                            hasChanges = true
-                        } else if self.lastIndexModificationDate == nil {
-                            self.lastIndexModificationDate = modDate
+                            if let lastDate = self.lastIndexModificationDate, modDate > lastDate {
+                                self.lastIndexModificationDate = modDate
+                                hasChanges = true
+                            } else if self.lastIndexModificationDate == nil {
+                                self.lastIndexModificationDate = modDate
+                            }
                         }
-                    }
 
-                    // Also check HEAD file for branch switches
-                    let headPath = (self.gitIndexPath as NSString).deletingLastPathComponent
-                    let headFilePath = (headPath as NSString).appendingPathComponent("HEAD")
-                    if let headAttrs = try? FileManager.default.attributesOfItem(atPath: headFilePath),
-                       let headModDate = headAttrs[.modificationDate] as? Date {
+                        // Also check HEAD file for branch switches
+                        let headPath = (self.gitIndexPath as NSString).deletingLastPathComponent
+                        let headFilePath = (headPath as NSString).appendingPathComponent("HEAD")
+                        if let headAttrs = try? FileManager.default.attributesOfItem(atPath: headFilePath),
+                           let headModDate = headAttrs[.modificationDate] as? Date {
 
-                        if let lastDate = self.lastWorkdirChecksum.flatMap({ Double($0) }).map({ Date(timeIntervalSince1970: $0) }),
-                           headModDate > lastDate {
-                            self.lastWorkdirChecksum = String(headModDate.timeIntervalSince1970)
-                            hasChanges = true
-                        } else if self.lastWorkdirChecksum == nil {
-                            self.lastWorkdirChecksum = String(headModDate.timeIntervalSince1970)
+                            if let lastDate = self.lastWorkdirChecksum.flatMap({ Double($0) }).map({ Date(timeIntervalSince1970: $0) }),
+                               headModDate > lastDate {
+                                self.lastWorkdirChecksum = String(headModDate.timeIntervalSince1970)
+                                hasChanges = true
+                            } else if self.lastWorkdirChecksum == nil {
+                                self.lastWorkdirChecksum = String(headModDate.timeIntervalSince1970)
+                            }
                         }
-                    }
 
-                    if hasChanges {
-                        self.scheduleDebounceCallback()
+                        if hasChanges {
+                            self.scheduleDebounceCallback()
+                        }
+                    } catch {
+                        break
                     }
-                } catch {
-                    break
                 }
             }
         }
@@ -178,10 +185,85 @@ class GitIndexWatcher {
         pollingTask = nil
         debounceTask?.cancel()
         debounceTask = nil
+        indexSource?.cancel()
+        headSource?.cancel()
+        indexSource = nil
+        headSource = nil
+        if indexFD != -1 {
+            close(indexFD)
+            indexFD = -1
+        }
+        if headFD != -1 {
+            close(headFD)
+            headFD = -1
+        }
         onChange = nil
         lastIndexModificationDate = nil
         lastWorkdirChecksum = nil
         hasPendingCallback = false
+    }
+
+    private func setupDispatchSources() -> Bool {
+        let headPath = (gitIndexPath as NSString).deletingLastPathComponent
+        let headFilePath = (headPath as NSString).appendingPathComponent("HEAD")
+
+        indexFD = open(gitIndexPath, O_EVTONLY)
+        headFD = open(headFilePath, O_EVTONLY)
+
+        var createdSource = false
+
+        if indexFD != -1 {
+            let source = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: indexFD,
+                eventMask: [.write, .rename, .delete, .extend, .attrib],
+                queue: DispatchQueue.global(qos: .utility)
+            )
+            source.setEventHandler { [weak self] in
+                self?.scheduleDebounceCallback()
+            }
+            source.setCancelHandler { [weak self] in
+                if let fd = self?.indexFD, fd != -1 {
+                    close(fd)
+                    self?.indexFD = -1
+                }
+            }
+            source.resume()
+            indexSource = source
+            createdSource = true
+        }
+
+        if headFD != -1 {
+            let source = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: headFD,
+                eventMask: [.write, .rename, .delete, .extend, .attrib],
+                queue: DispatchQueue.global(qos: .utility)
+            )
+            source.setEventHandler { [weak self] in
+                self?.scheduleDebounceCallback()
+            }
+            source.setCancelHandler { [weak self] in
+                if let fd = self?.headFD, fd != -1 {
+                    close(fd)
+                    self?.headFD = -1
+                }
+            }
+            source.resume()
+            headSource = source
+            createdSource = true
+        }
+
+        if !createdSource {
+            if indexFD != -1 {
+                close(indexFD)
+                indexFD = -1
+            }
+            if headFD != -1 {
+                close(headFD)
+                headFD = -1
+            }
+        }
+
+        return createdSource
     }
 
     private func scheduleDebounceCallback() {

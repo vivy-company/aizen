@@ -30,6 +30,10 @@ extension AgentRegistry {
             return "\(basePath)/kimi/kimi"
         case "opencode":
             return "\(basePath)/opencode/node_modules/.bin/opencode"
+        case "vibe":
+            return "\(basePath)/vibe/vibe-acp"
+        case "qwen":
+            return "\(basePath)/qwen/node_modules/.bin/qwen"
         default:
             return "\(basePath)/\(agentId)/\(agentId)"
         }
@@ -60,7 +64,7 @@ extension AgentRegistry {
             AgentMetadata(
                 id: "claude",
                 name: "Claude",
-                description: "Anthropic's AI assistant with advanced coding capabilities",
+                description: "Agentic coding tool that understands your codebase",
                 iconType: .builtin("claude"),
                 isBuiltIn: true,
                 isEnabled: true,
@@ -74,7 +78,7 @@ extension AgentRegistry {
             AgentMetadata(
                 id: "codex",
                 name: "Codex",
-                description: "OpenAI's code generation model",
+                description: "Lightweight open-source coding agent by OpenAI",
                 iconType: .builtin("openai"),
                 isBuiltIn: true,
                 isEnabled: true,
@@ -88,7 +92,7 @@ extension AgentRegistry {
             AgentMetadata(
                 id: "gemini",
                 name: "Gemini",
-                description: "Google's multimodal AI model",
+                description: "Open-source AI agent powered by Gemini models",
                 iconType: .builtin("gemini"),
                 isBuiltIn: true,
                 isEnabled: true,
@@ -102,7 +106,7 @@ extension AgentRegistry {
             AgentMetadata(
                 id: "kimi",
                 name: "Kimi",
-                description: "Moonshot AI assistant",
+                description: "CLI agent powered by Kimi K2, a trillion-parameter MoE model",
                 iconType: .builtin("kimi"),
                 isBuiltIn: true,
                 isEnabled: true,
@@ -116,13 +120,41 @@ extension AgentRegistry {
             AgentMetadata(
                 id: "opencode",
                 name: "OpenCode",
-                description: "OpenCode AI assistant",
+                description: "Open-source coding agent with multi-session and LSP support",
                 iconType: .builtin("opencode"),
                 isBuiltIn: true,
                 isEnabled: true,
                 executablePath: Self.managedPath(for: "opencode"),
                 launchArgs: ["acp"],
                 installMethod: .npm(package: "opencode-ai@latest")
+            )
+        }
+
+        updateBuiltInAgent("vibe", in: &metadata) {
+            AgentMetadata(
+                id: "vibe",
+                name: "Vibe",
+                description: "Open-source coding assistant powered by Devstral",
+                iconType: .builtin("vibe"),
+                isBuiltIn: true,
+                isEnabled: true,
+                executablePath: Self.managedPath(for: "vibe"),
+                launchArgs: [],
+                installMethod: .uv(package: "mistral-vibe")
+            )
+        }
+
+        updateBuiltInAgent("qwen", in: &metadata) {
+            AgentMetadata(
+                id: "qwen",
+                name: "Qwen Code",
+                description: "CLI tool for agentic coding, powered by Qwen3-Coder",
+                iconType: .builtin("qwen"),
+                isBuiltIn: true,
+                isEnabled: true,
+                executablePath: Self.managedPath(for: "qwen"),
+                launchArgs: ["--experimental-acp"],
+                installMethod: .npm(package: "@qwen-code/qwen-code")
             )
         }
 

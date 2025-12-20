@@ -32,6 +32,8 @@ enum SessionState: Equatable {
 /// ObservableObject that wraps ACPClient for managing an agent session
 @MainActor
 class AgentSession: ObservableObject, ACPClientDelegate {
+    static let maxMessageCount = 500
+    static let maxToolCallCount = 500
     // MARK: - Published Properties
 
     @Published var sessionId: SessionId?
@@ -475,6 +477,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             toolCallOrder.append(id)
         }
         toolCallsById[id] = toolCall
+        trimToolCallsIfNeeded()
     }
 
     /// Update an existing tool call in place (O(1) operation)
@@ -488,6 +491,16 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     func clearToolCalls() {
         toolCallsById.removeAll()
         toolCallOrder.removeAll()
+    }
+
+    private func trimToolCallsIfNeeded() {
+        let excess = toolCallOrder.count - Self.maxToolCallCount
+        guard excess > 0 else { return }
+        let idsToRemove = toolCallOrder.prefix(excess)
+        for id in idsToRemove {
+            toolCallsById.removeValue(forKey: id)
+        }
+        toolCallOrder.removeFirst(excess)
     }
 }
 

@@ -40,6 +40,11 @@ class GitDiffViewModel: ObservableObject {
 
         let task = Task { [weak self] in
             guard let self = self else { return }
+            defer {
+                Task { @MainActor in
+                    self.activeTasks.removeValue(forKey: file)
+                }
+            }
 
             if let cached = await self.cache.getDiff(for: file) {
                 await MainActor.run { [weak self] in

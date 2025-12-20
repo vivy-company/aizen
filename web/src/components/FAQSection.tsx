@@ -18,7 +18,12 @@ export default function FAQSection() {
       .replace(/Apache 2\.0/g, '<span class="text-zinc-300">Apache 2.0</span>')
       .replace(/macOS 13\.5 Ventura/g, '<span class="text-blue-500">macOS 13.5 Ventura</span>')
       .replace(/Apple Silicon/g, '<span class="text-zinc-400">Apple Silicon</span>')
-      .replace(/Intel Macs/g, '<span class="text-zinc-400">Intel Macs</span>');
+      .replace(/Intel Macs/g, '<span class="text-zinc-400">Intel Macs</span>')
+      .replace(/Aizen Pro/g, '<span class="text-blue-400">Aizen Pro</span>')
+      .replace(/\$5\.99\/mo/g, '<span class="text-green-400">$5.99/mo</span>')
+      .replace(/\$59\/yr/g, '<span class="text-green-400">$59/yr</span>')
+      .replace(/\$179/g, '<span class="text-green-400">$179</span>')
+      .replace(/30-day money-back guarantee/g, '<span class="text-green-400">30-day money-back guarantee</span>');
   };
 
   return (
@@ -26,7 +31,7 @@ export default function FAQSection() {
       <div className="max-w-[720px] mx-auto">
         <h2 className="text-[56px] font-semibold text-center mb-16 tracking-tight">{t("faq.title")}</h2>
         <div className="flex flex-col gap-8">
-          {["q1", "q2", "q3", "q4", "q5", "q6"].map((qKey) => {
+          {["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9"].map((qKey) => {
             const answer = t(`faq.${qKey}.answer`);
 
             return (

@@ -386,6 +386,7 @@ class ChatSessionViewModel: ObservableObject {
         cancellables.removeAll()
 
         session.$messages
+            .throttle(for: .milliseconds(33), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] newMessages in
                 guard let self = self else { return }
                 // AgentSession is @MainActor so we're already on main thread
@@ -402,6 +403,7 @@ class ChatSessionViewModel: ObservableObject {
         // Observe toolCallsById changes (dictionary-based storage)
         session.$toolCallsById
             .receive(on: DispatchQueue.main)
+            .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] _ in
                 guard let self = self, let session = self.currentAgentSession else { return }
                 let newToolCalls = session.toolCalls

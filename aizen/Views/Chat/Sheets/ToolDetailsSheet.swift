@@ -157,6 +157,7 @@ struct TerminalOutputPreview: View {
 
     @State private var output: String = ""
     @State private var isRunning: Bool = false
+    private let maxDisplayChars = 20_000
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -186,9 +187,12 @@ struct TerminalOutputPreview: View {
 
             // Terminal-like output area
             ScrollView([.horizontal, .vertical]) {
-                Text(output.isEmpty ? "No output yet..." : output)
+                let displayOutput = output.count > maxDisplayChars
+                    ? String(output.suffix(maxDisplayChars))
+                    : output
+                Text(displayOutput.isEmpty ? "No output yet..." : displayOutput)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(output.isEmpty ? .tertiary : .primary)
+                    .foregroundStyle(displayOutput.isEmpty ? .tertiary : .primary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -206,15 +210,21 @@ struct TerminalOutputPreview: View {
         }
     }
 
+    @MainActor
     private func loadOutput() async {
         guard let session = agentSession else { return }
 
         // Poll for output updates
         for _ in 0..<60 { // Poll for up to 30 seconds
-            output = await session.getTerminalOutput(terminalId: terminalId) ?? ""
-            isRunning = await session.isTerminalRunning(terminalId: terminalId)
+            let newOutput = await session.getTerminalOutput(terminalId: terminalId) ?? ""
+            let running = await session.isTerminalRunning(terminalId: terminalId)
 
-            if !isRunning {
+            if newOutput != output || running != isRunning {
+                output = newOutput
+                isRunning = running
+            }
+
+            if !running {
                 break
             }
 

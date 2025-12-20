@@ -6,70 +6,48 @@
 //
 
 import Foundation
+import os.log
 
-enum AgentUpdateError: Error {
+enum AgentUpdateError: Error, LocalizedError {
     case updateFailed(String)
     case unsupportedInstallMethod
     case agentNotFound
+
+    var errorDescription: String? {
+        switch self {
+        case .updateFailed(let message):
+            return "Update failed: \(message)"
+        case .unsupportedInstallMethod:
+            return "This agent's install method does not support updates"
+        case .agentNotFound:
+            return "Agent not found or has no install method configured"
+        }
+    }
 }
 
 actor AgentUpdater {
     static let shared = AgentUpdater()
 
-    private init() {}
-
-    /// Update an agent to the latest version
-    func updateAgent(agentName: String, package: String? = nil) async throws {
-        let metadata = AgentRegistry.shared.getMetadata(for: agentName)
-        guard let installMethod = metadata?.installMethod else {
-            throw AgentUpdateError.agentNotFound
-        }
-
-        switch installMethod {
-        case .npm(let npmPackage):
-            try await updateNpmPackage(package: package ?? npmPackage)
-        case .githubRelease:
-            throw AgentUpdateError.unsupportedInstallMethod
-        default:
-            throw AgentUpdateError.unsupportedInstallMethod
-        }
-
-        // Clear version cache after update
-        await AgentVersionChecker.shared.clearCache(for: agentName)
-    }
-
-    /// Update an NPM package globally
-    private func updateNpmPackage(package: String) async throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["npm", "install", "-g", "\(package)@latest"]
-
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-
-            if process.terminationStatus != 0 {
-                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
-                throw AgentUpdateError.updateFailed(errorMessage)
-            }
-        } catch let error as AgentUpdateError {
-            throw error
-        } catch {
-            throw AgentUpdateError.updateFailed(error.localizedDescription)
-        }
-    }
-
-    /// Check if update is in progress
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "AgentUpdater")
     private var updatingAgents: Set<String> = []
+
+    private init() {}
 
     func isUpdating(agentName: String) -> Bool {
         return updatingAgents.contains(agentName)
+    }
+
+    /// Update an agent to the latest version
+    func updateAgent(agentName: String) async throws {
+        guard let metadata = AgentRegistry.shared.getMetadata(for: agentName) else {
+            throw AgentUpdateError.agentNotFound
+        }
+
+        // Use AgentInstaller which handles all install methods
+        try await AgentInstaller.shared.updateAgent(metadata)
+
+        // Clear version cache after update
+        await AgentVersionChecker.shared.clearCache(for: agentName)
     }
 
     /// Update agent with progress tracking
@@ -84,26 +62,34 @@ actor AgentUpdater {
         updatingAgents.insert(agentName)
         defer { updatingAgents.remove(agentName) }
 
-        let metadata = AgentRegistry.shared.getMetadata(for: agentName)
-        guard let installMethod = metadata?.installMethod else {
+        guard let metadata = AgentRegistry.shared.getMetadata(for: agentName),
+              let installMethod = metadata.installMethod else {
             throw AgentUpdateError.agentNotFound
         }
 
+        let methodName: String
         switch installMethod {
         case .npm(let package):
-            await MainActor.run { onProgress("Updating \(package)...") }
+            methodName = package
+        case .uv(let package):
+            methodName = package
+        case .githubRelease(let repo, _):
+            methodName = repo
+        case .binary(let url):
+            methodName = url
+        }
 
-            do {
-                try await updateNpmPackage(package: package)
-                await MainActor.run { onProgress("Update complete!") }
-                await AgentVersionChecker.shared.clearCache(for: agentName)
-            } catch {
-                await MainActor.run { onProgress("Update failed: \(error.localizedDescription)") }
-                throw error
-            }
+        await MainActor.run { onProgress("Updating \(methodName)...") }
 
-        default:
-            throw AgentUpdateError.unsupportedInstallMethod
+        do {
+            try await AgentInstaller.shared.updateAgent(metadata)
+            await AgentVersionChecker.shared.clearCache(for: agentName)
+            await MainActor.run { onProgress("Update complete!") }
+            logger.info("Successfully updated \(agentName)")
+        } catch {
+            await MainActor.run { onProgress("Update failed: \(error.localizedDescription)") }
+            logger.error("Failed to update \(agentName): \(error.localizedDescription)")
+            throw error
         }
     }
 }

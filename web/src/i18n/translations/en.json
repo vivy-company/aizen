@@ -83,15 +83,27 @@
     },
     "q5": {
       "question": "Is Aizen free?",
-      "answer": "Yes. Aizen is free and open source under the Apache 2.0 license."
+      "answer": "Yes! Aizen is fully free and open source under the Apache 2.0 license. All features — workspaces, worktrees, agents, terminal, file browser, web browser, voice input — are included for free."
     },
     "q6": {
+      "question": "What's Aizen Pro?",
+      "answer": "Aizen Pro is a way to support continued development. Pro subscribers get priority support and will receive exclusive features as they're added. All current app features remain free — Pro is about keeping Aizen alive and growing. Available as monthly ($5.99/mo), yearly ($59/yr), or lifetime ($179)."
+    },
+    "q7": {
+      "question": "Can I use one license on multiple Macs?",
+      "answer": "Yes. Your Pro license can be activated on multiple Macs you own. Each device is registered to your license, and you can manage devices from the billing portal."
+    },
+    "q8": {
+      "question": "What's the refund policy?",
+      "answer": "We offer a 30-day money-back guarantee. If you're not satisfied, email dev@aizen.win within 30 days for a full refund, no questions asked."
+    },
+    "q9": {
       "question": "What are the requirements?",
       "answer": "macOS 13.5 Ventura or later. Apple Silicon and Intel Macs supported."
     }
   },
   "footer": {
-    "copyright": "© 2025 Vivy Technologies",
+    "copyright": "© 2025 Vivy Technologies Co., Limited",
     "discord": "Discord",
     "twitter": "Twitter",
     "github": "GitHub"

@@ -117,7 +117,7 @@ if (existsSync(outdir)) {
 
 const start = performance.now();
 
-const entrypoints = [...new Bun.Glob("**.html").scanSync("src")]
+const entrypoints = [...new Bun.Glob("**/*.html").scanSync("src")]
   .map(a => path.resolve("src", a))
   .filter(dir => !dir.includes("node_modules"));
 console.log(`Found ${entrypoints.length} HTML ${entrypoints.length === 1 ? "file" : "files"} to process\n`);
@@ -131,9 +131,9 @@ const result = await Bun.build({
   sourcemap: "linked",
   splitting: true,
   naming: {
-    chunk: "[name]-[hash].[ext]",
+    chunk: "[dir]/[name]-[hash].[ext]",
     entry: "[dir]/[name].[ext]",
-    asset: "[name]-[hash].[ext]",
+    asset: "[dir]/[name]-[hash].[ext]",
   },
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),

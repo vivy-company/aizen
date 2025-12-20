@@ -120,6 +120,7 @@ struct GitPanelWindowContent: View {
                 }
             }
             gitIndexWatchToken = nil
+            workflowService.stopAutoRefresh()
         }
         .onChange(of: gitStatus) { _ in
             let changed = updateChangedFilesCache()

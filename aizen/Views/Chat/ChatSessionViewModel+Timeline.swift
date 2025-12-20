@@ -89,9 +89,15 @@ extension ChatSessionViewModel {
     func syncMessages(_ newMessages: [MessageItem]) {
         let newIds = Set(newMessages.map { $0.id })
         let addedIds = newIds.subtracting(previousMessageIds)
-        let hasStructuralChanges = !addedIds.isEmpty
+        let removedIds = previousMessageIds.subtracting(newIds)
+        let hasStructuralChanges = !addedIds.isEmpty || !removedIds.isEmpty
 
         let updateBlock = { [self] in
+            // 0. Remove any messages that no longer exist
+            if !removedIds.isEmpty {
+                timelineItems.removeAll { removedIds.contains($0.stableId) }
+            }
+
             // 1. Insert new messages FIRST (changes structure/indices)
             for newMsg in newMessages where addedIds.contains(newMsg.id) {
                 insertTimelineItem(.message(newMsg))
@@ -125,9 +131,15 @@ extension ChatSessionViewModel {
     func syncToolCalls(_ newToolCalls: [ToolCall]) {
         let newIds = Set(newToolCalls.map { $0.id })
         let addedIds = newIds.subtracting(previousToolCallIds)
-        let hasStructuralChanges = !addedIds.isEmpty
+        let removedIds = previousToolCallIds.subtracting(newIds)
+        let hasStructuralChanges = !addedIds.isEmpty || !removedIds.isEmpty
 
         let updateBlock = { [self] in
+            // 0. Remove any tool calls that no longer exist
+            if !removedIds.isEmpty {
+                timelineItems.removeAll { removedIds.contains($0.stableId) }
+            }
+
             // 1. Insert new tool calls FIRST (changes structure/indices)
             for newCall in newToolCalls where addedIds.contains(newCall.id) {
                 insertTimelineItem(.toolCall(newCall))
