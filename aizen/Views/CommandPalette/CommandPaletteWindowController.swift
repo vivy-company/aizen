@@ -11,6 +11,7 @@ import SwiftUI
 
 class CommandPaletteWindowController: NSWindowController {
     private var appDeactivationObserver: NSObjectProtocol?
+    private var windowResignKeyObserver: NSObjectProtocol?
     private var eventMonitor: Any?
 
     convenience init(
@@ -40,12 +41,25 @@ class CommandPaletteWindowController: NSWindowController {
         ) { [weak self] _ in
             self?.closeWindow()
         }
+
+        // Close when panel loses key status (focus)
+        windowResignKeyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.closeWindow()
+        }
     }
 
     private func cleanup() {
         if let observer = appDeactivationObserver {
             NotificationCenter.default.removeObserver(observer)
             appDeactivationObserver = nil
+        }
+        if let observer = windowResignKeyObserver {
+            NotificationCenter.default.removeObserver(observer)
+            windowResignKeyObserver = nil
         }
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
@@ -165,6 +179,18 @@ class CommandPalettePanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 { // ESC key
+            requestClose?()
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        requestClose?()
+    }
 }
 
 struct CommandPaletteContent: View {

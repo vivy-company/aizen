@@ -11,6 +11,7 @@ import SwiftUI
 class FileSearchWindowController: NSWindowController {
     private var eventMonitor: Any?
     private var appDeactivationObserver: NSObjectProtocol?
+    private var windowResignKeyObserver: NSObjectProtocol?
 
     convenience init(worktreePath: String, onFileSelected: @escaping (String) -> Void) {
         let panel = FileSearchPanel(worktreePath: worktreePath, onFileSelected: onFileSelected)
@@ -34,12 +35,25 @@ class FileSearchWindowController: NSWindowController {
         ) { [weak self] _ in
             self?.closeWindow()
         }
+
+        // Close when panel loses key status (focus)
+        windowResignKeyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.closeWindow()
+        }
     }
 
     private func cleanup() {
         if let observer = appDeactivationObserver {
             NotificationCenter.default.removeObserver(observer)
             appDeactivationObserver = nil
+        }
+        if let observer = windowResignKeyObserver {
+            NotificationCenter.default.removeObserver(observer)
+            windowResignKeyObserver = nil
         }
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
@@ -173,6 +187,18 @@ class FileSearchPanel: NSPanel {
 
     override var canBecomeMain: Bool {
         return false
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 { // ESC key
+            requestClose?()
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        requestClose?()
     }
 }
 

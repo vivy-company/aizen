@@ -366,6 +366,13 @@ struct WorktreeDetailView: View {
     }
 
     private func showFileSearch() {
+        // Toggle behavior: close if already visible
+        if let existing = fileSearchWindowController, existing.window?.isVisible == true {
+            existing.closeWindow()
+            fileSearchWindowController = nil
+            return
+        }
+
         guard let worktreePath = worktree.path else { return }
 
         let windowController = FileSearchWindowController(

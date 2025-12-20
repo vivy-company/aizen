@@ -225,6 +225,13 @@ struct ContentView: View {
     }
 
     private func showCommandPalette() {
+        // Toggle behavior: close if already visible
+        if let existing = commandPaletteController, existing.window?.isVisible == true {
+            existing.closeWindow()
+            commandPaletteController = nil
+            return
+        }
+
         let controller = CommandPaletteWindowController(
             managedObjectContext: viewContext,
             onNavigate: { workspaceId, repoId, worktreeId in
