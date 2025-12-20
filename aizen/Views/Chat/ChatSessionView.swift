@@ -46,103 +46,101 @@ struct ChatSessionView: View {
             Color(nsColor: .windowBackgroundColor)
                 .ignoresSafeArea()
 
-            HStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    ChatMessageList(
-                        timelineItems: viewModel.timelineItems,
-                        isProcessing: viewModel.isProcessing,
-                        isSessionInitializing: viewModel.isSessionInitializing,
-                        selectedAgent: viewModel.selectedAgent,
-                        currentThought: viewModel.currentAgentSession?.currentThought,
-                        currentIterationId: viewModel.currentAgentSession?.currentIterationId,
-                        onScrollProxyReady: { proxy in
-                            viewModel.scrollProxy = proxy
-                        },
-                        onAppear: viewModel.loadMessages,
-                        renderInlineMarkdown: viewModel.renderInlineMarkdown,
-                        onToolTap: { toolCall in
-                            selectedToolCall = toolCall
-                        },
-                        onOpenFileInEditor: { path in
-                            fileToOpenInEditor = path
-                        },
-                        agentSession: viewModel.currentAgentSession,
-                        onScrollPositionChange: { isNearBottom in
-                            viewModel.isNearBottom = isNearBottom
-                        },
-                        childToolCallsProvider: { parentId in
-                            viewModel.childToolCalls(for: parentId)
+            VStack(spacing: 0) {
+                ChatMessageList(
+                    timelineItems: viewModel.timelineItems,
+                    isProcessing: viewModel.isProcessing,
+                    isSessionInitializing: viewModel.isSessionInitializing,
+                    selectedAgent: viewModel.selectedAgent,
+                    currentThought: viewModel.currentAgentSession?.currentThought,
+                    currentIterationId: viewModel.currentAgentSession?.currentIterationId,
+                    onScrollProxyReady: { proxy in
+                        viewModel.scrollProxy = proxy
+                    },
+                    onAppear: viewModel.loadMessages,
+                    renderInlineMarkdown: viewModel.renderInlineMarkdown,
+                    onToolTap: { toolCall in
+                        selectedToolCall = toolCall
+                    },
+                    onOpenFileInEditor: { path in
+                        fileToOpenInEditor = path
+                    },
+                    agentSession: viewModel.currentAgentSession,
+                    onScrollPositionChange: { isNearBottom in
+                        viewModel.isNearBottom = isNearBottom
+                    },
+                    childToolCallsProvider: { parentId in
+                        viewModel.childToolCalls(for: parentId)
+                    }
+                )
+
+                Spacer(minLength: 0)
+
+                VStack(spacing: 8) {
+                    // Agent Plan (inline, above permission requests)
+                    if let plan = viewModel.currentAgentPlan {
+                        HStack {
+                            AgentPlanInlineView(plan: plan)
+                            Spacer()
                         }
-                    )
-
-                    Spacer(minLength: 0)
-
-                    VStack(spacing: 8) {
-                        // Agent Plan (inline, above permission requests)
-                        if let plan = viewModel.currentAgentPlan {
-                            HStack {
-                                AgentPlanInlineView(plan: plan)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 20)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                        }
-
-                        // Permission Requests (excluding plan requests)
-                        if let agentSession = viewModel.currentAgentSession,
-                           viewModel.showingPermissionAlert,
-                           let request = viewModel.currentPermissionRequest,
-                           !isPlanRequest(request) {
-                            HStack {
-                                PermissionRequestView(session: agentSession, request: request)
-                                    .transition(.opacity)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 20)
-                        }
-
-                        if !viewModel.attachments.isEmpty {
-                            attachmentChipsView
-                                .padding(.horizontal, 20)
-                        }
-
-                        ChatControlsBar(
-                            selectedAgent: viewModel.selectedAgent,
-                            currentAgentSession: viewModel.currentAgentSession,
-                            hasModes: viewModel.hasModes,
-                            onAgentSelect: viewModel.requestAgentSwitch
-                        )
                         .padding(.horizontal, 20)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
 
-                        ChatInputBar(
-                            inputText: $viewModel.inputText,
-                            pendingCursorPosition: $viewModel.pendingCursorPosition,
-                            attachments: $viewModel.attachments,
-                            isProcessing: $viewModel.isProcessing,
-                            showingVoiceRecording: $showingVoiceRecording,
-                            showingAttachmentPicker: $showingAttachmentPicker,
-                            showingPermissionError: $showingPermissionError,
-                            permissionErrorMessage: $permissionErrorMessage,
-                            session: viewModel.currentAgentSession,
-                            currentModeId: viewModel.currentModeId,
-                            selectedAgent: viewModel.selectedAgent,
-                            isSessionReady: viewModel.isSessionReady,
-                            audioService: viewModel.audioService,
-                            autocompleteHandler: viewModel.autocompleteHandler,
-                            onSend: viewModel.sendMessage,
-                            onCancel: viewModel.cancelCurrentPrompt,
-                            onAutocompleteSelect: viewModel.handleAutocompleteSelection,
-                            onImagePaste: { data, mimeType in
-                                viewModel.attachments.append(.image(data, mimeType: mimeType))
-                            }
-                        )
+                    // Permission Requests (excluding plan requests)
+                    if let agentSession = viewModel.currentAgentSession,
+                       viewModel.showingPermissionAlert,
+                       let request = viewModel.currentPermissionRequest,
+                       !isPlanRequest(request) {
+                        HStack {
+                            PermissionRequestView(session: agentSession, request: request)
+                                .transition(.opacity)
+                            Spacer()
+                        }
                         .padding(.horizontal, 20)
                     }
-                    .padding(.vertical, 16)
+
+                    if !viewModel.attachments.isEmpty {
+                        attachmentChipsView
+                            .padding(.horizontal, 20)
+                    }
+
+                    ChatControlsBar(
+                        selectedAgent: viewModel.selectedAgent,
+                        currentAgentSession: viewModel.currentAgentSession,
+                        hasModes: viewModel.hasModes,
+                        onAgentSelect: viewModel.requestAgentSwitch
+                    )
+                    .padding(.horizontal, 20)
+
+                    ChatInputBar(
+                        inputText: $viewModel.inputText,
+                        pendingCursorPosition: $viewModel.pendingCursorPosition,
+                        attachments: $viewModel.attachments,
+                        isProcessing: $viewModel.isProcessing,
+                        showingVoiceRecording: $showingVoiceRecording,
+                        showingAttachmentPicker: $showingAttachmentPicker,
+                        showingPermissionError: $showingPermissionError,
+                        permissionErrorMessage: $permissionErrorMessage,
+                        session: viewModel.currentAgentSession,
+                        currentModeId: viewModel.currentModeId,
+                        selectedAgent: viewModel.selectedAgent,
+                        isSessionReady: viewModel.isSessionReady,
+                        audioService: viewModel.audioService,
+                        autocompleteHandler: viewModel.autocompleteHandler,
+                        onSend: viewModel.sendMessage,
+                        onCancel: viewModel.cancelCurrentPrompt,
+                        onAutocompleteSelect: viewModel.handleAutocompleteSelection,
+                        onImagePaste: { data, mimeType in
+                            viewModel.attachments.append(.image(data, mimeType: mimeType))
+                        }
+                    )
+                    .padding(.horizontal, 20)
                 }
-
-
+                .padding(.vertical, 16)
             }
+            .frame(maxWidth: 900)
+            .frame(maxWidth: .infinity)
         }
         .focusedSceneValue(\.chatActions, ChatActions(cycleModeForward: viewModel.cycleModeForward))
         .onAppear {

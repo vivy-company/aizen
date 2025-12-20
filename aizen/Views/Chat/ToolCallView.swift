@@ -30,11 +30,11 @@ struct ToolCallView: View {
         // Collapse tool calls from previous iterations
         let isCurrentIteration = currentIterationId == nil || toolCall.iterationId == currentIterationId
 
-        // Default expanded for current iteration edit/diff/terminal content
+        // Default expanded for current iteration edit/diff content (terminal collapsed by default)
         let shouldExpand = isCurrentIteration && (toolCall.kind == .edit || toolCall.kind == .delete ||
             toolCall.content.contains { content in
                 switch content {
-                case .diff, .terminal: return true
+                case .diff: return true
                 default: return false
                 }
             })
