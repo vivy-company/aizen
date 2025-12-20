@@ -28,16 +28,12 @@ extension AgentSession {
             return
         }
 
-        logger.debug("session/update raw params: \(String(describing: notification.params?.value))")
-
         do {
             let params = notification.params?.value as? [String: Any] ?? [:]
             let data = try JSONSerialization.data(withJSONObject: params)
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let updateNotification = try decoder.decode(SessionUpdateNotification.self, from: data)
-
-            logger.debug("Parsed session/update: \(String(describing: updateNotification.update))")
 
             // Handle different update types using the strongly-typed enum
             switch updateNotification.update {
@@ -98,7 +94,6 @@ extension AgentSession {
                 guard !text.isEmpty else { break }
 
                 let lastMessage = messages.last
-                logger.debug("agentMessageChunk: text='\(text)' lastRole=\(lastMessage?.role == .agent ? "agent" : "other") isComplete=\(lastMessage?.isComplete ?? true) isStreaming=\(self.isStreaming)")
 
                 if let lastMessage = lastMessage,
                    lastMessage.role == .agent,
@@ -110,7 +105,6 @@ extension AgentSession {
                     if !blockContent.isEmpty {
                         newBlocks.append(contentsOf: blockContent)
                     }
-                    logger.debug("agentMessageChunk: APPENDING to existing, newContent='\(newContent)'")
                     // Force SwiftUI to recognize the change by explicitly notifying
                     objectWillChange.send()
                     messages[messages.count - 1] = MessageItem(
@@ -133,7 +127,6 @@ extension AgentSession {
             case .agentThoughtChunk(let block):
                 let (text, _) = textAndContent(from: block)
                 if text.isEmpty { break }
-                logger.debug("Agent thought: \(text)")
                 if let existing = currentThought {
                     currentThought = existing + text
                 } else {
@@ -143,14 +136,7 @@ extension AgentSession {
                 // Coalesce plan updates - only update if content changed
                 // This prevents excessive UI rebuilds when multiple agents stream plan updates
                 if agentPlan != plan {
-                    logger.info("Plan updated: \(plan.entries.count) entries, session=\(sessionId?.value ?? "nil")")
-                    // Log entry statuses for debugging
-                    for (idx, entry) in plan.entries.enumerated() {
-                        logger.debug("  Plan[\(idx)]: \(entry.status.rawValue) - \(entry.content.prefix(50))")
-                    }
                     agentPlan = plan
-                } else {
-                    logger.debug("Plan update skipped (identical content)")
                 }
             case .availableCommandsUpdate(let commands):
                 availableCommands = commands
@@ -223,7 +209,6 @@ extension AgentSession {
                 if !flattened.isEmpty {
                     return [.text(TextContent(text: flattened.joined()))]
                 }
-                logger.debug("Tool call content decode failed: \(error.localizedDescription); raw=\(array)")
             }
         }
 
@@ -237,8 +222,6 @@ extension AgentSession {
             }
         }
 
-        // last resort
-        logger.debug("Tool call content decode failed: unhandled shape raw=\(String(describing: value))")
         return []
     }
 

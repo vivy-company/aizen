@@ -319,8 +319,6 @@ actor ACPClient {
         let requestId = RequestId.number(nextRequestId)
         nextRequestId += 1
 
-        logger.debug("→ Request \(method, privacy: .public) [id: \(self.requestIdDescription(requestId))]")
-
         let paramsData = try encoder.encode(params)
         let paramsValue = try decoder.decode(AnyCodable.self, from: paramsData)
 
@@ -425,8 +423,6 @@ actor ACPClient {
 
         do {
             let message = try decoder.decode(ACPMessage.self, from: data)
-
-            logger.debug("← Message \(self.describeMessage(message), privacy: .public)")
 
             switch message {
             case .response(let response):
