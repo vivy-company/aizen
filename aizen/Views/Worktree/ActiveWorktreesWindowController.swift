@@ -32,8 +32,8 @@ final class ActiveWorktreesWindowManager {
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         window.toolbarStyle = .unified
-        window.setContentSize(NSSize(width: 820, height: 560))
-        window.minSize = NSSize(width: 720, height: 480)
+        window.setContentSize(NSSize(width: 980, height: 620))
+        window.minSize = NSSize(width: 860, height: 540)
 
         let toolbar = NSToolbar(identifier: "ActiveWorktreesToolbar")
         toolbar.showsBaselineSeparator = false

@@ -50,6 +50,10 @@ final class ActiveWorktreesMetrics: ObservableObject {
         task = nil
     }
 
+    func refreshNow() {
+        sample()
+    }
+
     private func sample() {
         let now = Date()
         let cpuTime = SystemMetrics.currentCPUTime()
