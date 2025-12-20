@@ -189,30 +189,108 @@ struct CommandPaletteContent: View {
     private func refreshDisplayedWorktrees() {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let filtered = allWorktrees.filter { worktree in
+        let base = allWorktrees.filter { worktree in
             guard !worktree.isDeleted else { return false }
             guard worktree.repository?.workspace != nil else { return false }
-            if query.isEmpty { return true }
-
-            let branch = worktree.branch ?? ""
-            let repoName = worktree.repository?.name ?? ""
-            let workspaceName = worktree.repository?.workspace?.name ?? ""
-            return branch.localizedCaseInsensitiveContains(query) ||
-                   repoName.localizedCaseInsensitiveContains(query) ||
-                   workspaceName.localizedCaseInsensitiveContains(query)
+            return true
         }
 
-        let sorted = filtered.sorted { a, b in
-            let aActive = hasActiveSessions(a)
-            let bActive = hasActiveSessions(b)
-            if aActive != bActive { return aActive }
-            return (a.lastAccessed ?? .distantPast) > (b.lastAccessed ?? .distantPast)
+        if query.isEmpty {
+            let sorted = base.sorted { a, b in
+                let aLast = a.lastAccessed ?? .distantPast
+                let bLast = b.lastAccessed ?? .distantPast
+                if aLast != bLast { return aLast > bLast }
+
+                let aActive = hasActiveSessions(a)
+                let bActive = hasActiveSessions(b)
+                if aActive != bActive { return aActive }
+                return (a.branch ?? "") < (b.branch ?? "")
+            }
+
+            displayedWorktrees = Array(sorted.prefix(50))
+        } else {
+            let scored = base.compactMap { worktree -> (worktree: Worktree, score: Int)? in
+                guard let score = matchScore(for: worktree, query: query) else { return nil }
+                return (worktree, score)
+            }
+
+            let sorted = scored.sorted { a, b in
+                if a.score != b.score { return a.score > b.score }
+
+                let aLast = a.worktree.lastAccessed ?? .distantPast
+                let bLast = b.worktree.lastAccessed ?? .distantPast
+                if aLast != bLast { return aLast > bLast }
+
+                let aActive = hasActiveSessions(a.worktree)
+                let bActive = hasActiveSessions(b.worktree)
+                if aActive != bActive { return aActive }
+                return (a.worktree.branch ?? "") < (b.worktree.branch ?? "")
+            }
+
+            displayedWorktrees = Array(sorted.prefix(50)).map { $0.worktree }
         }
 
-        displayedWorktrees = Array(sorted.prefix(50))
         if selectedIndex >= displayedWorktrees.count {
             selectedIndex = max(0, displayedWorktrees.count - 1)
         }
+    }
+
+    private func searchFields(for worktree: Worktree) -> [String] {
+        var fields: [String] = []
+
+        if let branch = worktree.branch, !branch.isEmpty {
+            fields.append(branch)
+        }
+        if let repoName = worktree.repository?.name, !repoName.isEmpty {
+            fields.append(repoName)
+        }
+        if let workspaceName = worktree.repository?.workspace?.name, !workspaceName.isEmpty {
+            fields.append(workspaceName)
+        }
+        if let path = worktree.path, !path.isEmpty {
+            fields.append(path)
+            let name = URL(fileURLWithPath: path).lastPathComponent
+            if !name.isEmpty && name != path {
+                fields.append(name)
+            }
+        }
+        if let note = worktree.note, !note.isEmpty {
+            fields.append(note)
+        }
+
+        return fields
+    }
+
+    private func matchScore(for worktree: Worktree, query: String) -> Int? {
+        let normalizedQuery = query.lowercased()
+        let tokens = normalizedQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+
+        let fields = searchFields(for: worktree).map { $0.lowercased() }
+        if fields.isEmpty { return nil }
+
+        let combined = fields.joined(separator: " ")
+        guard tokens.allSatisfy({ combined.contains($0) }) else { return nil }
+
+        var score = 0
+        for field in fields {
+            if field == normalizedQuery {
+                score += 400
+            } else if field.hasPrefix(normalizedQuery) {
+                score += 300
+            } else if field.contains(normalizedQuery) {
+                score += 200
+            }
+
+            for token in tokens where token != normalizedQuery {
+                if field.hasPrefix(token) {
+                    score += 40
+                } else if field.contains(token) {
+                    score += 20
+                }
+            }
+        }
+
+        return score
     }
 
     private func hasActiveSessions(_ worktree: Worktree) -> Bool {
@@ -440,6 +518,8 @@ struct CommandPaletteContent: View {
               let workspaceId = worktree.repository?.workspace?.id else {
             return
         }
+        worktree.lastAccessed = Date()
+        try? viewContext.save()
         onNavigate(workspaceId, repoId, worktreeId)
         onClose()
     }

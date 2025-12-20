@@ -125,6 +125,13 @@ struct aizenApp: App {
             }
 
             CommandGroup(after: .newItem) {
+                Button("Active Worktrees...") {
+                    ActiveWorktreesWindowManager.shared.show(context: persistenceController.container.viewContext)
+                }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
+
+                Divider()
+
                 Button("Split Right") {
                     splitActions?.splitHorizontal()
                 }
