@@ -10,6 +10,7 @@ import os.log
 
 struct ActiveWorktreesView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @StateObject private var metrics = ActiveWorktreesMetrics()
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Worktree.lastAccessed, ascending: false)],
@@ -28,29 +29,61 @@ struct ActiveWorktreesView: View {
         }
     }
 
-    var body: some View {
-        VStack(spacing: 12) {
-            header
+    private var groupedWorktrees: [(name: String, items: [Worktree])] {
+        let grouped = Dictionary(grouping: activeWorktrees) { worktree in
+            worktree.repository?.workspace?.name ?? "Other"
+        }
 
-            if activeWorktrees.isEmpty {
-                emptyState
-            } else {
-                List(activeWorktrees, id: \.objectID) { worktree in
-                    ActiveWorktreeRow(
-                        worktree: worktree,
-                        chatCount: chatCount(for: worktree),
-                        terminalCount: terminalCount(for: worktree),
-                        browserCount: browserCount(for: worktree),
-                        fileCount: fileCount(for: worktree),
-                        onOpen: { navigate(to: worktree) },
-                        onTerminate: { terminateSessions(for: worktree) }
-                    )
+        return grouped
+            .map { (name: $0.key, items: $0.value) }
+            .sorted { lhs, rhs in
+                let lhsOrder = lhs.items.first?.repository?.workspace?.order ?? 0
+                let rhsOrder = rhs.items.first?.repository?.workspace?.order ?? 0
+                if lhsOrder != rhsOrder { return lhsOrder < rhsOrder }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                metricsHeader
+                if activeWorktrees.isEmpty {
+                    emptyState
+                } else {
+                    List {
+                        ForEach(groupedWorktrees, id: \.name) { group in
+                            Section(group.name) {
+                                ForEach(group.items, id: \.objectID) { worktree in
+                                    ActiveWorktreeRow(
+                                        worktree: worktree,
+                                        chatCount: chatCount(for: worktree),
+                                        terminalCount: terminalCount(for: worktree),
+                                        browserCount: browserCount(for: worktree),
+                                        fileCount: fileCount(for: worktree),
+                                        onOpen: { navigate(to: worktree) },
+                                        onTerminate: { terminateSessions(for: worktree) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.inset)
                 }
-                .listStyle(.inset)
+            }
+            .navigationTitle("Active Worktrees")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Terminate All") {
+                        showTerminateAllConfirm = true
+                    }
+                    .disabled(activeWorktrees.isEmpty)
+                }
             }
         }
-        .padding(16)
-        .frame(minWidth: 640, minHeight: 420)
+        .frame(minWidth: 720, minHeight: 460)
+        .onAppear { metrics.start() }
+        .onDisappear { metrics.stop() }
         .alert("Terminate all sessions?", isPresented: $showTerminateAllConfirm) {
             Button("Cancel", role: .cancel) {}
             Button("Terminate All", role: .destructive) {
@@ -61,35 +94,53 @@ struct ActiveWorktreesView: View {
         }
     }
 
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Active Worktrees")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                Text("Worktrees with open sessions")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button("Terminate All") {
-                showTerminateAllConfirm = true
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(activeWorktrees.isEmpty)
+    private var metricsHeader: some View {
+        HStack(spacing: 12) {
+            MetricCard(
+                title: "CPU",
+                value: String(format: "%.1f%%", metrics.cpuPercent),
+                subtitle: "App usage",
+                lineColor: .green,
+                history: metrics.cpuHistory.map { $0 / 100.0 }
+            )
+            MetricCard(
+                title: "Memory",
+                value: metrics.memoryBytes.formattedBytes(),
+                subtitle: "Resident",
+                lineColor: .blue,
+                history: metrics.memoryHistory.map { Double($0) / Double(metrics.maxMemoryHistoryBytes) }
+            )
+            MetricCard(
+                title: "Energy",
+                value: metrics.energyLabel,
+                subtitle: "Estimated",
+                lineColor: .orange,
+                history: metrics.energyHistory.map { $0 / 100.0 }
+            )
         }
+        .padding(.horizontal, 4)
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "checkmark.seal")
-                .font(.system(size: 28))
-                .foregroundStyle(.secondary)
-            Text("No active worktrees")
-                .font(.headline)
-            Text("Open a chat, terminal, or browser session to see it here.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        Group {
+            if #available(macOS 14.0, *) {
+                ContentUnavailableView(
+                    "No active worktrees",
+                    systemImage: "checkmark.seal",
+                    description: Text("Open a chat, terminal, or browser session to see it here.")
+                )
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "checkmark.seal")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.secondary)
+                    Text("No active worktrees")
+                        .font(.headline)
+                    Text("Open a chat, terminal, or browser session to see it here.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -221,6 +272,8 @@ private struct ActiveWorktreeRow: View {
                 if browserCount > 0 { badge(label: "Browser", count: browserCount) }
                 if fileCount > 0 { badge(label: "Files", count: fileCount) }
             }
+            ActivityMeter(score: activityScore)
+                .frame(width: 90)
             Button("Open") {
                 onOpen()
             }
@@ -239,6 +292,14 @@ private struct ActiveWorktreeRow: View {
             return "\(repoName) • \(branch)"
         }
         return repoName
+    }
+
+    private var activityScore: Double {
+        let score = (Double(chatCount) * 8.0)
+            + (Double(terminalCount) * 12.0)
+            + (Double(browserCount) * 6.0)
+            + (Double(fileCount) * 4.0)
+        return min(100.0, score)
     }
 
     private func badge(label: String, count: Int) -> some View {

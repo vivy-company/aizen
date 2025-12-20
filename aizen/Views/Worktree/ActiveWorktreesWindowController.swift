@@ -25,22 +25,22 @@ final class ActiveWorktreesWindowManager {
         let contentView = ActiveWorktreesView()
             .environment(\.managedObjectContext, context)
 
-        let hostingView = NSHostingView(rootView: contentView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 720, height: 520)
-
-        let window = NSWindow(
-            contentRect: hostingView.frame,
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
+        let hostingController = NSHostingController(rootView: contentView)
+        let window = NSWindow(contentViewController: hostingController)
         window.title = "Active Worktrees"
-        window.contentView = hostingView
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
+        window.toolbarStyle = .unified
+        window.setContentSize(NSSize(width: 820, height: 560))
+        window.minSize = NSSize(width: 720, height: 480)
+
+        let toolbar = NSToolbar(identifier: "ActiveWorktreesToolbar")
+        toolbar.showsBaselineSeparator = false
+        window.toolbar = toolbar
         window.center()
 
         self.window = window
         window.makeKeyAndOrderFront(nil)
     }
 }
-

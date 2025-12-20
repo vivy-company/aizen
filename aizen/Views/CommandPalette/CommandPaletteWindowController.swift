@@ -181,17 +181,22 @@ struct CommandPaletteContent: View {
 
     @State private var searchQuery = ""
     @State private var selectedIndex = 0
-    @State private var displayedWorktrees: [Worktree] = []
     @FocusState private var isSearchFocused: Bool
     @EnvironmentObject private var interaction: PaletteInteractionState
     @State private var hoveredIndex: Int?
+    @AppStorage("selectedWorktreeId") private var selectedWorktreeId: String?
 
-    private func refreshDisplayedWorktrees() {
+    private var filteredWorktrees: [Worktree] {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let base = allWorktrees.filter { worktree in
             guard !worktree.isDeleted else { return false }
             guard worktree.repository?.workspace != nil else { return false }
+            if let currentId = selectedWorktreeId,
+               let worktreeId = worktree.id?.uuidString,
+               currentId == worktreeId {
+                return false
+            }
             return true
         }
 
@@ -207,55 +212,62 @@ struct CommandPaletteContent: View {
                 return (a.branch ?? "") < (b.branch ?? "")
             }
 
-            displayedWorktrees = Array(sorted.prefix(50))
-        } else {
-            let scored = base.compactMap { worktree -> (worktree: Worktree, score: Int)? in
-                guard let score = matchScore(for: worktree, query: query) else { return nil }
-                return (worktree, score)
-            }
-
-            let sorted = scored.sorted { a, b in
-                if a.score != b.score { return a.score > b.score }
-
-                let aLast = a.worktree.lastAccessed ?? .distantPast
-                let bLast = b.worktree.lastAccessed ?? .distantPast
-                if aLast != bLast { return aLast > bLast }
-
-                let aActive = hasActiveSessions(a.worktree)
-                let bActive = hasActiveSessions(b.worktree)
-                if aActive != bActive { return aActive }
-                return (a.worktree.branch ?? "") < (b.worktree.branch ?? "")
-            }
-
-            displayedWorktrees = Array(sorted.prefix(50)).map { $0.worktree }
+            return Array(sorted.prefix(50))
         }
 
-        if selectedIndex >= displayedWorktrees.count {
-            selectedIndex = max(0, displayedWorktrees.count - 1)
+        let scored = base.compactMap { worktree -> (worktree: Worktree, score: Int)? in
+            guard let score = matchScore(for: worktree, query: query) else { return nil }
+            return (worktree, score)
         }
+
+        let sorted = scored.sorted { a, b in
+            if a.score != b.score { return a.score > b.score }
+
+            let aLast = a.worktree.lastAccessed ?? .distantPast
+            let bLast = b.worktree.lastAccessed ?? .distantPast
+            if aLast != bLast { return aLast > bLast }
+
+            let aActive = hasActiveSessions(a.worktree)
+            let bActive = hasActiveSessions(b.worktree)
+            if aActive != bActive { return aActive }
+            return (a.worktree.branch ?? "") < (b.worktree.branch ?? "")
+        }
+
+        return Array(sorted.prefix(50)).map { $0.worktree }
     }
 
-    private func searchFields(for worktree: Worktree) -> [String] {
-        var fields: [String] = []
+    private enum SearchFieldKind: Int {
+        case branch = 6
+        case worktreeName = 5
+        case repo = 4
+        case workspace = 3
+        case note = 2
+        case path = 1
+    }
+
+    private func searchFields(for worktree: Worktree, includePath: Bool) -> [(SearchFieldKind, String)] {
+        var fields: [(SearchFieldKind, String)] = []
 
         if let branch = worktree.branch, !branch.isEmpty {
-            fields.append(branch)
+            fields.append((.branch, branch))
         }
         if let repoName = worktree.repository?.name, !repoName.isEmpty {
-            fields.append(repoName)
+            fields.append((.repo, repoName))
         }
         if let workspaceName = worktree.repository?.workspace?.name, !workspaceName.isEmpty {
-            fields.append(workspaceName)
+            fields.append((.workspace, workspaceName))
         }
         if let path = worktree.path, !path.isEmpty {
-            fields.append(path)
             let name = URL(fileURLWithPath: path).lastPathComponent
-            if !name.isEmpty && name != path {
-                fields.append(name)
+            if !name.isEmpty {
+                fields.append((.worktreeName, name))
+            }
+            if includePath {
+                fields.append((.path, path))
             }
         }
         if let note = worktree.note, !note.isEmpty {
-            fields.append(note)
+            fields.append((.note, note))
         }
 
         return fields
@@ -264,33 +276,34 @@ struct CommandPaletteContent: View {
     private func matchScore(for worktree: Worktree, query: String) -> Int? {
         let normalizedQuery = query.lowercased()
         let tokens = normalizedQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        let includePath = normalizedQuery.contains("/") || normalizedQuery.contains("~")
 
-        let fields = searchFields(for: worktree).map { $0.lowercased() }
+        let fields = searchFields(for: worktree, includePath: includePath)
+            .map { (kind, value) in (kind, value.lowercased()) }
         if fields.isEmpty { return nil }
 
-        let combined = fields.joined(separator: " ")
-        guard tokens.allSatisfy({ combined.contains($0) }) else { return nil }
+        for token in tokens {
+            let matchesToken = fields.contains { $0.1.contains(token) }
+            if !matchesToken { return nil }
+        }
+
+        func scoreMatch(_ needle: String, in haystack: String, weight: Int) -> Int {
+            if haystack == needle { return 100 * weight }
+            if haystack.hasPrefix(needle) { return 60 * weight }
+            if haystack.contains(needle) { return 30 * weight }
+            return 0
+        }
 
         var score = 0
-        for field in fields {
-            if field == normalizedQuery {
-                score += 400
-            } else if field.hasPrefix(normalizedQuery) {
-                score += 300
-            } else if field.contains(normalizedQuery) {
-                score += 200
-            }
-
+        for (kind, field) in fields {
+            let weight = kind.rawValue
+            score += scoreMatch(normalizedQuery, in: field, weight: weight)
             for token in tokens where token != normalizedQuery {
-                if field.hasPrefix(token) {
-                    score += 40
-                } else if field.contains(token) {
-                    score += 20
-                }
+                score += scoreMatch(token, in: field, weight: max(1, weight / 2))
             }
         }
 
-        return score
+        return score > 0 ? score : nil
     }
 
     private func hasActiveSessions(_ worktree: Worktree) -> Bool {
@@ -326,7 +339,7 @@ struct CommandPaletteContent: View {
 
                 Divider().opacity(0.25)
 
-                if displayedWorktrees.isEmpty {
+                if filteredWorktrees.isEmpty {
                     emptyResultsView
                 } else {
                     resultsList
@@ -337,17 +350,27 @@ struct CommandPaletteContent: View {
         }
         .frame(width: 760, height: 520)
         .onAppear {
-            refreshDisplayedWorktrees()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isSearchFocused = true
             }
         }
-        .onChange(of: allWorktrees.count) { _ in
-            refreshDisplayedWorktrees()
-        }
         .onChange(of: searchQuery) { _ in
             selectedIndex = 0
-            refreshDisplayedWorktrees()
+        }
+        .onChange(of: filteredWorktrees.count) { _ in
+            if selectedIndex >= filteredWorktrees.count {
+                selectedIndex = max(0, filteredWorktrees.count - 1)
+            }
+        }
+        .onMoveCommand { direction in
+            switch direction {
+            case .down:
+                moveSelectionDown()
+            case .up:
+                moveSelectionUp()
+            default:
+                break
+            }
         }
         .background {
             Group {
@@ -368,7 +391,7 @@ struct CommandPaletteContent: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(displayedWorktrees.enumerated()), id: \.element.objectID) { index, worktree in
+                    ForEach(Array(filteredWorktrees.enumerated()), id: \.element.objectID) { index, worktree in
                         worktreeRow(
                             worktree: worktree,
                             index: index,
@@ -494,7 +517,7 @@ struct CommandPaletteContent: View {
 
     private func moveSelectionDown() {
         interaction.didUseKeyboard()
-        if selectedIndex < displayedWorktrees.count - 1 {
+        if selectedIndex < filteredWorktrees.count - 1 {
             selectedIndex += 1
         }
     }
@@ -508,8 +531,8 @@ struct CommandPaletteContent: View {
 
     private func selectCurrent() {
         interaction.didUseKeyboard()
-        guard selectedIndex < displayedWorktrees.count else { return }
-        selectWorktree(displayedWorktrees[selectedIndex])
+        guard selectedIndex < filteredWorktrees.count else { return }
+        selectWorktree(filteredWorktrees[selectedIndex])
     }
 
     private func selectWorktree(_ worktree: Worktree) {
