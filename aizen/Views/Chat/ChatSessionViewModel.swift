@@ -165,7 +165,8 @@ class ChatSessionViewModel: ObservableObject {
         loadPendingAttachmentsIfNeeded()
 
         // Configure autocomplete handler
-        autocompleteHandler.worktreePath = worktree.path ?? ""
+        let worktreePath = worktree.path ?? ""
+        autocompleteHandler.worktreePath = worktreePath
 
         if let existingSession = sessionManager.getAgentSession(for: sessionId) {
             currentAgentSession = existingSession
@@ -174,14 +175,20 @@ class ChatSessionViewModel: ObservableObject {
             setupSessionObservers(session: existingSession)
 
             // Index worktree files for autocomplete
-            Task {
-                await autocompleteHandler.indexWorktree()
+            if !worktreePath.isEmpty {
+                Task {
+                    await autocompleteHandler.indexWorktree()
+                }
             }
 
             if !existingSession.isActive {
+                guard !worktreePath.isEmpty else {
+                    logger.error("Chat session missing worktree path; cannot start agent session.")
+                    return
+                }
                 Task { [self] in
                     do {
-                        try await existingSession.start(agentName: self.selectedAgent, workingDir: worktree.path!)
+                        try await existingSession.start(agentName: self.selectedAgent, workingDir: worktreePath)
                         await sendPendingMessageIfNeeded()
                     } catch {
                         self.logger.error("Failed to start session for \(self.selectedAgent): \(error.localizedDescription)")
@@ -197,9 +204,14 @@ class ChatSessionViewModel: ObservableObject {
             return
         }
 
+        guard !worktreePath.isEmpty else {
+            logger.error("Chat session missing worktree path; cannot start agent session.")
+            return
+        }
+
         Task {
             // Create a dedicated AgentSession for this chat session to avoid cross-tab interference
-            let newSession = AgentSession(agentName: self.selectedAgent, workingDirectory: worktree.path ?? "")
+            let newSession = AgentSession(agentName: self.selectedAgent, workingDirectory: worktreePath)
             sessionManager.setAgentSession(newSession, for: sessionId)
             currentAgentSession = newSession
             autocompleteHandler.agentSession = newSession
@@ -219,7 +231,7 @@ class ChatSessionViewModel: ObservableObject {
 
             if !newSession.isActive {
                 do {
-                    try await newSession.start(agentName: self.selectedAgent, workingDir: worktree.path!)
+                    try await newSession.start(agentName: self.selectedAgent, workingDir: worktreePath)
                     // Check for pending message after session starts
                     await sendPendingMessageIfNeeded()
                 } catch {
@@ -230,6 +242,17 @@ class ChatSessionViewModel: ObservableObject {
                 // Session already active, check for pending message
                 await sendPendingMessageIfNeeded()
             }
+        }
+    }
+
+    func persistDraftState() {
+        guard let sessionId = session.id else { return }
+        let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            sessionManager.setPendingInputText(inputText, for: sessionId)
+        }
+        if !attachments.isEmpty {
+            sessionManager.setPendingAttachments(attachments, for: sessionId)
         }
     }
 

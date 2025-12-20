@@ -27,6 +27,8 @@ struct MarkdownRenderedView: View {
 
     @State private var cachedBlocks: [MarkdownBlock] = []
     @State private var cachedContentHash: Int = 0
+    @State private var pendingContentHash: Int = 0
+    @State private var parseTask: Task<Void, Never>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -44,17 +46,43 @@ struct MarkdownRenderedView: View {
         .onChange(of: content) { _ in
             updateCacheIfNeeded()
         }
+        .onDisappear {
+            parseTask?.cancel()
+            parseTask = nil
+        }
     }
 
     private func updateCacheIfNeeded() {
         let contentHash = content.hashValue
         guard cachedContentHash != contentHash else { return }
-        let document = Document(parsing: content)
-        cachedBlocks = convertMarkdown(document)
-        cachedContentHash = contentHash
+        guard pendingContentHash != contentHash else { return }
+
+        pendingContentHash = contentHash
+        parseTask?.cancel()
+
+        let contentSnapshot = content
+        parseTask = Task { @MainActor in
+            // Debounce rapid streaming updates
+            try? await Task.sleep(nanoseconds: 40_000_000)
+            guard !Task.isCancelled else { return }
+
+            let blocks = await Task.detached(priority: .userInitiated) {
+                let document = Document(parsing: contentSnapshot)
+                return Self.convertMarkdown(document)
+            }.value
+
+            guard !Task.isCancelled else { return }
+            if pendingContentHash == contentHash {
+                pendingContentHash = 0
+            }
+            if contentSnapshot == content {
+                cachedBlocks = blocks
+                cachedContentHash = contentHash
+            }
+        }
     }
 
-    private func convertMarkdown(_ document: Document) -> [MarkdownBlock] {
+    private static func convertMarkdown(_ document: Document) -> [MarkdownBlock] {
         var blocks: [MarkdownBlock] = []
         var index = 0
 
@@ -132,7 +160,7 @@ struct MarkdownRenderedView: View {
         return blocks
     }
 
-    private func extractImagesFromParagraph(_ paragraph: Paragraph) -> [MarkdownBlock] {
+    private static func extractImagesFromParagraph(_ paragraph: Paragraph) -> [MarkdownBlock] {
         var images: [MarkdownBlock] = []
         var imgIndex = 0
 
@@ -156,7 +184,7 @@ struct MarkdownRenderedView: View {
         return images
     }
 
-    private func extractImageAlt(_ image: Markdown.Image) -> String? {
+    private static func extractImageAlt(_ image: Markdown.Image) -> String? {
         // Extract alt text from image children
         var alt = ""
         for child in image.children {
@@ -167,7 +195,7 @@ struct MarkdownRenderedView: View {
         return alt.isEmpty ? nil : alt
     }
 
-    private func renderInlineContent(_ inlineElements: some Sequence<Markup>) -> AttributedString {
+    private static func renderInlineContent(_ inlineElements: some Sequence<Markup>) -> AttributedString {
         var result = AttributedString()
 
         for element in inlineElements {
@@ -206,7 +234,7 @@ struct MarkdownRenderedView: View {
         return result
     }
 
-    private func renderBlockQuoteContent(_ children: some Sequence<Markup>) -> AttributedString {
+    private static func renderBlockQuoteContent(_ children: some Sequence<Markup>) -> AttributedString {
         var result = AttributedString()
 
         for child in children {

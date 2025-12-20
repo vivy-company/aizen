@@ -42,21 +42,15 @@ struct ChatTabView: View {
     var body: some View {
         if sessions.isEmpty {
             chatEmptyState
-        } else {
-            ZStack {
-                ForEach(sessions) { session in
-                    ChatSessionView(
-                        worktree: worktree,
-                        session: session,
-                        sessionManager: sessionManager,
-                        viewContext: viewContext
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .opacity(selectedSessionId == session.id ? 1 : 0)
-                    .allowsHitTesting(selectedSessionId == session.id)
-                    .zIndex(selectedSessionId == session.id ? 1 : 0)
-                }
-            }
+        } else if let session = selectedSession ?? sessions.last {
+            ChatSessionView(
+                worktree: worktree,
+                session: session,
+                sessionManager: sessionManager,
+                viewContext: viewContext
+            )
+            .id(session.objectID)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.easeInOut(duration: 0.2), value: selectedSessionId)
             .onAppear {
                 if selectedSessionId == nil {
@@ -74,6 +68,11 @@ struct ChatTabView: View {
                 }
             }
         }
+    }
+
+    private var selectedSession: ChatSession? {
+        guard let currentId = selectedSessionId else { return nil }
+        return sessions.first(where: { $0.id == currentId })
     }
 
     private var chatEmptyState: some View {

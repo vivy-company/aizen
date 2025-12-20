@@ -26,7 +26,13 @@ struct CustomTextEditor: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
-        let textView = scrollView.documentView as! NSTextView
+        let textView: NSTextView
+        if let existing = scrollView.documentView as? NSTextView {
+            textView = existing
+        } else {
+            textView = NSTextView()
+            scrollView.documentView = textView
+        }
 
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
@@ -48,7 +54,7 @@ struct CustomTextEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
-        let textView = nsView.documentView as! NSTextView
+        guard let textView = nsView.documentView as? NSTextView else { return }
 
         if textView.string != text {
             textView.string = text

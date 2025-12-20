@@ -150,6 +150,7 @@ struct ChatSessionView: View {
             NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
         }
         .onDisappear {
+            viewModel.persistDraftState()
             autocompleteWindow?.dismiss()
             NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
         }

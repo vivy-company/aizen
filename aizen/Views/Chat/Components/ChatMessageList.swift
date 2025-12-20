@@ -101,11 +101,10 @@ struct ChatMessageList: View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 10) {
-                    ForEach(timelineItems, id: \.id) { item in
+                    ForEach(timelineItems, id: \.stableId) { item in
                         switch item {
                         case .message(let message):
                             MessageBubbleView(message: message, agentName: message.role == .agent ? selectedAgent : nil)
-                                .id(item.id)  // Use dynamic id to force re-render when content changes
                                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
                         case .toolCall(let toolCall):
                             // Skip child tool calls (rendered inside parent Task)
@@ -121,7 +120,6 @@ struct ChatMessageList: View {
                                     onOpenInEditor: onOpenFileInEditor,
                                     childToolCalls: children
                                 )
-                                .id(item.id)  // Use dynamic id to force re-render when status changes
                                 .transition(.opacity.combined(with: .move(edge: .leading)))
                             }
                         }

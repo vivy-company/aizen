@@ -49,6 +49,12 @@ struct MarkdownImageView: View {
     @State private var isLoading = true
     @State private var error: String?
     @State private var loadTask: Task<Void, Never>?
+    private static let imageCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 200
+        cache.totalCostLimit = 50 * 1024 * 1024
+        return cache
+    }()
 
     var body: some View {
         Group {
@@ -100,6 +106,15 @@ struct MarkdownImageView: View {
     }
 
     private func loadImage() async {
+        let cacheKey = NSString(string: url)
+        if let cached = Self.imageCache.object(forKey: cacheKey) {
+            await MainActor.run {
+                self.image = cached
+                self.isLoading = false
+            }
+            return
+        }
+
         guard let imageURL = URL(string: url) else {
             error = "Invalid URL"
             isLoading = false
@@ -118,6 +133,8 @@ struct MarkdownImageView: View {
                     self.image = nsImage
                     self.isLoading = false
                 }
+                let cost = nsImage.tiffRepresentation?.count ?? 0
+                Self.imageCache.setObject(nsImage, forKey: cacheKey, cost: cost)
             } else {
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
@@ -135,6 +152,7 @@ struct MarkdownImageView: View {
                         self.image = nsImage
                         self.isLoading = false
                     }
+                    Self.imageCache.setObject(nsImage, forKey: cacheKey, cost: data.count)
                 } else {
                     await MainActor.run {
                         self.error = "Invalid image data"

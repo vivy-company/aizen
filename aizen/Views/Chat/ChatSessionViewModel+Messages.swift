@@ -31,10 +31,13 @@ extension ChatSessionViewModel {
                 guard let agentSession = self.currentAgentSession else {
                     throw NSError(domain: "ChatSessionView", code: -1, userInfo: [NSLocalizedDescriptionKey: "No agent session"])
                 }
+                guard let worktreePath = self.worktree.path, !worktreePath.isEmpty else {
+                    throw NSError(domain: "ChatSessionView", code: -4, userInfo: [NSLocalizedDescriptionKey: "Missing worktree path"])
+                }
 
                 // Start session if not active
                 if !agentSession.isActive {
-                    try await agentSession.start(agentName: self.selectedAgent, workingDir: self.worktree.path!)
+                    try await agentSession.start(agentName: self.selectedAgent, workingDir: worktreePath)
                 }
 
                 // Wait for session to be ready (not just active) - handles initialization delay
