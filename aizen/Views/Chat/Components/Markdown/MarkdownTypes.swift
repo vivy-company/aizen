@@ -30,10 +30,9 @@ struct MarkdownBlock: Identifiable {
         case .heading(let text, let level):
             let textHash = String(text.characters).hashValue
             return "h\(level)-\(index)-\(textHash)"
-        case .codeBlock(let code, let lang):
-            // Use prefix hash for code blocks (can be large)
-            let codeHash = String(code.prefix(200)).hashValue
-            return "code-\(index)-\(codeHash)-\(lang ?? "none")"
+        case .codeBlock(_, let lang):
+            // Keep a stable ID for code blocks to avoid flicker during streaming updates.
+            return "code-\(index)-\(lang ?? "none")"
         case .list(let items, let ordered):
             let itemsHash = items.count > 0 ? String(items.first!.characters.prefix(50)).hashValue : 0
             return "list-\(ordered)-\(index)-\(items.count)-\(itemsHash)"

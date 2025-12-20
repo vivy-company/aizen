@@ -12,6 +12,7 @@ import CodeEditLanguages
 struct CodeBlockView: View {
     let code: String
     let language: String?
+    var isStreaming: Bool = false
 
     @State private var showCopyConfirmation = false
     @State private var highlightedText: AttributedString?
@@ -58,8 +59,10 @@ struct CodeBlockView: View {
                 .textSelection(.enabled)
             }
             .padding(8)
-            .task(id: code) {
-                await performHighlight()
+            .task(id: highlightTaskKey) {
+                guard !isStreaming else { return }
+                let snapshot = code
+                await performHighlight(codeSnapshot: snapshot)
             }
          
         }
@@ -85,7 +88,11 @@ struct CodeBlockView: View {
         }
     }
 
-    private func performHighlight() async {
+    private var highlightTaskKey: String {
+        "\(code.hashValue)-\(language ?? "none")-\(editorTheme)-\(isStreaming ? "stream" : "final")"
+    }
+
+    private func performHighlight(codeSnapshot: String) async {
         let detectedLanguage: CodeLanguage
         if let lang = language, !lang.isEmpty {
             detectedLanguage = LanguageDetection.languageFromFence(lang)
@@ -98,14 +105,18 @@ struct CodeBlockView: View {
 
         // Use shared highlighting queue (limits concurrent highlighting, provides caching)
         if let attributed = await HighlightingQueue.shared.highlight(
-            code: code,
+            code: codeSnapshot,
             language: detectedLanguage,
             theme: theme
         ) {
-            highlightedText = attributed
+            if codeSnapshot == code {
+                highlightedText = attributed
+            }
         } else {
             // Fallback to plain text on error or cancellation
-            highlightedText = AttributedString(code)
+            if highlightedText == nil, codeSnapshot == code {
+                highlightedText = AttributedString(codeSnapshot)
+            }
         }
     }
 

@@ -35,6 +35,7 @@ struct ChatInputBar: View {
     @State private var isHoveringInput = false
     @State private var dashPhase: CGFloat = 0
     @State private var gradientRotation: Double = 0
+    @State private var measuredTextHeight: CGFloat = 0
 
     private let gradientColors: [Color] = [
         .accentColor.opacity(0.7), .accentColor.opacity(0.4), .accentColor.opacity(0.7)
@@ -83,6 +84,7 @@ struct ChatInputBar: View {
 
                     CustomTextEditor(
                         text: $inputText,
+                        measuredHeight: $measuredTextHeight,
                         onSubmit: {
                             if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 onSend()
@@ -266,10 +268,10 @@ struct ChatInputBar: View {
     }
 
     private var textEditorHeight: CGFloat {
-        let lineCount = max(1, inputText.components(separatedBy: .newlines).count)
-        let lineHeight: CGFloat = 18
-        let baseHeight: CGFloat = lineHeight + 12
-        return min(max(baseHeight, CGFloat(lineCount) * lineHeight + 12), 120)
+        let minHeight: CGFloat = 30
+        let maxHeight: CGFloat = 120
+        let measured = measuredTextHeight > 0 ? measuredTextHeight : minHeight
+        return min(max(measured, minHeight), maxHeight)
     }
 
     private func startGradientAnimation() {

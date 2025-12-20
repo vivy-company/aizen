@@ -267,7 +267,7 @@ struct MarkdownBlockView: View {
                 .fontWeight(.bold)
                 .textSelection(.enabled)
         case .codeBlock(let code, let language):
-            CodeBlockView(code: code, language: language)
+            CodeBlockView(code: code, language: language, isStreaming: isStreaming && isLast)
         case .list(let items, let isOrdered):
             MarkdownListView(items: items, isOrdered: isOrdered)
         case .blockQuote(let attributedText):

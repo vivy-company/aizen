@@ -47,32 +47,52 @@ struct ChatSessionView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                ChatMessageList(
-                    timelineItems: viewModel.timelineItems,
-                    isProcessing: viewModel.isProcessing,
-                    isSessionInitializing: viewModel.isSessionInitializing,
-                    selectedAgent: viewModel.selectedAgent,
-                    currentThought: viewModel.currentAgentSession?.currentThought,
-                    currentIterationId: viewModel.currentAgentSession?.currentIterationId,
-                    onScrollProxyReady: { proxy in
-                        viewModel.scrollProxy = proxy
-                    },
-                    onAppear: viewModel.loadMessages,
-                    renderInlineMarkdown: viewModel.renderInlineMarkdown,
-                    onToolTap: { toolCall in
-                        selectedToolCall = toolCall
-                    },
-                    onOpenFileInEditor: { path in
-                        fileToOpenInEditor = path
-                    },
-                    agentSession: viewModel.currentAgentSession,
-                    onScrollPositionChange: { isNearBottom in
-                        viewModel.isNearBottom = isNearBottom
-                    },
-                    childToolCallsProvider: { parentId in
-                        viewModel.childToolCalls(for: parentId)
+                ZStack(alignment: .bottomTrailing) {
+                    ChatMessageList(
+                        timelineItems: viewModel.timelineItems,
+                        isProcessing: viewModel.isProcessing,
+                        isSessionInitializing: viewModel.isSessionInitializing,
+                        selectedAgent: viewModel.selectedAgent,
+                        currentThought: viewModel.currentAgentSession?.currentThought,
+                        currentIterationId: viewModel.currentAgentSession?.currentIterationId,
+                        onScrollProxyReady: { proxy in
+                            viewModel.scrollProxy = proxy
+                        },
+                        onAppear: viewModel.loadMessages,
+                        renderInlineMarkdown: viewModel.renderInlineMarkdown,
+                        onToolTap: { toolCall in
+                            selectedToolCall = toolCall
+                        },
+                        onOpenFileInEditor: { path in
+                            fileToOpenInEditor = path
+                        },
+                        agentSession: viewModel.currentAgentSession,
+                        onScrollPositionChange: { isNearBottom in
+                            viewModel.isNearBottom = isNearBottom
+                        },
+                        childToolCallsProvider: { parentId in
+                            viewModel.childToolCalls(for: parentId)
+                        }
+                    )
+
+                    if shouldShowScrollToBottom {
+                        Button(action: scrollToBottom) {
+                            Image(systemName: "arrow.down")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.primary)
+                                .padding(10)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(.separator.opacity(0.3), lineWidth: 0.5)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 16)
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
                     }
-                )
+                }
 
                 Spacer(minLength: 0)
 
@@ -248,6 +268,15 @@ struct ChatSessionView: View {
             return false
         }
         return true
+    }
+
+    private var shouldShowScrollToBottom: Bool {
+        !viewModel.isNearBottom && !viewModel.timelineItems.isEmpty
+    }
+
+    private func scrollToBottom() {
+        viewModel.isNearBottom = true
+        viewModel.scrollToBottom()
     }
 
     // MARK: - Subviews

@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 
 struct CustomTextEditor: NSViewRepresentable {
     @Binding var text: String
+    @Binding var measuredHeight: CGFloat
     let onSubmit: () -> Void
 
     // Autocomplete callbacks - passes (text, cursorPosition, cursorRect)
@@ -45,16 +46,25 @@ struct CustomTextEditor: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.drawsBackground = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainerInset = NSSize(width: 0, height: 6)
         textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.heightTracksTextView = false
 
         context.coordinator.textView = textView
+        context.coordinator.scrollView = scrollView
+        context.coordinator.updateMeasuredHeight()
 
         return scrollView
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         guard let textView = nsView.documentView as? NSTextView else { return }
+        context.coordinator.scrollView = nsView
 
         if textView.string != text {
             textView.string = text
@@ -75,29 +85,41 @@ struct CustomTextEditor: NSViewRepresentable {
         context.coordinator.onCursorChange = onCursorChange
         context.coordinator.onAutocompleteNavigate = onAutocompleteNavigate
         context.coordinator.onImagePaste = onImagePaste
+        context.coordinator.updateMeasuredHeight()
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, onSubmit: onSubmit, onCursorChange: onCursorChange, onAutocompleteNavigate: onAutocompleteNavigate, onImagePaste: onImagePaste)
+        Coordinator(
+            text: $text,
+            measuredHeight: $measuredHeight,
+            onSubmit: onSubmit,
+            onCursorChange: onCursorChange,
+            onAutocompleteNavigate: onAutocompleteNavigate,
+            onImagePaste: onImagePaste
+        )
     }
 
     class Coordinator: NSObject, NSTextViewDelegate {
         @Binding var text: String
+        @Binding var measuredHeight: CGFloat
         let onSubmit: () -> Void
         var onCursorChange: ((String, Int, NSRect) -> Void)?
         var onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?
         var onImagePaste: ((Data, String) -> Void)?
         weak var textView: NSTextView?
+        weak var scrollView: NSScrollView?
         private var eventMonitor: Any?
 
         init(
             text: Binding<String>,
+            measuredHeight: Binding<CGFloat>,
             onSubmit: @escaping () -> Void,
             onCursorChange: ((String, Int, NSRect) -> Void)?,
             onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?,
             onImagePaste: ((Data, String) -> Void)?
         ) {
             _text = text
+            _measuredHeight = measuredHeight
             self.onSubmit = onSubmit
             self.onCursorChange = onCursorChange
             self.onAutocompleteNavigate = onAutocompleteNavigate
@@ -189,6 +211,7 @@ struct CustomTextEditor: NSViewRepresentable {
             text = textView.string
             highlightMentions(in: textView)
             notifyCursorChange(textView)
+            updateMeasuredHeight()
         }
 
         func applyHighlighting(to textView: NSTextView) {
@@ -230,6 +253,28 @@ struct CustomTextEditor: NSViewRepresentable {
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             notifyCursorChange(textView)
+        }
+
+        func updateMeasuredHeight() {
+            guard let textView = textView,
+                  let scrollView = scrollView,
+                  let textContainer = textView.textContainer,
+                  let layoutManager = textView.layoutManager else {
+                return
+            }
+
+            textContainer.containerSize = NSSize(width: scrollView.contentSize.width, height: .greatestFiniteMagnitude)
+            layoutManager.ensureLayout(for: textContainer)
+
+            let usedRect = layoutManager.usedRect(for: textContainer)
+            let inset = textView.textContainerInset.height * 2
+            let newHeight = usedRect.height + inset
+
+            if abs(newHeight - measuredHeight) > 0.5 {
+                DispatchQueue.main.async { [weak self] in
+                    self?.measuredHeight = newHeight
+                }
+            }
         }
 
         private func notifyCursorChange(_ textView: NSTextView) {
