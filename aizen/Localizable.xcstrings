@@ -1466,7 +1466,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "chat.content.audioType %@"
+            "value" : "Audio: %@"
           }
         }
       }
@@ -1599,7 +1599,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "chat.content.imageType %@"
+            "value" : "Image: %@"
           }
         }
       }
@@ -1622,7 +1622,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "chat.content.resourceLink"
+            "value" : "Resource Link"
           }
         }
       }
@@ -1645,7 +1645,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "chat.content.resourceUri %@"
+            "value" : "Resource: %@"
           }
         }
       }
@@ -1679,7 +1679,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "chat.content.text"
+            "value" : "Text"
           }
         }
       }
@@ -1746,7 +1746,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "chat.error.prefix %@"
+            "value" : "Error: %@"
           }
         }
       }
@@ -2939,7 +2939,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "error.git.commandFailed %@"
+            "value" : "Git command failed: %@"
           }
         }
       }
@@ -2974,7 +2974,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "error.git.timeout"
+            "value" : "Git command timed out"
           }
         }
       }
@@ -7584,7 +7584,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "worktree.create.branchExists %@"
+            "value" : "Branch '%@' already exists"
           }
         }
       }
@@ -7739,7 +7739,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "worktree.detail.ahead %lld"
+            "value" : "%lld ahead"
           }
         }
       }
@@ -7762,7 +7762,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "worktree.detail.behind %lld"
+            "value" : "%lld behind"
           }
         }
       }
@@ -7840,7 +7840,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "worktree.detail.deleteConfirmMessageWithName %@"
+            "value" : "Are you sure you want to delete '%@'? This action cannot be undone."
           }
         }
       }
@@ -7995,7 +7995,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "worktree.detail.unsavedChangesMessage %@"
+            "value" : "You have unsaved changes in '%@'. Deleting this worktree will lose these changes."
           }
         }
       }
@@ -8106,7 +8106,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "worktree.list.lastAccessed %@"
+            "value" : "Last accessed %@"
           }
         }
       }
@@ -8360,7 +8360,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "worktree.session.terminalTitle %lld"
+            "value" : "Terminal %lld"
           }
         }
       }
