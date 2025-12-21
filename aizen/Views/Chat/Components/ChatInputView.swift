@@ -66,7 +66,8 @@ struct CustomTextEditor: NSViewRepresentable {
         guard let textView = nsView.documentView as? NSTextView else { return }
         context.coordinator.scrollView = nsView
 
-        if textView.string != text {
+        // Skip text updates during IME composition to avoid breaking CJK input
+        if textView.string != text && !textView.hasMarkedText() {
             textView.string = text
 
             // Apply mention highlighting
@@ -208,6 +209,8 @@ struct CustomTextEditor: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
+            // Skip updates during IME composition (marked text) to avoid breaking CJK input
+            guard !textView.hasMarkedText() else { return }
             text = textView.string
             highlightMentions(in: textView)
             notifyCursorChange(textView)
