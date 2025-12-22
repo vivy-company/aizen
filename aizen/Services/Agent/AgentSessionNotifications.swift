@@ -119,6 +119,7 @@ extension AgentSession {
                         executionTime: lastMessage.executionTime,
                         requestId: lastMessage.requestId
                     )
+                    messages = messages
                 } else {
                     addAgentMessage(text, contentBlocks: blockContent, isComplete: false, startTime: Date())
                 }

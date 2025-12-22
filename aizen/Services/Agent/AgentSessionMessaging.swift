@@ -293,6 +293,7 @@ extension AgentSession {
                 executionTime: executionTime,
                 requestId: completedMessage.requestId
             )
+            messages = messages
         }
     }
 
