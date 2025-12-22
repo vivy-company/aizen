@@ -46,6 +46,11 @@ struct MarkdownRenderedView: View {
         .onChange(of: content) { _ in
             updateCacheIfNeeded()
         }
+        .onChange(of: isStreaming) { streaming in
+            if !streaming {
+                forceUpdateCache()
+            }
+        }
         .onDisappear {
             parseTask?.cancel()
             parseTask = nil
@@ -78,6 +83,26 @@ struct MarkdownRenderedView: View {
             if contentSnapshot == content {
                 cachedBlocks = blocks
                 cachedContentHash = contentHash
+            }
+        }
+    }
+
+    private func forceUpdateCache() {
+        let contentHash = content.hashValue
+        pendingContentHash = contentHash
+        parseTask?.cancel()
+
+        let contentSnapshot = content
+        parseTask = Task { @MainActor in
+            let blocks = await Task.detached(priority: .userInitiated) {
+                let document = Document(parsing: contentSnapshot)
+                return Self.convertMarkdown(document)
+            }.value
+
+            if contentSnapshot == content {
+                cachedBlocks = blocks
+                cachedContentHash = contentHash
+                pendingContentHash = 0
             }
         }
     }
