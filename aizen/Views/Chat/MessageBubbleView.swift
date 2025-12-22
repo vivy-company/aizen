@@ -75,13 +75,7 @@ struct MessageBubbleView: View {
                             .foregroundStyle(.tertiary)
                             .multilineTextAlignment(.center)
                     } else {
-                        if message.role == .agent {
-                            MessageContentView(content: message.content, isComplete: message.isComplete)
-                                .id(message.content.count)
-                                .transaction { $0.disablesAnimations = true }
-                        } else {
-                            MessageContentView(content: message.content, isComplete: message.isComplete)
-                        }
+                        MessageContentView(content: message.content, isComplete: message.isComplete)
                     }
 
                     // Only show attachment chips for user messages with non-text attachments
@@ -149,7 +143,7 @@ struct MessageBubbleView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: bubbleAlignment)
-        .transition(.asymmetric(
+        .transition(message.role == .agent && !message.isComplete ? .identity : .asymmetric(
             insertion: .scale(scale: 0.95, anchor: bubbleAlignment == .trailing ? .bottomTrailing : .bottomLeading)
                 .combined(with: .opacity),
             removal: .opacity
