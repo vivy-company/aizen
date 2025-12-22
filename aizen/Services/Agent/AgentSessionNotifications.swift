@@ -91,8 +91,8 @@ extension AgentSession {
             case .agentMessageChunk(let block):
                 currentThought = nil
                 let (text, blockContent) = textAndContent(from: block)
-                guard !text.isEmpty else { break }
-
+                if text.isEmpty && blockContent.isEmpty { break }
+                recordAgentChunk()
                 let lastMessage = messages.last
 
                 if let lastMessage = lastMessage,
@@ -121,7 +121,9 @@ extension AgentSession {
                     )
                     messages = messages
                 } else {
-                    addAgentMessage(text, contentBlocks: blockContent, isComplete: false, startTime: Date())
+                    let initialText = text
+                    let initialBlocks = blockContent
+                    addAgentMessage(initialText, contentBlocks: initialBlocks, isComplete: false, startTime: Date())
                 }
             case .userMessageChunk:
                 break

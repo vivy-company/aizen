@@ -84,6 +84,9 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     var notificationTask: Task<Void, Never>?
     var versionCheckTask: Task<Void, Never>?
     let logger = Logger.forCategory("AgentSession")
+    private var finalizeMessageTask: Task<Void, Never>?
+    private var lastAgentChunkAt: Date?
+    private static let finalizeIdleDelay: TimeInterval = 0.2
 
     /// Currently pending Task tool calls (subagents) - used for parent tracking
     /// When only one Task is active, child tool calls are assigned to it
@@ -100,6 +103,47 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     init(agentName: String = "", workingDirectory: String = "") {
         self.agentName = agentName
         self.workingDirectory = workingDirectory
+    }
+
+    // MARK: - Streaming Finalization
+
+    func resetFinalizeState() {
+        finalizeMessageTask?.cancel()
+        finalizeMessageTask = nil
+        lastAgentChunkAt = nil
+    }
+
+    func recordAgentChunk() {
+        lastAgentChunkAt = Date()
+    }
+
+    func scheduleFinalizeLastMessage() {
+        finalizeMessageTask?.cancel()
+        finalizeMessageTask = Task { @MainActor in
+            while true {
+                let delay: TimeInterval
+                if let last = lastAgentChunkAt {
+                    let elapsed = Date().timeIntervalSince(last)
+                    delay = max(0.0, Self.finalizeIdleDelay - elapsed)
+                } else {
+                    delay = Self.finalizeIdleDelay
+                }
+
+                if delay > 0 {
+                    try? await Task.sleep(for: .seconds(delay))
+                }
+
+                guard !Task.isCancelled else { return }
+
+                if let last = lastAgentChunkAt,
+                   Date().timeIntervalSince(last) < Self.finalizeIdleDelay {
+                    continue
+                }
+
+                markLastMessageComplete()
+                return
+            }
+        }
     }
 
     // MARK: - Session Management

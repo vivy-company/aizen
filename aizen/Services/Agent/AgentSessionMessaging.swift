@@ -36,6 +36,7 @@ extension AgentSession {
 
         // Mark any incomplete agent message as complete before starting new conversation turn
         markLastMessageComplete()
+        resetFinalizeState()
 
         // Build content blocks array
         var contentBlocks: [ContentBlock] = []
@@ -100,6 +101,7 @@ extension AgentSession {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(100))
             self.isStreaming = false
+            self.scheduleFinalizeLastMessage()
             logger.debug("Streaming ended after notification drain")
         }
 

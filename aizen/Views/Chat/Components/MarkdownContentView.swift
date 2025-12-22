@@ -12,10 +12,10 @@ import Markdown
 
 struct MessageContentView: View {
     let content: String
-    var isComplete: Bool = true
+    var isStreaming: Bool = false
 
     var body: some View {
-        MarkdownRenderedView(content: content, isStreaming: !isComplete)
+        MarkdownRenderedView(content: content, isStreaming: isStreaming)
     }
 }
 
