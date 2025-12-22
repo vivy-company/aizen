@@ -531,8 +531,11 @@ class ChatSessionViewModel: ObservableObject {
                 self.isProcessing = isStreaming
                 if !isStreaming {
                     // Ensure final streamed chunks are reflected in the timeline.
-                    self.syncMessages(session.messages)
-                    self.syncToolCalls(session.toolCalls)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        self.rebuildTimeline()
+                        self.previousMessageIds = Set(session.messages.map { $0.id })
+                        self.previousToolCallIds = Set(session.toolCalls.map { $0.id })
+                    }
                 }
             }
             .store(in: &cancellables)
