@@ -85,6 +85,8 @@ actor GitBranchService {
 
             let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
             let errorOutput = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
 
             if process.terminationStatus == 0 {
                 if output.contains("Already up to date") || output.contains("Already up-to-date") {

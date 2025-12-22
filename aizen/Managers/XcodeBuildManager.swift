@@ -432,6 +432,9 @@ class XcodeBuildManager: ObservableObject {
                 process.terminate()
                 try? await Task.sleep(nanoseconds: 300_000_000)
             }
+            await MainActor.run {
+                self.closeLaunchPipes()
+            }
             return
         }
 
@@ -442,6 +445,9 @@ class XcodeBuildManager: ObservableObject {
                 arguments: [String(pid)]
             )
             try? await Task.sleep(nanoseconds: 300_000_000)
+            await MainActor.run {
+                self.closeLaunchPipes()
+            }
         }
     }
 
@@ -491,10 +497,20 @@ class XcodeBuildManager: ObservableObject {
         launchedAppPath = nil
         launchedPID = nil
         launchedProcess = nil
-        launchedOutputPipe = nil
-        launchedErrorPipe = nil
+        closeLaunchPipes()
         appMonitorTask?.cancel()
         appMonitorTask = nil
+    }
+
+    private func closeLaunchPipes() {
+        if let outputPipe = launchedOutputPipe {
+            try? outputPipe.fileHandleForReading.close()
+        }
+        if let errorPipe = launchedErrorPipe {
+            try? errorPipe.fileHandleForReading.close()
+        }
+        launchedOutputPipe = nil
+        launchedErrorPipe = nil
     }
 
     private func findBuiltApp(project: XcodeProject, scheme: String) async throws -> String? {

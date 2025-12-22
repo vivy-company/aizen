@@ -36,6 +36,10 @@ actor NPMAgentInstaller {
 
         try process.run()
         process.waitUntilExit()
+        defer {
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
+        }
 
         if process.terminationStatus != 0 {
             let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()

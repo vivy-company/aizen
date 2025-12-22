@@ -183,9 +183,9 @@ actor BinaryAgentInstaller {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
         process.arguments = ["-d", "com.apple.quarantine", path]
 
-        // Suppress errors (file might not have quarantine attribute)
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
+        // Suppress output (file might not have quarantine attribute)
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
 
         try? process.run()
         process.waitUntilExit()

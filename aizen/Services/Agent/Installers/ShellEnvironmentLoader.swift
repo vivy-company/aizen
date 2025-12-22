@@ -35,8 +35,9 @@ actor ShellEnvironmentLoader {
         process.arguments = arguments
 
         let pipe = Pipe()
+        let errorPipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardError = errorPipe
 
         var shellEnv: [String: String] = [:]
 
@@ -45,6 +46,8 @@ actor ShellEnvironmentLoader {
             process.waitUntilExit()
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
             if let output = String(data: data, encoding: .utf8) {
                 for line in output.split(separator: "\n") {
                     if let equalsIndex = line.firstIndex(of: "=") {
@@ -55,6 +58,8 @@ actor ShellEnvironmentLoader {
                 }
             }
         } catch {
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
             // Fallback to basic environment
             return ProcessInfo.processInfo.environment
         }

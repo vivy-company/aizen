@@ -35,7 +35,11 @@ actor XcodeLogService {
             DispatchQueue.global(qos: .userInitiated).async {
                 outputHandle.readabilityHandler = { handle in
                     let data = handle.availableData
-                    guard !data.isEmpty else { return }
+                    guard !data.isEmpty else {
+                        handle.readabilityHandler = nil
+                        try? handle.close()
+                        return
+                    }
 
                     if let text = String(data: data, encoding: .utf8) {
                         let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
@@ -50,7 +54,11 @@ actor XcodeLogService {
             DispatchQueue.global(qos: .userInitiated).async {
                 errorHandle.readabilityHandler = { handle in
                     let data = handle.availableData
-                    guard !data.isEmpty else { return }
+                    guard !data.isEmpty else {
+                        handle.readabilityHandler = nil
+                        try? handle.close()
+                        return
+                    }
 
                     if let text = String(data: data, encoding: .utf8) {
                         let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
@@ -119,6 +127,7 @@ actor XcodeLogService {
                 guard !data.isEmpty else {
                     // Empty data means EOF, clean up handler
                     handle.readabilityHandler = nil
+                    try? handle.close()
                     return
                 }
 
@@ -140,6 +149,7 @@ actor XcodeLogService {
                     process.terminationHandler = { _ in
                         // Clean up handler
                         outputHandle.readabilityHandler = nil
+                        try? outputHandle.close()
 
                         // Read any remaining data
                         let remainingData = outputHandle.readDataToEndOfFile()
@@ -160,6 +170,7 @@ actor XcodeLogService {
             logger.info("Mac log streaming ended for \(bundleId)")
         } catch {
             outputHandle.readabilityHandler = nil
+            try? outputHandle.close()
             logger.error("Failed to start Mac log streaming: \(error.localizedDescription)")
             continuation.yield("Error: Failed to start Mac log streaming - \(error.localizedDescription)")
         }
@@ -233,6 +244,7 @@ actor XcodeLogService {
                 guard !data.isEmpty else {
                     // Empty data means EOF, clean up handler
                     handle.readabilityHandler = nil
+                    try? handle.close()
                     return
                 }
 
@@ -254,6 +266,7 @@ actor XcodeLogService {
                     process.terminationHandler = { _ in
                         // Clean up handler
                         outputHandle.readabilityHandler = nil
+                        try? outputHandle.close()
 
                         // Read any remaining data
                         let remainingData = outputHandle.readDataToEndOfFile()
@@ -274,6 +287,7 @@ actor XcodeLogService {
             logger.info("Log streaming ended for \(bundleId)")
         } catch {
             outputHandle.readabilityHandler = nil
+            try? outputHandle.close()
             logger.error("Failed to start log streaming: \(error.localizedDescription)")
             continuation.yield("Error: Failed to start log streaming - \(error.localizedDescription)")
         }

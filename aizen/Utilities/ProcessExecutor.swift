@@ -71,16 +71,20 @@ actor ProcessExecutor {
         // Set up non-blocking output capture using readabilityHandler
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
-            if !data.isEmpty {
-                dataCollector.appendStdout(data)
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                return
             }
+            dataCollector.appendStdout(data)
         }
 
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
-            if !data.isEmpty {
-                dataCollector.appendStderr(data)
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                return
             }
+            dataCollector.appendStderr(data)
         }
 
         // Run process and wait asynchronously for termination
@@ -111,6 +115,10 @@ actor ProcessExecutor {
                     stderr: dataCollector.stderrString
                 )
 
+                // Close pipes to release file descriptors
+                try? stdoutPipe.fileHandleForReading.close()
+                try? stderrPipe.fileHandleForReading.close()
+
                 continuation.resume(returning: result)
             }
 
@@ -124,6 +132,8 @@ actor ProcessExecutor {
 
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
                 stderrPipe.fileHandleForReading.readabilityHandler = nil
+                try? stdoutPipe.fileHandleForReading.close()
+                try? stderrPipe.fileHandleForReading.close()
 
                 continuation.resume(throwing: ProcessExecutorError.executionFailed(error.localizedDescription))
             }
@@ -206,6 +216,7 @@ actor ProcessExecutor {
                 let data = handle.availableData
                 guard !data.isEmpty else {
                     handle.readabilityHandler = nil
+                    try? handle.close()
                     return
                 }
                 if let text = String(data: data, encoding: .utf8) {
@@ -217,6 +228,7 @@ actor ProcessExecutor {
                 let data = handle.availableData
                 guard !data.isEmpty else {
                     handle.readabilityHandler = nil
+                    try? handle.close()
                     return
                 }
                 if let text = String(data: data, encoding: .utf8) {
@@ -241,6 +253,8 @@ actor ProcessExecutor {
                 }
 
                 continuation.yield(.terminated(proc.terminationStatus))
+                try? stdoutPipe.fileHandleForReading.close()
+                try? stderrPipe.fileHandleForReading.close()
                 continuation.finish()
             }
 
@@ -248,11 +262,19 @@ actor ProcessExecutor {
                 if process.isRunning {
                     process.terminate()
                 }
+                stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                stderrPipe.fileHandleForReading.readabilityHandler = nil
+                try? stdoutPipe.fileHandleForReading.close()
+                try? stderrPipe.fileHandleForReading.close()
             }
 
             do {
                 try process.run()
             } catch {
+                stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                stderrPipe.fileHandleForReading.readabilityHandler = nil
+                try? stdoutPipe.fileHandleForReading.close()
+                try? stderrPipe.fileHandleForReading.close()
                 continuation.yield(.error(error.localizedDescription))
                 continuation.finish()
             }

@@ -233,7 +233,33 @@ actor ACPProcessManager {
     }
 
     private func handleTermination(exitCode: Int32) async {
+        await drainAndClosePipes()
         logger.info("Agent process terminated with code: \(exitCode)")
         await onTermination?(exitCode)
+    }
+
+    private func drainAndClosePipes() async {
+        if let stdoutHandle = stdoutPipe?.fileHandleForReading {
+            stdoutHandle.readabilityHandler = nil
+            let remaining = stdoutHandle.readDataToEndOfFile()
+            if !remaining.isEmpty {
+                await processIncomingData(remaining)
+            }
+            try? stdoutHandle.close()
+        }
+
+        if let stderrHandle = stderrPipe?.fileHandleForReading {
+            stderrHandle.readabilityHandler = nil
+            _ = stderrHandle.readDataToEndOfFile()
+            try? stderrHandle.close()
+        }
+
+        try? stdinPipe?.fileHandleForWriting.close()
+
+        stdinPipe = nil
+        stdoutPipe = nil
+        stderrPipe = nil
+        process = nil
+        readBuffer.removeAll()
     }
 }

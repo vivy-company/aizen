@@ -43,6 +43,10 @@ actor UVAgentInstaller {
 
         try process.run()
         process.waitUntilExit()
+        defer {
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
+        }
 
         if process.terminationStatus != 0 {
             let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
@@ -69,14 +73,17 @@ actor UVAgentInstaller {
         process.environment = shellEnv
 
         let pipe = Pipe()
+        let errorPipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardError = errorPipe
 
         do {
             try process.run()
             process.waitUntilExit()
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
             if let output = String(data: data, encoding: .utf8) {
                 // Parse "Version: x.y.z" from pip show output
                 for line in output.components(separatedBy: "\n") {
@@ -87,6 +94,8 @@ actor UVAgentInstaller {
                 }
             }
         } catch {
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
             logger.error("Failed to get version for \(package): \(error)")
         }
 
@@ -109,8 +118,8 @@ actor UVAgentInstaller {
         checkProcess.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         checkProcess.arguments = ["uv", "--version"]
         checkProcess.environment = shellEnv
-        checkProcess.standardOutput = Pipe()
-        checkProcess.standardError = Pipe()
+        checkProcess.standardOutput = FileHandle.nullDevice
+        checkProcess.standardError = FileHandle.nullDevice
 
         try? checkProcess.run()
         checkProcess.waitUntilExit()
@@ -129,11 +138,12 @@ actor UVAgentInstaller {
         installProcess.environment = shellEnv
 
         let errorPipe = Pipe()
-        installProcess.standardOutput = Pipe()
+        installProcess.standardOutput = FileHandle.nullDevice
         installProcess.standardError = errorPipe
 
         try installProcess.run()
         installProcess.waitUntilExit()
+        defer { try? errorPipe.fileHandleForReading.close() }
 
         if installProcess.terminationStatus != 0 {
             let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()

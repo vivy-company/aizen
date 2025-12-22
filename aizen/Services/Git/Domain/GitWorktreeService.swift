@@ -116,6 +116,7 @@ actor GitWorktreeService {
             guard process.terminationStatus == 0 else { return }
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            try? pipe.fileHandleForReading.close()
             let output = String(data: data, encoding: .utf8) ?? ""
 
             // If LFS is being used, pull the objects

@@ -77,8 +77,9 @@ enum ShellEnvironment {
         process.currentDirectoryURL = URL(fileURLWithPath: homeDir)
 
         let pipe = Pipe()
+        let errorPipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardError = errorPipe
 
         var shellEnv: [String: String] = [:]
 
@@ -87,6 +88,8 @@ enum ShellEnvironment {
             process.waitUntilExit()
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
             if let output = String(data: data, encoding: .utf8) {
                 for line in output.split(separator: "\n") {
                     if let equalsIndex = line.firstIndex(of: "=") {
@@ -97,6 +100,8 @@ enum ShellEnvironment {
                 }
             }
         } catch {
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
             logger.error("Failed to load shell environment: \(error.localizedDescription)")
             return ProcessInfo.processInfo.environment
         }

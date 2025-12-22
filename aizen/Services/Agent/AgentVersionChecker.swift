@@ -109,19 +109,24 @@ actor AgentVersionChecker {
         process.arguments = ["npm", "view", cleanPackage, "version"]
 
         let pipe = Pipe()
+        let errorPipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardError = errorPipe
 
         do {
             try process.run()
             process.waitUntilExit()
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
             if let version = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !version.isEmpty {
                 return version
             }
         } catch {
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
             logger.error("Failed to get latest npm version for \(cleanPackage): \(error)")
         }
 
@@ -283,19 +288,24 @@ actor AgentVersionChecker {
         process.arguments = ["--version"]
 
         let pipe = Pipe()
+        let errorPipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardError = errorPipe
 
         do {
             try process.run()
             process.waitUntilExit()
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
             if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !output.isEmpty {
                 return extractVersionNumber(from: output)
             }
         } catch {
+            try? pipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
             // Binary doesn't support --version, that's ok
         }
 

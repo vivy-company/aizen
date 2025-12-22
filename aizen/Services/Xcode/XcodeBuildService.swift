@@ -87,7 +87,10 @@ actor XcodeBuildService {
         // Read stdout
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
-            guard !data.isEmpty else { return }
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                return
+            }
 
             if let output = String(data: data, encoding: .utf8) {
                 outputLock.lock()
@@ -105,7 +108,10 @@ actor XcodeBuildService {
         // Read stderr
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
-            guard !data.isEmpty else { return }
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                return
+            }
 
             if let output = String(data: data, encoding: .utf8) {
                 outputLock.lock()
@@ -150,6 +156,10 @@ actor XcodeBuildService {
                         continuation.yield(.failed(error: errorSummary, log: fullLog))
                     }
 
+                    // Close pipes to release file descriptors
+                    try? stdoutPipe.fileHandleForReading.close()
+                    try? stderrPipe.fileHandleForReading.close()
+
                     terminationContinuation.resume()
                 }
             }
@@ -163,6 +173,10 @@ actor XcodeBuildService {
             }
 
         } catch {
+            stdoutPipe.fileHandleForReading.readabilityHandler = nil
+            stderrPipe.fileHandleForReading.readabilityHandler = nil
+            try? stdoutPipe.fileHandleForReading.close()
+            try? stderrPipe.fileHandleForReading.close()
             logger.error("Failed to start build process: \(error.localizedDescription)")
             continuation.yield(.failed(error: error.localizedDescription, log: ""))
         }
