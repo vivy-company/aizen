@@ -529,10 +529,15 @@ class ChatSessionViewModel: ObservableObject {
             .sink { [weak self] isStreaming in
                 guard let self = self else { return }
                 self.isProcessing = isStreaming
+
+                // When streaming ends, rebuild timeline with grouping
                 if !isStreaming {
-                    // Ensure final streamed chunks are reflected in the timeline.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        self.rebuildTimeline()
+                    Task { @MainActor in
+                        // Delay to ensure all tool calls are synced
+                        try? await Task.sleep(for: .milliseconds(150))
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            self.rebuildTimelineWithGrouping(isStreaming: false)
+                        }
                         self.previousMessageIds = Set(session.messages.map { $0.id })
                         self.previousToolCallIds = Set(session.toolCalls.map { $0.id })
                     }

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import ObjectiveC
 import SwiftUI
 import Combine
 
@@ -43,6 +44,51 @@ extension ChatSessionViewModel {
         timelineItems = (messages.map { .message($0) } + toolCalls.map { .toolCall($0) })
             .sorted { $0.timestamp < $1.timestamp }
             .filter { seen.insert($0.stableId).inserted }
+        rebuildTimelineIndex()
+    }
+
+    /// Rebuild timeline with tool call grouping for completed turns
+    func rebuildTimelineWithGrouping(isStreaming: Bool) {
+        let currentIterationId = currentAgentSession?.currentIterationId
+
+        // Group tool calls by iterationId
+        var groupsByIteration: [String: [ToolCall]] = [:]
+        var ungroupedCalls: [ToolCall] = []
+
+        for call in toolCalls {
+            // Skip child tool calls (they're rendered inside their parent)
+            guard call.parentToolCallId == nil else { continue }
+
+            if let iterationId = call.iterationId {
+                let isCurrentIteration = iterationId == currentIterationId
+                if isStreaming && isCurrentIteration {
+                    // Current turn during streaming - keep individual
+                    ungroupedCalls.append(call)
+                } else {
+                    groupsByIteration[iterationId, default: []].append(call)
+                }
+            } else {
+                // No iteration ID - keep individual
+                ungroupedCalls.append(call)
+            }
+        }
+
+        // Build timeline items
+        var items: [TimelineItem] = messages.map { .message($0) }
+
+        // Add grouped tool calls
+        for (iterationId, calls) in groupsByIteration where !calls.isEmpty {
+            let group = ToolCallGroup(iterationId: iterationId, toolCalls: calls)
+            items.append(.toolCallGroup(group))
+        }
+
+        // Add ungrouped tool calls
+        for call in ungroupedCalls {
+            items.append(.toolCall(call))
+        }
+
+        // Sort by timestamp
+        timelineItems = items.sorted { $0.timestamp < $1.timestamp }
         rebuildTimelineIndex()
     }
 

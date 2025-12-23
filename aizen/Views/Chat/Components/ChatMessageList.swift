@@ -128,6 +128,17 @@ struct ChatMessageList: View {
                                 )
                                 .transition(toolCall.status == .pending ? .opacity.combined(with: .move(edge: .leading)) : .identity)
                             }
+                        case .toolCallGroup(let group):
+                            ToolCallGroupView(
+                                group: group,
+                                currentIterationId: currentIterationId,
+                                agentSession: agentSession,
+                                onOpenDetails: { tapped in onToolTap(tapped) },
+                                onOpenInEditor: onOpenFileInEditor,
+                                childToolCallsProvider: childToolCallsProvider
+                            )
+                            .id(item.id)
+                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
                         }
                     }
 
