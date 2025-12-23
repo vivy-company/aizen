@@ -381,6 +381,7 @@ struct RepositoryRow: View {
     @State private var showingRemoveConfirmation = false
     @State private var alsoDeleteFromFilesystem = false
     @State private var showingNoteEditor = false
+    @State private var showingPostCreateActions = false
 
     @AppStorage("defaultTerminalBundleId") private var defaultTerminalBundleId: String?
     @AppStorage("defaultEditorBundleId") private var defaultEditorBundleId: String?
@@ -543,6 +544,12 @@ struct RepositoryRow: View {
                     Label("repository.editNote", systemImage: "note.text")
                 }
 
+                Button {
+                    showingPostCreateActions = true
+                } label: {
+                    Label("Post-Create Actions", systemImage: "gearshape.2")
+                }
+
                 Divider()
 
                 Button(role: .destructive) {
@@ -576,6 +583,9 @@ struct RepositoryRow: View {
                         try? repositoryManager.updateRepositoryNote(repository, note: repository.note)
                     }
                 )
+            }
+            .sheet(isPresented: $showingPostCreateActions) {
+                PostCreateActionsSheet(repository: repository)
             }
     }
 

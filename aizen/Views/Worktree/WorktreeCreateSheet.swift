@@ -20,6 +20,7 @@ struct WorktreeCreateSheet: View {
     @State private var validationWarning: String?
     @State private var showingBranchSelector = false
     @State private var selectedTemplateIndex: Int?
+    @State private var showingPostCreateActions = false
 
     @AppStorage("branchNameTemplates") private var branchNameTemplatesData: Data = Data()
 
@@ -152,6 +153,9 @@ struct WorktreeCreateSheet: View {
                         .foregroundStyle(.secondary)
                 }
 
+                // Post-create actions section
+                postCreateActionsSection
+
                 if let error = errorMessage {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 4) {
@@ -195,7 +199,7 @@ struct WorktreeCreateSheet: View {
             .padding()
         }
         .frame(width: 450)
-        .frame(minHeight: 300, maxHeight: 350)
+        .frame(minHeight: 380, maxHeight: 480)
         .sheet(isPresented: $showingBranchSelector) {
             BranchSelectorView(
                 repository: repository,
@@ -203,8 +207,95 @@ struct WorktreeCreateSheet: View {
                 selectedBranch: $selectedBranch
             )
         }
+        .sheet(isPresented: $showingPostCreateActions) {
+            PostCreateActionsSheet(repository: repository)
+        }
         .onAppear {
             suggestWorktreeName()
+        }
+    }
+
+    @ViewBuilder
+    private var postCreateActionsSection: some View {
+        let actions = repository.postCreateActions
+        let enabledCount = actions.filter { $0.enabled }.count
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Post-Create Actions")
+                .font(.headline)
+
+            Button {
+                showingPostCreateActions = true
+            } label: {
+                HStack {
+                    if actions.isEmpty {
+                        Image(systemName: "gearshape.2")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("No actions configured")
+                                .font(.subheadline)
+                            Text("Tap to add actions that run after worktree creation")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(actions.prefix(3)) { action in
+                                HStack(spacing: 6) {
+                                    Image(systemName: action.enabled ? "checkmark.circle.fill" : "circle")
+                                        .font(.caption)
+                                        .foregroundStyle(action.enabled ? .green : .secondary)
+                                    Image(systemName: action.type.icon)
+                                        .font(.caption)
+                                        .frame(width: 14)
+                                    Text(actionSummary(action))
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                }
+                                .foregroundStyle(action.enabled ? .primary : .secondary)
+                            }
+
+                            if actions.count > 3 {
+                                Text("+\(actions.count - 3) more")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.controlBackgroundColor).opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+
+            if enabledCount > 0 {
+                Text("\(enabledCount) action\(enabledCount == 1 ? "" : "s") will run after creation")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func actionSummary(_ action: PostCreateAction) -> String {
+        switch action.config {
+        case .copyFiles(let config):
+            return config.displayPatterns
+        case .runCommand(let config):
+            return config.command
+        case .symlink(let config):
+            return "Link \(config.source)"
+        case .customScript:
+            return "Custom script"
         }
     }
 

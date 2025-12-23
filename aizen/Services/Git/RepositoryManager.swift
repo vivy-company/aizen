@@ -23,6 +23,7 @@ class RepositoryManager: ObservableObject {
     private let worktreeService = GitWorktreeService()
     private let remoteService = GitRemoteService()
     private let fileSystemManager: RepositoryFileSystemManager
+    private let postCreateExecutor = PostCreateActionExecutor()
 
     init(viewContext: NSManagedObjectContext) {
         self.viewContext = viewContext
@@ -303,7 +304,49 @@ class RepositoryManager: ObservableObject {
         worktree.lastAccessed = Date()
 
         try viewContext.save()
+
+        // Execute post-create actions if configured
+        await executePostCreateActions(for: repository, newWorktreePath: path)
+
         return worktree
+    }
+
+    /// Execute post-create actions for a repository
+    private func executePostCreateActions(for repository: Repository, newWorktreePath: String) async {
+        let actions = repository.postCreateActions
+        guard !actions.isEmpty else { return }
+
+        // Find main worktree path
+        guard let mainWorktreePath = findMainWorktreePath(for: repository) else {
+            logger.warning("Could not find main worktree path for post-create actions")
+            return
+        }
+
+        logger.info("Executing \(actions.filter { $0.enabled }.count) post-create actions")
+
+        let result = await postCreateExecutor.execute(
+            actions: actions,
+            newWorktreePath: newWorktreePath,
+            mainWorktreePath: mainWorktreePath
+        )
+
+        if result.success {
+            logger.info("Post-create actions completed in \(String(format: "%.2f", result.duration))s")
+        } else {
+            logger.error("Post-create actions failed: \(result.error ?? "Unknown error")")
+        }
+    }
+
+    /// Find the main (primary) worktree path for a repository
+    private func findMainWorktreePath(for repository: Repository) -> String? {
+        // First try to find a worktree marked as primary
+        if let worktrees = repository.worktrees as? Set<Worktree>,
+           let primary = worktrees.first(where: { $0.isPrimary }) {
+            return primary.path
+        }
+
+        // Otherwise use the repository path itself (it's the main worktree)
+        return repository.path
     }
 
     func hasUnsavedChanges(_ worktree: Worktree) async throws -> Bool {

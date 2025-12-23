@@ -15,6 +15,7 @@
         <attribute name="lastUpdated" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="status" optional="YES" attributeType="String" defaultValueString="active"/>
         <attribute name="note" optional="YES" attributeType="String"/>
+        <attribute name="postCreateActionsData" optional="YES" attributeType="Binary"/>
         <relationship name="workspace" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Workspace" inverseName="repositories" inverseEntity="Workspace"/>
         <relationship name="worktrees" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Worktree" inverseName="repository" inverseEntity="Worktree"/>
     </entity>
