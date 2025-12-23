@@ -8,13 +8,12 @@
 import Foundation
 
 struct ToolCallGroup: Identifiable {
-    let id: String
     let iterationId: String
+    var id: String { iterationId }
     var toolCalls: [ToolCall]
     let timestamp: Date
 
     init(iterationId: String, toolCalls: [ToolCall]) {
-        self.id = iterationId
         self.iterationId = iterationId
         self.toolCalls = toolCalls.sorted { $0.timestamp < $1.timestamp }
         self.timestamp = toolCalls.first?.timestamp ?? Date.distantPast
