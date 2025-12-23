@@ -133,6 +133,7 @@ struct ChatMessageList: View {
                                 group: group,
                                 currentIterationId: currentIterationId,
                                 agentSession: agentSession,
+                                onOpenDetails: { tapped in onToolTap(tapped) },
                                 onOpenInEditor: onOpenFileInEditor,
                                 childToolCallsProvider: childToolCallsProvider
                             )

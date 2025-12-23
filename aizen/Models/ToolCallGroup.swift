@@ -27,8 +27,7 @@ struct ToolCallGroup: Identifiable {
 
     /// Summary text (e.g., "5 tool calls")
     var summaryText: String {
-        let count = toolCalls.count
-        return String(localized: "chat.toolcalls.summary \(count)")
+        String(localized: "\(toolCalls.count) tool calls")
     }
 
     /// All tool calls completed successfully

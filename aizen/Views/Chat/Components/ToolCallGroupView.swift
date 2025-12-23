@@ -11,6 +11,7 @@ struct ToolCallGroupView: View {
     let group: ToolCallGroup
     var currentIterationId: String? = nil
     var agentSession: AgentSession? = nil
+    var onOpenDetails: ((ToolCall) -> Void)? = nil
     var onOpenInEditor: ((String) -> Void)? = nil
     var childToolCallsProvider: (String) -> [ToolCall] = { _ in [] }
 
@@ -93,6 +94,7 @@ struct ToolCallGroupView: View {
                 ToolCallView(
                     toolCall: toolCall,
                     currentIterationId: currentIterationId,
+                    onOpenDetails: onOpenDetails,
                     agentSession: agentSession,
                     onOpenInEditor: onOpenInEditor,
                     childToolCalls: childToolCallsProvider(toolCall.toolCallId)
