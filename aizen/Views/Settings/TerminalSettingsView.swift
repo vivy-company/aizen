@@ -19,6 +19,14 @@ struct TerminalSettingsView: View {
     @AppStorage("terminalProgressEnabled") private var terminalProgressEnabled = true
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
 
+    // Copy settings
+    @AppStorage("terminalCopyTrimTrailingWhitespace") private var copyTrimTrailingWhitespace = true
+    @AppStorage("terminalCopyCollapseBlankLines") private var copyCollapseBlankLines = false
+    @AppStorage("terminalCopyStripShellPrompts") private var copyStripShellPrompts = false
+    @AppStorage("terminalCopyFlattenCommands") private var copyFlattenCommands = false
+    @AppStorage("terminalCopyRemoveBoxDrawing") private var copyRemoveBoxDrawing = false
+    @AppStorage("terminalCopyStripAnsiCodes") private var copyStripAnsiCodes = true
+
     @StateObject private var presetManager = TerminalPresetManager.shared
     @State private var tmuxAvailable = false
     @State private var clearingTmuxSessions = false
@@ -112,6 +120,21 @@ struct TerminalSettingsView: View {
             Section("Terminal Behavior") {
                 Toggle("Enable terminal notifications", isOn: $terminalNotificationsEnabled)
                 Toggle("Show progress overlays", isOn: $terminalProgressEnabled)
+            }
+
+            Section {
+                Toggle("Trim trailing whitespace", isOn: $copyTrimTrailingWhitespace)
+                Toggle("Collapse multiple blank lines", isOn: $copyCollapseBlankLines)
+                Toggle("Strip shell prompts ($ #)", isOn: $copyStripShellPrompts)
+                Toggle("Flatten multi-line commands", isOn: $copyFlattenCommands)
+                Toggle("Remove box-drawing characters", isOn: $copyRemoveBoxDrawing)
+                Toggle("Strip ANSI escape codes", isOn: $copyStripAnsiCodes)
+            } header: {
+                Text("Copy Text Processing")
+            } footer: {
+                Text("Transformations applied when copying text from terminal")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {

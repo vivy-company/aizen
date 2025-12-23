@@ -122,3 +122,4 @@ Temporary Items
 .sparkle-keys/
 *.pem
 Vendor/libghostty/.built-ref
+Vendor/libghostty/lib/libghostty.a

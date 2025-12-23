@@ -472,8 +472,19 @@ extension Ghostty {
                 let entry = contents.advanced(by: idx).pointee
                 guard let dataPtr = entry.data else { continue }
 
-                let string = String(cString: dataPtr)
+                var string = String(cString: dataPtr)
                 if !string.isEmpty {
+                    // Apply copy transformations from settings
+                    let settings = TerminalCopySettings(
+                        trimTrailingWhitespace: UserDefaults.standard.object(forKey: "terminalCopyTrimTrailingWhitespace") as? Bool ?? true,
+                        collapseBlankLines: UserDefaults.standard.bool(forKey: "terminalCopyCollapseBlankLines"),
+                        stripShellPrompts: UserDefaults.standard.bool(forKey: "terminalCopyStripShellPrompts"),
+                        flattenCommands: UserDefaults.standard.bool(forKey: "terminalCopyFlattenCommands"),
+                        removeBoxDrawing: UserDefaults.standard.bool(forKey: "terminalCopyRemoveBoxDrawing"),
+                        stripAnsiCodes: UserDefaults.standard.object(forKey: "terminalCopyStripAnsiCodes") as? Bool ?? true
+                    )
+                    string = TerminalTextCleaner.cleanText(string, settings: settings)
+
                     let pasteboard = NSPasteboard.general
                     pasteboard.clearContents()
                     pasteboard.setString(string, forType: .string)
