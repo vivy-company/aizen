@@ -345,17 +345,20 @@ struct PostCreateActionEditorSheet: View {
         let category: FileCategory
 
         enum FileCategory: String, CaseIterable {
-            case dotfiles = "Dotfiles"
-            case config = "Config"
-            case directories = "Directories"
-            case other = "Other Files"
+            case lfs = "Git LFS"
+            case gitignored = "Gitignored"
 
             var order: Int {
                 switch self {
-                case .dotfiles: return 0
-                case .config: return 1
-                case .directories: return 2
-                case .other: return 3
+                case .lfs: return 0
+                case .gitignored: return 1
+                }
+            }
+
+            var icon: String {
+                switch self {
+                case .lfs: return "externaldrive"
+                case .gitignored: return "eye.slash"
                 }
             }
         }
@@ -466,15 +469,20 @@ struct PostCreateActionEditorSheet: View {
 
         case .customScript:
             Section {
-                TextEditor(text: $customScript)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(minHeight: 100)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color(.separatorColor), lineWidth: 1)
-                    )
+                CodeEditorView(
+                    content: customScript,
+                    language: "bash",
+                    isEditable: true,
+                    onContentChange: { newValue in
+                        customScript = newValue
+                    }
+                )
+                .frame(height: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             } header: {
                 Text(selectedType.actionDescription)
+            } footer: {
+                Text("Variables: $NEW (new worktree path), $MAIN (main worktree path)")
             }
         }
     }
@@ -513,34 +521,47 @@ struct PostCreateActionEditorSheet: View {
             Text("Files to Copy")
         }
 
-        // File browser section
+        // File browser section - shows gitignored and LFS files
         Section {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(DetectedFile.FileCategory.allCases.sorted(by: { $0.order < $1.order }), id: \.self) { category in
-                        let filesInCategory = detectedFiles.filter { $0.category == category }
-                        if !filesInCategory.isEmpty {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(category.rawValue)
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
+            if detectedFiles.isEmpty {
+                Text("No gitignored or LFS files found")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(DetectedFile.FileCategory.allCases.sorted(by: { $0.order < $1.order }), id: \.self) { category in
+                            let filesInCategory = detectedFiles.filter { $0.category == category }
+                            if !filesInCategory.isEmpty {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: category.icon)
+                                            .font(.caption2)
+                                        Text(category.rawValue)
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                    }
                                     .foregroundStyle(.secondary)
                                     .padding(.top, 4)
 
-                                ForEach(filesInCategory) { file in
-                                    fileRow(file)
+                                    ForEach(filesInCategory) { file in
+                                        fileRow(file)
+                                    }
                                 }
                             }
                         }
                     }
+                    .padding(8)
                 }
-                .padding(8)
+                .frame(height: 160)
+                .background(Color(.controlBackgroundColor).opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-            .frame(height: 160)
-            .background(Color(.controlBackgroundColor).opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
         } header: {
-            Text("Repository Files")
+            Text("Files Not Copied by Git")
+        } footer: {
+            Text("Gitignored files and Git LFS tracked files won't exist in new worktrees")
         }
         .onAppear {
             scanRepository()
@@ -612,43 +633,58 @@ struct PostCreateActionEditorSheet: View {
 
     private func scanRepository() {
         guard let repoPath = repositoryPath else { return }
-        // Synchronous scan of root directory only - fast even for large repos
-        detectedFiles = scanRootDirectory(at: repoPath)
+        detectedFiles = scanForUntrackedFiles(at: repoPath)
     }
 
-    private func scanRootDirectory(at path: String) -> [DetectedFile] {
+    private func scanForUntrackedFiles(at path: String) -> [DetectedFile] {
         let fm = FileManager.default
         var result: [DetectedFile] = []
 
-        // Files/dirs to always hide
-        let hiddenItems: Set<String> = [".git", ".DS_Store", "node_modules", ".build", "DerivedData"]
+        // Parse .gitignore patterns
+        let gitignorePatterns = parseGitignore(at: path)
 
-        // Config file extensions
-        let configExtensions: Set<String> = ["yml", "yaml", "json", "toml", "ini", "conf", "config", "xml", "plist"]
+        // Parse .gitattributes for LFS patterns
+        let lfsPatterns = parseLFSPatterns(at: path)
+
+        // Items to always skip in listing
+        let skipItems: Set<String> = [".git", ".DS_Store"]
 
         guard let contents = try? fm.contentsOfDirectory(atPath: path) else { return [] }
 
         for item in contents {
-            // Skip hidden items we don't care about
-            if hiddenItems.contains(item) { continue }
+            if skipItems.contains(item) { continue }
 
             let fullPath = (path as NSString).appendingPathComponent(item)
             var isDirectory: ObjCBool = false
             guard fm.fileExists(atPath: fullPath, isDirectory: &isDirectory) else { continue }
 
             let isDir = isDirectory.boolValue
-            let category = categorizeFile(name: item, isDirectory: isDir, configExtensions: configExtensions)
 
-            result.append(DetectedFile(
-                id: item,
-                path: isDir ? "\(item)/**" : item,
-                name: item,
-                isDirectory: isDir,
-                category: category
-            ))
+            // Check if it's an LFS tracked file
+            if matchesAnyPattern(item, patterns: lfsPatterns) {
+                result.append(DetectedFile(
+                    id: item,
+                    path: isDir ? "\(item)/**" : item,
+                    name: item,
+                    isDirectory: isDir,
+                    category: .lfs
+                ))
+                continue
+            }
+
+            // Check if it's gitignored (won't be in new worktree)
+            if matchesAnyPattern(item, patterns: gitignorePatterns) || matchesAnyPattern(item + "/", patterns: gitignorePatterns) {
+                result.append(DetectedFile(
+                    id: item,
+                    path: isDir ? "\(item)/**" : item,
+                    name: item,
+                    isDirectory: isDir,
+                    category: .gitignored
+                ))
+            }
         }
 
-        // Sort: by category order, then alphabetically within category
+        // Sort: by category order, then alphabetically
         return result.sorted { lhs, rhs in
             if lhs.category.order != rhs.category.order {
                 return lhs.category.order < rhs.category.order
@@ -657,30 +693,79 @@ struct PostCreateActionEditorSheet: View {
         }
     }
 
-    private func categorizeFile(name: String, isDirectory: Bool, configExtensions: Set<String>) -> DetectedFile.FileCategory {
-        // Directories
-        if isDirectory {
-            return .directories
+    private func parseGitignore(at repoPath: String) -> [String] {
+        let gitignorePath = (repoPath as NSString).appendingPathComponent(".gitignore")
+        guard let content = try? String(contentsOfFile: gitignorePath, encoding: .utf8) else { return [] }
+
+        return content
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("#") }
+    }
+
+    private func parseLFSPatterns(at repoPath: String) -> [String] {
+        let gitattributesPath = (repoPath as NSString).appendingPathComponent(".gitattributes")
+        guard let content = try? String(contentsOfFile: gitattributesPath, encoding: .utf8) else { return [] }
+
+        var patterns: [String] = []
+        for line in content.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.contains("filter=lfs") {
+                // Extract the pattern (first part before space)
+                if let pattern = trimmed.components(separatedBy: .whitespaces).first {
+                    patterns.append(pattern)
+                }
+            }
+        }
+        return patterns
+    }
+
+    private func matchesAnyPattern(_ name: String, patterns: [String]) -> Bool {
+        for pattern in patterns {
+            if matchesGitPattern(name, pattern: pattern) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func matchesGitPattern(_ name: String, pattern: String) -> Bool {
+        var p = pattern
+
+        // Handle negation (we skip negated patterns for simplicity)
+        if p.hasPrefix("!") { return false }
+
+        // Remove leading slash (anchored to root)
+        if p.hasPrefix("/") {
+            p = String(p.dropFirst())
         }
 
-        // Dotfiles (hidden files starting with .)
-        if name.hasPrefix(".") {
-            return .dotfiles
+        // Remove trailing slash (directory indicator)
+        if p.hasSuffix("/") {
+            p = String(p.dropLast())
         }
 
-        // Config files by extension
-        let ext = (name as NSString).pathExtension.lowercased()
-        if configExtensions.contains(ext) {
-            return .config
+        // Direct match
+        if name == p { return true }
+
+        // Simple wildcard matching
+        if p.contains("*") {
+            // Convert glob to simple matching
+            // *.ext matches files ending with .ext
+            if p.hasPrefix("*") {
+                let suffix = String(p.dropFirst())
+                if name.hasSuffix(suffix) { return true }
+            }
+            // prefix* matches files starting with prefix
+            if p.hasSuffix("*") {
+                let prefix = String(p.dropLast())
+                if name.hasPrefix(prefix) { return true }
+            }
+            // ** matches everything
+            if p == "**" { return true }
         }
 
-        // Config files by name pattern
-        let lowerName = name.lowercased()
-        if lowerName.contains("config") || lowerName.contains("settings") || lowerName == "makefile" || lowerName == "dockerfile" {
-            return .config
-        }
-
-        return .other
+        return false
     }
 
     private var isValid: Bool {
