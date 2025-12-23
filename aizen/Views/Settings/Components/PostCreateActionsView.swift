@@ -643,13 +643,40 @@ struct PostCreateActionEditorSheet: View {
         // Parse .gitignore patterns
         let gitignorePatterns = parseGitignore(at: path)
 
-        // Parse .gitattributes for LFS patterns
+        // Parse .gitattributes for LFS patterns (can be full paths or globs)
         let lfsPatterns = parseLFSPatterns(at: path)
+
+        // Add LFS files first (these can be deep paths)
+        for lfsPattern in lfsPatterns {
+            // Check if it's a specific file path (not a glob)
+            if !lfsPattern.contains("*") {
+                let fullPath = (path as NSString).appendingPathComponent(lfsPattern)
+                var isDirectory: ObjCBool = false
+                if fm.fileExists(atPath: fullPath, isDirectory: &isDirectory) {
+                    result.append(DetectedFile(
+                        id: lfsPattern,
+                        path: lfsPattern,
+                        name: lfsPattern,
+                        isDirectory: isDirectory.boolValue,
+                        category: .lfs
+                    ))
+                }
+            } else {
+                // For glob patterns, show the pattern itself
+                result.append(DetectedFile(
+                    id: lfsPattern,
+                    path: lfsPattern,
+                    name: lfsPattern,
+                    isDirectory: false,
+                    category: .lfs
+                ))
+            }
+        }
 
         // Items to always skip in listing
         let skipItems: Set<String> = [".git", ".DS_Store"]
 
-        guard let contents = try? fm.contentsOfDirectory(atPath: path) else { return [] }
+        guard let contents = try? fm.contentsOfDirectory(atPath: path) else { return result }
 
         for item in contents {
             if skipItems.contains(item) { continue }
@@ -659,18 +686,6 @@ struct PostCreateActionEditorSheet: View {
             guard fm.fileExists(atPath: fullPath, isDirectory: &isDirectory) else { continue }
 
             let isDir = isDirectory.boolValue
-
-            // Check if it's an LFS tracked file
-            if matchesAnyPattern(item, patterns: lfsPatterns) {
-                result.append(DetectedFile(
-                    id: item,
-                    path: isDir ? "\(item)/**" : item,
-                    name: item,
-                    isDirectory: isDir,
-                    category: .lfs
-                ))
-                continue
-            }
 
             // Check if it's gitignored (won't be in new worktree)
             if matchesAnyPattern(item, patterns: gitignorePatterns) || matchesAnyPattern(item + "/", patterns: gitignorePatterns) {
