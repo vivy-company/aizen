@@ -356,24 +356,11 @@ struct PostCreateActionEditorSheet: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Button("Cancel") {
-                    dismiss()
-                    onCancel()
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Spacer()
-
                 Text(action == nil ? "Add Action" : "Edit Action")
+                    .font(.title2)
                     .fontWeight(.semibold)
 
                 Spacer()
-
-                Button("Save") {
-                    saveAction()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!isValid)
             }
             .padding()
 
@@ -397,8 +384,29 @@ struct PostCreateActionEditorSheet: View {
                 }
             }
             .formStyle(.grouped)
+
+            Divider()
+
+            // Footer
+            HStack {
+                Spacer()
+
+                Button("Cancel") {
+                    dismiss()
+                    onCancel()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Save") {
+                    saveAction()
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .disabled(!isValid)
+            }
+            .padding()
         }
-        .frame(width: 480, height: 450)
+        .frame(width: 480, height: 500)
         .onAppear {
             if let action = action {
                 loadAction(action)
@@ -746,19 +754,11 @@ struct PostCreateTemplatesSheet: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Button("Cancel") {
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Spacer()
-
                 Text("Apply Template")
+                    .font(.title2)
                     .fontWeight(.semibold)
 
                 Spacer()
-
-                Color.clear.frame(width: 60)
             }
             .padding()
 
@@ -787,6 +787,19 @@ struct PostCreateTemplatesSheet: View {
                 }
                 .padding()
             }
+
+            Divider()
+
+            // Footer
+            HStack {
+                Spacer()
+
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+            }
+            .padding()
         }
         .frame(width: 400, height: 450)
     }
