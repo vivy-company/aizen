@@ -15,7 +15,7 @@ export default function FAQSection() {
       .replace(/ACP/g, '<code class="text-[#89dceb] font-mono text-[15px]">ACP</code>')
       .replace(/NPM/g, '<code class="text-[#89dceb] font-mono text-[15px]">NPM</code>')
       .replace(/GitHub/g, '<span class="text-zinc-300">GitHub</span>')
-      .replace(/Apache 2\.0/g, '<span class="text-zinc-300">Apache 2.0</span>')
+      .replace(/GPL-3\.0/g, '<span class="text-zinc-300">GPL-3.0</span>')
       .replace(/macOS 13\.5 Ventura/g, '<span class="text-blue-500">macOS 13.5 Ventura</span>')
       .replace(/Apple Silicon/g, '<span class="text-zinc-400">Apple Silicon</span>')
       .replace(/Intel Macs/g, '<span class="text-zinc-400">Intel Macs</span>')

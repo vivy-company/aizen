@@ -83,7 +83,7 @@
     },
     "q5": {
       "question": "Is Aizen free?",
-      "answer": "Yes! Aizen is fully free and open source under the Apache 2.0 license. All features — workspaces, worktrees, agents, terminal, file browser, web browser, voice input — are included for free."
+      "answer": "Yes! Aizen is fully free and open source under the GPL-3.0 license. All features — workspaces, worktrees, agents, terminal, file browser, web browser, voice input — are included for free."
     },
     "q6": {
       "question": "What's Aizen Pro?",
