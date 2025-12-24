@@ -68,37 +68,40 @@ extension ChatSessionViewModel {
         }
         entries.sort { $0.timestamp < $1.timestamp }
 
-        // Build timeline: group tool calls at turn boundaries
-        // Turn summary appears: after last agent message, before next user message
+        // Build timeline: group tool calls at message boundaries
+        // Turn summary ONLY appears when turn actually ends:
+        // 1. User sends new message (interrupts/follows agent)
+        // 2. Streaming ends (agent finishes responding)
         var items: [TimelineItem] = []
         var toolCallBuffer: [ToolCall] = []
+        var turnToolCalls: [ToolCall] = []  // Accumulate all tool calls in current turn
         var lastAgentMessageId: String?
-        var pendingTurnSummary: TurnSummary?
 
         for entry in entries {
             switch entry.type {
             case .message(let msg):
-                // When user message arrives: finalize previous turn
-                // Group any buffered tool calls + add pending summary before user message
+                // User message = TURN BOUNDARY
                 if msg.role == .user {
+                    // Group any remaining buffered tool calls
                     if !toolCallBuffer.isEmpty {
                         let group = createGroupFromBuffer(
                             toolCalls: toolCallBuffer,
                             messageId: lastAgentMessageId,
-                            isCompletedTurn: false  // Interrupted by user
+                            isCompletedTurn: false
                         )
                         items.append(.toolCallGroup(group))
-                        pendingTurnSummary = createTurnSummary(from: toolCallBuffer)
+                        turnToolCalls.append(contentsOf: toolCallBuffer)
                         toolCallBuffer = []
                     }
-                    // Add turn summary before user message (end of agent turn)
-                    if let summary = pendingTurnSummary {
+                    // Add turn summary for the completed turn (before user message)
+                    if !turnToolCalls.isEmpty {
+                        let summary = createTurnSummary(from: turnToolCalls)
                         items.append(.turnSummary(summary))
-                        pendingTurnSummary = nil
+                        turnToolCalls = []  // Reset for next turn
                     }
                 }
 
-                // When agent message arrives after tools: group the tools
+                // Agent message after tools: just group them (turn not over yet)
                 if msg.role == .agent && !toolCallBuffer.isEmpty {
                     let group = createGroupFromBuffer(
                         toolCalls: toolCallBuffer,
@@ -106,18 +109,12 @@ extension ChatSessionViewModel {
                         isCompletedTurn: true
                     )
                     items.append(.toolCallGroup(group))
-                    // Save summary to add after this agent message
-                    pendingTurnSummary = createTurnSummary(from: toolCallBuffer)
+                    turnToolCalls.append(contentsOf: toolCallBuffer)
                     toolCallBuffer = []
+                    // NO summary here - turn continues
                 }
 
                 items.append(.message(msg))
-
-                // Add turn summary after agent's final message
-                if msg.role == .agent, let summary = pendingTurnSummary {
-                    items.append(.turnSummary(summary))
-                    pendingTurnSummary = nil
-                }
 
                 if msg.role == .agent {
                     lastAgentMessageId = msg.id
@@ -130,22 +127,27 @@ extension ChatSessionViewModel {
 
         // Handle remaining tool calls after all messages
         if !toolCallBuffer.isEmpty {
+            turnToolCalls.append(contentsOf: toolCallBuffer)
             if isStreaming {
-                // Still streaming - show individual tool calls (no summary yet)
+                // Still streaming - show individual tool calls (no summary)
                 for call in toolCallBuffer {
                     items.append(.toolCall(call))
                 }
             } else {
-                // Streaming ended - group tools and add summary
+                // Streaming ended = TURN END
                 let group = createGroupFromBuffer(
                     toolCalls: toolCallBuffer,
                     messageId: lastAgentMessageId,
                     isCompletedTurn: true
                 )
                 items.append(.toolCallGroup(group))
-                let summary = createTurnSummary(from: toolCallBuffer)
+                let summary = createTurnSummary(from: turnToolCalls)
                 items.append(.turnSummary(summary))
             }
+        } else if !isStreaming && !turnToolCalls.isEmpty {
+            // Turn ended with agent message after tools - add summary now
+            let summary = createTurnSummary(from: turnToolCalls)
+            items.append(.turnSummary(summary))
         }
 
         timelineItems = items
@@ -404,6 +406,15 @@ extension ChatSessionViewModel {
                 // processing indicator is visible
                 scrollProxy?.scrollTo("bottom_anchor", anchor: .bottom)
             }
+        }
+    }
+
+    /// Deferred scroll that avoids "ScrollViewProxy may not be accessed during view updates" crash
+    func scrollToBottomDeferred() {
+        Task { @MainActor in
+            // Small delay ensures we're outside any view update cycle
+            try? await Task.sleep(for: .milliseconds(50))
+            scrollProxy?.scrollTo("bottom_anchor", anchor: .bottom)
         }
     }
 }

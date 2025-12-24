@@ -271,6 +271,124 @@ struct UserAttachmentChip: View {
     }
 }
 
+// MARK: - Text Attachment Chip (for displaying pasted text in user messages)
+
+struct TextAttachmentChip: View {
+    let text: String
+
+    @State private var showingDetail = false
+
+    private var lineCount: Int {
+        text.components(separatedBy: .newlines).count
+    }
+
+    private var charCount: Int {
+        text.count
+    }
+
+    private var displayInfo: String {
+        if lineCount > 1 {
+            return "\(lineCount) lines"
+        } else {
+            return "\(charCount) chars"
+        }
+    }
+
+    var body: some View {
+        Button {
+            showingDetail = true
+        } label: {
+            AttachmentGlassCard(cornerRadius: 10) {
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.blue)
+
+                    Text("Pasted Text")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(displayInfo)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+            }
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showingDetail) {
+            TextAttachmentDetailSheet(text: text)
+        }
+    }
+}
+
+// MARK: - Text Attachment Detail Sheet
+
+private struct TextAttachmentDetailSheet: View {
+    let text: String
+    @Environment(\.dismiss) var dismiss
+
+    private var lineCount: Int {
+        text.components(separatedBy: .newlines).count
+    }
+
+    private var charCount: Int {
+        text.count
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Pasted Text")
+                        .font(.headline)
+                    HStack(spacing: 8) {
+                        Text("\(lineCount) lines")
+                        Text("\(charCount) characters")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Copy to clipboard")
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+
+            Divider()
+
+            ScrollView {
+                Text(text)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+            }
+        }
+        .frame(width: 700, height: 500)
+    }
+}
+
 // MARK: - Resource Content View
 
 struct ACPResourceView: View {
