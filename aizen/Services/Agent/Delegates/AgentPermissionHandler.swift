@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import AppKit
 import os.log
 
 /// Main actor class responsible for handling permission requests from agents
@@ -17,6 +18,13 @@ class AgentPermissionHandler: ObservableObject {
 
     @Published var permissionRequest: RequestPermissionRequest?
     @Published var showingPermissionAlert: Bool = false
+
+    // MARK: - Context Properties
+
+    /// The chat session ID this handler belongs to (set by ChatSessionManager)
+    var chatSessionId: UUID?
+    /// The worktree name for notification display (set by ChatSessionManager)
+    var worktreeName: String?
 
     // MARK: - Private Properties
 
@@ -29,7 +37,18 @@ class AgentPermissionHandler: ObservableObject {
 
     // MARK: - Initialization
 
-    init() {}
+    init() {
+        // Register for notification responses from PermissionNotificationManager
+        setupNotificationResponseHandler()
+    }
+
+    private func setupNotificationResponseHandler() {
+        PermissionNotificationManager.shared.onPermissionResponse = { [weak self] sessionId, optionId in
+            guard let self = self,
+                  self.chatSessionId == sessionId else { return }
+            self.respondToPermission(optionId: optionId)
+        }
+    }
 
     // MARK: - Permission Handling
 
@@ -43,6 +62,9 @@ class AgentPermissionHandler: ObservableObject {
             self.showingPermissionAlert = true
             self.permissionContinuation = continuation
 
+            // Trigger system notification if app is not active
+            self.triggerSystemNotificationIfNeeded(request: request)
+
             // Start timeout timer
             self.timeoutTask = Task { [weak self] in
                 do {
@@ -54,6 +76,19 @@ class AgentPermissionHandler: ObservableObject {
                 }
             }
         }
+    }
+
+    private func triggerSystemNotificationIfNeeded(request: RequestPermissionRequest) {
+        guard let chatSessionId = chatSessionId else { return }
+
+        let info = PermissionNotificationInfo(
+            chatSessionId: chatSessionId,
+            worktreeName: worktreeName ?? "Chat",
+            message: request.message ?? "",
+            options: request.options ?? []
+        )
+
+        PermissionNotificationManager.shared.notify(info: info)
     }
 
     /// Handle timeout - auto-deny the permission request
@@ -80,6 +115,11 @@ class AgentPermissionHandler: ObservableObject {
         // Cancel timeout - user responded in time
         timeoutTask?.cancel()
         timeoutTask = nil
+
+        // Clear any pending system notification
+        if let sessionId = chatSessionId {
+            PermissionNotificationManager.shared.clearNotification(for: sessionId)
+        }
 
         showingPermissionAlert = false
         permissionRequest = nil

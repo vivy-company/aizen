@@ -388,23 +388,65 @@ struct WorktreeDetailView: View {
 
     @ViewBuilder
     private var mainContentWithSidebars: some View {
-        contentView
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(selectedTab == "terminal" ? cachedTerminalBackgroundColor : nil)
-            .onReceive(NotificationCenter.default.publisher(for: .fileSearchShortcut)) { _ in
-                showFileSearch()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .openFileInEditor)) { notification in
-                if let path = notification.userInfo?["path"] as? String {
-                    openFile(path)
+        ZStack(alignment: .top) {
+            contentView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(selectedTab == "terminal" ? cachedTerminalBackgroundColor : nil)
+
+            // Permission banner for pending requests in other sessions
+            PermissionBannerView(
+                currentChatSessionId: viewModel.selectedChatSessionId,
+                onNavigate: { sessionId in
+                    navigateToChatSession(sessionId)
                 }
+            )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .fileSearchShortcut)) { _ in
+            showFileSearch()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openFileInEditor)) { notification in
+            if let path = notification.userInfo?["path"] as? String {
+                openFile(path)
             }
-            .onReceive(NotificationCenter.default.publisher(for: .sendMessageToChat)) { notification in
-                handleSendMessageToChat(notification)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .switchToChat)) { notification in
-                handleSwitchToChat(notification)
-            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sendMessageToChat)) { notification in
+            handleSendMessageToChat(notification)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToChat)) { notification in
+            handleSwitchToChat(notification)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToChatSession)) { notification in
+            handleSwitchToChatSession(notification)
+        }
+    }
+
+    private func navigateToChatSession(_ sessionId: UUID) {
+        // Check if this session belongs to current worktree
+        let chatSessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
+        if chatSessions.contains(where: { $0.id == sessionId }) {
+            // Same worktree - just switch to chat tab and select session
+            selectedTab = "chat"
+            viewModel.selectedChatSessionId = sessionId
+        } else {
+            // Different worktree - post navigation notification
+            NotificationCenter.default.post(
+                name: .navigateToChatSession,
+                object: nil,
+                userInfo: ["chatSessionId": sessionId]
+            )
+        }
+    }
+
+    private func handleSwitchToChatSession(_ notification: Notification) {
+        guard let sessionId = notification.userInfo?["chatSessionId"] as? UUID else {
+            return
+        }
+        // Verify this session belongs to current worktree before switching
+        let chatSessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
+        if chatSessions.contains(where: { $0.id == sessionId }) {
+            selectedTab = "chat"
+            viewModel.selectedChatSessionId = sessionId
+        }
     }
 
     private func handleSendMessageToChat(_ notification: Notification) {

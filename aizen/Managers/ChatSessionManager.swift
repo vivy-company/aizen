@@ -34,10 +34,14 @@ class ChatSessionManager: ObservableObject {
         return nil
     }
 
-    func setAgentSession(_ session: AgentSession, for chatSessionId: UUID) {
+    func setAgentSession(_ session: AgentSession, for chatSessionId: UUID, worktreeName: String? = nil) {
         agentSessions[chatSessionId] = session
         touch(chatSessionId)
         evictIfNeeded()
+
+        // Set permission handler context for notifications
+        session.permissionHandler.chatSessionId = chatSessionId
+        session.permissionHandler.worktreeName = worktreeName
 
         // Observe permission state changes
         observePermissionState(for: chatSessionId, session: session)

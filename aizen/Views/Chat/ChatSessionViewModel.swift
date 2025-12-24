@@ -173,6 +173,15 @@ class ChatSessionViewModel: ObservableObject {
             currentAgentSession = existingSession
             autocompleteHandler.agentSession = existingSession
             updateDerivedState(from: existingSession)
+
+            // Initialize sync state from existing session BEFORE setting up observers
+            // This prevents all existing messages/tool calls from appearing as "new"
+            previousMessageIds = Set(existingSession.messages.map { $0.id })
+            previousToolCallIds = Set(existingSession.toolCalls.map { $0.id })
+
+            // Rebuild timeline with proper grouping for existing data
+            rebuildTimelineWithGrouping(isStreaming: existingSession.isStreaming)
+
             setupSessionObservers(session: existingSession)
 
             // Index worktree files for autocomplete
@@ -213,7 +222,8 @@ class ChatSessionViewModel: ObservableObject {
         Task {
             // Create a dedicated AgentSession for this chat session to avoid cross-tab interference
             let newSession = AgentSession(agentName: self.selectedAgent, workingDirectory: worktreePath)
-            sessionManager.setAgentSession(newSession, for: sessionId)
+            let worktreeName = worktree.branch ?? "Chat"
+            sessionManager.setAgentSession(newSession, for: sessionId, worktreeName: worktreeName)
             currentAgentSession = newSession
             autocompleteHandler.agentSession = newSession
             updateDerivedState(from: newSession)

@@ -205,16 +205,27 @@ struct UserBubble<Background: View>: View {
     private let hPadding: CGFloat = 16
     private let vPadding: CGFloat = 12
 
-    private var hasAttachments: Bool {
-        contentBlocks.contains { block in
+    /// Attachment blocks are all content blocks except the first .text block (which is the main message)
+    private var attachmentBlocks: [ContentBlock] {
+        var foundFirstText = false
+        return contentBlocks.filter { block in
             switch block {
+            case .text:
+                if !foundFirstText {
+                    foundFirstText = true
+                    return false // Skip first text block (main message)
+                }
+                return true // Additional text blocks are pasted text attachments
             case .image, .resource, .resourceLink:
                 return true
-            case .text, .audio:
-                // Text content is shown in the bubble itself, not as attachment
+            case .audio:
                 return false
             }
         }
+    }
+    
+    private var hasAttachments: Bool {
+        !attachmentBlocks.isEmpty
     }
 
     var body: some View {
@@ -235,10 +246,10 @@ struct UserBubble<Background: View>: View {
                     }
                 }
 
-            // Attachments outside bubble
+            // Attachments outside bubble (pasted text, images, files)
             if hasAttachments {
                 VStack(alignment: .trailing, spacing: 4) {
-                    ForEach(Array(contentBlocks.enumerated()), id: \.offset) { _, block in
+                    ForEach(Array(attachmentBlocks.enumerated()), id: \.offset) { _, block in
                         attachmentView(for: block)
                     }
                 }
@@ -273,6 +284,9 @@ struct UserBubble<Background: View>: View {
     @ViewBuilder
     private func attachmentView(for block: ContentBlock) -> some View {
         switch block {
+        case .text(let textContent):
+            // Pasted text attachment (first .text block is filtered out in attachmentBlocks)
+            TextAttachmentChip(text: textContent.text)
         case .image(let imageContent):
             ImageAttachmentCardView(data: imageContent.data, mimeType: imageContent.mimeType)
         case .resource(let resourceContent):
@@ -289,8 +303,7 @@ struct UserBubble<Background: View>: View {
                 uri: linkContent.uri,
                 mimeType: linkContent.mimeType
             )
-        case .text, .audio:
-            // Text is shown in bubble, audio not displayed as attachment
+        case .audio:
             EmptyView()
         }
     }

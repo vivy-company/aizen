@@ -97,8 +97,8 @@ extension AgentSession {
             }
         }
 
-        // Add user message to UI with all content blocks
-        addUserMessage(content, contentBlocks: contentBlocks)
+        // Add user message to UI with UI content blocks (typed text + attachments, not prepended content)
+        addUserMessage(content, contentBlocks: uiContentBlocks)
 
         // Mark streaming active before sending
         isStreaming = true

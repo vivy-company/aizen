@@ -228,6 +228,40 @@ struct ContentView: View {
             }
             navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToChatSession)) { notification in
+            guard let chatSessionId = notification.userInfo?["chatSessionId"] as? UUID else {
+                return
+            }
+            navigateToChatSession(chatSessionId: chatSessionId)
+        }
+    }
+
+    private func navigateToChatSession(chatSessionId: UUID) {
+        // Lookup chat session and navigate to its worktree
+        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", chatSessionId as CVarArg)
+        request.fetchLimit = 1
+
+        guard let chatSession = try? viewContext.fetch(request).first,
+              let worktree = chatSession.worktree,
+              let worktreeId = worktree.id,
+              let repository = worktree.repository,
+              let repoId = repository.id,
+              let workspace = repository.workspace,
+              let workspaceId = workspace.id else {
+            return
+        }
+
+        navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
+
+        // Post notification to switch to chat tab with the specific session
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NotificationCenter.default.post(
+                name: .switchToChatSession,
+                object: nil,
+                userInfo: ["chatSessionId": chatSessionId]
+            )
+        }
     }
 
     private func showCommandPalette() {
