@@ -95,34 +95,28 @@ struct PermissionBannerView: View {
 
             Spacer(minLength: 8)
 
-            // Action buttons
+            // Action buttons - show all options
             HStack(spacing: 6) {
-                if let denyOption = info.options.first(where: { $0.kind == "deny" }) {
+                ForEach(info.options, id: \.optionId) { option in
                     Button {
-                        info.handler.respondToPermission(optionId: denyOption.optionId)
+                        info.handler.respondToPermission(optionId: option.optionId)
                     } label: {
-                        Text("permission.action.deny")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(denyButtonBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                if let allowOption = info.options.first(where: { $0.kind == "allow" }) {
-                    Button {
-                        info.handler.respondToPermission(optionId: allowOption.optionId)
-                    } label: {
-                        Text("permission.action.allow")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.accentColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        HStack(spacing: 3) {
+                            if option.kind.contains("allow") {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 9))
+                            } else if option.kind.contains("reject") {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 9))
+                            }
+                            Text(option.name)
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundStyle(buttonForeground(for: option))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(buttonBackground(for: option))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -140,13 +134,22 @@ struct PermissionBannerView: View {
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.15), radius: 20, y: 8)
     }
 
-    @ViewBuilder
-    private var denyButtonBackground: some View {
-        if colorScheme == .dark {
-            Color.white.opacity(0.1)
-        } else {
-            Color.black.opacity(0.06)
+    private func buttonForeground(for option: PermissionOption) -> Color {
+        if option.kind.contains("allow") || option.kind.contains("reject") {
+            return .white
         }
+        return .primary
+    }
+
+    private func buttonBackground(for option: PermissionOption) -> Color {
+        if option.kind == "allow_always" {
+            return .green
+        } else if option.kind.contains("allow") {
+            return .blue
+        } else if option.kind.contains("reject") {
+            return .red
+        }
+        return .clear
     }
 
     @ViewBuilder

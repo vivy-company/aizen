@@ -172,8 +172,10 @@ final class PermissionNotificationManager: NSObject, UNUserNotificationCenterDel
 
         switch actionIdentifier {
         case "ALLOW":
-            // Find first allow option and respond directly
-            if let allowOption = info?.options.first(where: { $0.kind == "allow" }) {
+            // Prefer allow_once for quick action from notification
+            let allowOption = info?.options.first(where: { $0.kind == "allow_once" })
+                ?? info?.options.first(where: { $0.kind.contains("allow") })
+            if let allowOption {
                 respondToPermission(chatSessionId: chatSessionId, optionId: allowOption.optionId)
             } else {
                 // Fallback - bring app to front and navigate
@@ -182,8 +184,10 @@ final class PermissionNotificationManager: NSObject, UNUserNotificationCenterDel
             }
 
         case "DENY":
-            // Find first deny option and respond directly
-            if let denyOption = info?.options.first(where: { $0.kind == "deny" }) {
+            // Prefer reject_once for quick action from notification
+            let denyOption = info?.options.first(where: { $0.kind == "reject_once" })
+                ?? info?.options.first(where: { $0.kind.contains("reject") })
+            if let denyOption {
                 respondToPermission(chatSessionId: chatSessionId, optionId: denyOption.optionId)
             }
 

@@ -180,31 +180,50 @@ actor AgentTerminalDelegate {
         terminals[terminalIdValue] = state
 
         // Capture output asynchronously
+        // Use read(upToCount:) instead of availableData to get Swift errors instead of ObjC exceptions
         outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            if data.isEmpty {
-                handle.readabilityHandler = nil
-                try? handle.close()
-                return
-            }
-            if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
-                Task {
-                    await self?.appendOutput(terminalId: terminalIdValue, output: output)
+            do {
+                guard let data = try handle.read(upToCount: 65536) else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
                 }
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
+                if let output = String(data: data, encoding: .utf8) {
+                    Task {
+                        await self?.appendOutput(terminalId: terminalIdValue, output: output)
+                    }
+                }
+            } catch {
+                // File handle closed or unavailable - clean up
+                handle.readabilityHandler = nil
             }
         }
 
         errorPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            if data.isEmpty {
-                handle.readabilityHandler = nil
-                try? handle.close()
-                return
-            }
-            if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
-                Task {
-                    await self?.appendOutput(terminalId: terminalIdValue, output: output)
+            do {
+                guard let data = try handle.read(upToCount: 65536) else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
                 }
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
+                if let output = String(data: data, encoding: .utf8) {
+                    Task {
+                        await self?.appendOutput(terminalId: terminalIdValue, output: output)
+                    }
+                }
+            } catch {
+                // File handle closed or unavailable - clean up
+                handle.readabilityHandler = nil
             }
         }
 
@@ -623,8 +642,9 @@ actor AgentTerminalDelegate {
         do {
             try process.run()
             process.waitUntilExit()
-            let data = pipe.fileHandleForReading.availableData
-            if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            // Use read(upToCount:) to get Swift errors instead of ObjC exceptions
+            if let data = try? pipe.fileHandleForReading.read(upToCount: 4096),
+               let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
                 if !path.isEmpty && FileManager.default.fileExists(atPath: path) {
                     return path
                 }
