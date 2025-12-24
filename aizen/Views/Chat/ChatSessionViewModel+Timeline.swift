@@ -86,6 +86,13 @@ extension ChatSessionViewModel {
                         isCompletedTurn: msg.role == .agent
                     )
                     items.append(.toolCallGroup(group))
+
+                    // Add turn summary after this group
+                    let summary = createTurnSummary(from: toolCallBuffer)
+                    if summary.fileChanges.count > 0 || summary.duration > 0 {
+                        items.append(.turnSummary(summary))
+                    }
+
                     toolCallBuffer = []
                 }
 
@@ -115,14 +122,12 @@ extension ChatSessionViewModel {
                     isCompletedTurn: true
                 )
                 items.append(.toolCallGroup(group))
-            }
-        }
 
-        // Add turn summary at end when turn is complete (not streaming)
-        if !isStreaming && !topLevelCalls.isEmpty {
-            let summary = createTurnSummary(from: topLevelCalls)
-            if summary.fileChanges.count > 0 || summary.duration > 0 {
-                items.append(.turnSummary(summary))
+                // Add turn summary for final group
+                let summary = createTurnSummary(from: toolCallBuffer)
+                if summary.fileChanges.count > 0 || summary.duration > 0 {
+                    items.append(.turnSummary(summary))
+                }
             }
         }
 
@@ -225,8 +230,13 @@ extension ChatSessionViewModel {
         // If a new agent message arrived, rebuild with grouping to collapse previous tool calls
         if newAgentMessageAdded {
             let isStreaming = currentAgentSession?.isStreaming ?? false
-            withAnimation(.easeInOut(duration: 0.2)) {
+            // Skip animation during streaming to prevent layout issues
+            if isStreaming {
                 rebuildTimelineWithGrouping(isStreaming: isStreaming)
+            } else {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    rebuildTimelineWithGrouping(isStreaming: isStreaming)
+                }
             }
             previousMessageIds = newIds
             return
@@ -312,8 +322,9 @@ extension ChatSessionViewModel {
             }
         }
 
-        // Only animate structural changes after initial load
-        if hasStructuralChanges && !previousToolCallIds.isEmpty {
+        // Only animate structural changes after initial load and when not streaming
+        let isStreaming = currentAgentSession?.isStreaming ?? false
+        if hasStructuralChanges && !previousToolCallIds.isEmpty && !isStreaming {
             withAnimation(.easeInOut(duration: 0.2)) { updateBlock() }
         } else {
             updateBlock()
@@ -371,11 +382,9 @@ extension ChatSessionViewModel {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(100))
             withAnimation(.easeOut(duration: 0.3)) {
-                if let lastMessage = messages.last {
-                    scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
-                } else if isProcessing {
-                    scrollProxy?.scrollTo("processing", anchor: .bottom)
-                }
+                // Always scroll to bottom_anchor to ensure everything including
+                // processing indicator is visible
+                scrollProxy?.scrollTo("bottom_anchor", anchor: .bottom)
             }
         }
     }

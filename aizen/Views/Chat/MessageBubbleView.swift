@@ -273,7 +273,7 @@ struct UserBubble<Background: View>: View {
     private func attachmentView(for block: ContentBlock) -> some View {
         switch block {
         case .image(let imageContent):
-            ACPImageView(data: imageContent.data, mimeType: imageContent.mimeType)
+            ImageAttachmentCardView(data: imageContent.data, mimeType: imageContent.mimeType)
         case .resource(let resourceContent):
             if let uri = resourceContent.resource.uri {
                 UserAttachmentChip(

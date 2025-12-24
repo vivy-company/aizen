@@ -92,6 +92,155 @@ struct ACPImageView: View {
     }
 }
 
+// MARK: - Image Attachment Card (compact chip with click-to-preview)
+
+struct ImageAttachmentCardView: View {
+    let data: String
+    let mimeType: String
+
+    @State private var showingDetail = false
+
+    private var imageData: Data? {
+        Data(base64Encoded: data)
+    }
+
+    private var nsImage: NSImage? {
+        guard let imageData else { return nil }
+        return NSImage(data: imageData)
+    }
+
+    private var imageDimensions: String {
+        guard let image = nsImage else { return "" }
+        let width = Int(image.size.width)
+        let height = Int(image.size.height)
+        return "\(width)×\(height)"
+    }
+
+    var body: some View {
+        Button {
+            showingDetail = true
+        } label: {
+            AttachmentGlassCard(cornerRadius: 10) {
+                HStack(spacing: 6) {
+                    if let image = nsImage {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 20, height: 20)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    } else {
+                        Image(systemName: "photo")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.purple)
+                    }
+
+                    Text(String(localized: "chat.content.image"))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if !imageDimensions.isEmpty {
+                        Text(imageDimensions)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+            }
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showingDetail) {
+            ImageDetailSheet(data: data, mimeType: mimeType)
+        }
+    }
+}
+
+// MARK: - Image Detail Sheet
+
+private struct ImageDetailSheet: View {
+    let data: String
+    let mimeType: String
+    @Environment(\.dismiss) var dismiss
+
+    private var imageData: Data? {
+        Data(base64Encoded: data)
+    }
+
+    private var nsImage: NSImage? {
+        guard let imageData else { return nil }
+        return NSImage(data: imageData)
+    }
+
+    private var fileSize: String {
+        guard let imageData else { return "" }
+        return ByteCountFormatter.string(fromByteCount: Int64(imageData.count), countStyle: .file)
+    }
+
+    private var imageDimensions: String {
+        guard let image = nsImage else { return "" }
+        let width = Int(image.size.width)
+        let height = Int(image.size.height)
+        return "\(width) × \(height)"
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Image")
+                        .font(.headline)
+                    HStack(spacing: 8) {
+                        if !imageDimensions.isEmpty {
+                            Text(imageDimensions)
+                        }
+                        if !fileSize.isEmpty {
+                            Text(fileSize)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+
+            Divider()
+
+            ScrollView {
+                if let image = nsImage {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "photo")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.secondary)
+                        Text("Unable to display image")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding()
+                }
+            }
+        }
+        .frame(width: 700, height: 500)
+    }
+}
+
 // MARK: - User Attachment Chip (for displaying file attachments in user messages)
 
 struct UserAttachmentChip: View {

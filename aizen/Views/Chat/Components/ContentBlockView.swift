@@ -26,7 +26,7 @@ struct ACPContentBlockView: View {
             return AnyView(MessageContentView(content: textContent.text))
 
         case .image(let imageContent):
-            return AnyView(ACPImageView(data: imageContent.data, mimeType: imageContent.mimeType))
+            return AnyView(ImageAttachmentCardView(data: imageContent.data, mimeType: imageContent.mimeType))
 
         case .resource(let resourceContent):
             // Handle resource union type (text or blob)
