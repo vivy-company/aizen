@@ -41,7 +41,14 @@ struct MarkdownRenderedView: View {
             }
         }
         .onAppear {
-            updateCacheIfNeeded()
+            // If content exists but no blocks cached (cancelled task / state reset), force re-parse
+            let hasContent = !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if hasContent && cachedBlocks.isEmpty {
+                pendingContentHash = 0
+                forceUpdateCache()
+            } else {
+                updateCacheIfNeeded()
+            }
         }
         .onChange(of: content) { _ in
             updateCacheIfNeeded()
@@ -60,7 +67,12 @@ struct MarkdownRenderedView: View {
     private func updateCacheIfNeeded() {
         let contentHash = content.hashValue
         guard cachedContentHash != contentHash else { return }
-        guard pendingContentHash != contentHash else { return }
+        // Skip if already pending, BUT force update if we have content but no blocks
+        // (handles cancelled task scenario)
+        let hasContent = !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if pendingContentHash == contentHash && !(hasContent && cachedBlocks.isEmpty) {
+            return
+        }
 
         pendingContentHash = contentHash
         parseTask?.cancel()
