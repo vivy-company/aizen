@@ -43,6 +43,9 @@ class AgentPermissionHandler: ObservableObject {
 
     /// Handle permission request from agent - suspends until user responds or timeout
     func handlePermissionRequest(request: RequestPermissionRequest) async -> RequestPermissionResponse {
+        logger.info("Permission request received: \(request.message ?? "no message")")
+        logger.info("Options: \(request.options?.map { $0.optionId }.joined(separator: ", ") ?? "none")")
+
         // Cancel any existing timeout
         timeoutTask?.cancel()
 
@@ -101,6 +104,8 @@ class AgentPermissionHandler: ObservableObject {
 
     /// Respond to a permission request with user's choice
     func respondToPermission(optionId: String) {
+        logger.info("Permission response: \(optionId)")
+
         // Cancel timeout - user responded in time
         timeoutTask?.cancel()
         timeoutTask = nil
@@ -116,8 +121,11 @@ class AgentPermissionHandler: ObservableObject {
         if let continuation = permissionContinuation {
             let outcome = PermissionOutcome(optionId: optionId)
             let response = RequestPermissionResponse(outcome: outcome)
+            logger.info("Sending permission response with outcome: \(optionId)")
             continuation.resume(returning: response)
             permissionContinuation = nil
+        } else {
+            logger.warning("No continuation found for permission response")
         }
     }
 

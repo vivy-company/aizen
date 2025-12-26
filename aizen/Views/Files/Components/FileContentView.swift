@@ -79,9 +79,10 @@ struct FileContentView: View {
 
             // Content
             if isMarkdown && showPreview {
-                // Markdown preview
+                // Markdown preview - pass directory of file as basePath for relative image URLs
+                let fileDirectory = (file.path as NSString).deletingLastPathComponent
                 ScrollView {
-                    MarkdownRenderedView(content: file.content, isStreaming: false)
+                    MarkdownView(content: file.content, isStreaming: false, basePath: fileDirectory)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding()
                 }

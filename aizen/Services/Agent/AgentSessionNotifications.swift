@@ -152,8 +152,8 @@ extension AgentSession {
                 currentMode = SessionMode(rawValue: mode)
             }
         } catch {
-            logger.error("Failed to parse session update: \(error.localizedDescription)")
-            self.error = "Failed to parse session update: \(error.localizedDescription)"
+            // Log at debug level - don't surface to user as this may be a non-standard notification
+            logger.debug("Failed to parse session update: \(error.localizedDescription)")
         }
     }
 

@@ -223,13 +223,7 @@ actor ACPProcessManager {
     private func processIncomingData(_ data: Data) async {
         readBuffer.append(data)
 
-        // Process complete lines
-        while let newlineIndex = readBuffer.firstIndex(of: 0x0A) {
-            let lineData = readBuffer[..<newlineIndex]
-            readBuffer.removeSubrange(...newlineIndex)
-
-            await onDataReceived?(Data(lineData))
-        }
+        await drainBufferedMessages()
     }
 
     private func handleTermination(exitCode: Int32) async {
@@ -254,7 +248,7 @@ actor ACPProcessManager {
             try? stderrHandle.close()
         }
 
-        await flushPartialLineIfNeeded()
+        await flushRemainingBufferIfNeeded()
 
         try? stdinPipe?.fileHandleForWriting.close()
 
@@ -265,10 +259,107 @@ actor ACPProcessManager {
         readBuffer.removeAll()
     }
 
-    private func flushPartialLineIfNeeded() async {
-        guard !readBuffer.isEmpty else { return }
-        let trailing = readBuffer
-        readBuffer.removeAll()
-        await onDataReceived?(trailing)
+    private enum JSONScanResult {
+        case complete(Data.Index)
+        case needMore
+        case invalid
+    }
+
+    private func drainBufferedMessages() async {
+        while let message = popNextJSONMessage() {
+            await onDataReceived?(message)
+        }
+    }
+
+    private func popNextJSONMessage() -> Data? {
+        while true {
+            guard let startIndex = findJSONStartIndex(in: readBuffer) else {
+                if !readBuffer.isEmpty {
+                    readBuffer.removeAll(keepingCapacity: true)
+                }
+                return nil
+            }
+
+            if startIndex > readBuffer.startIndex {
+                readBuffer.removeSubrange(..<startIndex)
+            }
+
+            switch scanForJSONMessageEnd(in: readBuffer, from: readBuffer.startIndex) {
+            case .complete(let endIndex):
+                let end = readBuffer.index(after: endIndex)
+                let message = readBuffer[..<end]
+                readBuffer.removeSubrange(..<end)
+                return Data(message)
+            case .needMore:
+                return nil
+            case .invalid:
+                readBuffer.removeFirst()
+                continue
+            }
+        }
+    }
+
+    private func findJSONStartIndex(in buffer: Data) -> Data.Index? {
+        buffer.firstIndex { byte in
+            byte == 0x7B || byte == 0x5B // '{' or '['
+        }
+    }
+
+    private func scanForJSONMessageEnd(in buffer: Data, from startIndex: Data.Index) -> JSONScanResult {
+        var stack: [UInt8] = []
+        var inString = false
+        var escaped = false
+
+        var index = startIndex
+        while index < buffer.endIndex {
+            let byte = buffer[index]
+
+            if inString {
+                if escaped {
+                    escaped = false
+                } else if byte == 0x5C { // '\\'
+                    escaped = true
+                } else if byte == 0x22 { // '"'
+                    inString = false
+                }
+            } else {
+                switch byte {
+                case 0x22:
+                    inString = true
+                case 0x7B, 0x5B: // '{' or '['
+                    stack.append(byte)
+                case 0x7D: // '}'
+                    guard let last = stack.last, last == 0x7B else {
+                        return .invalid
+                    }
+                    stack.removeLast()
+                    if stack.isEmpty {
+                        return .complete(index)
+                    }
+                case 0x5D: // ']'
+                    guard let last = stack.last, last == 0x5B else {
+                        return .invalid
+                    }
+                    stack.removeLast()
+                    if stack.isEmpty {
+                        return .complete(index)
+                    }
+                default:
+                    break
+                }
+            }
+
+            index = buffer.index(after: index)
+        }
+
+        return .needMore
+    }
+
+    private func flushRemainingBufferIfNeeded() async {
+        await drainBufferedMessages()
+
+        if !readBuffer.isEmpty {
+            readBuffer.removeAll(keepingCapacity: true)
+        }
     }
 }

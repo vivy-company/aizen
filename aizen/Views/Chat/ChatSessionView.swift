@@ -55,9 +55,8 @@ struct ChatSessionView: View {
                         selectedAgent: viewModel.selectedAgent,
                         currentThought: viewModel.currentAgentSession?.currentThought,
                         currentIterationId: viewModel.currentAgentSession?.currentIterationId,
-                        onScrollProxyReady: { proxy in
-                            viewModel.scrollProxy = proxy
-                        },
+                        scrollRequest: viewModel.scrollRequest,
+                        shouldAutoScroll: viewModel.isNearBottom,
                         onAppear: viewModel.loadMessages,
                         renderInlineMarkdown: viewModel.renderInlineMarkdown,
                         onToolTap: { toolCall in

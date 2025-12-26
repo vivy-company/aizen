@@ -80,12 +80,19 @@ class ChatSessionViewModel: ObservableObject {
 
     // MARK: - Internal State
 
-    var scrollProxy: ScrollViewProxy?
-    @Published var isNearBottom: Bool = true
+    @Published var scrollRequest: ScrollRequest?
+    @Published var isNearBottom: Bool = true {
+        didSet {
+            if !isNearBottom {
+                cancelPendingAutoScroll()
+            }
+        }
+    }
     private var cancellables = Set<AnyCancellable>()
     private var notificationCancellables = Set<AnyCancellable>()
     private var wasStreaming: Bool = false  // Track streaming state transitions
     let logger = Logger.forCategory("ChatSession")
+    var autoScrollTask: Task<Void, Never>?
 
     // MARK: - Computed Properties
 

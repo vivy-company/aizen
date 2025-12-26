@@ -14,6 +14,12 @@ import Combine
 private var timelineIndexKey: UInt8 = 0
 
 extension ChatSessionViewModel {
+    struct ScrollRequest: Equatable {
+        let id: UUID
+        let animated: Bool
+        let force: Bool
+    }
+
     // MARK: - Timeline Index (O(1) Lookup)
 
     /// Dictionary for O(1) timeline item lookups by ID
@@ -399,22 +405,34 @@ extension ChatSessionViewModel {
     // MARK: - Scrolling
 
     func scrollToBottom() {
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(100))
-            withAnimation(.easeOut(duration: 0.3)) {
-                // Always scroll to bottom_anchor to ensure everything including
-                // processing indicator is visible
-                scrollProxy?.scrollTo("bottom_anchor", anchor: .bottom)
-            }
-        }
+        requestScrollToBottom(force: true, animated: true)
     }
 
     /// Deferred scroll that avoids "ScrollViewProxy may not be accessed during view updates" crash
     func scrollToBottomDeferred() {
-        Task { @MainActor in
-            // Small delay ensures we're outside any view update cycle
-            try? await Task.sleep(for: .milliseconds(50))
-            scrollProxy?.scrollTo("bottom_anchor", anchor: .bottom)
+        scheduleAutoScrollToBottom()
+    }
+
+    private func requestScrollToBottom(force: Bool, animated: Bool) {
+        scrollRequest = ScrollRequest(id: UUID(), animated: animated, force: force)
+    }
+
+    private func scheduleAutoScrollToBottom() {
+        guard isNearBottom else { return }
+        guard autoScrollTask == nil else { return }
+
+        autoScrollTask = Task { @MainActor in
+            defer { autoScrollTask = nil }
+            try? await Task.sleep(for: .milliseconds(16))
+            if Task.isCancelled || !isNearBottom {
+                return
+            }
+            scrollRequest = ScrollRequest(id: UUID(), animated: false, force: false)
         }
+    }
+
+    func cancelPendingAutoScroll() {
+        autoScrollTask?.cancel()
+        autoScrollTask = nil
     }
 }

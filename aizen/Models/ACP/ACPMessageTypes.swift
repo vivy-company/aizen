@@ -82,9 +82,16 @@ struct JSONRPCError: Codable {
     let data: AnyCodable?
 }
 
-enum RequestId: Codable, Hashable {
+enum RequestId: Codable, Hashable, CustomStringConvertible {
     case string(String)
     case number(Int)
+
+    var description: String {
+        switch self {
+        case .string(let str): return str
+        case .number(let num): return String(num)
+        }
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()

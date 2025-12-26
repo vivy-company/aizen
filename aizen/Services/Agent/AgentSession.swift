@@ -355,22 +355,32 @@ class AgentSession: ObservableObject, ACPClientDelegate {
 
     /// Set mode by ID
     func setModeById(_ modeId: String) async throws {
+        logger.info("setModeById called: \(modeId) (current: \(self.currentModeId ?? "nil"))")
+
         // Skip if already on this mode or a change is in progress
-        guard modeId != currentModeId, !isModeChanging else { return }
+        guard modeId != currentModeId, !isModeChanging else {
+            logger.info("Skipping mode change: already on mode or change in progress")
+            return
+        }
 
         guard let sessionId = sessionId, let client = acpClient else {
+            logger.error("setModeById failed: session not active")
             throw AgentSessionError.sessionNotActive
         }
 
         isModeChanging = true
         defer { isModeChanging = false }
 
+        logger.info("Sending session/set_mode request...")
         let response = try await client.setMode(sessionId: sessionId, modeId: modeId)
         if response.success {
+            logger.info("Mode change succeeded: \(modeId)")
             currentModeId = modeId
             if let modeName = availableModes.first(where: { $0.id == modeId })?.name {
                 addSystemMessage("Mode changed to \(modeName)")
             }
+        } else {
+            logger.warning("Mode change response indicated failure")
         }
     }
 

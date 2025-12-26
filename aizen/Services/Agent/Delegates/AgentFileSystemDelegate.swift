@@ -6,9 +6,12 @@
 //
 
 import Foundation
+import os.log
 
 /// Actor responsible for handling file system operations for agent sessions
 actor AgentFileSystemDelegate {
+
+    private let logger = Logger.forCategory("FileSystemDelegate")
 
     // MARK: - Initialization
 
@@ -44,8 +47,15 @@ actor AgentFileSystemDelegate {
 
     /// Handle file write request from agent
     func handleFileWriteRequest(_ path: String, content: String, sessionId: String) async throws -> WriteTextFileResponse {
+        logger.info("Write request for: \(path) (\(content.count) chars)")
         let url = URL(fileURLWithPath: path)
-        try content.write(to: url, atomically: true, encoding: .utf8)
-        return WriteTextFileResponse(_meta: nil)
+        do {
+            try content.write(to: url, atomically: true, encoding: .utf8)
+            logger.info("Write succeeded: \(path)")
+            return WriteTextFileResponse(_meta: nil)
+        } catch {
+            logger.error("Write failed for \(path): \(error.localizedDescription)")
+            throw error
+        }
     }
 }

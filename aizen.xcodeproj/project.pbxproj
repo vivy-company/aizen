@@ -706,7 +706,6 @@
 				Views/Chat/Components/InlineTerminalView.swift,
 				Views/Chat/Components/Markdown/MarkdownImageView.swift,
 				Views/Chat/Components/Markdown/MarkdownListView.swift,
-				Views/Chat/Components/Markdown/MarkdownTableView.swift,
 				Views/Chat/Components/Markdown/MarkdownTypes.swift,
 				Views/Chat/Components/Markdown/MermaidDiagramView.swift,
 				Views/Chat/Components/MarkdownContentView.swift,

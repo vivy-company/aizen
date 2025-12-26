@@ -416,6 +416,12 @@ actor ACPClient {
     // MARK: - Private Methods
 
     private func handleMessage(data: Data) async {
+        // Skip empty or whitespace-only lines
+        guard let text = String(data: data, encoding: .utf8),
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+
         // Emit to debug stream if enabled
         if let continuation = debugContinuation {
             let method = extractMethod(from: data)
@@ -442,7 +448,10 @@ actor ACPClient {
                 await handleIncomingRequest(request)
             }
         } catch {
-            logger.error("Failed to decode message: \(error)")
+            // Log at debug level - non-JSON output from agent (debug messages, status lines, etc.)
+            if let text = String(data: data, encoding: .utf8) {
+                logger.debug("Non-JSON output from agent: \(text.prefix(200))")
+            }
         }
     }
 
@@ -455,11 +464,13 @@ actor ACPClient {
     }
 
     private func handleIncomingRequest(_ request: JSONRPCRequest) async {
+        logger.info("Incoming request: \(request.method) id=\(request.id)")
         do {
             let response = try await requestRouter.routeRequest(request)
+            logger.info("Request \(request.method) succeeded")
             try await sendSuccessResponse(requestId: request.id, result: response)
         } catch {
-            logger.error("Error handling request \(request.method): \(error)")
+            logger.error("Error handling request \(request.method): \(error.localizedDescription)")
 
             if let acpError = error as? ACPClientError, case .invalidResponse = acpError {
                 try? await sendErrorResponse(

@@ -117,5 +117,38 @@ for file in "${RESOURCES_DIR}"/*; do
     fi
 done
 
+# Copy KaTeX resources for math rendering
+KATEX_SRC="${SRCROOT}/aizen/Resources/katex"
+if [ -d "${KATEX_SRC}" ]; then
+    mkdir -p "${RESOURCES_DIR}/katex"
+    cp -a "${KATEX_SRC}/." "${RESOURCES_DIR}/katex/" || {
+        echo "Warning: Failed to copy KaTeX resources" >&2
+    }
+    echo "KaTeX resources copied"
+fi
+
+# Copy KaTeX fonts
+FONTS_SRC="${SRCROOT}/aizen/Resources/fonts"
+if [ -d "${FONTS_SRC}" ]; then
+    mkdir -p "${RESOURCES_DIR}/fonts"
+    for font in "${FONTS_SRC}"/KaTeX_*; do
+        [ -f "$font" ] || continue
+        cp "$font" "${RESOURCES_DIR}/fonts/" || {
+            echo "Warning: Failed to copy font: $(basename "$font")" >&2
+        }
+    done
+    echo "KaTeX fonts copied"
+fi
+
+# Copy Mermaid resources for diagram rendering
+MERMAID_SRC="${SRCROOT}/aizen/Resources/mermaid"
+if [ -d "${MERMAID_SRC}" ]; then
+    mkdir -p "${RESOURCES_DIR}/mermaid"
+    cp -a "${MERMAID_SRC}/." "${RESOURCES_DIR}/mermaid/" || {
+        echo "Warning: Failed to copy Mermaid resources" >&2
+    }
+    echo "Mermaid resources copied"
+fi
+
 echo "Resource organization complete: ${THEME_COUNT} themes moved"
 exit 0

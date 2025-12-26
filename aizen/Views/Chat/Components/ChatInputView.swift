@@ -625,7 +625,7 @@ struct ReviewCommentsDetailView: View {
             Divider()
 
             ScrollView {
-                MarkdownRenderedView(content: content)
+                MarkdownView(content: content, isStreaming: false)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
             }

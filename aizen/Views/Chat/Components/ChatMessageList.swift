@@ -37,7 +37,8 @@ struct ChatMessageList: View {
     let selectedAgent: String
     let currentThought: String?
     let currentIterationId: String?
-    let onScrollProxyReady: (ScrollViewProxy) -> Void
+    let scrollRequest: ChatSessionViewModel.ScrollRequest?
+    let shouldAutoScroll: Bool
     let onAppear: () -> Void
     let renderInlineMarkdown: (String) -> AttributedString
     var onToolTap: (ToolCall) -> Void = { _ in }
@@ -197,9 +198,12 @@ struct ChatMessageList: View {
             .onPreferenceChange(ScrollViewHeightKey.self) { viewport in
                 updateScrollState(viewport: viewport)
             }
+            .onChange(of: scrollRequest?.id) { _ in
+                handleScrollRequest(proxy: proxy)
+            }
             .onAppear {
-                onScrollProxyReady(proxy)
                 onAppear()
+                handleScrollRequest(proxy: proxy)
             }
         }
     }
@@ -225,6 +229,21 @@ struct ChatMessageList: View {
         if lastReportedNearBottom == nil || isNearBottom != lastReportedNearBottom {
             lastReportedNearBottom = isNearBottom
             onScrollPositionChange(isNearBottom)
+        }
+    }
+
+    private func handleScrollRequest(proxy: ScrollViewProxy) {
+        guard let request = scrollRequest else { return }
+        guard request.force || shouldAutoScroll else { return }
+
+        DispatchQueue.main.async {
+            if request.animated {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    proxy.scrollTo("bottom_anchor", anchor: .bottom)
+                }
+            } else {
+                proxy.scrollTo("bottom_anchor", anchor: .bottom)
+            }
         }
     }
 
