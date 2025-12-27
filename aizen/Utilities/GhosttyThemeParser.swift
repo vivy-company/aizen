@@ -215,6 +215,16 @@ struct GhosttyThemeParser {
         return parseRaw(contentsOf: themePath)?.toGitStatusColors() ?? .default
     }
 
+    /// Returns the ANSI palette colors (0-15) for a theme
+    static func loadANSIPalette(named name: String) -> [Int: NSColor]? {
+        guard let resourcePath = Bundle.main.resourcePath else { return nil }
+        let themePath = ((resourcePath as NSString)
+            .appendingPathComponent("ghostty/themes") as NSString)
+            .appendingPathComponent(name)
+
+        return parseRaw(contentsOf: themePath)?.palette
+    }
+
     /// Returns tmux mode-style string for selection highlighting
     /// Format: "fg=#RRGGBB,bg=#RRGGBB"
     static func loadTmuxModeStyle(named name: String) -> String {

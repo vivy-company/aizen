@@ -6,6 +6,71 @@
 //
 
 import SwiftUI
+import AppKit
+
+// MARK: - ANSI Color Provider
+
+/// Provides ANSI colors from the user's selected theme
+struct ANSIColorProvider {
+    static let shared = ANSIColorProvider()
+
+    private var cachedThemeName: String?
+    private var cachedPalette: [Int: NSColor]?
+
+    /// Get the current theme's palette, with caching
+    mutating func getPalette() -> [Int: NSColor] {
+        let themeName = UserDefaults.standard.string(forKey: "editorTheme") ?? "Aizen Dark"
+
+        // Return cached palette if theme hasn't changed
+        if themeName == cachedThemeName, let palette = cachedPalette {
+            return palette
+        }
+
+        // Load and cache new palette
+        if let palette = GhosttyThemeParser.loadANSIPalette(named: themeName), !palette.isEmpty {
+            cachedThemeName = themeName
+            cachedPalette = palette
+            return palette
+        }
+
+        // Return Aizen Dark defaults
+        return Self.aizenDarkPalette
+    }
+
+    /// Aizen Dark fallback palette
+    static let aizenDarkPalette: [Int: NSColor] = [
+        0: NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1),  // #1a1a1a
+        1: NSColor(srgbRed: 0.941, green: 0.533, blue: 0.596, alpha: 1),  // #f08898
+        2: NSColor(srgbRed: 0.643, green: 0.878, blue: 0.612, alpha: 1),  // #a4e09c
+        3: NSColor(srgbRed: 0.961, green: 0.871, blue: 0.643, alpha: 1),  // #f5dea4
+        4: NSColor(srgbRed: 0.518, green: 0.706, blue: 0.973, alpha: 1),  // #84b4f8
+        5: NSColor(srgbRed: 0.784, green: 0.635, blue: 0.957, alpha: 1),  // #c8a2f4
+        6: NSColor(srgbRed: 0.565, green: 0.863, blue: 0.816, alpha: 1),  // #90dcd0
+        7: NSColor(srgbRed: 0.816, green: 0.839, blue: 0.941, alpha: 1),  // #d0d6f0
+        8: NSColor(srgbRed: 0.267, green: 0.267, blue: 0.267, alpha: 1),  // #444444
+        9: NSColor(srgbRed: 0.941, green: 0.533, blue: 0.596, alpha: 1),  // #f08898
+        10: NSColor(srgbRed: 0.643, green: 0.878, blue: 0.612, alpha: 1), // #a4e09c
+        11: NSColor(srgbRed: 0.961, green: 0.871, blue: 0.643, alpha: 1), // #f5dea4
+        12: NSColor(srgbRed: 0.518, green: 0.706, blue: 0.973, alpha: 1), // #84b4f8
+        13: NSColor(srgbRed: 0.784, green: 0.635, blue: 0.957, alpha: 1), // #c8a2f4
+        14: NSColor(srgbRed: 0.565, green: 0.863, blue: 0.816, alpha: 1), // #90dcd0
+        15: NSColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 1),       // #ffffff
+    ]
+
+    /// Get color for ANSI index from theme
+    func color(for index: Int) -> Color {
+        var provider = self
+        let palette = provider.getPalette()
+        if let nsColor = palette[index] {
+            return Color(nsColor)
+        }
+        // Fallback to Aizen Dark
+        if let nsColor = Self.aizenDarkPalette[index] {
+            return Color(nsColor)
+        }
+        return .primary
+    }
+}
 
 // MARK: - ANSI Color Definitions
 
@@ -17,26 +82,27 @@ enum ANSIColor {
     case rgb(UInt8, UInt8, UInt8)
     case palette(UInt8)
 
-    // Aizen Dark palette colors
+    /// Get color from user's selected theme
     var color: Color {
+        let provider = ANSIColorProvider.shared
         switch self {
         case .default: return .primary
-        case .black: return Color(red: 0.102, green: 0.102, blue: 0.102)           // #1a1a1a
-        case .red: return Color(red: 0.941, green: 0.533, blue: 0.596)             // #f08898
-        case .green: return Color(red: 0.643, green: 0.878, blue: 0.612)           // #a4e09c
-        case .yellow: return Color(red: 0.961, green: 0.871, blue: 0.643)          // #f5dea4
-        case .blue: return Color(red: 0.518, green: 0.706, blue: 0.973)            // #84b4f8
-        case .magenta: return Color(red: 0.784, green: 0.635, blue: 0.957)         // #c8a2f4
-        case .cyan: return Color(red: 0.565, green: 0.863, blue: 0.816)            // #90dcd0
-        case .white: return Color(red: 0.816, green: 0.839, blue: 0.941)           // #d0d6f0
-        case .brightBlack: return Color(red: 0.267, green: 0.267, blue: 0.267)     // #444444
-        case .brightRed: return Color(red: 0.941, green: 0.533, blue: 0.596)       // #f08898
-        case .brightGreen: return Color(red: 0.643, green: 0.878, blue: 0.612)     // #a4e09c
-        case .brightYellow: return Color(red: 0.961, green: 0.871, blue: 0.643)    // #f5dea4
-        case .brightBlue: return Color(red: 0.518, green: 0.706, blue: 0.973)      // #84b4f8
-        case .brightMagenta: return Color(red: 0.784, green: 0.635, blue: 0.957)   // #c8a2f4
-        case .brightCyan: return Color(red: 0.565, green: 0.863, blue: 0.816)      // #90dcd0
-        case .brightWhite: return Color(white: 1.0)                                 // #ffffff
+        case .black: return provider.color(for: 0)
+        case .red: return provider.color(for: 1)
+        case .green: return provider.color(for: 2)
+        case .yellow: return provider.color(for: 3)
+        case .blue: return provider.color(for: 4)
+        case .magenta: return provider.color(for: 5)
+        case .cyan: return provider.color(for: 6)
+        case .white: return provider.color(for: 7)
+        case .brightBlack: return provider.color(for: 8)
+        case .brightRed: return provider.color(for: 9)
+        case .brightGreen: return provider.color(for: 10)
+        case .brightYellow: return provider.color(for: 11)
+        case .brightBlue: return provider.color(for: 12)
+        case .brightMagenta: return provider.color(for: 13)
+        case .brightCyan: return provider.color(for: 14)
+        case .brightWhite: return provider.color(for: 15)
         case .rgb(let r, let g, let b):
             return Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
         case .palette(let index):
@@ -45,14 +111,9 @@ enum ANSIColor {
     }
 
     private func paletteColor(_ index: UInt8) -> Color {
-        // Standard 16 colors (0-15)
+        // Standard 16 colors (0-15) - use theme colors
         if index < 16 {
-            let colors: [ANSIColor] = [
-                .black, .red, .green, .yellow, .blue, .magenta, .cyan, .white,
-                .brightBlack, .brightRed, .brightGreen, .brightYellow,
-                .brightBlue, .brightMagenta, .brightCyan, .brightWhite
-            ]
-            return colors[Int(index)].color
+            return ANSIColorProvider.shared.color(for: Int(index))
         }
         // 216 color cube (16-231)
         if index < 232 {
