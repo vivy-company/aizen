@@ -67,50 +67,79 @@ class XcodeBuildManager: ObservableObject {
         guard path != currentWorktreePath else { return }
         currentWorktreePath = path
 
-        Task { @MainActor [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
 
-            // Reset state on main actor to ensure proper UI updates
-            self.detectedProject = nil
-            self.selectedScheme = nil
-            self.currentPhase = .idle
-            self.lastBuildLog = nil
-            self.isReady = false
+            // Reset state on main actor
+            await MainActor.run {
+                self.detectedProject = nil
+                self.selectedScheme = nil
+                self.currentPhase = .idle
+                self.lastBuildLog = nil
+                self.isReady = false
+            }
 
-            // Detect project (runs off main actor)
+            // Detect project off main actor
             let project = await self.projectDetector.detectProject(at: path)
 
             guard let project = project else {
                 return  // isReady stays false
             }
 
-            // Load cached destinations immediately (non-blocking)
-            self.loadCachedDestinations()
+            // Load cached destinations off main actor (JSON decoding)
+            let cachedDestinations = self.loadCachedDestinationsOffMainActor()
+            let lastDestId = UserDefaults.standard.string(forKey: "xcodeLastDestinationId") ?? ""
+            let schemeKey = "xcodeScheme_\(project.path.hashValue)"
+            let savedScheme = UserDefaults.standard.string(forKey: schemeKey)
 
-            // Set project and scheme
-            self.detectedProject = project
+            // Update UI state on main actor
+            await MainActor.run {
+                if let cached = cachedDestinations {
+                    self.availableDestinations = cached
+                }
 
-            // Restore or auto-select scheme
-            let savedScheme = UserDefaults.standard.string(forKey: self.projectSchemeKey)
-            if let saved = savedScheme, project.schemes.contains(saved) {
-                self.selectedScheme = saved
-            } else {
-                self.selectedScheme = project.schemes.first
+                self.detectedProject = project
+
+                // Restore or auto-select scheme
+                if let saved = savedScheme, project.schemes.contains(saved) {
+                    self.selectedScheme = saved
+                } else {
+                    self.selectedScheme = project.schemes.first
+                }
+
+                // Restore selected destination from cache
+                if !lastDestId.isEmpty, let dest = self.findDestination(byId: lastDestId) {
+                    self.selectedDestination = dest
+                } else if self.selectedDestination == nil {
+                    self.selectedDestination = self.availableDestinations[.simulator]?.first { $0.platform == "iOS" }
+                        ?? self.availableDestinations[.mac]?.first
+                }
+
+                // Mark ready if we have cached destinations
+                if !self.availableDestinations.isEmpty {
+                    self.isReady = true
+                }
             }
 
-            // Mark as ready immediately if we have cached destinations
-            if !self.availableDestinations.isEmpty {
-                self.isReady = true
-                // Refresh destinations in background
-                Task {
-                    await self.loadDestinations(force: false)
-                }
+            // Refresh destinations in background (or load if no cache)
+            if cachedDestinations != nil {
+                await self.loadDestinations(force: false)
             } else {
-                // First time: must wait for destinations
                 await self.loadDestinations(force: true)
-                self.isReady = true
+                await MainActor.run {
+                    self.isReady = true
+                }
             }
         }
+    }
+
+    /// Load cached destinations off main actor to avoid UI freeze
+    private func loadCachedDestinationsOffMainActor() -> [DestinationType: [XcodeDestination]]? {
+        guard let data = UserDefaults.standard.data(forKey: destinationsCacheKey),
+              let cached = try? JSONDecoder().decode(CachedDestinations.self, from: data) else {
+            return nil
+        }
+        return cached.toDestinationDict()
     }
 
     func refreshDestinations() {
@@ -122,24 +151,6 @@ class XcodeBuildManager: ObservableObject {
     // MARK: - Destination Caching
 
     private let destinationsCacheKey = "xcodeDestinationsCache"
-
-    private func loadCachedDestinations() {
-        guard let data = UserDefaults.standard.data(forKey: destinationsCacheKey),
-              let cached = try? JSONDecoder().decode(CachedDestinations.self, from: data) else {
-            return
-        }
-
-        self.availableDestinations = cached.toDestinationDict()
-
-        // Restore selected destination
-        if let lastId = lastDestinationId.isEmpty ? nil : lastDestinationId,
-           let destination = findDestination(byId: lastId) {
-            self.selectedDestination = destination
-        } else if selectedDestination == nil {
-            self.selectedDestination = availableDestinations[.simulator]?.first { $0.platform == "iOS" }
-                ?? availableDestinations[.mac]?.first
-        }
-    }
 
     private func cacheDestinations(_ destinations: [DestinationType: [XcodeDestination]]) {
         let allDestinations = destinations.flatMap { type, dests in
