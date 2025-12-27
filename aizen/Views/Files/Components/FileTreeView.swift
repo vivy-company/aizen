@@ -61,7 +61,7 @@ struct FileTreeItem: View {
     let onOpenFile: (String) -> Void
     let viewModel: FileBrowserViewModel
 
-    @AppStorage("editorTheme") private var editorTheme: String = "Catppuccin Mocha"
+    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
     @State private var isHovering = false
     @State private var showingDialog: FileInputDialogType?
     @State private var showingDeleteAlert = false

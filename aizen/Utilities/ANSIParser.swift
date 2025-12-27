@@ -17,25 +17,26 @@ enum ANSIColor {
     case rgb(UInt8, UInt8, UInt8)
     case palette(UInt8)
 
+    // Aizen Dark palette colors
     var color: Color {
         switch self {
         case .default: return .primary
-        case .black: return Color(white: 0.3)
-        case .red: return Color(red: 0.8, green: 0.2, blue: 0.2)
-        case .green: return Color(red: 0.2, green: 0.8, blue: 0.2)
-        case .yellow: return Color(red: 0.8, green: 0.8, blue: 0.2)
-        case .blue: return Color(red: 0.2, green: 0.4, blue: 0.9)
-        case .magenta: return Color(red: 0.8, green: 0.2, blue: 0.8)
-        case .cyan: return Color(red: 0.2, green: 0.8, blue: 0.8)
-        case .white: return Color(nsColor: .white)
-        case .brightBlack: return Color(white: 0.5)
-        case .brightRed: return Color(red: 1.0, green: 0.4, blue: 0.4)
-        case .brightGreen: return Color(red: 0.4, green: 1.0, blue: 0.4)
-        case .brightYellow: return Color(red: 1.0, green: 1.0, blue: 0.4)
-        case .brightBlue: return Color(red: 0.4, green: 0.6, blue: 1.0)
-        case .brightMagenta: return Color(red: 1.0, green: 0.4, blue: 1.0)
-        case .brightCyan: return Color(red: 0.4, green: 1.0, blue: 1.0)
-        case .brightWhite: return Color(white: 1.0)
+        case .black: return Color(red: 0.102, green: 0.102, blue: 0.102)           // #1a1a1a
+        case .red: return Color(red: 0.941, green: 0.533, blue: 0.596)             // #f08898
+        case .green: return Color(red: 0.643, green: 0.878, blue: 0.612)           // #a4e09c
+        case .yellow: return Color(red: 0.961, green: 0.871, blue: 0.643)          // #f5dea4
+        case .blue: return Color(red: 0.518, green: 0.706, blue: 0.973)            // #84b4f8
+        case .magenta: return Color(red: 0.784, green: 0.635, blue: 0.957)         // #c8a2f4
+        case .cyan: return Color(red: 0.565, green: 0.863, blue: 0.816)            // #90dcd0
+        case .white: return Color(red: 0.816, green: 0.839, blue: 0.941)           // #d0d6f0
+        case .brightBlack: return Color(red: 0.267, green: 0.267, blue: 0.267)     // #444444
+        case .brightRed: return Color(red: 0.941, green: 0.533, blue: 0.596)       // #f08898
+        case .brightGreen: return Color(red: 0.643, green: 0.878, blue: 0.612)     // #a4e09c
+        case .brightYellow: return Color(red: 0.961, green: 0.871, blue: 0.643)    // #f5dea4
+        case .brightBlue: return Color(red: 0.518, green: 0.706, blue: 0.973)      // #84b4f8
+        case .brightMagenta: return Color(red: 0.784, green: 0.635, blue: 0.957)   // #c8a2f4
+        case .brightCyan: return Color(red: 0.565, green: 0.863, blue: 0.816)      // #90dcd0
+        case .brightWhite: return Color(white: 1.0)                                 // #ffffff
         case .rgb(let r, let g, let b):
             return Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
         case .palette(let index):

@@ -59,7 +59,7 @@ struct aizenApp: App {
     // Terminal settings observers
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
-    @AppStorage("terminalThemeName") private var terminalThemeName = "Catppuccin Mocha"
+    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
 
     init() {

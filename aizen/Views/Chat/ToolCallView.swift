@@ -355,8 +355,8 @@ struct HighlightedTextContentView: View {
     let filePath: String?
 
     @State private var highlightedText: AttributedString?
-    @AppStorage("editorTheme") private var editorTheme: String = "Catppuccin Mocha"
-    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Catppuccin Latte"
+    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
+    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
     @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
     @Environment(\.colorScheme) private var colorScheme
 

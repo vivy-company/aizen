@@ -12,8 +12,8 @@ struct TerminalSettingsView: View {
     private let logger = Logger.settings
     @Binding var fontName: String
     @Binding var fontSize: Double
-    @AppStorage("terminalThemeName") private var themeName = "Catppuccin Mocha"
-    @AppStorage("terminalThemeNameLight") private var themeNameLight = "Catppuccin Latte"
+    @AppStorage("terminalThemeName") private var themeName = "Aizen Dark"
+    @AppStorage("terminalThemeNameLight") private var themeNameLight = "Aizen Light"
     @AppStorage("terminalUsePerAppearanceTheme") private var usePerAppearanceTheme = false
     @AppStorage("terminalNotificationsEnabled") private var terminalNotificationsEnabled = true
     @AppStorage("terminalProgressEnabled") private var terminalProgressEnabled = true

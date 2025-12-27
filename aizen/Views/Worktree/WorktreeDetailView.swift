@@ -29,7 +29,7 @@ struct WorktreeDetailView: View {
     @AppStorage("showGitStatus") private var showGitStatus = true
     @AppStorage("showXcodeBuild") private var showXcodeBuild = true
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
-    @AppStorage("terminalThemeName") private var terminalThemeName = "Catppuccin Mocha"
+    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
     @State private var selectedTab = "chat"
     @State private var lastOpenedApp: DetectedApp?
     @StateObject private var gitRepositoryService: GitRepositoryService

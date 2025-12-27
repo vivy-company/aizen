@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct EditorSettingsView: View {
-    @AppStorage("editorTheme") private var editorTheme: String = "Catppuccin Mocha"
-    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Catppuccin Latte"
+    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
+    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
     @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
     @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
     @AppStorage("editorFontSize") private var editorFontSize: Double = 12.0
@@ -137,8 +137,8 @@ struct EditorSettingsView: View {
 
             Section {
                 Button("Reset to Defaults") {
-                    editorTheme = "Catppuccin Mocha"
-                    editorThemeLight = "Catppuccin Latte"
+                    editorTheme = "Aizen Dark"
+                    editorThemeLight = "Aizen Light"
                     usePerAppearanceTheme = false
                     editorFontFamily = "Menlo"
                     editorFontSize = 12.0

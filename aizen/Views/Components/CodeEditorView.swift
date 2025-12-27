@@ -23,8 +23,8 @@ struct CodeEditorView: View {
     @State private var gitDiffCoordinator = GitDiffCoordinator()
 
     // Editor settings from AppStorage
-    @AppStorage("editorTheme") private var editorTheme: String = "Catppuccin Mocha"
-    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Catppuccin Latte"
+    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
+    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
     @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
     @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
     @AppStorage("editorFontSize") private var editorFontSize: Double = 12.0

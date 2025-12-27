@@ -67,8 +67,8 @@ extension Ghostty {
 
         @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
         @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
-        @AppStorage("terminalThemeName") private var terminalThemeName = "Catppuccin Mocha"
-        @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Catppuccin Latte"
+        @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
+        @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
         @AppStorage("terminalUsePerAppearanceTheme") private var usePerAppearanceTheme = false
         @AppStorage("appearanceMode") private var appearanceMode = "system"
 
