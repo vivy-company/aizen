@@ -128,18 +128,33 @@ struct MarkdownListItem: Identifiable, Equatable {
     let children: [MarkdownListItem]
     let checkbox: CheckboxState?
     let depth: Int
+    let listOrdered: Bool
+    let listStartIndex: Int
+    let itemIndex: Int
 
     enum CheckboxState: Equatable {
         case checked
         case unchecked
     }
 
-    init(content: MarkdownInlineContent, children: [MarkdownListItem] = [], checkbox: CheckboxState? = nil, depth: Int = 0, index: Int = 0) {
+    init(
+        content: MarkdownInlineContent,
+        children: [MarkdownListItem] = [],
+        checkbox: CheckboxState? = nil,
+        depth: Int = 0,
+        index: Int = 0,
+        listOrdered: Bool = false,
+        listStartIndex: Int = 1
+    ) {
         self.content = content
         self.children = children
         self.checkbox = checkbox
         self.depth = depth
-        self.id = "li-\(depth)-\(index)-\(content.hashValue)"
+        self.listOrdered = listOrdered
+        self.listStartIndex = listStartIndex
+        self.itemIndex = index
+        let orderTag = listOrdered ? "o" : "u"
+        self.id = "li-\(depth)-\(index)-\(orderTag)-\(content.hashValue)"
     }
 }
 
@@ -319,38 +334,59 @@ final class MarkdownParser {
         )
     }
 
-    /// Extract $$...$$ block math from content
+    /// Extract $$...$$ block math from content, skipping fenced code blocks
     private func extractMathBlocks(from content: String) -> [(content: String, isMath: Bool)] {
         var segments: [(content: String, isMath: Bool)] = []
-        var remaining = content
+        var current = ""
+        var inCodeFence = false
 
-        while !remaining.isEmpty {
-            if let startRange = remaining.range(of: "$$") {
-                let beforeMath = String(remaining[..<startRange.lowerBound])
-                if !beforeMath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    segments.append((beforeMath, false))
-                }
+        func flushCurrentIfNeeded() {
+            if !current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                segments.append((current, false))
+            }
+            current = ""
+        }
 
-                let afterStart = remaining[startRange.upperBound...]
-                if let endRange = afterStart.range(of: "$$") {
-                    let mathContent = String(afterStart[..<endRange.lowerBound])
+        func isFenceStart(at index: String.Index) -> Bool {
+            guard content[index...].hasPrefix("```") else { return false }
+            let lineStart = content[..<index].lastIndex(of: "\n").map { content.index(after: $0) } ?? content.startIndex
+            let prefix = content[lineStart..<index]
+            return prefix.allSatisfy { $0 == " " || $0 == "\t" }
+        }
+
+        var i = content.startIndex
+        while i < content.endIndex {
+            if isFenceStart(at: i) {
+                inCodeFence.toggle()
+                current.append(contentsOf: "```")
+                i = content.index(i, offsetBy: 3)
+                continue
+            }
+
+            if !inCodeFence && content[i...].hasPrefix("$$") {
+                flushCurrentIfNeeded()
+
+                let afterStart = content.index(i, offsetBy: 2)
+                if let endRange = content[afterStart...].range(of: "$$") {
+                    let mathContent = String(content[afterStart..<endRange.lowerBound])
                         .trimmingCharacters(in: .whitespacesAndNewlines)
                     if !mathContent.isEmpty {
                         segments.append((mathContent, true))
                     }
-                    remaining = String(afterStart[endRange.upperBound...])
+                    i = endRange.upperBound
+                    continue
                 } else {
                     // Unclosed $$, treat rest as non-math
-                    segments.append((String(remaining[startRange.lowerBound...]), false))
+                    current.append(contentsOf: content[i...])
                     break
                 }
-            } else {
-                if !remaining.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    segments.append((remaining, false))
-                }
-                break
             }
+
+            current.append(content[i])
+            i = content.index(after: i)
         }
+
+        flushCurrentIfNeeded()
 
         return segments.isEmpty ? [(content, false)] : segments
     }
@@ -532,7 +568,13 @@ final class MarkdownParser {
         var itemIndex = 0
 
         for item in list.listItems {
-            let parsedItem = parseListItem(item, depth: 0, index: itemIndex)
+            let parsedItem = parseListItem(
+                item,
+                depth: 0,
+                index: itemIndex,
+                listOrdered: ordered,
+                listStartIndex: startIndex
+            )
             items.append(parsedItem)
             itemIndex += 1
         }
@@ -540,7 +582,13 @@ final class MarkdownParser {
         return MarkdownBlock(.list(items: items, ordered: ordered, startIndex: startIndex), index: index)
     }
 
-    private func parseListItem(_ item: Markdown.ListItem, depth: Int, index: Int) -> MarkdownListItem {
+    private func parseListItem(
+        _ item: Markdown.ListItem,
+        depth: Int,
+        index: Int,
+        listOrdered: Bool,
+        listStartIndex: Int
+    ) -> MarkdownListItem {
         var checkbox: MarkdownListItem.CheckboxState? = nil
 
         // Check for checkbox in the item's checkbox property
@@ -549,13 +597,13 @@ final class MarkdownParser {
         }
 
         var inlineChildren: [Markup] = []
-        var nestedLists: [(ListItemContainer, Bool)] = []
+        var nestedLists: [(ListItemContainer, Bool, Int)] = []
 
         for child in item.children {
             if let list = child as? UnorderedList {
-                nestedLists.append((list, false))
+                nestedLists.append((list, false, 1))
             } else if let list = child as? OrderedList {
-                nestedLists.append((list, true))
+                nestedLists.append((list, true, Int(list.startIndex)))
             } else if let paragraph = child as? Paragraph {
                 for c in paragraph.children { inlineChildren.append(c) }
             } else {
@@ -583,10 +631,18 @@ final class MarkdownParser {
         }
 
         var children: [MarkdownListItem] = []
-        for (nestedList, _) in nestedLists {
+        for (nestedList, nestedOrdered, nestedStartIndex) in nestedLists {
             var nestedIndex = 0
             for nestedItem in nestedList.listItems {
-                children.append(parseListItem(nestedItem, depth: depth + 1, index: nestedIndex))
+                children.append(
+                    parseListItem(
+                        nestedItem,
+                        depth: depth + 1,
+                        index: nestedIndex,
+                        listOrdered: nestedOrdered,
+                        listStartIndex: nestedStartIndex
+                    )
+                )
                 nestedIndex += 1
             }
         }
@@ -596,7 +652,9 @@ final class MarkdownParser {
             children: children,
             checkbox: checkbox,
             depth: depth,
-            index: index
+            index: index,
+            listOrdered: listOrdered,
+            listStartIndex: listStartIndex
         )
     }
 

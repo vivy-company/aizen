@@ -282,7 +282,7 @@ actor SVGRenderer {
 
     private var cache = NSCache<NSString, CachedSVG>()
     // Keep active renderers alive until they complete
-    private var activeRenderers = Set<ObjectIdentifier>()
+    private var activeRenderers: [ObjectIdentifier: SVGWebRenderer] = [:]
 
     private class CachedSVG: NSObject {
         let image: NSImage
@@ -315,7 +315,7 @@ actor SVGRenderer {
                 let rendererId = ObjectIdentifier(renderer)
 
                 // Store the renderer to keep it alive
-                await self.registerRenderer(rendererId)
+                await self.registerRenderer(renderer, id: rendererId)
 
                 renderer.render(svgData: svgData) { [weak renderer] result in
                     guard !hasResumed else { return }
@@ -348,12 +348,12 @@ actor SVGRenderer {
         return result
     }
 
-    private func registerRenderer(_ id: ObjectIdentifier) {
-        activeRenderers.insert(id)
+    private func registerRenderer(_ renderer: SVGWebRenderer, id: ObjectIdentifier) {
+        activeRenderers[id] = renderer
     }
 
     private func unregisterRenderer(_ id: ObjectIdentifier) {
-        activeRenderers.remove(id)
+        activeRenderers.removeValue(forKey: id)
     }
 }
 

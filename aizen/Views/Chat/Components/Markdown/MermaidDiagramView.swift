@@ -242,9 +242,16 @@ struct MermaidWebView: NSViewRepresentable {
         weak var webView: WKWebView?
         var lastCode: String = ""
         var lastIsDark: Bool = false
+        private var currentHTMLFile: URL?
 
         init(_ parent: MermaidWebView) {
             self.parent = parent
+        }
+
+        deinit {
+            if let file = currentHTMLFile {
+                try? FileManager.default.removeItem(at: file)
+            }
         }
 
         func loadContent(code: String, isDark: Bool) {
@@ -323,7 +330,7 @@ struct MermaidWebView: NSViewRepresentable {
                         mermaid.initialize({
                             startOnLoad: false,
                             theme: '\(theme)',
-                            securityLevel: 'loose',
+                            securityLevel: 'strict',
                             themeVariables: {
                                 background: '\(bgColor)',
                                 primaryTextColor: '\(textColor)',
@@ -361,9 +368,14 @@ struct MermaidWebView: NSViewRepresentable {
             """
 
             // Write HTML to temp file and use loadFileURL
+            if let existingFile = currentHTMLFile {
+                try? FileManager.default.removeItem(at: existingFile)
+                currentHTMLFile = nil
+            }
             let htmlFile = tempDir.appendingPathComponent("diagram-\(UUID().uuidString).html")
             do {
                 try html.write(to: htmlFile, atomically: true, encoding: .utf8)
+                currentHTMLFile = htmlFile
                 webView.loadFileURL(htmlFile, allowingReadAccessTo: tempDir)
             } catch {
                 DispatchQueue.main.async {

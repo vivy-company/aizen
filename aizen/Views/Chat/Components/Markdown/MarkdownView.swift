@@ -269,8 +269,8 @@ struct CombinedTextBlockView: View {
             case .blockQuote(let nestedBlocks):
                 result.append(buildQuoteAttributedString(nestedBlocks))
 
-            case .list(let items, let ordered, let startIndex):
-                result.append(buildListAttributedString(items, ordered: ordered, startIndex: startIndex))
+            case .list(let items, _, _):
+                result.append(buildListAttributedString(items))
 
             case .thematicBreak:
                 var hr = AttributedString("───────────────────────────────")
@@ -330,22 +330,22 @@ struct CombinedTextBlockView: View {
         return result
     }
 
-    private func buildListAttributedString(_ items: [MarkdownListItem], ordered: Bool, startIndex: Int, depth: Int = 0) -> AttributedString {
+    private func buildListAttributedString(_ items: [MarkdownListItem]) -> AttributedString {
         var result = AttributedString()
 
         for (index, item) in items.enumerated() {
-            if index > 0 || depth > 0 {
+            if index > 0 || item.depth > 0 {
                 result.append(AttributedString("\n"))
             }
 
-            let indent = String(repeating: "    ", count: depth)
+            let indent = String(repeating: "    ", count: item.depth)
             let bullet: String
             if let checkbox = item.checkbox {
                 bullet = checkbox == .checked ? "☑ " : "☐ "
-            } else if ordered {
-                bullet = "\(startIndex + index). "
+            } else if item.listOrdered {
+                bullet = "\(item.listStartIndex + item.itemIndex). "
             } else {
-                bullet = depth == 0 ? "• " : (depth == 1 ? "◦ " : "▪ ")
+                bullet = item.depth == 0 ? "• " : (item.depth == 1 ? "◦ " : "▪ ")
             }
 
             var bulletAttr = AttributedString(indent + bullet)
@@ -360,7 +360,7 @@ struct CombinedTextBlockView: View {
             result.append(contentAttr)
 
             if !item.children.isEmpty {
-                result.append(buildListAttributedString(item.children, ordered: ordered, startIndex: 1, depth: depth + 1))
+                result.append(buildListAttributedString(item.children))
             }
         }
 
@@ -546,8 +546,8 @@ struct BlockRenderer: View {
             MathBlockView(content: content, isBlock: true)
                 .padding(.vertical, 8)
 
-        case .list(let items, let ordered, let startIndex):
-            ListBlockView(items: items, ordered: ordered, startIndex: startIndex)
+        case .list(let items, _, _):
+            ListBlockView(items: items)
                 .padding(.vertical, 2)
 
         case .blockQuote(let blocks):
@@ -797,17 +797,11 @@ struct SelectableTextView: NSViewRepresentable {
 
 struct ListBlockView: View {
     let items: [MarkdownListItem]
-    let ordered: Bool
-    let startIndex: Int
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                ListItemView(
-                    item: item,
-                    ordered: ordered,
-                    index: ordered ? startIndex + index : 0
-                )
+                ListItemView(item: item)
             }
         }
     }
@@ -815,8 +809,6 @@ struct ListBlockView: View {
 
 struct ListItemView: View {
     let item: MarkdownListItem
-    let ordered: Bool
-    let index: Int
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -833,8 +825,8 @@ struct ListItemView: View {
                         .foregroundStyle(checkbox == .checked ? .green : .secondary)
                         .font(.body)
                         .frame(width: 16)
-                } else if ordered {
-                    Text("\(index).")
+                } else if item.listOrdered {
+                    Text("\(item.listStartIndex + item.itemIndex).")
                         .foregroundStyle(.secondary)
                         .font(.body)
                         .frame(minWidth: 16, alignment: .trailing)
@@ -856,7 +848,7 @@ struct ListItemView: View {
 
             // Nested items
             ForEach(item.children) { child in
-                ListItemView(item: child, ordered: ordered, index: 0)
+                ListItemView(item: child)
             }
         }
     }
@@ -1003,4 +995,3 @@ struct TableBlockView: View {
         }
     }
 }
-
