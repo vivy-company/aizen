@@ -45,7 +45,7 @@ actor TmuxSessionManager {
         let configFile = aizenDir.appendingPathComponent("tmux.conf")
 
         // Get theme-based mode style for selection highlighting
-        let themeName = UserDefaults.standard.string(forKey: "terminalThemeName") ?? "Catppuccin Mocha"
+        let themeName = UserDefaults.standard.string(forKey: "terminalThemeName") ?? "Aizen Dark"
         let modeStyle = GhosttyThemeParser.loadTmuxModeStyle(named: themeName)
 
         // Always overwrite to ensure latest config
@@ -63,7 +63,7 @@ actor TmuxSessionManager {
         set -g status off
 
         # Increase scrollback buffer (default is 2000)
-        set -g history-limit 500000
+        set -g history-limit 10000
 
         # Enable mouse support
         set -g mouse on
