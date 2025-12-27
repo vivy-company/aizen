@@ -6,26 +6,13 @@
 
 import SwiftUI
 
-private enum InlineDiffLineType {
-    case context
-    case added
-    case deleted
-    case separator
-}
-
-private struct InlineDiffLine: Identifiable {
-    let id = UUID()
-    let type: InlineDiffLineType
-    let content: String
-}
-
 struct InlineDiffView: View {
     let diff: ToolCallDiff
 
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
 
-    @State private var cachedDiffLines: [InlineDiffLine]?
+    @State private var cachedDiffLines: [ChatDiffLine]?
     @State private var isComputing: Bool = false
     @State private var showFullDiff: Bool = false
 
@@ -39,7 +26,7 @@ struct InlineDiffView: View {
         "\(diff.path)-\(diff.oldText?.hashValue ?? 0)-\(diff.newText.hashValue)"
     }
 
-    private var diffLines: [InlineDiffLine] {
+    private var diffLines: [ChatDiffLine] {
         cachedDiffLines ?? []
     }
 
@@ -47,11 +34,16 @@ struct InlineDiffView: View {
         diffLines.count > previewLineCount
     }
 
-    private var previewLines: [InlineDiffLine] {
+    private var previewLines: [ChatDiffLine] {
         if hasMoreLines {
             return Array(diffLines.prefix(previewLineCount))
         }
         return diffLines
+    }
+    
+    private var previewHeight: CGFloat {
+        let lineHeight = max(fontSize + 4, 14)
+        return CGFloat(previewLines.count) * lineHeight + 8
     }
 
     var body: some View {
@@ -65,7 +57,7 @@ struct InlineDiffView: View {
             }
             .foregroundStyle(.secondary)
 
-            // Diff content - no scroll, just preview lines
+            // Diff content with multiline selection support
             VStack(alignment: .leading, spacing: 0) {
                 if isComputing {
                     HStack {
@@ -77,14 +69,13 @@ struct InlineDiffView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
-                } else {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(previewLines) { line in
-                            diffLineView(line)
-                        }
-                    }
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else if !previewLines.isEmpty {
+                    SelectableDiffView(
+                        lines: previewLines,
+                        fontSize: fontSize,
+                        fontFamily: terminalFontName
+                    )
+                    .frame(height: previewHeight)
 
                     // Show more button
                     if hasMoreLines {
@@ -136,38 +127,9 @@ struct InlineDiffView: View {
         isComputing = false
     }
 
-    @ViewBuilder
-    private func diffLineView(_ line: InlineDiffLine) -> some View {
-        switch line.type {
-        case .context:
-            Text("  \(line.content)")
-                .font(.custom(terminalFontName, size: fontSize))
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        case .added:
-            Text("+ \(line.content)")
-                .font(.custom(terminalFontName, size: fontSize))
-                .foregroundColor(.green)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.green.opacity(0.1))
-        case .deleted:
-            Text("- \(line.content)")
-                .font(.custom(terminalFontName, size: fontSize))
-                .foregroundColor(.red)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.red.opacity(0.1))
-        case .separator:
-            Text(line.content)
-                .font(.custom(terminalFontName, size: fontSize))
-                .foregroundColor(.cyan)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 2)
-        }
-    }
-
     // MARK: - Diff Computation
 
-    private func computeUnifiedDiff(oldText: String?, newText: String, contextLines: Int = 3) -> [InlineDiffLine] {
+    private func computeUnifiedDiff(oldText: String?, newText: String, contextLines: Int = 3) -> [ChatDiffLine] {
         let oldLines = (oldText ?? "").split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let newLines = newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
 
@@ -175,7 +137,7 @@ struct InlineDiffView: View {
         let lcs = longestCommonSubsequence(oldLines, newLines)
 
         // Build edit script
-        var edits: [(type: InlineDiffLineType, content: String)] = []
+        var edits: [(type: ChatDiffLineType, content: String)] = []
         var oldIdx = 0
         var newIdx = 0
         var lcsIdx = 0
@@ -251,8 +213,8 @@ struct InlineDiffView: View {
         return a.filter { bSet.contains($0) }
     }
 
-    private func generateHunks(edits: [(type: InlineDiffLineType, content: String)], contextLines: Int) -> [InlineDiffLine] {
-        var result: [InlineDiffLine] = []
+    private func generateHunks(edits: [(type: ChatDiffLineType, content: String)], contextLines: Int) -> [ChatDiffLine] {
+        var result: [ChatDiffLine] = []
 
         // Find ranges of changes
         var changeIndices: [Int] = []
@@ -291,13 +253,13 @@ struct InlineDiffView: View {
 
             // Add separator between hunks
             if hunkIdx > 0 {
-                result.append(InlineDiffLine(type: .separator, content: "···"))
+                result.append(ChatDiffLine(type: .separator, content: "···"))
             }
 
             // Add lines in this hunk
             for i in startIdx...endIdx {
                 let edit = edits[i]
-                result.append(InlineDiffLine(type: edit.type, content: edit.content))
+                result.append(ChatDiffLine(type: edit.type, content: edit.content))
             }
         }
 
@@ -311,7 +273,7 @@ private struct FullDiffSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let diff: ToolCallDiff
-    let diffLines: [InlineDiffLine]
+    let diffLines: [ChatDiffLine]
     let terminalFontName: String
     let fontSize: CGFloat
 
@@ -343,49 +305,15 @@ private struct FullDiffSheet: View {
 
             Divider()
 
-            // Full diff content
-            ScrollView([.horizontal, .vertical]) {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(diffLines) { line in
-                        diffLineView(line)
-                    }
-                }
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-            }
+            // Full diff content with multiline selection
+            SelectableDiffView(
+                lines: diffLines,
+                fontSize: fontSize,
+                fontFamily: terminalFontName
+            )
             .background(Color(nsColor: .textBackgroundColor))
         }
         .background(.ultraThinMaterial)
         .frame(minWidth: 600, idealWidth: 800, minHeight: 400, idealHeight: 600)
-    }
-
-    @ViewBuilder
-    private func diffLineView(_ line: InlineDiffLine) -> some View {
-        switch line.type {
-        case .context:
-            Text("  \(line.content)")
-                .font(.custom(terminalFontName, size: fontSize))
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        case .added:
-            Text("+ \(line.content)")
-                .font(.custom(terminalFontName, size: fontSize))
-                .foregroundColor(.green)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.green.opacity(0.1))
-        case .deleted:
-            Text("- \(line.content)")
-                .font(.custom(terminalFontName, size: fontSize))
-                .foregroundColor(.red)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.red.opacity(0.1))
-        case .separator:
-            Text(line.content)
-                .font(.custom(terminalFontName, size: fontSize))
-                .foregroundColor(.cyan)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 2)
-        }
     }
 }

@@ -5,28 +5,143 @@
 //  Message list view with timeline items
 //
 
+import AppKit
 import SwiftUI
 
-// MARK: - Preference Keys for Scroll Detection
+// MARK: - Scroll Observation
 
-private struct ScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+private struct ScrollViewObserver: NSViewRepresentable {
+    let onScroll: (CGFloat, CGFloat, CGFloat) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onScroll: onScroll)
     }
-}
 
-private struct ScrollContentHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            context.coordinator.attach(to: view)
+        }
+        return view
     }
-}
 
-private struct ScrollViewHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onScroll = onScroll
+        DispatchQueue.main.async {
+            context.coordinator.attach(to: nsView)
+        }
+    }
+
+    final class Coordinator: NSObject {
+        var onScroll: (CGFloat, CGFloat, CGFloat) -> Void
+        private weak var scrollView: NSScrollView?
+        private weak var documentView: NSView?
+        private var boundsObserver: NSObjectProtocol?
+        private var frameObserver: NSObjectProtocol?
+
+        init(onScroll: @escaping (CGFloat, CGFloat, CGFloat) -> Void) {
+            self.onScroll = onScroll
+        }
+
+        deinit {
+            tearDownObservers()
+        }
+
+        func attach(to view: NSView) {
+            guard let foundScrollView = findScrollView(from: view) else { return }
+
+            if foundScrollView !== scrollView {
+                tearDownObservers()
+                scrollView = foundScrollView
+                observe(scrollView: foundScrollView)
+                return
+            }
+
+            if let foundDocumentView = foundScrollView.documentView, foundDocumentView !== documentView {
+                observeDocumentView(foundDocumentView)
+            }
+        }
+
+        private func findScrollView(from view: NSView) -> NSScrollView? {
+            if let scrollView = view.enclosingScrollView {
+                return scrollView
+            }
+
+            var currentSuperview = view.superview
+            while let current = currentSuperview {
+                if let scrollView = current as? NSScrollView {
+                    return scrollView
+                }
+                currentSuperview = current.superview
+            }
+
+            return nil
+        }
+
+        private func observe(scrollView: NSScrollView) {
+            scrollView.contentView.postsBoundsChangedNotifications = true
+            boundsObserver = NotificationCenter.default.addObserver(
+                forName: NSView.boundsDidChangeNotification,
+                object: scrollView.contentView,
+                queue: .main
+            ) { [weak self] _ in
+                self?.notifyScrollPosition()
+            }
+
+            if let documentView = scrollView.documentView {
+                observeDocumentView(documentView)
+            }
+
+            notifyScrollPosition()
+        }
+
+        private func observeDocumentView(_ documentView: NSView) {
+            if documentView === self.documentView {
+                return
+            }
+
+            if let frameObserver = frameObserver {
+                NotificationCenter.default.removeObserver(frameObserver)
+                self.frameObserver = nil
+            }
+
+            self.documentView = documentView
+            documentView.postsFrameChangedNotifications = true
+            frameObserver = NotificationCenter.default.addObserver(
+                forName: NSView.frameDidChangeNotification,
+                object: documentView,
+                queue: .main
+            ) { [weak self] _ in
+                self?.notifyScrollPosition()
+            }
+        }
+
+        private func notifyScrollPosition() {
+            guard let scrollView = scrollView else { return }
+            let contentHeight = scrollView.documentView?.bounds.height ?? 0
+            let viewportHeight = scrollView.contentView.bounds.height
+            let rawOffset = scrollView.contentView.bounds.origin.y
+            let offsetFromTop: CGFloat
+            if let documentView = scrollView.documentView, !documentView.isFlipped {
+                let maxOffset = max(0, contentHeight - viewportHeight)
+                offsetFromTop = maxOffset - rawOffset
+            } else {
+                offsetFromTop = rawOffset
+            }
+            onScroll(-offsetFromTop, contentHeight, viewportHeight)
+        }
+
+        private func tearDownObservers() {
+            if let boundsObserver = boundsObserver {
+                NotificationCenter.default.removeObserver(boundsObserver)
+            }
+            if let frameObserver = frameObserver {
+                NotificationCenter.default.removeObserver(frameObserver)
+            }
+            boundsObserver = nil
+            frameObserver = nil
+            documentView = nil
+        }
     }
 }
 
@@ -175,28 +290,10 @@ struct ChatMessageList: View {
                     }
                 }
                 .background(
-                    GeometryReader { contentGeometry in
-                        Color.clear
-                            .preference(key: ScrollContentHeightKey.self, value: contentGeometry.size.height)
-                            .preference(key: ScrollOffsetKey.self, value: contentGeometry.frame(in: .named("scroll")).minY)
+                    ScrollViewObserver { offset, contentHeight, viewportHeight in
+                        updateScrollState(offset: offset, content: contentHeight, viewport: viewportHeight)
                     }
                 )
-            }
-            .coordinateSpace(name: "scroll")
-            .background(
-                GeometryReader { scrollGeometry in
-                    Color.clear
-                        .preference(key: ScrollViewHeightKey.self, value: scrollGeometry.size.height)
-                }
-            )
-            .onPreferenceChange(ScrollOffsetKey.self) { offset in
-                updateScrollState(offset: offset)
-            }
-            .onPreferenceChange(ScrollContentHeightKey.self) { content in
-                updateScrollState(content: content)
-            }
-            .onPreferenceChange(ScrollViewHeightKey.self) { viewport in
-                updateScrollState(viewport: viewport)
             }
             .onChange(of: scrollRequest?.id) { _ in
                 handleScrollRequest(proxy: proxy)
