@@ -195,6 +195,7 @@ struct GeneralSettingsView: View {
     // Language
     @State private var selectedLanguage: AppLanguage = .system
     @State private var showingRestartAlert = false
+    @State private var hasLoadedLanguage = false
 
     // Default Apps
     @AppStorage("defaultTerminalBundleId") private var defaultTerminalBundleId: String?
@@ -235,6 +236,7 @@ struct GeneralSettingsView: View {
                     }
                 }
                 .onChange(of: selectedLanguage) { newValue in
+                    guard hasLoadedLanguage else { return }
                     applyLanguage(newValue)
                 }
             }
@@ -440,6 +442,9 @@ struct GeneralSettingsView: View {
             }
         } else {
             selectedLanguage = .system
+        }
+        DispatchQueue.main.async {
+            hasLoadedLanguage = true
         }
     }
 
