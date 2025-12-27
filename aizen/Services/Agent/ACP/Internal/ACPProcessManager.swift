@@ -259,124 +259,64 @@ actor ACPProcessManager {
         readBuffer.removeAll()
     }
 
-    private enum JSONScanResult {
-        case complete(Data.Index)
-        case needMore
-        case invalid
-    }
+    // MARK: - Newline-Delimited Message Parsing (ACP Spec)
+    // Per ACP spec: Messages are delimited by newlines (\n) and MUST NOT contain embedded newlines
 
     private func drainBufferedMessages() async {
-        while let message = popNextJSONMessage() {
+        while let message = popNextMessage() {
             await onDataReceived?(message)
         }
     }
 
-    private func popNextJSONMessage() -> Data? {
-        while true {
-            guard let startIndex = findJSONStartIndex(in: readBuffer) else {
-                if !readBuffer.isEmpty {
-                    readBuffer.removeAll(keepingCapacity: true)
-                }
-                return nil
-            }
+    /// Extract the next newline-delimited message from the buffer
+    /// Per ACP stdio spec: each line is a complete JSON-RPC message
+    private func popNextMessage() -> Data? {
+        let newline: UInt8 = 0x0A  // '\n'
 
-            if startIndex > readBuffer.startIndex {
-                readBuffer.removeSubrange(..<startIndex)
-            }
-
-            switch scanForJSONMessageEnd(in: readBuffer, from: readBuffer.startIndex) {
-            case .complete(let endIndex):
-                let end = readBuffer.index(after: endIndex)
-                let message = Data(readBuffer[..<end])
-                readBuffer.removeSubrange(..<end)
-
-                // Validate this looks like JSON-RPC (contains "jsonrpc" key)
-                // This filters out non-JSON content that happens to have balanced braces
-                // (e.g., raw source code output from agents like Codex)
-                if looksLikeJSONRPC(message) {
-                    return message
-                } else {
-                    // Not JSON-RPC, skip it and continue looking
-                    continue
-                }
-            case .needMore:
-                return nil
-            case .invalid:
-                readBuffer.removeFirst()
-                continue
-            }
-        }
-    }
-
-    /// Quick check if data looks like a JSON-RPC message
-    /// JSON-RPC messages must contain "jsonrpc" key
-    private func looksLikeJSONRPC(_ data: Data) -> Bool {
-        // Check for "jsonrpc" which is required in all JSON-RPC 2.0 messages
-        let jsonrpcMarker = "\"jsonrpc\"".data(using: .utf8)!
-        return data.range(of: jsonrpcMarker) != nil
-    }
-
-    private func findJSONStartIndex(in buffer: Data) -> Data.Index? {
-        buffer.firstIndex { byte in
-            byte == 0x7B || byte == 0x5B // '{' or '['
-        }
-    }
-
-    private func scanForJSONMessageEnd(in buffer: Data, from startIndex: Data.Index) -> JSONScanResult {
-        var stack: [UInt8] = []
-        var inString = false
-        var escaped = false
-
-        var index = startIndex
-        while index < buffer.endIndex {
-            let byte = buffer[index]
-
-            if inString {
-                if escaped {
-                    escaped = false
-                } else if byte == 0x5C { // '\\'
-                    escaped = true
-                } else if byte == 0x22 { // '"'
-                    inString = false
-                }
-            } else {
-                switch byte {
-                case 0x22:
-                    inString = true
-                case 0x7B, 0x5B: // '{' or '['
-                    stack.append(byte)
-                case 0x7D: // '}'
-                    guard let last = stack.last, last == 0x7B else {
-                        return .invalid
-                    }
-                    stack.removeLast()
-                    if stack.isEmpty {
-                        return .complete(index)
-                    }
-                case 0x5D: // ']'
-                    guard let last = stack.last, last == 0x5B else {
-                        return .invalid
-                    }
-                    stack.removeLast()
-                    if stack.isEmpty {
-                        return .complete(index)
-                    }
-                default:
-                    break
-                }
-            }
-
-            index = buffer.index(after: index)
+        guard let newlineIndex = readBuffer.firstIndex(of: newline) else {
+            // No complete line yet, wait for more data
+            return nil
         }
 
-        return .needMore
+        // Extract the line (excluding the newline)
+        let lineData = Data(readBuffer[..<newlineIndex])
+
+        // Remove the line and newline from buffer
+        readBuffer.removeSubrange(...newlineIndex)
+
+        // Skip empty lines
+        let trimmed = lineData.trimmingLeadingWhitespace()
+        if trimmed.isEmpty {
+            // Recursively get next message (skip empty lines)
+            return popNextMessage()
+        }
+
+        return lineData
     }
 
     private func flushRemainingBufferIfNeeded() async {
         await drainBufferedMessages()
 
         if !readBuffer.isEmpty {
+            // Process any remaining partial line as a message
+            let remaining = readBuffer
             readBuffer.removeAll(keepingCapacity: true)
+            if !remaining.isEmpty {
+                await onDataReceived?(remaining)
+            }
         }
+    }
+}
+
+// MARK: - Data Extension
+
+private extension Data {
+    /// Remove leading whitespace bytes (space, tab, carriage return, newline)
+    func trimmingLeadingWhitespace() -> Data {
+        let whitespace: Set<UInt8> = [0x20, 0x09, 0x0D, 0x0A]  // space, tab, CR, LF
+        guard let firstNonWhitespace = self.firstIndex(where: { !whitespace.contains($0) }) else {
+            return Data()
+        }
+        return Data(self[firstNonWhitespace...])
     }
 }
