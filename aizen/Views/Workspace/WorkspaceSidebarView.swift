@@ -387,8 +387,8 @@ struct WorkspaceSidebarView: View {
         .sheet(isPresented: $showingSupportSheet) {
             SupportSheet()
         }
-        .confirmationDialog(
-            Text("Repository Not Found"),
+        .alert(
+            "Repository Not Found",
             isPresented: $showingMissingRepoAlert,
             presenting: missingRepository
         ) { missing in
@@ -398,7 +398,6 @@ struct WorkspaceSidebarView: View {
             Button("Remove from Aizen", role: .destructive) {
                 removeRepository(missing)
             }
-            Button("Cancel", role: .cancel) {}
         } message: { missing in
             Text("The repository \"\(missing.repository.name ?? "Unknown")\" could not be found at:\n\(missing.lastKnownPath)\n\nIt may have been moved or deleted.")
         }
