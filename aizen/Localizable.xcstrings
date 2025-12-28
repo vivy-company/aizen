@@ -15449,6 +15449,86 @@
           }
         }
       }
+    },
+    "Repository Not Found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repository Not Found"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到仓库"
+          }
+        }
+      }
+    },
+    "Locate Repository...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locate Repository..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "定位仓库..."
+          }
+        }
+      }
+    },
+    "Remove from Aizen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from Aizen"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从 Aizen 移除"
+          }
+        }
+      }
+    },
+    "The repository \"%@\" could not be found at:\n%@\n\nIt may have been moved or deleted.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The repository \"%@\" could not be found at:\n%@\n\nIt may have been moved or deleted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在以下位置找不到仓库 \"%@\"：\n%@\n\n它可能已被移动或删除。"
+          }
+        }
+      }
+    },
+    "Repository path no longer exists: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repository path no longer exists: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仓库路径不存在：%@"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

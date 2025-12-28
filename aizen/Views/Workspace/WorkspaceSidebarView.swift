@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreData
+import UniformTypeIdentifiers
 import os.log
 
 struct WorkspaceSidebarView: View {
@@ -25,6 +26,8 @@ struct WorkspaceSidebarView: View {
     @State private var showingSupportSheet = false
     @State private var workspaceToEdit: Workspace?
     @State private var refreshTask: Task<Void, Never>?
+    @State private var missingRepository: RepositoryManager.MissingRepository?
+    @State private var showingMissingRepoAlert = false
     @AppStorage("repositoryStatusFilters") private var storedStatusFilters: String = ""
 
     private var selectedStatusFilters: Set<ItemStatus> {
@@ -115,6 +118,12 @@ struct WorkspaceSidebarView: View {
         if let selected = selectedRepository {
             do {
                 try await repositoryManager.refreshRepository(selected)
+            } catch let error as Libgit2Error {
+                if case .repositoryPathMissing(let path) = error {
+                    await handleMissingRepository(selected, path: path)
+                } else {
+                    logger.error("Failed to refresh selected repository \(selected.name ?? "unknown"): \(error.localizedDescription)")
+                }
             } catch {
                 logger.error("Failed to refresh selected repository \(selected.name ?? "unknown"): \(error.localizedDescription)")
             }
@@ -126,10 +135,27 @@ struct WorkspaceSidebarView: View {
             do {
                 try await repositoryManager.refreshRepository(repository)
                 try await Task.sleep(for: .milliseconds(100))
+            } catch let error as Libgit2Error {
+                if case .repositoryPathMissing(let path) = error {
+                    await handleMissingRepository(repository, path: path)
+                } else {
+                    logger.error("Failed to refresh repository \(repository.name ?? "unknown"): \(error.localizedDescription)")
+                }
             } catch {
                 logger.error("Failed to refresh repository \(repository.name ?? "unknown"): \(error.localizedDescription)")
             }
         }
+    }
+
+    @MainActor
+    private func handleMissingRepository(_ repository: Repository, path: String) {
+        guard let id = repository.id else { return }
+        missingRepository = RepositoryManager.MissingRepository(
+            id: id,
+            repository: repository,
+            lastKnownPath: path
+        )
+        showingMissingRepoAlert = true
     }
 
     var body: some View {
@@ -361,11 +387,80 @@ struct WorkspaceSidebarView: View {
         .sheet(isPresented: $showingSupportSheet) {
             SupportSheet()
         }
+        .confirmationDialog(
+            Text("Repository Not Found"),
+            isPresented: $showingMissingRepoAlert,
+            presenting: missingRepository
+        ) { missing in
+            Button("Locate Repository...") {
+                locateRepository(missing)
+            }
+            Button("Remove from Aizen", role: .destructive) {
+                removeRepository(missing)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { missing in
+            Text("The repository \"\(missing.repository.name ?? "Unknown")\" could not be found at:\n\(missing.lastKnownPath)\n\nIt may have been moved or deleted.")
+        }
+        .fileImporter(
+            isPresented: Binding(
+                get: { missingRepository != nil && !showingMissingRepoAlert },
+                set: { if !$0 { missingRepository = nil } }
+            ),
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            handleRelocateResult(result)
+        }
         .onAppear {
             startPeriodicRefresh()
         }
         .onDisappear {
             stopPeriodicRefresh()
+        }
+    }
+
+    private func locateRepository(_ missing: RepositoryManager.MissingRepository) {
+        // Keep missingRepository set so fileImporter opens
+        showingMissingRepoAlert = false
+    }
+
+    private func removeRepository(_ missing: RepositoryManager.MissingRepository) {
+        do {
+            if selectedRepository?.id == missing.repository.id {
+                selectedRepository = nil
+                selectedWorktree = nil
+            }
+            try repositoryManager.deleteRepository(missing.repository)
+        } catch {
+            logger.error("Failed to remove repository: \(error.localizedDescription)")
+        }
+        missingRepository = nil
+    }
+
+    private func handleRelocateResult(_ result: Result<[URL], Error>) {
+        guard let missing = missingRepository else { return }
+
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else {
+                missingRepository = nil
+                return
+            }
+
+            Task {
+                do {
+                    try await repositoryManager.relocateRepository(missing.repository, to: url.path)
+                    logger.info("Repository relocated to \(url.path)")
+                } catch {
+                    logger.error("Failed to relocate repository: \(error.localizedDescription)")
+                }
+                missingRepository = nil
+            }
+
+        case .failure(let error):
+            logger.error("Failed to select folder: \(error.localizedDescription)")
+            missingRepository = nil
         }
     }
 }

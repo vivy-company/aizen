@@ -69,6 +69,40 @@ class RepositoryManager: ObservableObject {
         try viewContext.save()
     }
 
+    // MARK: - Repository Path Validation
+
+    /// Represents a repository with a missing or invalid path
+    struct MissingRepository: Identifiable {
+        let id: UUID
+        let repository: Repository
+        let lastKnownPath: String
+    }
+
+    /// Check if a repository path exists and is valid
+    func validateRepositoryPath(_ repository: Repository) -> Bool {
+        guard let path = repository.path else { return false }
+        return FileManager.default.fileExists(atPath: path)
+    }
+
+    /// Update a repository with a new path (relocate)
+    func relocateRepository(_ repository: Repository, to newPath: String) async throws {
+        // Validate it's a git repository
+        guard await GitUtils.isGitRepository(at: newPath) else {
+            throw Libgit2Error.notARepository(newPath)
+        }
+
+        // Get main repository path (in case this is a worktree)
+        let mainRepoPath = await GitUtils.getMainRepositoryPath(at: newPath)
+
+        repository.path = mainRepoPath
+        repository.lastUpdated = Date()
+
+        // Rescan worktrees for the new location
+        try await scanWorktrees(for: repository)
+
+        try viewContext.save()
+    }
+
     // MARK: - Repository Operations
 
     func addExistingRepository(path: String, workspace: Workspace) async throws -> Repository {
@@ -189,6 +223,11 @@ class RepositoryManager: ObservableObject {
     func refreshRepository(_ repository: Repository) async throws {
         guard let repositoryPath = repository.path else {
             throw Libgit2Error.invalidPath("Repository path is nil")
+        }
+
+        // Check if path still exists
+        guard FileManager.default.fileExists(atPath: repositoryPath) else {
+            throw Libgit2Error.repositoryPathMissing(repositoryPath)
         }
 
         do {

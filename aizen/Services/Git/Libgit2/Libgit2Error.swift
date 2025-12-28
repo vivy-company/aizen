@@ -4,6 +4,7 @@ import Clibgit2
 /// Errors from libgit2 operations
 enum Libgit2Error: LocalizedError {
     case notARepository(String)
+    case repositoryPathMissing(String)
     case repositoryCorrupted(String)
     case worktreeNotFound(String)
     case worktreeAlreadyExists(String)
@@ -24,6 +25,8 @@ enum Libgit2Error: LocalizedError {
         switch self {
         case .notARepository(let path):
             return "Not a git repository: \(path)"
+        case .repositoryPathMissing(let path):
+            return "Repository path no longer exists: \(path)"
         case .repositoryCorrupted(let message):
             return "Repository corrupted: \(message)"
         case .worktreeNotFound(let name):
