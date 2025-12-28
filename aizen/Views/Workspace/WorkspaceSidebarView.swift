@@ -27,8 +27,6 @@ struct WorkspaceSidebarView: View {
     @State private var workspaceToEdit: Workspace?
     @State private var refreshTask: Task<Void, Never>?
     @State private var missingRepository: RepositoryManager.MissingRepository?
-    @State private var showingMissingRepoAlert = false
-    @State private var showingRelocateFilePicker = false
     @AppStorage("repositoryStatusFilters") private var storedStatusFilters: String = ""
 
     private var selectedStatusFilters: Set<ItemStatus> {
@@ -151,12 +149,13 @@ struct WorkspaceSidebarView: View {
     @MainActor
     private func handleMissingRepository(_ repository: Repository, path: String) {
         guard let id = repository.id else { return }
+        // Only show if not already showing one
+        guard missingRepository == nil else { return }
         missingRepository = RepositoryManager.MissingRepository(
             id: id,
             repository: repository,
             lastKnownPath: path
         )
-        showingMissingRepoAlert = true
     }
 
     var body: some View {
@@ -388,26 +387,14 @@ struct WorkspaceSidebarView: View {
         .sheet(isPresented: $showingSupportSheet) {
             SupportSheet()
         }
-        .alert(
-            "Repository Not Found",
-            isPresented: $showingMissingRepoAlert,
-            presenting: missingRepository
-        ) { missing in
-            Button("Locate Repository...") {
-                locateRepository(missing)
-            }
-            Button("Remove from Aizen", role: .destructive) {
-                removeRepository(missing)
-            }
-        } message: { missing in
-            Text("The repository \"\(missing.repository.name ?? "Unknown")\" could not be found at:\n\(missing.lastKnownPath)\n\nIt may have been moved or deleted.")
-        }
-        .fileImporter(
-            isPresented: $showingRelocateFilePicker,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            handleRelocateResult(result)
+        .sheet(item: $missingRepository) { missing in
+            MissingRepositorySheet(
+                missing: missing,
+                repositoryManager: repositoryManager,
+                selectedRepository: $selectedRepository,
+                selectedWorktree: $selectedWorktree,
+                onDismiss: { missingRepository = nil }
+            )
         }
         .onAppear {
             startPeriodicRefresh()
@@ -416,65 +403,122 @@ struct WorkspaceSidebarView: View {
             stopPeriodicRefresh()
         }
     }
+}
 
-    private func locateRepository(_ missing: RepositoryManager.MissingRepository) {
-        showingMissingRepoAlert = false
-        // Delay slightly to allow alert to dismiss before showing file picker
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            showingRelocateFilePicker = true
+// MARK: - Missing Repository Sheet
+
+struct MissingRepositorySheet: View {
+    let missing: RepositoryManager.MissingRepository
+    @ObservedObject var repositoryManager: RepositoryManager
+    @Binding var selectedRepository: Repository?
+    @Binding var selectedWorktree: Worktree?
+    let onDismiss: () -> Void
+
+    @State private var showingFilePicker = false
+    @State private var isRelocating = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "folder.badge.questionmark")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+
+            Text("Repository Not Found")
+                .font(.headline)
+
+            VStack(spacing: 8) {
+                Text("The repository \"\(missing.repository.name ?? "Unknown")\" could not be found at:")
+                    .multilineTextAlignment(.center)
+
+                Text(missing.lastKnownPath)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .padding(8)
+                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
+
+                Text("It may have been moved or deleted.")
+                    .foregroundStyle(.secondary)
+            }
+
+            if let error = errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            HStack(spacing: 12) {
+                Button(role: .destructive) {
+                    removeRepository()
+                } label: {
+                    Text("Remove from Aizen")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    showingFilePicker = true
+                } label: {
+                    if isRelocating {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Text("Locate Repository...")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isRelocating)
+            }
+        }
+        .padding(24)
+        .frame(width: 420)
+        .interactiveDismissDisabled()
+        .fileImporter(
+            isPresented: $showingFilePicker,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            handleRelocateResult(result)
         }
     }
 
-    private func removeRepository(_ missing: RepositoryManager.MissingRepository) {
+    private func removeRepository() {
         do {
             if selectedRepository?.id == missing.repository.id {
                 selectedRepository = nil
                 selectedWorktree = nil
             }
             try repositoryManager.deleteRepository(missing.repository)
+            onDismiss()
         } catch {
-            logger.error("Failed to remove repository: \(error.localizedDescription)")
+            errorMessage = "Failed to remove: \(error.localizedDescription)"
         }
-        missingRepository = nil
     }
 
     private func handleRelocateResult(_ result: Result<[URL], Error>) {
-        guard let missing = missingRepository else {
-            showingRelocateFilePicker = false
-            return
-        }
-
         switch result {
         case .success(let urls):
-            guard let url = urls.first else {
-                // User cancelled - show alert again
-                showingRelocateFilePicker = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    showingMissingRepoAlert = true
-                }
-                return
-            }
+            guard let url = urls.first else { return }
+
+            isRelocating = true
+            errorMessage = nil
 
             Task {
                 do {
                     try await repositoryManager.relocateRepository(missing.repository, to: url.path)
-                    logger.info("Repository relocated to \(url.path)")
-                    missingRepository = nil
+                    onDismiss()
                 } catch {
-                    logger.error("Failed to relocate repository: \(error.localizedDescription)")
-                    // Show alert again on failure
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        showingMissingRepoAlert = true
-                    }
+                    isRelocating = false
+                    errorMessage = "Invalid repository: \(error.localizedDescription)"
                 }
             }
 
         case .failure:
-            // User cancelled - show alert again
-            showingRelocateFilePicker = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                showingMissingRepoAlert = true
-            }
+            // User cancelled file picker - stay on sheet
+            break
         }
     }
 }
