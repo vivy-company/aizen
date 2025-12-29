@@ -42,17 +42,15 @@ extension AgentSession {
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let updateNotification = try decoder.decode(SessionUpdateNotification.self, from: data)
 
-            // Dispatch state updates asynchronously to avoid "Modifying state during view update" warnings
-            Task { @MainActor in
-                await self.processUpdate(updateNotification.update)
-            }
+            // Process update directly - we're already on MainActor from startNotificationListener
+            processUpdate(updateNotification.update)
         } catch {
             logger.warning("Failed to parse session update: \(error.localizedDescription)\nRaw params: \(String(describing: notification.params))")
         }
     }
 
-    /// Process session update (called asynchronously to avoid view update conflicts)
-    private func processUpdate(_ update: SessionUpdate) async {
+    /// Process session update
+    private func processUpdate(_ update: SessionUpdate) {
         switch update {
             case .toolCall(let toolCallUpdate):
                 // Mark any in-progress agent message as complete before tool execution
