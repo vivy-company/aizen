@@ -123,3 +123,4 @@ Temporary Items
 *.pem
 Vendor/libghostty/.built-ref
 Vendor/libghostty/lib/libghostty.a
+/libghostty.a
