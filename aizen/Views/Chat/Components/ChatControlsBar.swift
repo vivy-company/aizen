@@ -15,6 +15,7 @@ struct ChatControlsBar: View {
     let onRemoveAttachment: (ChatAttachment) -> Void
     let plan: Plan?
     let onShowUsage: () -> Void
+    let onNewSession: () -> Void
 
     @State private var showingAuthClearedMessage = false
 
@@ -55,6 +56,12 @@ struct ChatControlsBar: View {
             .help("Usage")
 
             Menu {
+                Button("New Session") {
+                    onNewSession()
+                }
+
+                Divider()
+
                 Button("Re-authenticate") {
                     AgentRegistry.shared.clearAuthPreference(for: selectedAgent)
 

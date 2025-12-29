@@ -14,6 +14,7 @@ struct ChatTabView: View {
     @Binding var selectedSessionId: UUID?
 
     @Environment(\.managedObjectContext) private var viewContext
+    @AppStorage("defaultACPAgent") private var defaultAgent = "claude"
     private let sessionManager = ChatSessionManager.shared
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ChatTabView")
     @State private var enabledAgents: [AgentMetadata] = []
@@ -52,7 +53,8 @@ struct ChatTabView: View {
                         worktree: worktree,
                         session: session,
                         sessionManager: sessionManager,
-                        viewContext: viewContext
+                        viewContext: viewContext,
+                        onNewSession: { createNewSession(withAgent: session.agentName ?? defaultAgent) }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .opacity(isSelected ? 1 : 0)

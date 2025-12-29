@@ -12,6 +12,7 @@ struct ChatSessionView: View {
     let worktree: Worktree
     @ObservedObject var session: ChatSession
     let sessionManager: ChatSessionManager
+    let onNewSession: () -> Void
 
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -27,10 +28,11 @@ struct ChatSessionView: View {
     @State private var fileToOpenInEditor: String?
     @State private var autocompleteWindow: AutocompleteWindowController?
 
-    init(worktree: Worktree, session: ChatSession, sessionManager: ChatSessionManager, viewContext: NSManagedObjectContext) {
+    init(worktree: Worktree, session: ChatSession, sessionManager: ChatSessionManager, viewContext: NSManagedObjectContext, onNewSession: @escaping () -> Void) {
         self.worktree = worktree
         self.session = session
         self.sessionManager = sessionManager
+        self.onNewSession = onNewSession
         self._viewContext = Environment(\.managedObjectContext)
 
         let vm = ChatSessionViewModel(
@@ -117,7 +119,8 @@ struct ChatSessionView: View {
                         attachments: viewModel.attachments,
                         onRemoveAttachment: viewModel.removeAttachment,
                         plan: viewModel.currentAgentPlan,
-                        onShowUsage: { showingUsageSheet = true }
+                        onShowUsage: { showingUsageSheet = true },
+                        onNewSession: onNewSession
                     )
                     .padding(.horizontal, 20)
 
