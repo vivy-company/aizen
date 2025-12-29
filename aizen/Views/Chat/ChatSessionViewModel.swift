@@ -363,6 +363,32 @@ class ChatSessionViewModel: ObservableObject {
         pendingAgentSwitch = nil
     }
 
+    func restartSession() {
+        guard let agentSession = currentAgentSession else { return }
+
+        Task {
+            // Close the current session
+            await agentSession.close()
+
+            // Clear messages and tool calls
+            agentSession.messages.removeAll()
+            agentSession.clearToolCalls()
+
+            // Clear timeline
+            previousMessageIds = []
+            previousToolCallIds = []
+            timelineItems = []
+
+            // Restart the session
+            let worktreePath = worktree.path ?? ""
+            do {
+                try await agentSession.start(agentName: selectedAgent, workingDir: worktreePath)
+            } catch {
+                logger.error("Failed to restart session: \(error.localizedDescription)")
+            }
+        }
+    }
+
     // MARK: - Autocomplete
 
     func handleAutocompleteSelection() {
