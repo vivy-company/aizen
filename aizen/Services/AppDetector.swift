@@ -52,6 +52,7 @@ class AppDetector: ObservableObject {
         ("Visual Studio Code", "com.microsoft.VSCode", .editor),
         ("VSCodium", "com.visualstudio.code.oss", .editor),
         ("Cursor", "com.todesktop.230313mzl4w4u92", .editor),
+        ("Antigravity", "com.google.antigravity", .editor),
         ("Windsurf", "com.codeium.windsurf", .editor),
         ("Sublime Text", "com.sublimetext.4", .editor),
         ("Nova", "com.panic.Nova", .editor),
