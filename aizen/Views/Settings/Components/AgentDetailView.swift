@@ -422,12 +422,12 @@ struct AgentDetailView: View {
             }
         }
         .toolbar {
-            // Install button
-            if metadata.isBuiltIn,
-               metadata.installMethod != nil,
-               !isAgentValid,
-               !isUpdating {
-                ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                // Install button
+                if metadata.isBuiltIn,
+                   metadata.installMethod != nil,
+                   !isAgentValid,
+                   !isUpdating {
                     if isInstalling {
                         ProgressView()
                             .scaleEffect(0.7)
@@ -441,11 +441,9 @@ struct AgentDetailView: View {
                         .help("Install agent")
                     }
                 }
-            }
 
-            // Update button
-            if canUpdate && (isAgentValid || isUpdating) {
-                ToolbarItem(placement: .primaryAction) {
+                // Update button
+                if canUpdate && (isAgentValid || isUpdating) {
                     if isUpdating {
                         ProgressView()
                             .scaleEffect(0.7)
@@ -459,11 +457,9 @@ struct AgentDetailView: View {
                         .help("Update to latest version")
                     }
                 }
-            }
 
-            // Test Connection button
-            if isAgentValid {
-                ToolbarItem(placement: .primaryAction) {
+                // Test Connection button
+                if isAgentValid {
                     if isTesting {
                         ProgressView()
                             .scaleEffect(0.7)
@@ -477,17 +473,9 @@ struct AgentDetailView: View {
                         .help("Test connection")
                     }
                 }
-            }
 
-            // Spacer
-            ToolbarItem(placement: .primaryAction) {
-                Spacer()
-                    .frame(width: 8)
-            }
-
-            // Edit button for custom agents only
-            if !metadata.isBuiltIn {
-                ToolbarItem(placement: .primaryAction) {
+                // Edit button for custom agents only
+                if !metadata.isBuiltIn {
                     Button {
                         showingEditSheet = true
                     } label: {

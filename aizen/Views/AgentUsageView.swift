@@ -575,6 +575,7 @@ struct AgentUsageSheet: View {
     let agentId: String
     let agentName: String
 
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var metricsStore = AgentUsageMetricsStore.shared
     @ObservedObject private var activityStore = AgentUsageStore.shared
 
@@ -583,20 +584,31 @@ struct AgentUsageSheet: View {
         let refreshState = metricsStore.refreshState(for: agentId)
 
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                AgentIconView(agent: agentId, size: 28)
-                    .padding(6)
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(8)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(agentName)
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    Text("Usage details")
-                        .font(.caption)
+            ZStack(alignment: .topTrailing) {
+                HStack(spacing: 12) {
+                    AgentIconView(agent: agentId, size: 28)
+                        .padding(6)
+                        .background(Color.secondary.opacity(0.1))
+                        .cornerRadius(8)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(agentName)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        Text("Usage details")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
+                .buttonStyle(.plain)
             }
 
             ScrollView {

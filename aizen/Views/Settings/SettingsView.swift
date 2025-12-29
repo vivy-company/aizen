@@ -108,12 +108,6 @@ struct SettingsView: View {
             }
         } detail: {
             detailView
-                .toolbar {
-                    // Ensure toolbar area is always rendered for consistent .unified style
-                    ToolbarItem(placement: .primaryAction) {
-                        Color.clear.frame(width: 0, height: 0)
-                    }
-                }
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 750, minHeight: 500)
