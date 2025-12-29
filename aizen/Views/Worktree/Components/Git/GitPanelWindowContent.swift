@@ -13,6 +13,7 @@ enum GitPanelTab: String, CaseIterable {
     case history
     case comments
     case workflows
+    case prs
 
     var displayName: String {
         switch self {
@@ -20,6 +21,7 @@ enum GitPanelTab: String, CaseIterable {
         case .history: return String(localized: "git.panel.history")
         case .comments: return String(localized: "git.panel.comments")
         case .workflows: return String(localized: "git.panel.workflows")
+        case .prs: return String(localized: "git.panel.prs")
         }
     }
 
@@ -29,6 +31,7 @@ enum GitPanelTab: String, CaseIterable {
         case .history: return "clock"
         case .comments: return "text.bubble"
         case .workflows: return "bolt.circle"
+        case .prs: return "arrow.triangle.merge"
         }
     }
 }
@@ -85,17 +88,24 @@ struct GitPanelWindowContent: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Left: Tab content
-            leftPanel
-                .frame(width: leftPanelWidth)
+        Group {
+            if selectedTab == .prs {
+                // PRs tab has its own split view layout
+                PullRequestsView(repoPath: worktreePath)
+            } else {
+                HStack(spacing: 0) {
+                    // Left: Tab content
+                    leftPanel
+                        .frame(width: leftPanelWidth)
 
-            // Resizable divider
-            resizableDivider
+                    // Resizable divider
+                    resizableDivider
 
-            // Right: Diff view or Workflow details
-            rightPanel
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Right: Diff view or Workflow details
+                    rightPanel
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
         }
         .onAppear {
             if let path = worktree.path {
@@ -237,6 +247,8 @@ struct GitPanelWindowContent: View {
                     selectedWorkflowForTrigger = workflow
                 }
             )
+        case .prs:
+            EmptyView()
         }
     }
 
@@ -403,9 +415,12 @@ struct GitPanelWindowContent: View {
 
     @ViewBuilder
     private var rightPanel: some View {
-        if selectedTab == .workflows {
+        switch selectedTab {
+        case .prs:
+            EmptyView()
+        case .workflows:
             workflowDetailPanel
-        } else {
+        default:
             diffPanel
         }
     }

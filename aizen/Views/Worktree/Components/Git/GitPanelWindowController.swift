@@ -136,25 +136,38 @@ struct GitPanelWindowContentWithToolbar: View {
             onClose: onClose
         )
         .toolbar {
-             ToolbarItem(placement: .navigation) {
-                    Picker("", selection: $selectedTab) {
-                        ForEach(GitPanelTab.allCases, id: \.self) { tab in
-                            Label(tab.displayName, systemImage: tab.icon).tag(tab)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-            }
-            
-            
+            // Group 1: Stash (git), Comments
             ToolbarItem(placement: .navigation) {
-                 Spacer().frame(width: 12)
+                Picker("", selection: $selectedTab) {
+                    Label(GitPanelTab.git.displayName, systemImage: GitPanelTab.git.icon).tag(GitPanelTab.git)
+                    Label(GitPanelTab.comments.displayName, systemImage: GitPanelTab.comments.icon).tag(GitPanelTab.comments)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
             }
-            
-          
-            
-             ToolbarItem(placement: .navigation) {
-                 branchSelector
+
+            // Fixed spacer
+            ToolbarItem(placement: .navigation) {
+                Spacer().frame(width: 24)
+            }
+
+            // Group 2: History, PRs, Workflows
+            ToolbarItem(placement: .navigation) {
+                Picker("", selection: $selectedTab) {
+                    Label(GitPanelTab.history.displayName, systemImage: GitPanelTab.history.icon).tag(GitPanelTab.history)
+                    Label(GitPanelTab.prs.displayName, systemImage: GitPanelTab.prs.icon).tag(GitPanelTab.prs)
+                    Label(GitPanelTab.workflows.displayName, systemImage: GitPanelTab.workflows.icon).tag(GitPanelTab.workflows)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+
+            ToolbarItem(placement: .navigation) {
+                Spacer().frame(width: 12)
+            }
+
+            ToolbarItem(placement: .navigation) {
+                branchSelector
             }
             
 
