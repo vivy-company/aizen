@@ -97,14 +97,11 @@ struct ToolCallGroupView: View {
                     .font(.system(size: 11))
                     .foregroundColor(.primary)
 
-                Spacer(minLength: 4)
-
-                // Expand indicator
+                // Expand indicator (right after content, no spacer)
                 Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                     .font(.system(size: 8, weight: .medium))
                     .foregroundStyle(.tertiary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 3)
             .contentShape(Rectangle())
         }
