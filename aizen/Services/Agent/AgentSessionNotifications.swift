@@ -127,6 +127,7 @@ extension AgentSession {
                 } else {
                     let initialText = text
                     let initialBlocks = blockContent
+                    AgentUsageStore.shared.recordAgentMessage(agentId: agentName)
                     addAgentMessage(initialText, contentBlocks: initialBlocks, isComplete: false, startTime: Date())
                 }
             case .userMessageChunk:
@@ -179,6 +180,7 @@ extension AgentSession {
                 upsertToolCall(updated)
             } else {
                 // New tool call - add to dictionary and order
+                AgentUsageStore.shared.recordToolCall(agentId: agentName)
                 upsertToolCall(newCall)
             }
         }

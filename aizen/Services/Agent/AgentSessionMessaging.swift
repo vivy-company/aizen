@@ -101,6 +101,7 @@ extension AgentSession {
 
         // Add user message to UI with UI content blocks (typed text + attachments, not prepended content)
         addUserMessage(content, contentBlocks: uiContentBlocks)
+        AgentUsageStore.shared.recordPrompt(agentId: agentName, attachmentsCount: attachments.count)
 
         // Mark streaming active before sending
         isStreaming = true

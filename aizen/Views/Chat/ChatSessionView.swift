@@ -22,6 +22,7 @@ struct ChatSessionView: View {
     @State private var showingVoiceRecording = false
     @State private var showingPermissionError = false
     @State private var permissionErrorMessage = ""
+    @State private var showingUsageSheet = false
     @State private var selectedToolCall: ToolCall?
     @State private var fileToOpenInEditor: String?
     @State private var autocompleteWindow: AutocompleteWindowController?
@@ -115,7 +116,8 @@ struct ChatSessionView: View {
                         hasModes: viewModel.hasModes,
                         attachments: viewModel.attachments,
                         onRemoveAttachment: viewModel.removeAttachment,
-                        plan: viewModel.currentAgentPlan
+                        plan: viewModel.currentAgentPlan,
+                        onShowUsage: { showingUsageSheet = true }
                     )
                     .padding(.horizontal, 20)
 
@@ -191,6 +193,12 @@ struct ChatSessionView: View {
                     versionInfo: versionInfo
                 )
             }
+        }
+        .sheet(isPresented: $showingUsageSheet) {
+            AgentUsageSheet(
+                agentId: viewModel.selectedAgent,
+                agentName: viewModel.selectedAgentDisplayName
+            )
         }
         .sheet(item: $selectedToolCall) { toolCall in
             ToolDetailsSheet(toolCalls: [toolCall], agentSession: viewModel.currentAgentSession)
