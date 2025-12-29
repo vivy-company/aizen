@@ -109,8 +109,7 @@ extension AgentSession {
                     if !blockContent.isEmpty {
                         newBlocks.append(contentsOf: blockContent)
                     }
-                    // Force SwiftUI to recognize the change by explicitly notifying
-                    objectWillChange.send()
+                    // Update in place - @Published will notify SwiftUI
                     messages[index] = MessageItem(
                         id: lastAgentMessage.id,
                         role: .agent,
@@ -123,7 +122,6 @@ extension AgentSession {
                         executionTime: lastAgentMessage.executionTime,
                         requestId: lastAgentMessage.requestId
                     )
-                    messages = messages
                 } else {
                     let initialText = text
                     let initialBlocks = blockContent

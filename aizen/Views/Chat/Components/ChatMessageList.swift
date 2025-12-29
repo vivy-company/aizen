@@ -211,10 +211,12 @@ struct ChatMessageList: View {
                 showLoadingView = true
                 loadingStartTime = Date()
             }
+        }
+        .task {
+            // Enable animations after a brief delay to avoid modifying state during view update
             if !allowAnimations {
-                DispatchQueue.main.async {
-                    self.allowAnimations = true
-                }
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+                allowAnimations = true
             }
         }
     }

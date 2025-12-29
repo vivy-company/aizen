@@ -440,14 +440,16 @@ class AgentSession: ObservableObject, ACPClientDelegate {
 
     // MARK: - ACPClientDelegate Methods
 
-    func handleFileReadRequest(_ path: String, sessionId: String, line: Int?, limit: Int?)
+    // File operations are nonisolated to avoid blocking MainActor during large file I/O
+    nonisolated func handleFileReadRequest(_ path: String, sessionId: String, line: Int?, limit: Int?)
         async throws -> ReadTextFileResponse
     {
         return try await fileSystemDelegate.handleFileReadRequest(
             path, sessionId: sessionId, line: line, limit: limit)
     }
 
-    func handleFileWriteRequest(_ path: String, content: String, sessionId: String) async throws
+    // File operations are nonisolated to avoid blocking MainActor during large file I/O
+    nonisolated func handleFileWriteRequest(_ path: String, content: String, sessionId: String) async throws
         -> WriteTextFileResponse
     {
         return try await fileSystemDelegate.handleFileWriteRequest(
