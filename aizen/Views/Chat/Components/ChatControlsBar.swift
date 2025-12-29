@@ -14,6 +14,7 @@ struct ChatControlsBar: View {
     let attachments: [ChatAttachment]
     let onRemoveAttachment: (ChatAttachment) -> Void
     let plan: Plan?
+    let onShowUsage: () -> Void
 
     @State private var showingAuthClearedMessage = false
 
@@ -45,6 +46,13 @@ struct ChatControlsBar: View {
             if hasModes, let agentSession = currentAgentSession {
                 ModeSelectorView(session: agentSession)
             }
+
+            Button(action: onShowUsage) {
+                Image(systemName: "chart.bar")
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Usage")
 
             Menu {
                 Button("Re-authenticate") {

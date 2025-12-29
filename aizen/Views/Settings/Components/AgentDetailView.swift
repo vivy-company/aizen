@@ -38,10 +38,22 @@ struct AgentDetailView: View {
     @State private var showingMCPMarketplace = false
     @State private var mcpServerToRemove: MCPInstalledServer?
     @State private var showingMCPRemoveConfirmation = false
+    @State private var showingUsageDetails = false
     @ObservedObject private var mcpManager = MCPManager.shared
+    @ObservedObject private var usageStore = AgentUsageStore.shared
+    @ObservedObject private var usageMetricsStore = AgentUsageMetricsStore.shared
 
     private var configSpec: AgentConfigSpec {
         AgentConfigRegistry.spec(for: metadata.id)
+    }
+
+    private var supportsUsageMetrics: Bool {
+        switch UsageProvider.fromAgentId(metadata.id) {
+        case .codex, .claude, .gemini:
+            return true
+        default:
+            return false
+        }
     }
 
     var body: some View {
@@ -205,6 +217,19 @@ struct AgentDetailView: View {
                         Text("Auth cleared. New chat sessions will prompt for authentication.")
                             .font(.caption)
                             .foregroundColor(.green)
+                    }
+                }
+
+                // MARK: - Usage
+
+                if supportsUsageMetrics {
+                    Section("Usage") {
+                        AgentUsageSummaryView(
+                            report: usageMetricsStore.report(for: metadata.id),
+                            refreshState: usageMetricsStore.refreshState(for: metadata.id),
+                            onRefresh: { usageMetricsStore.refresh(agentId: metadata.id, force: true) },
+                            onOpenDetails: { showingUsageDetails = true }
+                        )
                     }
                 }
 
@@ -526,6 +551,11 @@ struct AgentDetailView: View {
             loadCommands()
             await mcpManager.syncInstalled(agentId: metadata.id, agentPath: metadata.executablePath)
         }
+        .task(id: metadata.id) {
+            if supportsUsageMetrics {
+                usageMetricsStore.refreshIfNeeded(agentId: metadata.id)
+            }
+        }
         .sheet(isPresented: $showingRulesEditor) {
             if let rulesFile = configSpec.rulesFile {
                 AgentRulesEditorSheet(
@@ -550,6 +580,9 @@ struct AgentDetailView: View {
                 agentName: metadata.name,
                 onDismiss: { loadCommands() }
             )
+        }
+        .sheet(isPresented: $showingUsageDetails) {
+            AgentUsageSheet(agentId: metadata.id, agentName: metadata.name)
         }
         .sheet(isPresented: $showingMCPMarketplace) {
             MCPMarketplaceView(

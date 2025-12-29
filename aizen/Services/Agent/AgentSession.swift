@@ -350,6 +350,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
 
         let metadata = AgentRegistry.shared.getMetadata(for: agentName)
         let displayName = metadata?.name ?? agentName
+        AgentUsageStore.shared.recordSessionStart(agentId: agentName)
         addSystemMessage("Session started with \(displayName) in \(workingDir)")
     }
 
