@@ -113,7 +113,7 @@ struct AgentDetailView: View {
                                 if wasEnabled && !newValue {
                                     let defaultAgent = UserDefaults.standard.string(forKey: "defaultACPAgent") ?? "claude"
                                     if defaultAgent == metadata.id {
-                                        if let newDefault = await AgentRegistry.shared.getEnabledAgents().first {
+                                        if let newDefault = AgentRegistry.shared.getEnabledAgents().first {
                                             await MainActor.run {
                                                 UserDefaults.standard.set(newDefault.id, forKey: "defaultACPAgent")
                                             }

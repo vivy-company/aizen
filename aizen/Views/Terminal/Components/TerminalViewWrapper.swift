@@ -26,12 +26,14 @@ class TerminalViewCoordinator {
         stopMonitoring()
         // Poll for process exit every 500ms
         exitCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self, weak terminal] _ in
-            guard let self = self, let terminal = terminal else { return }
+            Task { @MainActor [weak self, weak terminal] in
+                guard let self = self, let terminal = terminal else { return }
 
-            if terminal.processExited {
-                self.exitCheckTimer?.invalidate()
-                self.exitCheckTimer = nil
-                self.onProcessExit()
+                if terminal.processExited {
+                    self.exitCheckTimer?.invalidate()
+                    self.exitCheckTimer = nil
+                    self.onProcessExit()
+                }
             }
         }
         exitCheckTimer?.tolerance = 0.1
@@ -129,10 +131,6 @@ struct TerminalViewWrapper: NSViewRepresentable {
         // Set process exit callback
         terminalView.onProcessExit = onProcessExit
 
-        // Set title change callback to update session title
-        let sessionToUpdate = session
-        let worktreeToUpdate = worktree
-        let moc = session.managedObjectContext
         terminalView.onProgressReport = onProgress
 
         // Store terminal in manager for persistence

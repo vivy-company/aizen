@@ -74,7 +74,7 @@ struct AgentListItemView: View {
                                 let defaultAgent = UserDefaults.standard.string(forKey: "defaultACPAgent") ?? "claude"
                                 if defaultAgent == metadata.id {
                                     // Find first enabled agent that's not this one
-                                    if let newDefault = await AgentRegistry.shared.getEnabledAgents().first {
+                                    if let newDefault = AgentRegistry.shared.getEnabledAgents().first {
                                         await MainActor.run {
                                             UserDefaults.standard.set(newDefault.id, forKey: "defaultACPAgent")
                                         }

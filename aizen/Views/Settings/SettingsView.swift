@@ -174,9 +174,7 @@ struct SettingsView: View {
     }
 
     private func loadAgents() {
-        Task {
-            agents = await AgentRegistry.shared.getAllAgents()
-        }
+        agents = AgentRegistry.shared.getAllAgents()
     }
 
     private var proSidebarRow: some View {
