@@ -25,7 +25,7 @@ class GitRepositoryService: ObservableObject {
     // Debouncing for status reload
     private var statusReloadTask: Task<Void, Never>?
     private var isStatusReloadPending = false
-    private let statusReloadDebounceInterval: TimeInterval = 0.3
+    private let statusReloadDebounceInterval: TimeInterval = 1.0
     private var inFlightStatusTask: Task<Void, Never>?
     private var pendingReloadIsLightweight = true
 

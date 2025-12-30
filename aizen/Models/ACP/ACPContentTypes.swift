@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Annotations
 
-struct Annotations: Codable {
+nonisolated struct Annotations: Codable {
     let audience: [String]?  // Array of Role strings
     let lastModified: String?  // ISO 8601 datetime
     let priority: Int?
@@ -24,7 +24,7 @@ struct Annotations: Codable {
 
 // MARK: - Content Types
 
-enum ContentBlock: Codable {
+nonisolated enum ContentBlock: Codable {
     case text(TextContent)
     case image(ImageContent)
     case audio(AudioContent)
@@ -73,7 +73,7 @@ enum ContentBlock: Codable {
 
 // MARK: - Text Content
 
-struct TextContent: Codable {
+nonisolated struct TextContent: Codable {
     let type: String = "text"
     let text: String
     let annotations: Annotations?
@@ -92,7 +92,7 @@ struct TextContent: Codable {
 
 // MARK: - Image Content
 
-struct ImageContent: Codable {
+nonisolated struct ImageContent: Codable {
     let type: String = "image"
     let data: String
     let mimeType: String
@@ -115,7 +115,7 @@ struct ImageContent: Codable {
 
 // MARK: - Audio Content
 
-struct AudioContent: Codable {
+nonisolated struct AudioContent: Codable {
     let type: String = "audio"
     let data: String
     let mimeType: String
@@ -129,7 +129,7 @@ struct AudioContent: Codable {
 
 // MARK: - Resource Link Content
 
-struct ResourceLinkContent: Codable {
+nonisolated struct ResourceLinkContent: Codable {
     let type: String = "resource_link"
     let uri: String
     let name: String
@@ -147,7 +147,7 @@ struct ResourceLinkContent: Codable {
 
 // MARK: - Embedded Resource Types
 
-enum EmbeddedResourceType: Codable {
+nonisolated enum EmbeddedResourceType: Codable {
     case text(EmbeddedTextResourceContents)
     case blob(EmbeddedBlobResourceContents)
 
@@ -179,7 +179,7 @@ enum EmbeddedResourceType: Codable {
     }
 }
 
-struct EmbeddedTextResourceContents: Codable {
+nonisolated struct EmbeddedTextResourceContents: Codable {
     let type: String = "text"
     let text: String
     let mimeType: String?
@@ -191,7 +191,7 @@ struct EmbeddedTextResourceContents: Codable {
     }
 }
 
-struct EmbeddedBlobResourceContents: Codable {
+nonisolated struct EmbeddedBlobResourceContents: Codable {
     let type: String = "blob"
     let blob: String
     let mimeType: String?
@@ -205,7 +205,7 @@ struct EmbeddedBlobResourceContents: Codable {
 
 // MARK: - Resource Content
 
-struct ResourceContent: Codable {
+nonisolated struct ResourceContent: Codable {
     let type: String = "resource"
     let resource: EmbeddedResourceType
     let annotations: Annotations?

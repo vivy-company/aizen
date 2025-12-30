@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Session Update Notification
 
-struct SessionUpdateNotification: Codable {
+nonisolated struct SessionUpdateNotification: Codable {
     let sessionId: SessionId
     let update: SessionUpdate
     let _meta: [String: AnyCodable]?
@@ -21,7 +21,7 @@ struct SessionUpdateNotification: Codable {
 
 // MARK: - Session Update
 
-enum SessionUpdate: Codable {
+nonisolated enum SessionUpdate: Codable {
     case userMessageChunk(ContentBlock)
     case agentMessageChunk(ContentBlock)
     case agentThoughtChunk(ContentBlock)
@@ -114,7 +114,7 @@ enum SessionUpdate: Codable {
 
 // MARK: - Tool Call Types
 
-struct ToolCallUpdate: Codable {
+nonisolated struct ToolCallUpdate: Codable {
     let toolCallId: String
     let title: String?  // Optional for Codex compatibility
     let kind: ToolKind?  // Optional for Codex compatibility
@@ -154,7 +154,7 @@ struct ToolCallUpdate: Codable {
     }
 }
 
-struct ToolCallUpdateDetails: Codable {
+nonisolated struct ToolCallUpdateDetails: Codable {
     let toolCallId: String
     let status: ToolStatus?
     let locations: [ToolLocation]?
@@ -176,7 +176,7 @@ struct ToolCallUpdateDetails: Codable {
 
 // MARK: - Helper for encoding arbitrary keys
 
-struct AnyCodingKey: CodingKey {
+nonisolated struct AnyCodingKey: CodingKey {
     let stringValue: String
     let intValue: Int?
 

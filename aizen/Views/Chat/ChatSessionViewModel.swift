@@ -43,6 +43,7 @@ class ChatSessionViewModel: ObservableObject {
     // Track previous IDs for incremental sync (avoids storing full duplicate arrays)
     var previousMessageIds: Set<String> = []
     var previousToolCallIds: Set<String> = []
+    var childToolCallsByParentId: [String: [ToolCall]] = [:]
 
     // Historical messages loaded from Core Data (separate from live session)
     var historicalMessages: [MessageItem] = []
@@ -93,6 +94,8 @@ class ChatSessionViewModel: ObservableObject {
     private var wasStreaming: Bool = false  // Track streaming state transitions
     let logger = Logger.forCategory("ChatSession")
     var autoScrollTask: Task<Void, Never>?
+    var suppressNextAutoScroll: Bool = false
+    private var gitPauseApplied: Bool = false
 
     // MARK: - Computed Properties
 
@@ -161,6 +164,11 @@ class ChatSessionViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     deinit {
+        if gitPauseApplied, let path = worktree.path, !path.isEmpty {
+            Task {
+                await GitIndexWatchCenter.shared.resume(worktreePath: path)
+            }
+        }
         cancellables.removeAll()
         notificationCancellables.removeAll()
     }
@@ -465,7 +473,7 @@ class ChatSessionViewModel: ObservableObject {
         cancellables.removeAll()
 
         session.$messages
-            .throttle(for: .milliseconds(33), scheduler: DispatchQueue.main, latest: true)
+            .throttle(for: .milliseconds(250), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] newMessages in
                 guard let self = self else { return }
                 // AgentSession is @MainActor so we're already on main thread
@@ -473,7 +481,9 @@ class ChatSessionViewModel: ObservableObject {
                 self.syncMessages(newMessages)
 
                 // Only auto-scroll if user is near bottom
-                if self.isNearBottom {
+                let shouldSkipAutoScroll = self.suppressNextAutoScroll
+                self.suppressNextAutoScroll = false
+                if self.isNearBottom && !shouldSkipAutoScroll {
                     self.scrollToBottomDeferred()
                 }
             }
@@ -482,7 +492,7 @@ class ChatSessionViewModel: ObservableObject {
         // Observe toolCallsById changes (dictionary-based storage)
         session.$toolCallsById
             .receive(on: DispatchQueue.main)
-            .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
+            .throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] _ in
                 guard let self = self, let session = self.currentAgentSession else { return }
                 let newToolCalls = session.toolCalls
@@ -575,6 +585,20 @@ class ChatSessionViewModel: ObservableObject {
             .sink { [weak self] isStreaming in
                 guard let self = self else { return }
                 self.isProcessing = isStreaming
+
+                if let path = self.worktree.path, !path.isEmpty {
+                    if isStreaming && !self.gitPauseApplied {
+                        self.gitPauseApplied = true
+                        Task {
+                            await GitIndexWatchCenter.shared.pause(worktreePath: path)
+                        }
+                    } else if !isStreaming && self.gitPauseApplied {
+                        self.gitPauseApplied = false
+                        Task {
+                            await GitIndexWatchCenter.shared.resume(worktreePath: path)
+                        }
+                    }
+                }
 
                 // Only rebuild when streaming actually ends (transitions from true to false)
                 let streamingEnded = self.wasStreaming && !isStreaming

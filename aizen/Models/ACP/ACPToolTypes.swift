@@ -10,7 +10,7 @@ import Foundation
 // MARK: - Tool Call Content
 
 /// Content produced by a tool call - can be standard content, diff, or terminal
-enum ToolCallContent: Codable {
+nonisolated enum ToolCallContent: Codable {
     case content(ContentBlock)
     case diff(ToolCallDiff)
     case terminal(ToolCallTerminal)
@@ -96,7 +96,7 @@ enum ToolCallContent: Codable {
     }
 }
 
-struct ToolCallDiff: Codable {
+nonisolated struct ToolCallDiff: Codable {
     let path: String
     let oldText: String?
     let newText: String
@@ -106,7 +106,7 @@ struct ToolCallDiff: Codable {
     }
 }
 
-struct ToolCallTerminal: Codable {
+nonisolated struct ToolCallTerminal: Codable {
     let terminalId: String
 
     enum CodingKeys: String, CodingKey {
@@ -116,7 +116,7 @@ struct ToolCallTerminal: Codable {
 
 // MARK: - Tool Calls
 
-struct ToolCall: Codable, Identifiable {
+nonisolated struct ToolCall: Codable, Identifiable {
     let toolCallId: String
     var title: String
     var kind: ToolKind?  // Optional for Codex compatibility
@@ -149,7 +149,7 @@ struct ToolCall: Codable, Identifiable {
     }
 }
 
-enum ToolKind: String, Codable {
+nonisolated enum ToolKind: String, Codable {
     case read
     case edit
     case delete
@@ -182,14 +182,14 @@ enum ToolKind: String, Codable {
     }
 }
 
-enum ToolStatus: String, Codable {
+nonisolated enum ToolStatus: String, Codable {
     case pending
     case inProgress = "in_progress"
     case completed
     case failed
 }
 
-struct ToolLocation: Codable {
+nonisolated struct ToolLocation: Codable {
     let path: String?
     let line: Int?  // Line number (0-indexed position)
     let _meta: [String: AnyCodable]?
@@ -201,7 +201,7 @@ struct ToolLocation: Codable {
 
 // MARK: - Available Commands
 
-struct AvailableCommand: Codable {
+nonisolated struct AvailableCommand: Codable {
     let name: String
     let description: String
     let input: CommandInputSpec?
@@ -212,7 +212,7 @@ struct AvailableCommand: Codable {
     }
 }
 
-struct CommandInputSpec: Codable {
+nonisolated struct CommandInputSpec: Codable {
     let type: String?
     let hint: String?  // Codex uses this instead of type
     let properties: [String: AnyCodable]?
@@ -221,20 +221,20 @@ struct CommandInputSpec: Codable {
 
 // MARK: - Agent Plan
 
-enum PlanPriority: String, Codable {
+nonisolated enum PlanPriority: String, Codable {
     case low
     case medium
     case high
 }
 
-enum PlanEntryStatus: String, Codable {
+nonisolated enum PlanEntryStatus: String, Codable {
     case pending
     case inProgress = "in_progress"
     case completed
     case cancelled
 }
 
-struct PlanEntry: Codable, Equatable {
+nonisolated struct PlanEntry: Codable, Equatable {
     let content: String
     let priority: PlanPriority
     let status: PlanEntryStatus
@@ -254,6 +254,6 @@ struct PlanEntry: Codable, Equatable {
     }
 }
 
-struct Plan: Codable, Equatable {
+nonisolated struct Plan: Codable, Equatable {
     let entries: [PlanEntry]
 }

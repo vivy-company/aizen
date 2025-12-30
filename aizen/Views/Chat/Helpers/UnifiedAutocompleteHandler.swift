@@ -62,9 +62,6 @@ class UnifiedAutocompleteHandler: ObservableObject {
             }
 
             if char == "@" || char == "/" {
-                let distance = textBeforeCursor.distance(from: textBeforeCursor.startIndex, to: textBeforeCursor.endIndex) - 1
-                var currentIndex = textBeforeCursor.index(textBeforeCursor.startIndex, offsetBy: distance)
-
                 // Find actual position of trigger
                 var tempIndex = textBeforeCursor.endIndex
                 for (i, c) in textBeforeCursor.enumerated().reversed() {

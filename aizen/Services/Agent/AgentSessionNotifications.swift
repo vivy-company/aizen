@@ -19,6 +19,7 @@ extension AgentSession {
             for await notification in await client.notifications {
                 handleNotification(notification)
             }
+            handleNotificationStreamEnded()
         }
     }
 
@@ -28,24 +29,33 @@ extension AgentSession {
             return
         }
 
-        do {
-            let params = notification.params?.value as? [String: Any] ?? [:]
+        let params = notification.params?.value as? [String: Any] ?? [:]
 
-            // Log the update type for debugging
-            if let update = params["update"] as? [String: Any],
-               let updateType = update["sessionUpdate"] as? String {
-                logger.debug("Processing session update: \(updateType)")
+        // Log the update type for debugging
+        if let update = params["update"] as? [String: Any],
+           let updateType = update["sessionUpdate"] as? String {
+            logger.debug("Processing session update: \(updateType)")
+        }
+
+        let previousTask = notificationProcessingTask
+        let logger = self.logger
+        let rawParams = notification.params
+
+        notificationProcessingTask = Task(priority: .userInitiated) { [weak self] in
+            if let previousTask {
+                await previousTask.value
             }
 
-            let data = try JSONSerialization.data(withJSONObject: params)
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
-            let updateNotification = try decoder.decode(SessionUpdateNotification.self, from: data)
+            do {
+                let data = try JSONSerialization.data(withJSONObject: params)
+                let decoder = JSONDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                let updateNotification = try decoder.decode(SessionUpdateNotification.self, from: data)
 
-            // Process update directly - we're already on MainActor from startNotificationListener
-            processUpdate(updateNotification.update)
-        } catch {
-            logger.warning("Failed to parse session update: \(error.localizedDescription)\nRaw params: \(String(describing: notification.params))")
+                self?.processUpdate(updateNotification.update)
+            } catch {
+                logger.warning("Failed to parse session update: \(error.localizedDescription)\nRaw params: \(String(describing: rawParams))")
+            }
         }
     }
 
@@ -89,53 +99,30 @@ extension AgentSession {
                 )
                 toolCall.parentToolCallId = parentId
                 updateToolCalls([toolCall])
+                applyBufferedToolCallUpdatesIfPresent(for: toolCallUpdate.toolCallId)
             case .toolCallUpdate(let details):
                 let toolCallId = details.toolCallId
+                let isTaskTool = isTaskToolCall(details)
+                let status = details.status ?? .pending
 
-                // Extract terminal meta fields if present (experimental Claude Code feature)
-                var terminalOutputContent: [ToolCallContent] = []
-                if let meta = details._meta {
-                    // Handle terminal_output meta
-                    if let terminalOutput = meta["terminal_output"]?.value as? [String: Any],
-                       let outputData = terminalOutput["data"] as? String {
-                        let terminalContent = ToolCallContent.content(.text(TextContent(text: outputData)))
-                        terminalOutputContent.append(terminalContent)
+                if isTaskTool && status == .pending {
+                    if !activeTaskIds.contains(toolCallId) {
+                        activeTaskIds.append(toolCallId)
                     }
+                }
 
-                    // Handle terminal_exit meta
-                    if let terminalExit = meta["terminal_exit"]?.value as? [String: Any] {
-                        let exitCode = terminalExit["exit_code"] as? Int
-                        let signal = terminalExit["signal"] as? String
-                        let exitMessage = if let code = exitCode {
-                            "Terminal exited with code \(code)"
-                        } else if let sig = signal {
-                            "Terminal terminated by signal \(sig)"
-                        } else {
-                            "Terminal exited"
-                        }
-                        let exitContent = ToolCallContent.content(.text(TextContent(text: "\n\(exitMessage)\n")))
-                        terminalOutputContent.append(exitContent)
+                if getToolCall(id: toolCallId) == nil {
+                    if ensureToolCallExists(from: details, isTaskTool: isTaskTool) {
+                        applyBufferedToolCallUpdatesIfPresent(for: toolCallId)
+                    } else {
+                        bufferToolCallUpdate(details)
+                        return
                     }
                 }
 
                 // Single update combining all changes (avoids state corruption)
                 updateToolCallInPlace(id: toolCallId) { updated in
-                    updated.status = details.status ?? updated.status
-                    updated.locations = details.locations ?? updated.locations
-                    updated.kind = details.kind ?? updated.kind
-                    updated.rawInput = details.rawInput ?? updated.rawInput
-                    updated.rawOutput = details.rawOutput ?? updated.rawOutput
-                    if let newTitle = normalizedTitle(details.title) {
-                        updated.title = newTitle
-                    }
-
-                    // Merge all content: existing + terminal output + regular content
-                    var allContent = updated.content
-                    allContent.append(contentsOf: terminalOutputContent)
-                    if let newContent = details.content {
-                        allContent.append(contentsOf: newContent)
-                    }
-                    updated.content = coalesceAdjacentTextBlocks(allContent)
+                    applyToolCallUpdate(details, to: &updated)
                 }
 
                 // Clean up activeTaskIds when Task completes
@@ -143,6 +130,7 @@ extension AgentSession {
                     activeTaskIds.removeAll { $0 == toolCallId }
                 }
             case .agentMessageChunk(let block):
+                clearThoughtBuffer()
                 currentThought = nil
                 let (text, blockContent) = textAndContent(from: block)
                 if text.isEmpty && blockContent.isEmpty { break }
@@ -150,36 +138,17 @@ extension AgentSession {
 
                 // Find the last agent message (not just last message)
                 // This prevents system messages (like mode changes) from splitting the stream
-                let lastAgentIndex = messages.lastIndex { $0.role == .agent }
-                let lastAgentMessage = lastAgentIndex.map { messages[$0] }
+                let lastAgentMessage = messages.last { $0.role == .agent }
 
                 if let lastAgentMessage = lastAgentMessage,
-                   !lastAgentMessage.isComplete,
-                   let index = lastAgentIndex {
-                    // Append to existing incomplete agent message
-                    var newContent = lastAgentMessage.content
-                    newContent.append(text)
-                    var newBlocks = lastAgentMessage.contentBlocks
-                    if !blockContent.isEmpty {
-                        newBlocks.append(contentsOf: blockContent)
-                    }
-                    // Update in place - @Published will notify SwiftUI
-                    messages[index] = MessageItem(
-                        id: lastAgentMessage.id,
-                        role: .agent,
-                        content: newContent,
-                        timestamp: lastAgentMessage.timestamp,
-                        toolCalls: lastAgentMessage.toolCalls,
-                        contentBlocks: newBlocks,
-                        isComplete: false,
-                        startTime: lastAgentMessage.startTime,
-                        executionTime: lastAgentMessage.executionTime,
-                        requestId: lastAgentMessage.requestId
-                    )
+                   !lastAgentMessage.isComplete {
+                    // Append to existing incomplete agent message (buffered to reduce UI churn)
+                    appendAgentMessageChunk(text: text, contentBlocks: blockContent)
                 } else {
                     let initialText = text
                     let initialBlocks = blockContent
                     AgentUsageStore.shared.recordAgentMessage(agentId: agentName)
+                    clearAgentMessageBuffer()
                     addAgentMessage(initialText, contentBlocks: initialBlocks, isComplete: false, startTime: Date())
                 }
             case .userMessageChunk:
@@ -187,11 +156,7 @@ extension AgentSession {
             case .agentThoughtChunk(let block):
                 let (text, _) = textAndContent(from: block)
                 if text.isEmpty { break }
-                if let existing = currentThought {
-                    currentThought = existing + text
-                } else {
-                    currentThought = text
-                }
+                appendThoughtChunk(text)
             case .plan(let plan):
                 // Coalesce plan updates - only update if content changed
                 // This prevents excessive UI rebuilds when multiple agents stream plan updates
@@ -382,12 +347,162 @@ extension AgentSession {
 
     /// Detect if a tool call is a Task (subagent) via _meta.claudeCode.toolName
     private func isTaskToolCall(_ update: ToolCallUpdate) -> Bool {
-        guard let meta = update._meta,
+        isTaskToolCall(update._meta)
+    }
+
+    private func isTaskToolCall(_ details: ToolCallUpdateDetails) -> Bool {
+        isTaskToolCall(details._meta)
+    }
+
+    private func isTaskToolCall(_ meta: [String: AnyCodable]?) -> Bool {
+        guard let meta,
               let claudeCode = meta["claudeCode"]?.value as? [String: Any],
               let toolName = claudeCode["toolName"] as? String else {
             return false
         }
         return toolName == "Task"
+    }
+
+    private func handleNotificationStreamEnded() {
+        logger.warning("Notification stream ended; finalizing current turn")
+        if isStreaming {
+            isStreaming = false
+        }
+        resetFinalizeState()
+        markLastMessageComplete()
+        clearThoughtBuffer()
+        currentThought = nil
+    }
+
+    private func bufferToolCallUpdate(_ details: ToolCallUpdateDetails) {
+        pendingToolCallUpdatesById[details.toolCallId, default: []].append(details)
+    }
+
+    private func bufferToolCallContent(_ content: [ToolCallContent], for toolCallId: String) {
+        guard !content.isEmpty else { return }
+        pendingToolCallContentById[toolCallId, default: []].append(contentsOf: content)
+        scheduleToolCallContentFlush(for: toolCallId)
+    }
+
+    private func scheduleToolCallContentFlush(for toolCallId: String) {
+        guard toolCallContentFlushTasks[toolCallId] == nil else { return }
+        toolCallContentFlushTasks[toolCallId] = Task { @MainActor in
+            defer { toolCallContentFlushTasks[toolCallId] = nil }
+            try? await Task.sleep(for: .seconds(Self.toolCallContentFlushInterval))
+            flushToolCallContent(for: toolCallId)
+        }
+    }
+
+    private func flushToolCallContent(for toolCallId: String) {
+        guard let pending = pendingToolCallContentById.removeValue(forKey: toolCallId),
+              !pending.isEmpty else {
+            return
+        }
+        toolCallContentFlushTasks[toolCallId]?.cancel()
+        toolCallContentFlushTasks[toolCallId] = nil
+
+        updateToolCallInPlace(id: toolCallId) { updated in
+            var allContent = updated.content
+            allContent.append(contentsOf: pending)
+            updated.content = coalesceAdjacentTextBlocks(allContent)
+        }
+    }
+
+    private func applyBufferedToolCallUpdatesIfPresent(for toolCallId: String) {
+        guard let pending = pendingToolCallUpdatesById.removeValue(forKey: toolCallId),
+              !pending.isEmpty else {
+            return
+        }
+
+        updateToolCallInPlace(id: toolCallId) { updated in
+            for details in pending {
+                applyToolCallUpdate(details, to: &updated)
+            }
+        }
+    }
+
+    private func ensureToolCallExists(from details: ToolCallUpdateDetails, isTaskTool: Bool) -> Bool {
+        guard getToolCall(id: details.toolCallId) == nil else { return true }
+        guard let title = normalizedTitle(details.title) else { return false }
+
+        var parentId: String? = nil
+        if !isTaskTool && activeTaskIds.count == 1 {
+            parentId = activeTaskIds.first
+        }
+
+        var toolCall = ToolCall(
+            toolCallId: details.toolCallId,
+            title: title,
+            kind: details.kind,
+            status: details.status ?? .pending,
+            content: [],
+            locations: details.locations,
+            rawInput: details.rawInput,
+            rawOutput: details.rawOutput,
+            timestamp: Date()
+        )
+        toolCall.iterationId = currentIterationId
+        toolCall.parentToolCallId = parentId
+        updateToolCalls([toolCall])
+        return true
+    }
+
+    private func applyToolCallUpdate(_ details: ToolCallUpdateDetails, to updated: inout ToolCall) {
+        // Extract terminal meta fields if present (experimental Claude Code feature)
+        var terminalOutputContent: [ToolCallContent] = []
+        if let meta = details._meta {
+            // Handle terminal_output meta
+            if let terminalOutput = meta["terminal_output"]?.value as? [String: Any],
+               let outputData = terminalOutput["data"] as? String {
+                let terminalContent = ToolCallContent.content(.text(TextContent(text: outputData)))
+                terminalOutputContent.append(terminalContent)
+            }
+
+            // Handle terminal_exit meta
+            if let terminalExit = meta["terminal_exit"]?.value as? [String: Any] {
+                let exitCode = terminalExit["exit_code"] as? Int
+                let signal = terminalExit["signal"] as? String
+                let exitMessage = if let code = exitCode {
+                    "Terminal exited with code \(code)"
+                } else if let sig = signal {
+                    "Terminal terminated by signal \(sig)"
+                } else {
+                    "Terminal exited"
+                }
+                let exitContent = ToolCallContent.content(.text(TextContent(text: "\n\(exitMessage)\n")))
+                terminalOutputContent.append(exitContent)
+            }
+        }
+
+        updated.status = details.status ?? updated.status
+        updated.locations = details.locations ?? updated.locations
+        updated.kind = details.kind ?? updated.kind
+        updated.rawInput = details.rawInput ?? updated.rawInput
+        updated.rawOutput = details.rawOutput ?? updated.rawOutput
+        if let newTitle = normalizedTitle(details.title) {
+            updated.title = newTitle
+        }
+
+        // Merge content with buffering to reduce heavy updates (especially for large file reads)
+        var incomingContent = terminalOutputContent
+        if let newContent = details.content, !newContent.isEmpty {
+            incomingContent.append(contentsOf: newContent)
+        }
+
+        let status = details.status ?? updated.status
+        if !incomingContent.isEmpty {
+            let shouldFlushNow = status == .completed || status == .failed
+            if shouldFlushNow {
+                flushToolCallContent(for: details.toolCallId)
+                var allContent = updated.content
+                allContent.append(contentsOf: incomingContent)
+                updated.content = coalesceAdjacentTextBlocks(allContent)
+            } else {
+                bufferToolCallContent(incomingContent, for: details.toolCallId)
+            }
+        } else if status == .completed || status == .failed {
+            flushToolCallContent(for: details.toolCallId)
+        }
     }
 
     /// Extract best-effort string from loosely-typed "text" payloads

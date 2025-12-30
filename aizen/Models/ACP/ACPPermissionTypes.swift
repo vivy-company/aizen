@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Permission Request
 
-struct RequestPermissionRequest: Codable {
+nonisolated struct RequestPermissionRequest: Codable {
     let message: String?
     let options: [PermissionOption]?
     let sessionId: SessionId?
@@ -23,7 +23,7 @@ struct RequestPermissionRequest: Codable {
     }
 }
 
-struct PermissionOption: Codable {
+nonisolated struct PermissionOption: Codable {
     let kind: String
     let name: String
     let optionId: String
@@ -35,7 +35,7 @@ struct PermissionOption: Codable {
     }
 }
 
-struct PermissionToolCall: Codable {
+nonisolated struct PermissionToolCall: Codable {
     let toolCallId: String
     let rawInput: AnyCodable?
 
@@ -47,7 +47,7 @@ struct PermissionToolCall: Codable {
 
 // MARK: - Permission Decision
 
-enum PermissionDecision: String, Codable {
+nonisolated enum PermissionDecision: String, Codable {
     case allowOnce = "allow_once"
     case allowAlways = "allow_always"
     case rejectOnce = "reject_once"
@@ -56,7 +56,7 @@ enum PermissionDecision: String, Codable {
 
 // MARK: - Permission Response
 
-struct RequestPermissionResponse: Codable {
+nonisolated struct RequestPermissionResponse: Codable {
     let outcome: PermissionOutcome
 
     enum CodingKeys: String, CodingKey {
@@ -64,7 +64,7 @@ struct RequestPermissionResponse: Codable {
     }
 }
 
-struct PermissionOutcome: Codable {
+nonisolated struct PermissionOutcome: Codable {
     let outcome: String // "selected" or "cancelled"
     let optionId: String?
 

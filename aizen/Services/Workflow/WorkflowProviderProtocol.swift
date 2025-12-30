@@ -34,7 +34,7 @@ protocol WorkflowProviderProtocol {
 // MARK: - Base Implementation Helpers
 
 extension WorkflowProviderProtocol {
-    func executeCommand(_ executable: String, arguments: [String], workingDirectory: String) async throws -> ProcessResult {
+    nonisolated func executeCommand(_ executable: String, arguments: [String], workingDirectory: String) async throws -> ProcessResult {
         try await ProcessExecutor.shared.executeWithOutput(
             executable: executable,
             arguments: arguments,
@@ -42,7 +42,7 @@ extension WorkflowProviderProtocol {
         )
     }
 
-    func parseJSON<T: Decodable>(_ data: Data, as type: T.Type) throws -> T {
+    nonisolated func parseJSON<T: Decodable>(_ data: Data, as type: T.Type) throws -> T {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         decoder.dateDecodingStrategy = .iso8601

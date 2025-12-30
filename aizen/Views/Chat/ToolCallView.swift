@@ -19,6 +19,7 @@ struct ToolCallView: View {
     var childToolCalls: [ToolCall] = []  // Children for Task tool calls
 
     @State private var isExpanded: Bool
+    @State private var userExpanded: Bool = false
 
     init(toolCall: ToolCall, currentIterationId: String? = nil, onOpenDetails: ((ToolCall) -> Void)? = nil, agentSession: AgentSession? = nil, onOpenInEditor: ((String) -> Void)? = nil, childToolCalls: [ToolCall] = []) {
         self.toolCall = toolCall
@@ -49,6 +50,7 @@ struct ToolCallView: View {
             Button(action: {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isExpanded.toggle()
+                    userExpanded = true
                 }
             }) {
                 HStack(spacing: 8) {
@@ -92,8 +94,16 @@ struct ToolCallView: View {
 
             // Expandable content
             if isExpanded && (hasContent || !childToolCalls.isEmpty) {
+                if !shouldShowContent {
+                    Text("Running…")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 4)
+                        .transition(.opacity)
+                }
+
                 // Child tool calls for Task (rendered inline)
-                if isTaskToolCall && !childToolCalls.isEmpty {
+                if shouldShowContent, isTaskToolCall && !childToolCalls.isEmpty {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(childToolCalls) { child in
                             ToolCallView(
@@ -110,7 +120,7 @@ struct ToolCallView: View {
                 }
 
                 // Original content (for non-Task or Task's own summary)
-                if hasContent {
+                if shouldShowContent, hasContent {
                     inlineContentView
                         .transition(.opacity.combined(with: .move(edge: .top)))
 
@@ -226,6 +236,14 @@ struct ToolCallView: View {
         !toolCall.content.isEmpty
     }
 
+    private var isFinal: Bool {
+        toolCall.status == .completed || toolCall.status == .failed
+    }
+
+    private var shouldShowContent: Bool {
+        isFinal || userExpanded
+    }
+
     @ViewBuilder
     private var inlineContentView: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -241,7 +259,7 @@ struct ToolCallView: View {
         case .content(let block):
             inlineContentBlock(block)
         case .diff(let diff):
-            InlineDiffView(diff: diff)
+            InlineDiffView(diff: diff, allowCompute: isFinal)
         case .terminal(let terminal):
             InlineTerminalView(terminalId: terminal.terminalId, agentSession: agentSession)
         }
@@ -251,7 +269,12 @@ struct ToolCallView: View {
     private func inlineContentBlock(_ block: ContentBlock) -> some View {
         switch block {
         case .text(let textContent):
-            HighlightedTextContentView(text: textContent.text, filePath: filePath)
+            HighlightedTextContentView(
+                text: textContent.text,
+                filePath: filePath,
+                allowHighlight: isFinal,
+                allowSelection: isFinal
+            )
         default:
             EmptyView()
         }
@@ -355,6 +378,8 @@ struct ToolCallView: View {
 struct HighlightedTextContentView: View {
     let text: String
     let filePath: String?
+    let allowHighlight: Bool
+    var allowSelection: Bool = true
 
     @State private var highlightedText: AttributedString?
     @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
@@ -412,6 +437,9 @@ struct HighlightedTextContentView: View {
     }
 
     private var shouldHighlight: Bool {
+        guard allowHighlight else { return false }
+        if parsedContent.code.count > 4000 { return false }
+        if parsedContent.code.filter({ $0 == "\n" }).count > 200 { return false }
         let (_, fenceLang) = parsedContent
         // Highlight if we have a fence language or a code file path
         if fenceLang != nil { return true }
@@ -419,27 +447,27 @@ struct HighlightedTextContentView: View {
         return LanguageDetection.isCodeFile(mimeType: nil, uri: path)
     }
 
-    private var codeLines: [String] {
-        parsedContent.code.components(separatedBy: "\n")
-    }
-
     var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                if shouldHighlight, let highlighted = highlightedText {
-                    Text(highlighted)
-                        .font(.system(size: 10, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+            if shouldHighlight, let highlighted = highlightedText {
+                let highlightedView = Text(highlighted)
+                    .font(.system(size: 10, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if allowSelection {
+                    highlightedView.textSelection(.enabled)
                 } else {
-                    // Lazy render lines for large content
-                    ForEach(Array(codeLines.enumerated()), id: \.offset) { _, line in
-                        Text(line.isEmpty ? " " : line)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(.primary)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                    highlightedView
+                }
+            } else {
+                let displayText = parsedContent.code.isEmpty ? " " : parsedContent.code
+                let plainView = Text(displayText)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if allowSelection {
+                    plainView.textSelection(.enabled)
+                } else {
+                    plainView
                 }
             }
         }
@@ -447,7 +475,7 @@ struct HighlightedTextContentView: View {
         .padding(6)
         .background(Color(nsColor: .textBackgroundColor))
         .cornerRadius(4)
-        .task(id: text) {
+        .task(id: allowHighlight ? text : "highlight-disabled") {
             guard shouldHighlight else { return }
             await performHighlight()
         }

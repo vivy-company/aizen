@@ -13,7 +13,7 @@ class GitIndexWatcher {
     private let worktreePath: String
     private let gitIndexPath: String
     private let pollInterval: TimeInterval = 1.0  // Poll every 1 second
-    private let debounceInterval: TimeInterval = 0.5  // Debounce rapid changes
+    private let debounceInterval: TimeInterval = 1.0  // Debounce rapid changes
     private var pollingTask: Task<Void, Never>?
     private var debounceTask: Task<Void, Never>?
     private var indexSource: DispatchSourceFileSystemObject?

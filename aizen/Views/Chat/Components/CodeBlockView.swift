@@ -38,6 +38,8 @@ struct CodeBlockView: View {
     @State private var showCopyConfirmation = false
     @State private var highlightedText: AttributedString?
     @State private var isHovering = false
+    @State private var isExpanded = false
+    @State private var didSetInitialExpand = false
     @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
     @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
     @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
@@ -82,6 +84,26 @@ struct CodeBlockView: View {
         }
     }
 
+    private var lineCount: Int {
+        max(1, trimmedCode.components(separatedBy: "\n").count)
+    }
+
+    private var previewText: String {
+        let lines = trimmedCode.components(separatedBy: "\n")
+        let previewCount = min(8, lines.count)
+        return lines.prefix(previewCount).joined(separator: "\n")
+    }
+
+    private var previewLineCount: Int {
+        max(1, previewText.components(separatedBy: "\n").count)
+    }
+
+    private var shouldHighlight: Bool {
+        guard !isStreaming, isExpanded else { return false }
+        if trimmedCode.count > 4000 { return false }
+        return lineCount <= 200
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header bar
@@ -100,7 +122,6 @@ struct CodeBlockView: View {
                 Spacer()
 
                 // Line count
-                let lineCount = trimmedCode.components(separatedBy: "\n").count
                 Text("\(lineCount) line\(lineCount == 1 ? "" : "s")")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
@@ -125,51 +146,36 @@ struct CodeBlockView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Copy code")
+
+                Button(action: toggleExpanded) {
+                    HStack(spacing: 4) {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text(isExpanded ? "Collapse" : "Expand")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(headerBackground)
 
-            // Code content
-            ScrollView(.horizontal, showsIndicators: true) {
-                HStack(alignment: .top, spacing: 0) {
-                    // Line numbers
-                    VStack(alignment: .trailing, spacing: 0) {
-                        ForEach(1...max(1, trimmedCode.components(separatedBy: "\n").count), id: \.self) { num in
-                            Text("\(num)")
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.tertiary)
-                                .frame(height: 18)
-                        }
-                    }
-                    .padding(.trailing, 12)
-                    .padding(.leading, 8)
-
-                    Divider()
-                        .frame(height: CGFloat(max(1, trimmedCode.components(separatedBy: "\n").count)) * 18)
-
-                    // Code
-                    Group {
-                        if let highlighted = highlightedText {
-                            Text(highlighted)
-                        } else {
-                            Text(trimmedCode)
-                                .foregroundColor(.primary)
-                        }
-                    }
-                    .font(.system(size: 13, design: .monospaced))
-                    .lineSpacing(2)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: true, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-                    .padding(.leading, 12)
+            Group {
+                if isExpanded {
+                    codeContent(text: trimmedCode, displayLineCount: lineCount, useHighlight: true)
+                } else {
+                    codeContent(text: previewText, displayLineCount: previewLineCount, useHighlight: false)
                 }
-                .padding(.vertical, 10)
             }
-            .background(codeBackground)
             .task(id: highlightTaskKey) {
-                guard !isStreaming else { return }
+                guard shouldHighlight else {
+                    if highlightedText != nil {
+                        highlightedText = nil
+                    }
+                    return
+                }
                 let snapshot = trimmedCode
                 await performHighlight(codeSnapshot: snapshot)
             }
@@ -184,6 +190,11 @@ struct CodeBlockView: View {
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
             }
+        }
+        .task(id: trimmedCode.hashValue) {
+            guard !didSetInitialExpand else { return }
+            isExpanded = lineCount <= 12
+            didSetInitialExpand = true
         }
     }
 
@@ -203,7 +214,7 @@ struct CodeBlockView: View {
     }
 
     private var highlightTaskKey: String {
-        "\(trimmedCode.hashValue)-\(language ?? "none")-\(effectiveThemeName)-\(isStreaming ? "stream" : "final")"
+        "\(trimmedCode.hashValue)-\(language ?? "none")-\(effectiveThemeName)-\(isStreaming ? "stream" : "final")-\(isExpanded ? "expanded" : "collapsed")"
     }
 
     private func performHighlight(codeSnapshot: String) async {
@@ -232,6 +243,51 @@ struct CodeBlockView: View {
                 highlightedText = AttributedString(codeSnapshot)
             }
         }
+    }
+
+    private func toggleExpanded() {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            isExpanded.toggle()
+        }
+    }
+
+    @ViewBuilder
+    private func codeContent(text: String, displayLineCount: Int, useHighlight: Bool) -> some View {
+        ScrollView(.horizontal, showsIndicators: true) {
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .trailing, spacing: 0) {
+                    ForEach(1...displayLineCount, id: \.self) { num in
+                        Text("\(num)")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                            .frame(height: 18)
+                    }
+                }
+                .padding(.trailing, 12)
+                .padding(.leading, 8)
+
+                Divider()
+                    .frame(height: CGFloat(displayLineCount) * 18)
+
+                Group {
+                    if useHighlight, let highlighted = highlightedText {
+                        Text(highlighted)
+                    } else {
+                        Text(text)
+                            .foregroundColor(.primary)
+                    }
+                }
+                .font(.system(size: 13, design: .monospaced))
+                .lineSpacing(2)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: true, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+                .padding(.leading, 12)
+            }
+            .padding(.vertical, 10)
+        }
+        .background(codeBackground)
     }
 
     private func defaultTheme() -> EditorTheme {

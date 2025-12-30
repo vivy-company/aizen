@@ -490,9 +490,10 @@ struct GitPanelWindowContent: View {
     private func setupGitWatcher() {
         guard gitIndexWatchToken == nil else { return }
         Task {
-            let token = await GitIndexWatchCenter.shared.addSubscriber(worktreePath: worktreePath) { [weak gitRepositoryService] in
+            let service = gitRepositoryService
+            let token = await GitIndexWatchCenter.shared.addSubscriber(worktreePath: worktreePath) { [weak service] in
                 Task { @MainActor in
-                    gitRepositoryService?.reloadStatus(lightweight: true)
+                    service?.reloadStatus(lightweight: true)
                 }
             }
             await MainActor.run {

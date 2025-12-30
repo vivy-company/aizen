@@ -8,6 +8,7 @@ import SwiftUI
 
 struct InlineDiffView: View {
     let diff: ToolCallDiff
+    var allowCompute: Bool = true
 
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
@@ -15,6 +16,7 @@ struct InlineDiffView: View {
     @State private var cachedDiffLines: [ChatDiffLine]?
     @State private var isComputing: Bool = false
     @State private var showFullDiff: Bool = false
+    @State private var lastComputedDiffId: String?
 
     private let previewLineCount = 8
 
@@ -24,6 +26,10 @@ struct InlineDiffView: View {
 
     private var diffId: String {
         "\(diff.path)-\(diff.oldText?.hashValue ?? 0)-\(diff.newText.hashValue)"
+    }
+
+    private var diffTaskId: String {
+        allowCompute ? diffId : "diff-deferred-\(diff.path)"
     }
 
     private var diffLines: [ChatDiffLine] {
@@ -59,7 +65,13 @@ struct InlineDiffView: View {
 
             // Diff content with multiline selection support
             VStack(alignment: .leading, spacing: 0) {
-                if isComputing {
+                if !allowCompute {
+                    Text("Diff will appear when the tool completes")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 6)
+                } else if isComputing {
                     HStack {
                         ProgressView()
                             .scaleEffect(0.7)
@@ -102,7 +114,7 @@ struct InlineDiffView: View {
             .background(Color(nsColor: .textBackgroundColor))
             .cornerRadius(6)
         }
-        .task(id: diffId) {
+        .task(id: diffTaskId) {
             await computeDiffAsync()
         }
         .sheet(isPresented: $showFullDiff) {
@@ -113,7 +125,14 @@ struct InlineDiffView: View {
     // MARK: - Async Diff Computation
     
     private func computeDiffAsync() async {
+        guard allowCompute else { return }
+
+        if lastComputedDiffId != diffId {
+            cachedDiffLines = nil
+        }
+
         guard cachedDiffLines == nil else { return }
+        lastComputedDiffId = diffId
         
         isComputing = true
         
@@ -121,16 +140,19 @@ struct InlineDiffView: View {
         let newText = diff.newText
         
         let lines = await Task.detached(priority: .userInitiated) {
-            self.computeUnifiedDiff(oldText: oldText, newText: newText)
+            InlineDiffComputer.computeUnifiedDiff(oldText: oldText, newText: newText)
         }.value
         
         cachedDiffLines = lines
         isComputing = false
     }
 
-    // MARK: - Diff Computation
+}
 
-    private func computeUnifiedDiff(oldText: String?, newText: String, contextLines: Int = 3) -> [ChatDiffLine] {
+// MARK: - Diff Computation
+
+private nonisolated enum InlineDiffComputer {
+    static func computeUnifiedDiff(oldText: String?, newText: String, contextLines: Int = 3) -> [ChatDiffLine] {
         let oldLines = (oldText ?? "").split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let newLines = newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
 
@@ -166,7 +188,7 @@ struct InlineDiffView: View {
         return generateHunks(edits: edits, contextLines: contextLines)
     }
 
-    private func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
+    static func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
         let m = a.count
         let n = b.count
         guard m > 0 && n > 0 else { return [] }
@@ -209,12 +231,12 @@ struct InlineDiffView: View {
     }
 
     /// Simple LCS for large files - only matches exact consecutive sequences
-    private func simpleLCS(_ a: [String], _ b: [String]) -> [String] {
-        var bSet = Set(b)
+    static func simpleLCS(_ a: [String], _ b: [String]) -> [String] {
+        let bSet = Set(b)
         return a.filter { bSet.contains($0) }
     }
 
-    private func generateHunks(edits: [(type: ChatDiffLineType, content: String)], contextLines: Int) -> [ChatDiffLine] {
+    static func generateHunks(edits: [(type: ChatDiffLineType, content: String)], contextLines: Int) -> [ChatDiffLine] {
         var result: [ChatDiffLine] = []
 
         // Find ranges of changes

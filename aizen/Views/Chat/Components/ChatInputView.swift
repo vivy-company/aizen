@@ -52,6 +52,12 @@ struct CustomTextEditor: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.isAutomaticTextCompletionEnabled = false
+        textView.isAutomaticLinkDetectionEnabled = false
+        textView.isAutomaticDataDetectionEnabled = false
+        textView.isGrammarCheckingEnabled = false
+        textView.isContinuousSpellCheckingEnabled = false
         textView.drawsBackground = false
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
@@ -64,7 +70,7 @@ struct CustomTextEditor: NSViewRepresentable {
 
         context.coordinator.textView = textView
         context.coordinator.scrollView = scrollView
-        context.coordinator.updateMeasuredHeight()
+        context.coordinator.updateMeasuredHeightIfNeeded()
 
         return scrollView
     }
@@ -94,7 +100,7 @@ struct CustomTextEditor: NSViewRepresentable {
         context.coordinator.onAutocompleteNavigate = onAutocompleteNavigate
         context.coordinator.onImagePaste = onImagePaste
         context.coordinator.onLargeTextPaste = onLargeTextPaste
-        context.coordinator.updateMeasuredHeight()
+        context.coordinator.updateMeasuredHeightIfNeeded()
     }
 
     func makeCoordinator() -> Coordinator {
@@ -120,6 +126,12 @@ struct CustomTextEditor: NSViewRepresentable {
         weak var textView: NSTextView?
         weak var scrollView: NSScrollView?
         private var eventMonitor: Any?
+        private var lastMeasuredText: String = ""
+        private var lastMeasuredWidth: CGFloat = 0
+        private var lastCursorPosition: Int = -1
+        private var lastCursorText: String = ""
+        private var didApplyMentionHighlight = false
+        private static let mentionRegex = try? NSRegularExpression(pattern: "@[^\\s]+", options: [])
 
         init(
             text: Binding<String>,
@@ -250,7 +262,7 @@ struct CustomTextEditor: NSViewRepresentable {
             text = textView.string
             highlightMentions(in: textView)
             notifyCursorChange(textView)
-            updateMeasuredHeight()
+            updateMeasuredHeightIfNeeded()
         }
 
         func applyHighlighting(to textView: NSTextView) {
@@ -260,9 +272,24 @@ struct CustomTextEditor: NSViewRepresentable {
         private func highlightMentions(in textView: NSTextView) {
             let text = textView.string
             let fullRange = NSRange(location: 0, length: text.utf16.count)
-
-            // Store current selection
             let selectedRange = textView.selectedRange()
+
+            if !text.contains("@") {
+                guard didApplyMentionHighlight else { return }
+                let attributedString = NSAttributedString(
+                    string: text,
+                    attributes: [
+                        .font: NSFont.systemFont(ofSize: 14),
+                        .foregroundColor: NSColor.labelColor
+                    ]
+                )
+                textView.textStorage?.setAttributedString(attributedString)
+                if selectedRange.location <= text.count {
+                    textView.setSelectedRange(selectedRange)
+                }
+                didApplyMentionHighlight = false
+                return
+            }
 
             // Create attributed string with default styling
             let attributedString = NSMutableAttributedString(string: text)
@@ -270,23 +297,20 @@ struct CustomTextEditor: NSViewRepresentable {
             attributedString.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
 
             // Find and highlight @mentions (pattern: @followed by non-whitespace until space)
-            let pattern = "@[^\\s]+"
-            if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
-                let matches = regex.matches(in: text, options: [], range: fullRange)
-                for match in matches {
-                    attributedString.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: match.range)
-                }
+            let matches = Self.mentionRegex?.matches(in: text, options: [], range: fullRange) ?? []
+            for match in matches {
+                attributedString.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: match.range)
             }
 
             // Only update if there are actual mentions to highlight
-            if textView.textStorage?.string != attributedString.string ||
-               !attributedString.isEqual(to: textView.attributedString()) {
+            if !attributedString.isEqual(to: textView.attributedString()) {
                 textView.textStorage?.setAttributedString(attributedString)
                 // Restore selection
                 if selectedRange.location <= text.count {
                     textView.setSelectedRange(selectedRange)
                 }
             }
+            didApplyMentionHighlight = !matches.isEmpty
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -316,9 +340,36 @@ struct CustomTextEditor: NSViewRepresentable {
             }
         }
 
+        func updateMeasuredHeightIfNeeded() {
+            guard let textView = textView,
+                  let scrollView = scrollView else {
+                return
+            }
+
+            let width = scrollView.contentSize.width
+            let text = textView.string
+
+            guard abs(width - lastMeasuredWidth) > 0.5 || text != lastMeasuredText else {
+                return
+            }
+
+            lastMeasuredWidth = width
+            lastMeasuredText = text
+            updateMeasuredHeight()
+        }
+
         private func notifyCursorChange(_ textView: NSTextView) {
             let currentText = textView.string
             let cursorPosition = textView.selectedRange().location
+            if cursorPosition == lastCursorPosition && currentText == lastCursorText {
+                return
+            }
+            lastCursorPosition = cursorPosition
+            lastCursorText = currentText
+            if !currentText.contains("@") && !currentText.contains("/") {
+                onCursorChange?(currentText, cursorPosition, .zero)
+                return
+            }
             let cursorRect = cursorScreenRect(for: cursorPosition, in: textView)
             onCursorChange?(currentText, cursorPosition, cursorRect)
         }

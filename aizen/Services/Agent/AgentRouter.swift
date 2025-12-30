@@ -29,15 +29,13 @@ class AgentRouter: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
-                await self?.rebuildLookupCache()
-            }
+            self?.rebuildLookupCache()
         }
 
         // Initialize async
         Task {
-            await self.rebuildLookupCache()
-            await self.initializeSessions()
+            self.rebuildLookupCache()
+            self.initializeSessions()
         }
     }
 
@@ -47,17 +45,17 @@ class AgentRouter: ObservableObject {
         }
     }
 
-    private func rebuildLookupCache() async {
+    private func rebuildLookupCache() {
         enabledAgentLookup.removeAll()
-        let enabledAgents = await AgentRegistry.shared.getEnabledAgents()
+        let enabledAgents = AgentRegistry.shared.getEnabledAgents()
         for agent in enabledAgents {
             enabledAgentLookup[agent.id.lowercased()] = agent
             enabledAgentLookup[agent.name.lowercased()] = agent
         }
     }
 
-    private func initializeSessions() async {
-        let enabledAgents = await AgentRegistry.shared.getEnabledAgents()
+    private func initializeSessions() {
+        let enabledAgents = AgentRegistry.shared.getEnabledAgents()
         for agent in enabledAgents {
             activeSessions[agent.id] = AgentSession(agentName: agent.id)
         }

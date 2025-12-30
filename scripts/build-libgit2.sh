@@ -7,6 +7,11 @@ OPENSSL_VERSION="openssl-3.3.2"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUTPUT_DIR="$SCRIPT_DIR/../Vendor/libgit2"
 TMP_DIR="/tmp/libgit2-build-$$"
+DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.5}"
+
+export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
+export CFLAGS="-mmacosx-version-min=$DEPLOYMENT_TARGET"
+export LDFLAGS="-mmacosx-version-min=$DEPLOYMENT_TARGET"
 
 echo "Building libgit2 $LIBGIT2_VERSION with SSH support..."
 
@@ -57,6 +62,7 @@ cmake .. \
     -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_STATIC_LIBS=ON \
     -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_EXAMPLES=OFF \
     -DBUILD_TESTING=OFF \
@@ -88,6 +94,7 @@ export PKG_CONFIG_PATH=""
 cmake .. \
     -DBUILD_SHARED_LIBS=OFF \
     -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" \
     -DCMAKE_BUILD_TYPE=Release \
     -DUSE_SSH=ON \
     -DCMAKE_PREFIX_PATH="$TMP_DIR/libssh2-install" \

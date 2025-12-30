@@ -13,9 +13,12 @@ actor GitIndexWatchCenter {
     private struct Entry {
         let watcher: GitIndexWatcher
         var subscribers: [UUID: @Sendable () -> Void]
+        var pauseCount: Int
+        var hasPendingNotification: Bool
     }
 
     private var entries: [String: Entry] = [:]
+    private var pauseCounts: [String: Int] = [:]
 
     func addSubscriber(worktreePath: String, onChange: @escaping @Sendable () -> Void) -> UUID {
         let key = worktreePath
@@ -28,7 +31,13 @@ actor GitIndexWatchCenter {
         }
 
         let watcher = GitIndexWatcher(worktreePath: worktreePath)
-        var entry = Entry(watcher: watcher, subscribers: [id: onChange])
+        let pauseCount = pauseCounts[key] ?? 0
+        var entry = Entry(
+            watcher: watcher,
+            subscribers: [id: onChange],
+            pauseCount: pauseCount,
+            hasPendingNotification: false
+        )
         entries[key] = entry
 
         watcher.startWatching { [worktreePath] in
@@ -53,11 +62,47 @@ actor GitIndexWatchCenter {
         }
     }
 
+    func pause(worktreePath: String) {
+        let key = worktreePath
+        pauseCounts[key, default: 0] += 1
+        if var entry = entries[key] {
+            entry.pauseCount += 1
+            entries[key] = entry
+        }
+    }
+
+    func resume(worktreePath: String) {
+        let key = worktreePath
+        guard let current = pauseCounts[key], current > 0 else { return }
+        let newCount = current - 1
+        if newCount == 0 {
+            pauseCounts.removeValue(forKey: key)
+        } else {
+            pauseCounts[key] = newCount
+        }
+
+        guard var entry = entries[key] else { return }
+        entry.pauseCount = max(0, entry.pauseCount - 1)
+        let shouldNotify = entry.pauseCount == 0 && entry.hasPendingNotification
+        entry.hasPendingNotification = false
+        entries[key] = entry
+
+        if shouldNotify {
+            for callback in entry.subscribers.values {
+                callback()
+            }
+        }
+    }
+
     private func notifySubscribers(worktreePath: String) {
-        guard let entry = entries[worktreePath] else { return }
+        guard var entry = entries[worktreePath] else { return }
+        if entry.pauseCount > 0 {
+            entry.hasPendingNotification = true
+            entries[worktreePath] = entry
+            return
+        }
         for callback in entry.subscribers.values {
             callback()
         }
     }
 }
-

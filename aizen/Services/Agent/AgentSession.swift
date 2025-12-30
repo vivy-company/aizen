@@ -82,17 +82,30 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     var cancellables = Set<AnyCancellable>()
     var process: Process?
     var notificationTask: Task<Void, Never>?
+    var notificationProcessingTask: Task<Void, Never>?
     var versionCheckTask: Task<Void, Never>?
     let logger = Logger.forCategory("AgentSession")
     private var finalizeMessageTask: Task<Void, Never>?
     private var lastAgentChunkAt: Date?
     private static let finalizeIdleDelay: TimeInterval = 0.2
     private var isModeChanging = false
+    private var thoughtBuffer: String = ""
+    private var thoughtFlushTask: Task<Void, Never>?
+    private static let thoughtUpdateInterval: TimeInterval = 0.15
+    private var pendingAgentText: String = ""
+    private var pendingAgentBlocks: [ContentBlock] = []
+    private var agentMessageFlushTask: Task<Void, Never>?
+    private static let agentMessageFlushInterval: TimeInterval = 0.25
+    var pendingToolCallContentById: [String: [ToolCallContent]] = [:]
+    var toolCallContentFlushTasks: [String: Task<Void, Never>] = [:]
+    static let toolCallContentFlushInterval: TimeInterval = 0.25
 
     /// Currently pending Task tool calls (subagents) - used for parent tracking
     /// When only one Task is active, child tool calls are assigned to it
     /// When multiple Tasks are active (parallel), we cannot reliably assign parents
     var activeTaskIds: [String] = []
+    /// Buffer tool call updates that arrive before the tool call itself
+    var pendingToolCallUpdatesById: [String: [ToolCallUpdateDetails]] = [:]
 
     // Delegates
     private let fileSystemDelegate = AgentFileSystemDelegate()
@@ -112,6 +125,80 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         finalizeMessageTask?.cancel()
         finalizeMessageTask = nil
         lastAgentChunkAt = nil
+    }
+
+    func appendThoughtChunk(_ text: String) {
+        thoughtBuffer += text
+        scheduleThoughtFlush()
+    }
+
+    func clearThoughtBuffer() {
+        thoughtBuffer = ""
+        thoughtFlushTask?.cancel()
+        thoughtFlushTask = nil
+    }
+
+    private func scheduleThoughtFlush() {
+        guard thoughtFlushTask == nil else { return }
+        thoughtFlushTask = Task { @MainActor in
+            defer { thoughtFlushTask = nil }
+            try? await Task.sleep(for: .seconds(Self.thoughtUpdateInterval))
+            currentThought = thoughtBuffer
+        }
+    }
+
+    func appendAgentMessageChunk(text: String, contentBlocks: [ContentBlock]) {
+        pendingAgentText += text
+        if !contentBlocks.isEmpty {
+            pendingAgentBlocks.append(contentsOf: contentBlocks)
+        }
+        scheduleAgentMessageFlush()
+    }
+
+    func flushAgentMessageBuffer() {
+        guard !pendingAgentText.isEmpty || !pendingAgentBlocks.isEmpty else { return }
+        agentMessageFlushTask?.cancel()
+        agentMessageFlushTask = nil
+
+        if let lastIndex = messages.lastIndex(where: { $0.role == .agent && !$0.isComplete }) {
+            let lastAgentMessage = messages[lastIndex]
+            let newContent = lastAgentMessage.content + pendingAgentText
+            var newBlocks = lastAgentMessage.contentBlocks
+            if !pendingAgentBlocks.isEmpty {
+                newBlocks.append(contentsOf: pendingAgentBlocks)
+            }
+            messages[lastIndex] = MessageItem(
+                id: lastAgentMessage.id,
+                role: .agent,
+                content: newContent,
+                timestamp: lastAgentMessage.timestamp,
+                toolCalls: lastAgentMessage.toolCalls,
+                contentBlocks: newBlocks,
+                isComplete: false,
+                startTime: lastAgentMessage.startTime,
+                executionTime: lastAgentMessage.executionTime,
+                requestId: lastAgentMessage.requestId
+            )
+        }
+
+        pendingAgentText = ""
+        pendingAgentBlocks = []
+    }
+
+    func clearAgentMessageBuffer() {
+        pendingAgentText = ""
+        pendingAgentBlocks = []
+        agentMessageFlushTask?.cancel()
+        agentMessageFlushTask = nil
+    }
+
+    private func scheduleAgentMessageFlush() {
+        guard agentMessageFlushTask == nil else { return }
+        agentMessageFlushTask = Task { @MainActor in
+            defer { agentMessageFlushTask = nil }
+            try? await Task.sleep(for: .seconds(Self.agentMessageFlushInterval))
+            flushAgentMessageBuffer()
+        }
     }
 
     func recordAgentChunk() {
@@ -565,6 +652,12 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     func clearToolCalls() {
         toolCallsById.removeAll()
         toolCallOrder.removeAll()
+        pendingToolCallUpdatesById.removeAll()
+        pendingToolCallContentById.removeAll()
+        for (_, task) in toolCallContentFlushTasks {
+            task.cancel()
+        }
+        toolCallContentFlushTasks.removeAll()
     }
 
     private func trimToolCallsIfNeeded() {

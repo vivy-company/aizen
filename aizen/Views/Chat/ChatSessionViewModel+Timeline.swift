@@ -15,7 +15,13 @@ private var timelineIndexKey: UInt8 = 0
 
 extension ChatSessionViewModel {
     struct ScrollRequest: Equatable {
+        enum Target: Equatable {
+            case bottom
+            case item(id: String, anchor: UnitPoint)
+        }
+
         let id: UUID
+        let target: Target
         let animated: Bool
         let force: Bool
     }
@@ -41,6 +47,16 @@ extension ChatSessionViewModel {
         )
     }
 
+    /// Rebuild child tool call index for quick lookup in views
+    private func rebuildChildToolCallsIndex() {
+        var index: [String: [ToolCall]] = [:]
+        for call in toolCalls {
+            guard let parent = call.parentToolCallId else { continue }
+            index[parent, default: []].append(call)
+        }
+        childToolCallsByParentId = index
+    }
+
     // MARK: - Timeline
 
     /// Full rebuild - used only for initial load or major state changes
@@ -51,6 +67,7 @@ extension ChatSessionViewModel {
             .sorted { $0.timestamp < $1.timestamp }
             .filter { seen.insert($0.stableId).inserted }
         rebuildTimelineIndex()
+        rebuildChildToolCallsIndex()
     }
 
     /// Rebuild timeline with tool call grouping by message boundaries
@@ -187,6 +204,7 @@ extension ChatSessionViewModel {
 
         timelineItems = items
         rebuildTimelineIndex()
+        rebuildChildToolCallsIndex()
     }
 
     /// Create turn summary from all tool calls in the turn
@@ -297,6 +315,20 @@ extension ChatSessionViewModel {
             return
         }
 
+        // Fast path: no structural changes during streaming - update only the last agent message.
+        if !hasStructuralChanges, let lastAgentMessage = newMessages.last(where: { $0.role == .agent }) {
+            if let idx = timelineIndex[lastAgentMessage.id], idx < timelineItems.count {
+                if case .message(let existing) = timelineItems[idx], existing == lastAgentMessage {
+                    previousMessageIds = newIds
+                    return
+                }
+                timelineItems[idx] = .message(lastAgentMessage)
+                timelineItems = timelineItems
+                previousMessageIds = newIds
+                return
+            }
+        }
+
         var didMutate = false
 
         let updateBlock = { [self] in
@@ -340,6 +372,21 @@ extension ChatSessionViewModel {
 
         // Update tracked IDs for next sync
         previousMessageIds = newIds
+
+        // Always jump when a new message is added.
+        if !addedIds.isEmpty {
+            if let newestUserMessage = newMessages.last(where: { addedIds.contains($0.id) && $0.role == .user }) {
+                suppressNextAutoScroll = true
+                requestScrollToItem(
+                    id: newestUserMessage.id,
+                    anchor: .top,
+                    force: true,
+                    animated: true
+                )
+            } else {
+                requestScrollToBottom(force: true, animated: true)
+            }
+        }
     }
 
     /// Sync tool calls incrementally - update existing or insert new
@@ -390,6 +437,8 @@ extension ChatSessionViewModel {
             timelineItems = timelineItems
         }
 
+        rebuildChildToolCallsIndex()
+
         // Update tracked IDs for next sync
         previousToolCallIds = newIds
     }
@@ -423,12 +472,12 @@ extension ChatSessionViewModel {
 
     /// Get child tool calls for a parent Task
     func childToolCalls(for parentId: String) -> [ToolCall] {
-        toolCalls.filter { $0.parentToolCallId == parentId }
+        childToolCallsByParentId[parentId] ?? []
     }
 
     /// Check if a tool call has children (is a Task with nested calls)
     func hasChildToolCalls(toolCallId: String) -> Bool {
-        toolCalls.contains { $0.parentToolCallId == toolCallId }
+        !(childToolCallsByParentId[toolCallId]?.isEmpty ?? true)
     }
 
     // MARK: - Scrolling
@@ -443,7 +492,16 @@ extension ChatSessionViewModel {
     }
 
     private func requestScrollToBottom(force: Bool, animated: Bool) {
-        scrollRequest = ScrollRequest(id: UUID(), animated: animated, force: force)
+        scrollRequest = ScrollRequest(id: UUID(), target: .bottom, animated: animated, force: force)
+    }
+
+    private func requestScrollToItem(id: String, anchor: UnitPoint, force: Bool, animated: Bool) {
+        scrollRequest = ScrollRequest(
+            id: UUID(),
+            target: .item(id: id, anchor: anchor),
+            animated: animated,
+            force: force
+        )
     }
 
     private func scheduleAutoScrollToBottom() {
@@ -456,7 +514,7 @@ extension ChatSessionViewModel {
             if Task.isCancelled || !isNearBottom {
                 return
             }
-            scrollRequest = ScrollRequest(id: UUID(), animated: false, force: false)
+            scrollRequest = ScrollRequest(id: UUID(), target: .bottom, animated: false, force: false)
         }
     }
 

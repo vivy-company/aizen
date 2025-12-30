@@ -37,6 +37,7 @@ extension AgentSession {
         // Mark any incomplete agent message as complete before starting new conversation turn
         markLastMessageComplete()
         resetFinalizeState()
+        clearThoughtBuffer()
 
         // Build content blocks array for sending to agent
         var contentBlocks: [ContentBlock] = []
@@ -165,12 +166,14 @@ extension AgentSession {
             messages.append(cancelMessage)
 
             // Clear current thought
+            clearThoughtBuffer()
             currentThought = nil
         } catch {
             logger.error("Error cancelling prompt: \(error.localizedDescription)")
             // Still reset streaming state even on error
             isStreaming = false
             resetFinalizeState()
+            clearThoughtBuffer()
         }
     }
 
@@ -315,6 +318,7 @@ extension AgentSession {
     }
 
     func markLastMessageComplete() {
+        flushAgentMessageBuffer()
         if let lastIndex = messages.lastIndex(where: { $0.role == .agent && !$0.isComplete }) {
             let completedMessage = messages[lastIndex]
             let executionTime = completedMessage.startTime.map { Date().timeIntervalSince($0) }

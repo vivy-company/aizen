@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Client Capabilities
 
-struct ClientCapabilities: Codable {
+nonisolated struct ClientCapabilities: Codable {
     let fs: FileSystemCapabilities
     let terminal: Bool
     let meta: [String: AnyCodable]?
@@ -27,7 +27,7 @@ struct ClientCapabilities: Codable {
     }
 }
 
-struct FileSystemCapabilities: Codable {
+nonisolated struct FileSystemCapabilities: Codable {
     let readTextFile: Bool
     let writeTextFile: Bool
 
@@ -39,7 +39,7 @@ struct FileSystemCapabilities: Codable {
 
 // MARK: - Agent Capabilities
 
-struct AgentCapabilities: Codable {
+nonisolated struct AgentCapabilities: Codable {
     let loadSession: Bool?
     let mcpCapabilities: MCPCapabilities?
     let promptCapabilities: PromptCapabilities?
@@ -53,7 +53,7 @@ struct AgentCapabilities: Codable {
     }
 }
 
-struct MCPCapabilities: Codable {
+nonisolated struct MCPCapabilities: Codable {
     let http: Bool?
     let sse: Bool?
 
@@ -63,12 +63,12 @@ struct MCPCapabilities: Codable {
     }
 }
 
-struct PromptCapabilities: Codable {
+nonisolated struct PromptCapabilities: Codable {
     let audio: Bool?
     let embeddedContext: Bool?
     let image: Bool?
 }
 
-struct SessionCapabilities: Codable {
+nonisolated struct SessionCapabilities: Codable {
     let _meta: [String: AnyCodable]?
 }

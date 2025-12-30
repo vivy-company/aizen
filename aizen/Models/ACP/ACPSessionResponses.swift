@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Initialize
 
-struct InitializeResponse: Codable {
+nonisolated struct InitializeResponse: Codable {
     let protocolVersion: Int
     let agentInfo: AgentInfo?
     let agentCapabilities: AgentCapabilities
@@ -25,7 +25,7 @@ struct InitializeResponse: Codable {
 
 // MARK: - Session Management
 
-struct NewSessionResponse: Codable {
+nonisolated struct NewSessionResponse: Codable {
     let sessionId: SessionId
     // Legacy API (backward compatibility)
     let modes: ModesInfo?
@@ -41,7 +41,7 @@ struct NewSessionResponse: Codable {
     }
 }
 
-struct LoadSessionResponse: Codable {
+nonisolated struct LoadSessionResponse: Codable {
     let sessionId: SessionId
 
     enum CodingKeys: String, CodingKey {
@@ -51,7 +51,7 @@ struct LoadSessionResponse: Codable {
 
 // MARK: - Prompt
 
-struct SessionPromptResponse: Codable {
+nonisolated struct SessionPromptResponse: Codable {
     let stopReason: StopReason
 
     enum CodingKeys: String, CodingKey {
@@ -61,15 +61,15 @@ struct SessionPromptResponse: Codable {
 
 // MARK: - Mode & Model Selection
 
-struct SetModeResponse: Codable {
+nonisolated struct SetModeResponse: Codable {
     let success: Bool
 }
 
-struct SetModelResponse: Codable {
+nonisolated struct SetModelResponse: Codable {
     let success: Bool
 }
 
-struct SetSessionConfigOptionResponse: Codable {
+nonisolated struct SetSessionConfigOptionResponse: Codable {
     let configOptions: [SessionConfigOption]
 
     enum CodingKeys: String, CodingKey {
@@ -79,14 +79,14 @@ struct SetSessionConfigOptionResponse: Codable {
 
 // MARK: - Authentication
 
-struct AuthenticateResponse: Codable {
+nonisolated struct AuthenticateResponse: Codable {
     let success: Bool
     let error: String?
 }
 
 // MARK: - File System
 
-struct ReadTextFileResponse: Codable {
+nonisolated struct ReadTextFileResponse: Codable {
     let content: String
     let totalLines: Int?
     let _meta: [String: AnyCodable]?
@@ -98,7 +98,7 @@ struct ReadTextFileResponse: Codable {
     }
 }
 
-struct WriteTextFileResponse: Codable {
+nonisolated struct WriteTextFileResponse: Codable {
     let _meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {

@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Terminal Types
 
-struct TerminalId: Codable, Hashable {
+nonisolated struct TerminalId: Codable, Hashable {
     let value: String
 
     init(_ value: String) {
@@ -29,7 +29,7 @@ struct TerminalId: Codable, Hashable {
 
 // MARK: - Environment Variable
 
-struct EnvVariable: Codable {
+nonisolated struct EnvVariable: Codable {
     let name: String
     let value: String
     let _meta: [String: AnyCodable]?
@@ -41,7 +41,7 @@ struct EnvVariable: Codable {
 
 // MARK: - Terminal Exit Status
 
-struct TerminalExitStatus: Codable {
+nonisolated struct TerminalExitStatus: Codable {
     let exitCode: Int?
     let signal: String?
     let _meta: [String: AnyCodable]?
@@ -55,7 +55,7 @@ struct TerminalExitStatus: Codable {
 
 // MARK: - Create Terminal
 
-struct CreateTerminalRequest: Codable {
+nonisolated struct CreateTerminalRequest: Codable {
     let command: String
     let args: [String]?
     let cwd: String?
@@ -71,7 +71,7 @@ struct CreateTerminalRequest: Codable {
     }
 }
 
-struct CreateTerminalResponse: Codable {
+nonisolated struct CreateTerminalResponse: Codable {
     let terminalId: TerminalId
     let _meta: [String: AnyCodable]?
 
@@ -83,7 +83,7 @@ struct CreateTerminalResponse: Codable {
 
 // MARK: - Terminal Output
 
-struct TerminalOutputRequest: Codable {
+nonisolated struct TerminalOutputRequest: Codable {
     let terminalId: TerminalId
     let sessionId: String
     let _meta: [String: AnyCodable]?
@@ -95,7 +95,7 @@ struct TerminalOutputRequest: Codable {
     }
 }
 
-struct TerminalOutputResponse: Codable {
+nonisolated struct TerminalOutputResponse: Codable {
     let output: String
     let exitStatus: TerminalExitStatus?
     let truncated: Bool
@@ -109,7 +109,7 @@ struct TerminalOutputResponse: Codable {
 
 // MARK: - Wait for Exit
 
-struct WaitForExitRequest: Codable {
+nonisolated struct WaitForExitRequest: Codable {
     let terminalId: TerminalId
     let sessionId: String
     let _meta: [String: AnyCodable]?
@@ -121,7 +121,7 @@ struct WaitForExitRequest: Codable {
     }
 }
 
-struct WaitForExitResponse: Codable {
+nonisolated struct WaitForExitResponse: Codable {
     let exitCode: Int?
     let signal: String?
     let _meta: [String: AnyCodable]?
@@ -129,7 +129,7 @@ struct WaitForExitResponse: Codable {
 
 // MARK: - Kill Terminal
 
-struct KillTerminalRequest: Codable {
+nonisolated struct KillTerminalRequest: Codable {
     let terminalId: TerminalId
     let sessionId: String
     let _meta: [String: AnyCodable]?
@@ -141,7 +141,7 @@ struct KillTerminalRequest: Codable {
     }
 }
 
-struct KillTerminalResponse: Codable {
+nonisolated struct KillTerminalResponse: Codable {
     let success: Bool
     let _meta: [String: AnyCodable]?
 
@@ -152,7 +152,7 @@ struct KillTerminalResponse: Codable {
 
 // MARK: - Release Terminal
 
-struct ReleaseTerminalRequest: Codable {
+nonisolated struct ReleaseTerminalRequest: Codable {
     let terminalId: TerminalId
     let sessionId: String
     let _meta: [String: AnyCodable]?
@@ -164,7 +164,7 @@ struct ReleaseTerminalRequest: Codable {
     }
 }
 
-struct ReleaseTerminalResponse: Codable {
+nonisolated struct ReleaseTerminalResponse: Codable {
     let success: Bool
     let _meta: [String: AnyCodable]?
 

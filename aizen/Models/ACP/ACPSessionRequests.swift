@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Initialize
 
-struct InitializeRequest: Codable {
+nonisolated struct InitializeRequest: Codable {
     let protocolVersion: Int
     let clientCapabilities: ClientCapabilities
     let clientInfo: ClientInfo?
@@ -23,7 +23,7 @@ struct InitializeRequest: Codable {
 
 // MARK: - Session Management
 
-struct NewSessionRequest: Codable {
+nonisolated struct NewSessionRequest: Codable {
     let cwd: String
     let mcpServers: [MCPServerConfig]
 
@@ -33,7 +33,7 @@ struct NewSessionRequest: Codable {
     }
 }
 
-struct LoadSessionRequest: Codable {
+nonisolated struct LoadSessionRequest: Codable {
     let sessionId: SessionId
     let cwd: String?
     let mcpServers: [MCPServerConfig]?
@@ -45,7 +45,7 @@ struct LoadSessionRequest: Codable {
     }
 }
 
-struct CancelSessionRequest: Codable {
+nonisolated struct CancelSessionRequest: Codable {
     let sessionId: SessionId
 
     enum CodingKeys: String, CodingKey {
@@ -55,7 +55,7 @@ struct CancelSessionRequest: Codable {
 
 // MARK: - Prompt
 
-struct SessionPromptRequest: Codable {
+nonisolated struct SessionPromptRequest: Codable {
     let sessionId: SessionId
     let prompt: [ContentBlock]
 
@@ -67,7 +67,7 @@ struct SessionPromptRequest: Codable {
 
 // MARK: - Mode & Model Selection
 
-struct SetModeRequest: Codable {
+nonisolated struct SetModeRequest: Codable {
     let sessionId: SessionId
     let modeId: String
 
@@ -77,7 +77,7 @@ struct SetModeRequest: Codable {
     }
 }
 
-struct SetModelRequest: Codable {
+nonisolated struct SetModelRequest: Codable {
     let sessionId: SessionId
     let modelId: String
 
@@ -87,7 +87,7 @@ struct SetModelRequest: Codable {
     }
 }
 
-struct SetSessionConfigOptionRequest: Codable {
+nonisolated struct SetSessionConfigOptionRequest: Codable {
     let sessionId: SessionId
     let configId: SessionConfigId
     let value: SessionConfigValueId
@@ -101,7 +101,7 @@ struct SetSessionConfigOptionRequest: Codable {
 
 // MARK: - Authentication
 
-struct AuthenticateRequest: Codable {
+nonisolated struct AuthenticateRequest: Codable {
     let methodId: String
     let credentials: [String: String]?
 
@@ -113,7 +113,7 @@ struct AuthenticateRequest: Codable {
 
 // MARK: - File System
 
-struct ReadTextFileRequest: Codable {
+nonisolated struct ReadTextFileRequest: Codable {
     let path: String
     let line: Int?  // Start line (1-based per ACP spec)
     let limit: Int?  // Number of lines to read
@@ -125,7 +125,7 @@ struct ReadTextFileRequest: Codable {
     }
 }
 
-struct WriteTextFileRequest: Codable {
+nonisolated struct WriteTextFileRequest: Codable {
     let path: String
     let content: String
     let sessionId: String

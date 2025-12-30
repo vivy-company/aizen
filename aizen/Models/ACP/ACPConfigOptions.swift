@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Session Config Option
 
-struct SessionConfigOption: Codable {
+nonisolated struct SessionConfigOption: Codable {
     let id: SessionConfigId
     let name: String
     let kind: SessionConfigKind
@@ -23,7 +23,7 @@ struct SessionConfigOption: Codable {
 
 // MARK: - Session Config ID & Value ID
 
-struct SessionConfigId: Codable, Hashable {
+nonisolated struct SessionConfigId: Codable, Hashable {
     let value: String
 
     init(_ value: String) {
@@ -41,7 +41,7 @@ struct SessionConfigId: Codable, Hashable {
     }
 }
 
-struct SessionConfigValueId: Codable, Hashable {
+nonisolated struct SessionConfigValueId: Codable, Hashable {
     let value: String
 
     init(_ value: String) {
@@ -61,7 +61,7 @@ struct SessionConfigValueId: Codable, Hashable {
 
 // MARK: - Session Config Kind
 
-enum SessionConfigKind: Codable {
+nonisolated enum SessionConfigKind: Codable {
     case select(SessionConfigSelect)
     // Future: can add toggle, slider, etc.
 
@@ -105,7 +105,7 @@ enum SessionConfigKind: Codable {
 
 // MARK: - Session Config Select
 
-struct SessionConfigSelect: Codable {
+nonisolated struct SessionConfigSelect: Codable {
     var currentValue: SessionConfigValueId
     let options: SessionConfigSelectOptions
 
@@ -117,7 +117,7 @@ struct SessionConfigSelect: Codable {
 
 // MARK: - Session Config Select Options
 
-enum SessionConfigSelectOptions: Codable {
+nonisolated enum SessionConfigSelectOptions: Codable {
     case ungrouped([SessionConfigSelectOption])
     case grouped([SessionConfigSelectGroup])
 
@@ -151,7 +151,7 @@ enum SessionConfigSelectOptions: Codable {
 
 // MARK: - Session Config Select Option
 
-struct SessionConfigSelectOption: Codable {
+nonisolated struct SessionConfigSelectOption: Codable {
     let value: SessionConfigValueId
     let label: String
 
@@ -163,7 +163,7 @@ struct SessionConfigSelectOption: Codable {
 
 // MARK: - Session Config Select Group
 
-struct SessionConfigSelectGroup: Codable {
+nonisolated struct SessionConfigSelectGroup: Codable {
     let label: String
     let options: [SessionConfigSelectOption]
 

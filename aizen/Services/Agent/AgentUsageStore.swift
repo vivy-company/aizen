@@ -38,6 +38,8 @@ final class AgentUsageStore: ObservableObject {
     private let storeKey = "agentUsageStats"
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private var persistTask: Task<Void, Never>?
+    private let persistDelay: TimeInterval = 0.5
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -85,7 +87,7 @@ final class AgentUsageStore: ObservableObject {
         var stats = statsByAgent[agentId] ?? .empty
         update(&stats)
         statsByAgent[agentId] = stats
-        persist()
+        schedulePersist()
     }
 
     private func load() {
@@ -103,6 +105,14 @@ final class AgentUsageStore: ObservableObject {
             defaults.set(data, forKey: storeKey)
         } catch {
             // Best effort persistence; ignore write failures.
+        }
+    }
+
+    private func schedulePersist() {
+        persistTask?.cancel()
+        persistTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(persistDelay))
+            persist()
         }
     }
 }

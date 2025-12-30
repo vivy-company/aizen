@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Session ID
 
-struct SessionId: Codable, Hashable {
+nonisolated struct SessionId: Codable, Hashable {
     let value: String
 
     init(_ value: String) {
@@ -29,20 +29,20 @@ struct SessionId: Codable, Hashable {
 
 // MARK: - Client & Agent Info
 
-struct ClientInfo: Codable {
+nonisolated struct ClientInfo: Codable {
     let name: String
     let title: String?
     let version: String?
 }
 
-struct AgentInfo: Codable {
+nonisolated struct AgentInfo: Codable {
     let name: String
     let version: String
 }
 
 // MARK: - Stop Reason
 
-enum StopReason: String, Codable {
+nonisolated enum StopReason: String, Codable {
     case endTurn = "end_turn"
     case maxTokens = "max_tokens"
     case maxTurnRequests = "max_turn_requests"
@@ -52,19 +52,19 @@ enum StopReason: String, Codable {
 
 // MARK: - Session Mode Types
 
-enum SessionMode: String, Codable {
+nonisolated enum SessionMode: String, Codable {
     case code
     case chat
     case ask
 }
 
-struct ModeInfo: Codable, Hashable {
+nonisolated struct ModeInfo: Codable, Hashable {
     let id: String
     let name: String
     let description: String?
 }
 
-struct ModesInfo: Codable {
+nonisolated struct ModesInfo: Codable {
     let currentModeId: String
     let availableModes: [ModeInfo]
 
@@ -76,7 +76,7 @@ struct ModesInfo: Codable {
 
 // MARK: - Model Selection Types
 
-struct ModelInfo: Codable, Hashable {
+nonisolated struct ModelInfo: Codable, Hashable {
     let modelId: String
     let name: String
     let description: String?
@@ -88,7 +88,7 @@ struct ModelInfo: Codable, Hashable {
     }
 }
 
-struct ModelsInfo: Codable {
+nonisolated struct ModelsInfo: Codable {
     let currentModelId: String
     let availableModels: [ModelInfo]
 
@@ -100,7 +100,7 @@ struct ModelsInfo: Codable {
 
 // MARK: - Authentication Types
 
-struct AuthMethod: Codable {
+nonisolated struct AuthMethod: Codable {
     let id: String
     let name: String
     let description: String?
@@ -108,7 +108,7 @@ struct AuthMethod: Codable {
 
 // MARK: - MCP Server Configuration
 
-enum MCPServerConfig: Codable {
+nonisolated enum MCPServerConfig: Codable {
     case stdio(StdioServerConfig)
     case http(HTTPServerConfig)
     case sse(SSEServerConfig)
@@ -150,7 +150,7 @@ enum MCPServerConfig: Codable {
     }
 }
 
-struct StdioServerConfig: Codable {
+nonisolated struct StdioServerConfig: Codable {
     let name: String
     let command: String
     let args: [String]
@@ -162,7 +162,7 @@ struct StdioServerConfig: Codable {
     }
 }
 
-struct HTTPServerConfig: Codable {
+nonisolated struct HTTPServerConfig: Codable {
     let name: String
     let url: String
     let headers: [HTTPHeader]?
@@ -173,7 +173,7 @@ struct HTTPServerConfig: Codable {
     }
 }
 
-struct SSEServerConfig: Codable {
+nonisolated struct SSEServerConfig: Codable {
     let name: String
     let url: String
     let headers: [HTTPHeader]?
@@ -184,7 +184,7 @@ struct SSEServerConfig: Codable {
     }
 }
 
-struct HTTPHeader: Codable {
+nonisolated struct HTTPHeader: Codable {
     let name: String
     let value: String
     let _meta: [String: AnyCodable]?

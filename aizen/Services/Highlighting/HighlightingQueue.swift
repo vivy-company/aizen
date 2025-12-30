@@ -17,6 +17,8 @@ actor HighlightingQueue {
     // Cache for highlighted results (keyed by content hash + language)
     private var cache: [Int: AttributedString] = [:]
     private let maxCacheSize = 100
+    private let maxHighlightCharacters = 4000
+    private let maxHighlightLines = 200
 
     // Concurrency control
     private var activeCount = 0
@@ -33,6 +35,18 @@ actor HighlightingQueue {
         language: CodeLanguage,
         theme: EditorTheme
     ) async -> AttributedString? {
+        if code.count > maxHighlightCharacters {
+            return nil
+        }
+
+        var lineCount = 1
+        for char in code where char == "\n" {
+            lineCount += 1
+            if lineCount > maxHighlightLines {
+                return nil
+            }
+        }
+
         // Generate cache key from content and language
         let cacheKey = code.hashValue ^ language.id.hashValue
 

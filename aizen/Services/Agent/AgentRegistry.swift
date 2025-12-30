@@ -26,14 +26,19 @@ actor AgentRegistry {
 
     /// Agent metadata storage with in-memory cache
     private var metadataCache: [String: AgentMetadata]?
+    private static var cachedMetadata: [String: AgentMetadata] = [:]
+    private static var cacheLoaded: Bool = false
+    private static let cacheLock = NSLock()
 
     internal var agentMetadata: [String: AgentMetadata] {
         get {
             if let cache = metadataCache {
+                Self.updateNonisolatedCache(cache)
                 return cache
             }
 
             guard let data = defaults.data(forKey: metadataStoreKey) else {
+                Self.updateNonisolatedCache([:])
                 return [:]
             }
 
@@ -41,9 +46,11 @@ actor AgentRegistry {
                 let decoder = JSONDecoder()
                 let decoded = try decoder.decode([String: AgentMetadata].self, from: data)
                 metadataCache = decoded
+                Self.updateNonisolatedCache(decoded)
                 return decoded
             } catch {
                 logger.error("Failed to decode agent metadata: \(error.localizedDescription)")
+                Self.updateNonisolatedCache([:])
                 return [:]
             }
         }
@@ -53,6 +60,7 @@ actor AgentRegistry {
                 let encoder = JSONEncoder()
                 let data = try encoder.encode(newValue)
                 defaults.set(data, forKey: metadataStoreKey)
+                Self.updateNonisolatedCache(newValue)
                 Task { @MainActor in
                     NotificationCenter.default.post(name: .agentMetadataDidChange, object: nil)
                 }
@@ -74,16 +82,38 @@ actor AgentRegistry {
 
     /// Load metadata directly from UserDefaults (thread-safe)
     private nonisolated func loadMetadataFromDefaults() -> [String: AgentMetadata] {
+        if let cached = Self.readNonisolatedCache() {
+            return cached
+        }
+
         guard let data = defaults.data(forKey: metadataStoreKey) else {
+            Self.updateNonisolatedCache([:])
             return [:]
         }
 
         do {
             let decoder = JSONDecoder()
-            return try decoder.decode([String: AgentMetadata].self, from: data)
+            let decoded = try decoder.decode([String: AgentMetadata].self, from: data)
+            Self.updateNonisolatedCache(decoded)
+            return decoded
         } catch {
+            Self.updateNonisolatedCache([:])
             return [:]
         }
+    }
+
+    private nonisolated static func readNonisolatedCache() -> [String: AgentMetadata]? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        guard cacheLoaded else { return nil }
+        return cachedMetadata
+    }
+
+    private nonisolated static func updateNonisolatedCache(_ metadata: [String: AgentMetadata]) {
+        cacheLock.lock()
+        cachedMetadata = metadata
+        cacheLoaded = true
+        cacheLock.unlock()
     }
 
     /// Get all agents (enabled and disabled)

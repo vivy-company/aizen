@@ -286,37 +286,56 @@ actor ACPProcessManager {
 
         // Convert to byte array for safe subscript access
         let bytes = Array(readBuffer)
-        let maxSearch = min(bytes.count, 200000)
+        guard let first = bytes.first else { return nil }
 
-        for endIndex in 0..<maxSearch {
+        // JSON-RPC messages should start with object/array
+        guard first == 0x7B || first == 0x5B else {
+            return nil
+        }
+
+        var depth = 0
+        var inString = false
+        var escaped = false
+
+        for endIndex in 0..<bytes.count {
             let byte = bytes[endIndex]
 
-            // Only attempt parsing at potential JSON boundaries
-            // } ends objects, ] ends arrays, \n ends compact JSON lines
-            let isPotentialBoundary = (byte == 0x7D || byte == 0x5D || byte == 0x0A)
-
-            guard isPotentialBoundary else {
+            if inString {
+                if escaped {
+                    escaped = false
+                    continue
+                }
+                if byte == 0x5C { // '\\'
+                    escaped = true
+                    continue
+                }
+                if byte == 0x22 { // '"'
+                    inString = false
+                }
                 continue
             }
 
-            // Create test data from byte array
-            let testData = Data(bytes[0...endIndex])
+            if byte == 0x22 { // '"'
+                inString = true
+                continue
+            }
 
-            // Try to parse as complete JSON
-            if let _ = try? JSONSerialization.jsonObject(with: testData) {
-                // Valid complete JSON found!
-                // Ensure we don't remove more than available (buffer may have changed)
-                let removeCount = min(endIndex + 1, readBuffer.count)
-                readBuffer.removeFirst(removeCount)
-                logger.debug("Parsed JSON message, \(testData.count) bytes")
-                return testData
+            if byte == 0x7B || byte == 0x5B { // '{' or '['
+                depth += 1
+            } else if byte == 0x7D || byte == 0x5D { // '}' or ']'
+                depth -= 1
+                if depth == 0 {
+                    let testData = Data(bytes[0...endIndex])
+                    let removeCount = min(endIndex + 1, readBuffer.count)
+                    readBuffer.removeFirst(removeCount)
+                    logger.debug("Parsed JSON message, \(testData.count) bytes")
+                    return testData
+                }
             }
         }
 
-        // No complete JSON found in reasonable range
-        if readBuffer.count > 100000 {
-            let bufferSize = readBuffer.count
-            logger.warning("Large buffer (\(bufferSize) bytes) without complete JSON message")
+        if readBuffer.count > 200000 {
+            logger.warning("Large buffer (\(self.readBuffer.count) bytes) without complete JSON message")
         }
 
         return nil

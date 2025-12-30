@@ -273,128 +273,148 @@ struct ChatMessageList: View {
     }
 
     private var messageListContent: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 10) {
-                ForEach(timelineItems, id: \.stableId) { item in
-                    switch item {
-                    case .message(let message):
-                        MessageBubbleView(
-                            message: message,
-                            agentName: message.role == .agent ? selectedAgent : nil
-                        )
-                        .id(message.id)
-                        .transition(
-                            message.isComplete
-                                ? .opacity.combined(with: .scale(scale: 0.95)) : .identity)
-                    case .toolCall(let toolCall):
-                        // Skip child tool calls (rendered inside parent Task)
-                        if toolCall.parentToolCallId != nil {
-                            EmptyView()
-                        } else {
-                            let children = childToolCallsProvider(toolCall.toolCallId)
-                            ToolCallView(
-                                toolCall: toolCall,
-                                currentIterationId: currentIterationId,
-                                onOpenDetails: { tapped in onToolTap(tapped) },
-                                agentSession: agentSession,
-                                onOpenInEditor: onOpenFileInEditor,
-                                childToolCalls: children
+        ScrollViewReader { proxy in
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: 10) {
+                    ForEach(timelineItems, id: \.stableId) { item in
+                        switch item {
+                        case .message(let message):
+                            MessageBubbleView(
+                                message: message,
+                                agentName: message.role == .agent ? selectedAgent : nil
                             )
-                            .id(toolCall.id)
+                            .id(message.id)
                             .transition(
-                                toolCall.status == .pending
-                                    ? .opacity.combined(with: .move(edge: .leading)) : .identity
+                                message.isComplete
+                                    ? .opacity.combined(with: .scale(scale: 0.95)) : .identity)
+                        case .toolCall(let toolCall):
+                            // Skip child tool calls (rendered inside parent Task)
+                            if toolCall.parentToolCallId != nil {
+                                EmptyView()
+                            } else {
+                                let children = childToolCallsProvider(toolCall.toolCallId)
+                                ToolCallView(
+                                    toolCall: toolCall,
+                                    currentIterationId: currentIterationId,
+                                    onOpenDetails: { tapped in onToolTap(tapped) },
+                                    agentSession: agentSession,
+                                    onOpenInEditor: onOpenFileInEditor,
+                                    childToolCalls: children
+                                )
+                                .id(toolCall.id)
+                                .transition(
+                                    toolCall.status == .pending
+                                        ? .opacity.combined(with: .move(edge: .leading)) : .identity
+                                )
+                            }
+                        case .toolCallGroup(let group):
+                            ToolCallGroupView(
+                                group: group,
+                                currentIterationId: currentIterationId,
+                                agentSession: agentSession,
+                                onOpenDetails: { tapped in onToolTap(tapped) },
+                                onOpenInEditor: onOpenFileInEditor,
+                                childToolCallsProvider: childToolCallsProvider
                             )
-                        }
-                    case .toolCallGroup(let group):
-                        ToolCallGroupView(
-                            group: group,
-                            currentIterationId: currentIterationId,
-                            agentSession: agentSession,
-                            onOpenDetails: { tapped in onToolTap(tapped) },
-                            onOpenInEditor: onOpenFileInEditor,
-                            childToolCallsProvider: childToolCallsProvider
-                        )
-                        .id(group.id)
-                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                            .id(group.id)
+                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
 
-                    case .turnSummary(let summary):
-                        TurnSummaryView(
-                            summary: summary,
-                            onOpenInEditor: onOpenFileInEditor
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .id(summary.id)
-                        .transition(.opacity)
+                        case .turnSummary(let summary):
+                            TurnSummaryView(
+                                summary: summary,
+                                onOpenInEditor: onOpenFileInEditor
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(summary.id)
+                            .transition(.opacity)
+                        }
+                    }
+
+                    if isProcessing {
+                        processingIndicator
+                            .id("processing")
+                            .transition(.opacity)
+                    }
+
+                    // Bottom anchor for scroll position detection
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottom_anchor")
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 20)
+                .transaction { transaction in
+                    // Disable animations during initial load or when processing
+                    // to prevent empty screen issues during rapid updates
+                    if !allowAnimations || isProcessing {
+                        transaction.disablesAnimations = true
                     }
                 }
-
-                if isProcessing {
-                    processingIndicator
-                        .id("processing")
-                        .transition(.opacity)
-                }
-
-                // Bottom anchor for scroll position detection
-                Color.clear
-                    .frame(height: 1)
-                    .id("bottom_anchor")
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 20)
-            .transaction { transaction in
-                // Disable animations during initial load or when processing
-                // to prevent empty screen issues during rapid updates
-                if !allowAnimations || isProcessing {
-                    transaction.disablesAnimations = true
-                }
-            }
-            .background(
-                ScrollViewObserver(
-                    onScroll: { offset, contentHeight, viewportHeight in
-                        updateScrollState(
-                            offset: offset, content: contentHeight, viewport: viewportHeight)
-                    },
-                    scrollToBottomRequest: shouldTriggerScroll ? scrollRequest?.id : nil,
-                    animated: scrollRequest?.animated ?? true,
-                    force: scrollRequest?.force ?? false
+                .background(
+                    ScrollViewObserver(
+                        onScroll: { offset, contentHeight, viewportHeight in
+                            updateScrollState(
+                                offset: offset, content: contentHeight, viewport: viewportHeight)
+                        },
+                        scrollToBottomRequest: scrollToBottomRequestId,
+                        animated: scrollRequest?.animated ?? true,
+                        force: scrollRequest?.force ?? false
+                    )
                 )
-            )
-        }
-        .onAppear {
-            onAppear()
+            }
+            .onChange(of: scrollRequest) { request in
+                guard let request = request else { return }
+                guard case .item(let targetId, let anchor) = request.target else { return }
+                DispatchQueue.main.async {
+                    if request.animated {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            proxy.scrollTo(targetId, anchor: anchor)
+                        }
+                    } else {
+                        proxy.scrollTo(targetId, anchor: anchor)
+                    }
+                }
+            }
+            .onAppear {
+                onAppear()
+            }
         }
     }
 
     /// Only trigger scroll if force is true or auto-scroll is enabled
     private var shouldTriggerScroll: Bool {
         guard let request = scrollRequest else { return false }
+        guard case .bottom = request.target else { return false }
         return request.force || shouldAutoScroll
     }
 
-    @State private var scrollViewHeight: CGFloat = 0
-    @State private var contentHeight: CGFloat = 0
-    @State private var scrollOffset: CGFloat = 0
+    private var scrollToBottomRequestId: UUID? {
+        guard shouldTriggerScroll, let request = scrollRequest else { return nil }
+        guard case .bottom = request.target else { return nil }
+        return request.id
+    }
+
     @State private var lastReportedNearBottom: Bool? = nil
 
     private func updateScrollState(
-        offset: CGFloat? = nil, content: CGFloat? = nil, viewport: CGFloat? = nil
+        offset: CGFloat, content: CGFloat, viewport: CGFloat
     ) {
-        if let offset = offset { scrollOffset = offset }
-        if let content = content { contentHeight = content }
-        if let viewport = viewport { scrollViewHeight = viewport }
-
         // Calculate if we're near the bottom
         // scrollOffset is negative when scrolled down (content moves up)
         // When at bottom: -scrollOffset + viewportHeight >= contentHeight
-        let distanceFromBottom = contentHeight + scrollOffset - scrollViewHeight
-        let isNearBottom = distanceFromBottom <= 50 || contentHeight <= scrollViewHeight
+        let distanceFromBottom = content + offset - viewport
+        let isNearBottom = distanceFromBottom <= 50 || content <= viewport
 
         // Always report on first calculation (when lastReportedNearBottom is nil)
         // or when the state changes
         if lastReportedNearBottom == nil || isNearBottom != lastReportedNearBottom {
-            lastReportedNearBottom = isNearBottom
-            onScrollPositionChange(isNearBottom)
+            let nextValue = isNearBottom
+            DispatchQueue.main.async {
+                if lastReportedNearBottom == nil || nextValue != lastReportedNearBottom {
+                    lastReportedNearBottom = nextValue
+                    onScrollPositionChange(nextValue)
+                }
+            }
         }
     }
 

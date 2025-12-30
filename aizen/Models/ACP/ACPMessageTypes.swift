@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - JSON-RPC Message Types
 
-enum ACPMessage: Codable {
+nonisolated enum ACPMessage: Codable {
     case request(JSONRPCRequest)
     case response(JSONRPCResponse)
     case notification(JSONRPCNotification)
@@ -44,7 +44,7 @@ enum ACPMessage: Codable {
     }
 }
 
-struct JSONRPCRequest: Codable {
+nonisolated struct JSONRPCRequest: Codable {
     let jsonrpc: String = "2.0"
     let id: RequestId
     let method: String
@@ -55,7 +55,7 @@ struct JSONRPCRequest: Codable {
     }
 }
 
-struct JSONRPCResponse: Codable {
+nonisolated struct JSONRPCResponse: Codable {
     let jsonrpc: String = "2.0"
     let id: RequestId
     let result: AnyCodable?
@@ -66,7 +66,7 @@ struct JSONRPCResponse: Codable {
     }
 }
 
-struct JSONRPCNotification: Codable {
+nonisolated struct JSONRPCNotification: Codable {
     let jsonrpc: String = "2.0"
     let method: String
     let params: AnyCodable?
@@ -76,13 +76,13 @@ struct JSONRPCNotification: Codable {
     }
 }
 
-struct JSONRPCError: Codable {
+nonisolated struct JSONRPCError: Codable {
     let code: Int
     let message: String
     let data: AnyCodable?
 }
 
-enum RequestId: Codable, Hashable, CustomStringConvertible {
+nonisolated enum RequestId: Codable, Hashable, CustomStringConvertible {
     case string(String)
     case number(Int)
 
@@ -117,7 +117,7 @@ enum RequestId: Codable, Hashable, CustomStringConvertible {
 
 // MARK: - AnyCodable Helper
 
-struct AnyCodable: Codable {
+nonisolated struct AnyCodable: Codable {
     let value: Any
 
     init(_ value: Any) {

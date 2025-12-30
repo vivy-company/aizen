@@ -8,58 +8,42 @@
 import SwiftUI
 
 struct ShimmerEffect: ViewModifier {
-    private let animation: Animation
     private let gradient: Gradient
-    private let min: CGFloat
-    private let max: CGFloat
+    private let bandSize: CGFloat
+    private let duration: Double
 
-    @State private var isInitialState = true
+    @State private var phase: CGFloat = 0
     @Environment(\.layoutDirection) private var layoutDirection
 
     init(
-        animation: Animation = .linear(duration: 1.5).delay(0.25).repeatForever(autoreverses: false),
         gradient: Gradient = Gradient(colors: [
-            .black.opacity(0.3),
-            .black,
-            .black.opacity(0.3)
+            .white.opacity(0.4),
+            .white,
+            .white.opacity(0.4)
         ]),
-        bandSize: CGFloat = 0.3
+        bandSize: CGFloat = 0.3,
+        duration: Double = 1.5
     ) {
-        self.animation = animation
         self.gradient = gradient
-        self.min = 0 - bandSize
-        self.max = 1 + bandSize
-    }
-
-    var startPoint: UnitPoint {
-        if layoutDirection == .rightToLeft {
-            isInitialState ? UnitPoint(x: max, y: min) : UnitPoint(x: 0, y: 1)
-        } else {
-            isInitialState ? UnitPoint(x: min, y: min) : UnitPoint(x: 1, y: 1)
-        }
-    }
-
-    var endPoint: UnitPoint {
-        if layoutDirection == .rightToLeft {
-            isInitialState ? UnitPoint(x: 1, y: 0) : UnitPoint(x: min, y: max)
-        } else {
-            isInitialState ? UnitPoint(x: 0, y: 0) : UnitPoint(x: max, y: max)
-        }
+        self.bandSize = bandSize
+        self.duration = duration
     }
 
     func body(content: Content) -> some View {
+        let startX = phase - bandSize
+        let endX = phase + bandSize
+
         content
             .mask(
                 LinearGradient(
                     gradient: gradient,
-                    startPoint: startPoint,
-                    endPoint: endPoint
+                    startPoint: UnitPoint(x: layoutDirection == .rightToLeft ? 1 - startX : startX, y: 0),
+                    endPoint: UnitPoint(x: layoutDirection == .rightToLeft ? 1 - endX : endX, y: 0)
                 )
             )
-            .animation(animation, value: isInitialState)
             .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now()) {
-                    isInitialState = false
+                withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
+                    phase = 1 + bandSize * 2
                 }
             }
     }

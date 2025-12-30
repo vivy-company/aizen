@@ -88,14 +88,14 @@ struct MarkdownView: View {
 
             // Streaming buffer (incomplete content)
             if isStreaming && !viewModel.streamingBuffer.isEmpty {
-                StreamingTextView(text: viewModel.streamingBuffer)
+                StreamingTextView(text: viewModel.streamingBuffer, allowSelection: false)
                     .padding(.vertical, 2)
                     .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(.easeOut(duration: 0.15), value: viewModel.blocks.count)
-        .animation(.easeOut(duration: 0.1), value: viewModel.streamingBuffer)
+        .animation(isStreaming ? nil : .easeOut(duration: 0.15), value: viewModel.blocks.count)
+        .animation(isStreaming ? nil : .easeOut(duration: 0.1), value: viewModel.streamingBuffer)
         .onChange(of: content) { newContent in
             viewModel.parse(newContent, isStreaming: isStreaming)
         }
@@ -457,13 +457,19 @@ struct SpecialBlockRenderer: View {
 /// Optimized text view for streaming content with smooth character appearance
 struct StreamingTextView: View {
     let text: String
+    var allowSelection: Bool = true
 
     var body: some View {
-        Text(text)
-            .font(.system(size: NSFont.systemFontSize))
-            .foregroundStyle(.primary)
-            .textSelection(.enabled)
-            .contentTransition(.numericText())
+        if allowSelection {
+            Text(text)
+                .font(.system(size: NSFont.systemFontSize))
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+        } else {
+            Text(text)
+                .font(.system(size: NSFont.systemFontSize))
+                .foregroundStyle(.primary)
+        }
     }
 }
 
@@ -474,9 +480,15 @@ final class MarkdownViewModel: ObservableObject {
     @Published var blocks: [MarkdownBlock] = []
     @Published var streamingBuffer: String = ""
 
-    private let parser = MarkdownParser()
     private var lastContent: String = ""
     private var lastIsStreaming: Bool = false
+    private var parseTask: Task<Void, Never>?
+    private let streamingDebounceNanos: UInt64 = 300_000_000
+    private let streamingLargeDebounceNanos: UInt64 = 600_000_000
+    private let streamingLargeContentThreshold = 6000
+    private let streamingMinDelta = 120
+    private var lastParsedLength: Int = 0
+    private var parseGeneration: Int = 0
 
     func parse(_ content: String, isStreaming: Bool) {
         // Re-parse if content changed OR streaming state changed
@@ -484,12 +496,45 @@ final class MarkdownViewModel: ObservableObject {
         lastContent = content
         lastIsStreaming = isStreaming
 
-        let document = isStreaming
-            ? parser.parseStreaming(content, isComplete: false)
-            : parser.parse(content)
+        let contentSnapshot = content
+        let isStreamingSnapshot = isStreaming
+        let delta = abs(contentSnapshot.count - lastParsedLength)
+        if isStreamingSnapshot && delta < streamingMinDelta {
+            return
+        }
 
-        blocks = document.blocks
-        streamingBuffer = document.streamingBuffer
+        parseTask?.cancel()
+        parseGeneration += 1
+        let generation = parseGeneration
+
+        if isStreamingSnapshot {
+            let debounce = contentSnapshot.count > streamingLargeContentThreshold
+                ? streamingLargeDebounceNanos
+                : streamingDebounceNanos
+            parseTask = Task.detached(priority: .userInitiated) {
+                try? await Task.sleep(nanoseconds: debounce)
+                guard !Task.isCancelled else { return }
+                let parser = MarkdownParser()
+                let document = parser.parseStreaming(contentSnapshot, isComplete: false)
+                await MainActor.run { [weak self] in
+                    guard let self, generation == self.parseGeneration else { return }
+                    self.blocks = document.blocks
+                    self.streamingBuffer = document.streamingBuffer
+                    self.lastParsedLength = contentSnapshot.count
+                }
+            }
+        } else {
+            parseTask = Task.detached(priority: .userInitiated) {
+                let parser = MarkdownParser()
+                let document = parser.parse(contentSnapshot)
+                await MainActor.run { [weak self] in
+                    guard let self, generation == self.parseGeneration else { return }
+                    self.blocks = document.blocks
+                    self.streamingBuffer = document.streamingBuffer
+                    self.lastParsedLength = contentSnapshot.count
+                }
+            }
+        }
     }
 }
 

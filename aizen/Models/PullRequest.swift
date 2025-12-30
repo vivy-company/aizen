@@ -169,7 +169,7 @@ struct PRFile: Identifiable, Equatable, Sendable {
 
 // MARK: - PR Filter
 
-enum PRFilter: String, CaseIterable, Sendable {
+nonisolated enum PRFilter: String, CaseIterable, Sendable {
     case open
     case merged
     case closed
