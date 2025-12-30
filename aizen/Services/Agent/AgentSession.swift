@@ -309,13 +309,22 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                 } catch {
                     logger.info(
                         "[\(agentName)] Session without auth failed: \(error.localizedDescription)")
-                    // Fall through to show auth dialog
+                    // Check if error indicates API key/custom endpoint issue
+                    let errorMessage = error.localizedDescription.lowercased()
+                    if errorMessage.contains("api key") || errorMessage.contains("invalid") ||
+                       errorMessage.contains("unauthorized") || errorMessage.contains("401") {
+                        // Show actual error for custom API configuration issues
+                        self.needsAuthentication = true
+                        addSystemMessage("⚠️ \(error.localizedDescription)")
+                        return
+                    }
+                    // Fall through to show auth dialog for other errors
                 }
             }
 
             // Show auth dialog
             self.needsAuthentication = true
-            addSystemMessage("Authentication required for \(agentName).")
+            addSystemMessage("Authentication required. Use the login button or configure API keys in environment variables.")
             return
         }
 

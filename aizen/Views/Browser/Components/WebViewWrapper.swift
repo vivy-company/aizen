@@ -16,13 +16,19 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     // MARK: - WKUIDelegate
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        // Handle new tab/window requests (e.g., target="_blank" links)
+        // Handle new tab/window requests (e.g., target="_blank" links, dev tools console URLs)
         if let url = navigationAction.request.url {
-            // Notify parent to create new tab
-            parent.onNewTab?(url.absoluteString)
+            if parent.onNewTab != nil {
+                // Notify parent to create new tab
+                parent.onNewTab?(url.absoluteString)
+            } else {
+                // No new tab handler - load in current webview to prevent crash
+                webView.load(URLRequest(url: url))
+            }
         }
 
-        // Return nil to prevent WKWebView from creating its own window
+        // Return nil - we handle navigation ourselves
+        // This is safe because we either opened a new tab or loaded in current webview
         return nil
     }
 
@@ -288,6 +294,9 @@ struct WebViewWrapper: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
+        // Update coordinator's parent reference to get latest closures
+        context.coordinator.parent = self
+
         // Get the WKWebView from container
         guard let webView = nsView.subviews.first(where: { $0 is WKWebView }) as? WKWebView else { return }
         // Don't reload if URL is empty
