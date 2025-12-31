@@ -118,6 +118,16 @@ actor GitHostingService {
 
     // Cache CLI paths
     private var cliPathCache: [GitHostingProvider: String?] = [:]
+    private let iso8601DateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+    private let iso8601FallbackFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 
     // MARK: - CLI Execution Helper
 
@@ -134,6 +144,12 @@ actor GitHostingService {
         )
 
         return result
+    }
+
+    private func parseISO8601Date(_ value: String) -> Date {
+        iso8601DateFormatter.date(from: value)
+            ?? iso8601FallbackFormatter.date(from: value)
+            ?? Date()
     }
 
     // MARK: - Provider Detection
@@ -722,12 +738,6 @@ actor GitHostingService {
 
         let mrs = try decoder.decode([GitLabMR].self, from: data)
 
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let fallbackFormatter = ISO8601DateFormatter()
-        fallbackFormatter.formatOptions = [.withInternetDateTime]
-
         return mrs.map { mr in
             let mergeableState: PullRequest.MergeableState
             switch mr.mergeStatus {
@@ -743,8 +753,8 @@ actor GitHostingService {
             default: state = .open
             }
 
-            let createdAt = dateFormatter.date(from: mr.createdAt) ?? fallbackFormatter.date(from: mr.createdAt) ?? Date()
-            let updatedAt = dateFormatter.date(from: mr.updatedAt) ?? fallbackFormatter.date(from: mr.updatedAt) ?? Date()
+            let createdAt = parseISO8601Date(mr.createdAt)
+            let updatedAt = parseISO8601Date(mr.updatedAt)
 
             return PullRequest(
                 id: mr.iid,
@@ -948,14 +958,8 @@ actor GitHostingService {
         default: state = .open
         }
 
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let fallbackFormatter = ISO8601DateFormatter()
-        fallbackFormatter.formatOptions = [.withInternetDateTime]
-
-        let createdAt = dateFormatter.date(from: mr.createdAt) ?? fallbackFormatter.date(from: mr.createdAt) ?? Date()
-        let updatedAt = dateFormatter.date(from: mr.updatedAt) ?? fallbackFormatter.date(from: mr.updatedAt) ?? Date()
+        let createdAt = parseISO8601Date(mr.createdAt)
+        let updatedAt = parseISO8601Date(mr.updatedAt)
 
         return PullRequest(
             id: mr.iid,
@@ -1132,16 +1136,10 @@ actor GitHostingService {
             return []
         }
 
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let fallbackFormatter = ISO8601DateFormatter()
-        fallbackFormatter.formatOptions = [.withInternetDateTime]
-
         return notes
             .filter { !($0.system ?? false) }
             .map { note in
-                let createdAt = dateFormatter.date(from: note.created_at) ?? fallbackFormatter.date(from: note.created_at) ?? Date()
+                let createdAt = parseISO8601Date(note.created_at)
                 return PRComment(
                     id: String(note.id),
                     author: note.author.username,
