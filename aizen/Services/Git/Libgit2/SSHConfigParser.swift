@@ -118,7 +118,7 @@ nonisolated func findSSHKeyForHost(_ host: String) -> String? {
 }
 
 /// Check if host matches pattern (supports * wildcard)
-private func matchesHost(_ host: String, pattern: String) -> Bool {
+nonisolated private func matchesHost(_ host: String, pattern: String) -> Bool {
     if pattern == "*" {
         return true
     }
@@ -130,7 +130,7 @@ private func matchesHost(_ host: String, pattern: String) -> Bool {
 }
 
 /// Expand ~ in path
-private func expandPath(_ path: String) -> String {
+nonisolated private func expandPath(_ path: String) -> String {
     if path.hasPrefix("~/") {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
         return homeDir + String(path.dropFirst(1))

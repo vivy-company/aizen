@@ -116,7 +116,7 @@ class FileHeaderCellView: NSTableCellView {
             } else {
                 let fileExtension = (path as NSString).pathExtension
                 let contentType = UTType(filenameExtension: fileExtension) ?? .data
-                self.iconView.image = NSWorkspace.shared.icon(forContentType: contentType)
+                self.iconView.image = NSWorkspace.shared.icon(for: contentType)
             }
         }
     }

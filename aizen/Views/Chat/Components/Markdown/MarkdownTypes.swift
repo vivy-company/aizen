@@ -12,7 +12,7 @@ import AppKit
 // MARK: - Parsed Markdown Document
 
 /// Represents a fully parsed markdown document with all blocks
-struct ParsedMarkdownDocument {
+nonisolated struct ParsedMarkdownDocument {
     let blocks: [MarkdownBlock]
     let footnotes: [String: MarkdownBlock]
     let isComplete: Bool
@@ -24,7 +24,7 @@ struct ParsedMarkdownDocument {
 // MARK: - Markdown Block
 
 /// Markdown block with stable ID for efficient SwiftUI diffing
-struct MarkdownBlock: Identifiable, Equatable {
+nonisolated struct MarkdownBlock: Identifiable, Equatable {
     let id: String
     let type: MarkdownBlockType
 
@@ -71,7 +71,7 @@ struct MarkdownBlock: Identifiable, Equatable {
 
 // MARK: - Markdown Block Type
 
-enum MarkdownBlockType: Equatable {
+nonisolated enum MarkdownBlockType: Equatable {
     case paragraph(MarkdownInlineContent)
     case heading(MarkdownInlineContent, level: Int)
     case codeBlock(code: String, language: String?, isStreaming: Bool)
@@ -104,7 +104,7 @@ enum MarkdownBlockType: Equatable {
 
 // MARK: - Column Alignment
 
-enum ColumnAlignment: Equatable {
+nonisolated enum ColumnAlignment: Equatable {
     case left
     case center
     case right
@@ -122,7 +122,7 @@ enum ColumnAlignment: Equatable {
 
 // MARK: - Markdown List Item
 
-struct MarkdownListItem: Identifiable, Equatable {
+nonisolated struct MarkdownListItem: Identifiable, Equatable {
     let id: String
     let content: MarkdownInlineContent
     let children: [MarkdownListItem]
@@ -160,7 +160,7 @@ struct MarkdownListItem: Identifiable, Equatable {
 
 // MARK: - Markdown Table Row
 
-struct MarkdownTableRow: Identifiable, Equatable {
+nonisolated struct MarkdownTableRow: Identifiable, Equatable {
     let id: String
     let cells: [MarkdownInlineContent]
     let isHeader: Bool
@@ -175,7 +175,7 @@ struct MarkdownTableRow: Identifiable, Equatable {
 // MARK: - Markdown Inline Content
 
 /// Rich inline content that can be rendered as AttributedString
-struct MarkdownInlineContent: Equatable, Hashable {
+nonisolated struct MarkdownInlineContent: Equatable, Hashable {
     let elements: [InlineElement]
 
     var isEmpty: Bool { elements.isEmpty }
@@ -213,7 +213,7 @@ struct MarkdownInlineContent: Equatable, Hashable {
 
 // MARK: - Inline Element
 
-enum InlineElement: Equatable, Hashable {
+nonisolated enum InlineElement: Equatable, Hashable {
     case text(String)
     case emphasis(MarkdownInlineContent)
     case strong(MarkdownInlineContent)

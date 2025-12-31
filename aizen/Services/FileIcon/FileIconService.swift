@@ -118,7 +118,7 @@ actor FileIconService {
         }
 
         let resizedIcon = await MainActor.run {
-            NSWorkspace.shared.icon(forContentType: .data).resized(to: size)
+            NSWorkspace.shared.icon(for: .data).resized(to: size)
         }
 
         let cost = Int(size.width * size.height * 4)
