@@ -34,22 +34,8 @@ struct AgentUpdateSheet: View {
 
             // Version info
             VStack(spacing: 12) {
-                HStack {
-                    Text("Current version:")
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text(versionInfo.current ?? "Unknown")
-                        .fontWeight(.medium)
-                }
-
-                HStack {
-                    Text("Latest version:")
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text(versionInfo.latest ?? "Unknown")
-                        .fontWeight(.medium)
-                        .foregroundColor(.blue)
-                }
+                versionRow(label: "Current version:", value: versionInfo.current ?? "Unknown")
+                versionRow(label: "Latest version:", value: versionInfo.latest ?? "Unknown", accent: true)
             }
             .padding()
             .background(Color(.controlBackgroundColor))
@@ -118,6 +104,17 @@ struct AgentUpdateSheet: View {
                     updateError = error.localizedDescription
                 }
             }
+        }
+    }
+
+    private func versionRow(label: String, value: String, accent: Bool = false) -> some View {
+        HStack {
+            Text(label)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .fontWeight(.medium)
+                .foregroundColor(accent ? .blue : .primary)
         }
     }
 }
