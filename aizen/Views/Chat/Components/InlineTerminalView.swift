@@ -16,7 +16,7 @@ struct InlineTerminalView: View {
     @State private var output: String = ""
     @State private var isRunning: Bool = false
     @State private var loadTask: Task<Void, Never>?
-    private let maxDisplayChars = 20_000
+    private let maxDisplayChars = TerminalOutputDefaults.maxDisplayChars
 
     private var fontSize: CGFloat {
         max(terminalFontSize - 2, 9) // Slightly smaller for inline view

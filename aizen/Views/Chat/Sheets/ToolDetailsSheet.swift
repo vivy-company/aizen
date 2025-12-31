@@ -141,7 +141,7 @@ struct TerminalOutputPreview: View {
 
     @State private var output: String = ""
     @State private var isRunning: Bool = false
-    private let maxDisplayChars = 20_000
+    private let maxDisplayChars = TerminalOutputDefaults.maxDisplayChars
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
