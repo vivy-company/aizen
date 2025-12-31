@@ -77,7 +77,7 @@ struct InlineTerminalView: View {
             let gracePeriodIterations = TerminalOutputDefaults.gracePeriodIterations
 
             // Poll for output with cancellation support
-            for _ in 0..<120 { // 60 seconds max
+            for _ in 0..<TerminalOutputDefaults.maxPollIterationsInline {
                 if Task.isCancelled { break }
 
                 let terminalOutput = await session.getTerminalOutput(terminalId: terminalId) ?? ""

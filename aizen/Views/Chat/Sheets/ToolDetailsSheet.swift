@@ -184,7 +184,7 @@ struct TerminalOutputPreview: View {
         let gracePeriodIterations = TerminalOutputDefaults.gracePeriodIterations
 
         // Poll for output updates
-        for _ in 0..<60 { // Poll for up to 30 seconds
+        for _ in 0..<TerminalOutputDefaults.maxPollIterationsDetail {
             let newOutput = await session.getTerminalOutput(terminalId: terminalId) ?? ""
             let running = await session.isTerminalRunning(terminalId: terminalId)
 
