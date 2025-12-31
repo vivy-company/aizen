@@ -101,20 +101,13 @@ enum ClaudeUsageFetcher {
     private static func makeWindow(title: String, window: OAuthUsageWindow?) -> UsageQuotaWindow? {
         guard let window, let utilization = window.utilization else { return nil }
         let resetDate = ClaudeOAuthUsageFetcher.parseISO8601Date(window.resetsAt)
-        let resetDescription = resetDate.map(formatResetDate)
+        let resetDescription = resetDate.map(UsageFormatter.resetDateString)
         return UsageQuotaWindow(
             title: title,
             usedPercent: utilization,
             resetsAt: resetDate,
             resetDescription: resetDescription
         )
-    }
-
-    private static func formatResetDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d 'at' h:mma"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.string(from: date)
     }
 
     private static func inferPlan(rateLimitTier: String?, subscriptionType: String?) -> String? {

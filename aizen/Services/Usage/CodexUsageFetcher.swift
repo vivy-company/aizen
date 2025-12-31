@@ -474,10 +474,7 @@ private struct RateWindow {
     }
 
     private static func resetDescription(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d 'at' h:mma"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.string(from: date)
+        UsageFormatter.resetDateString(date)
     }
 }
 

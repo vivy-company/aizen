@@ -21,6 +21,12 @@ enum UsageFormatter {
         formatter.maximumFractionDigits = 2
         return formatter
     }()
+    private static let resetDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d 'at' h:mma"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
 
     static func tokenString(_ value: Int?) -> String {
         guard let value else { return "N/A" }
@@ -41,6 +47,10 @@ enum UsageFormatter {
     static func relativeDateString(_ date: Date?) -> String {
         guard let date else { return "N/A" }
         return RelativeDateFormatter.shared.string(from: date)
+    }
+
+    static func resetDateString(_ date: Date) -> String {
+        resetDateFormatter.string(from: date)
     }
 
     static func amountString(_ value: Double, unit: String?) -> String {
