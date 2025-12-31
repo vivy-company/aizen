@@ -7,6 +7,7 @@
 
 import Foundation
 import UniformTypeIdentifiers
+import os
 
 // MARK: - AgentSession + Messaging
 

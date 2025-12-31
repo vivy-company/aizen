@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 // MARK: - AgentSession + Authentication
 

@@ -47,7 +47,7 @@ struct ContentBlockRenderer: View {
     }
 
     @ViewBuilder
-    private func imageView(data: Data, mimeType: String) -> some View {
+    private func imageView(data: String, mimeType: String) -> some View {
         switch style {
         case .full:
             ImageAttachmentCardView(data: data)

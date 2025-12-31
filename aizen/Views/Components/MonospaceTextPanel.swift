@@ -14,7 +14,7 @@ struct MonospaceTextPanel: View {
     var maxHeight: CGFloat = 200
     var font: Font = .system(size: 11, design: .monospaced)
     var textColor: Color = .primary
-    var emptyTextColor: Color = .tertiary
+    var emptyTextColor: Color = .secondary
     var backgroundColor: Color = Color(nsColor: .textBackgroundColor)
     var padding: CGFloat = 8
     var allowsSelection: Bool = true
