@@ -22,7 +22,6 @@ struct TerminalPaneView: View {
 
     @State private var shouldFocus: Bool = false
     @State private var focusVersion: Int = 0  // Increment to force updateNSView
-    @State private var terminalView: GhosttyTerminalView?  // Store reference to resign directly
     @State private var isLoading: Bool = false
     @State private var progressState: GhosttyProgressState = .remove
     @State private var progressValue: Int? = nil

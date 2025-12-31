@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import os.log
 
 // MARK: - Split Terminal View
 
@@ -26,7 +25,6 @@ struct SplitTerminalView: View {
     @State private var showCloseConfirmation = false
     @State private var pendingCloseAction: CloseAction = .pane
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
-    private let logger = Logger.terminal
 
     private enum CloseAction {
         case pane

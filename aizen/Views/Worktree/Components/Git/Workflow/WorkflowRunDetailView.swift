@@ -11,7 +11,6 @@ struct WorkflowRunDetailView: View {
     @ObservedObject var service: WorkflowService
 
     @State private var selectedJobId: String?
-    @State private var showLogs: Bool = true
     @State private var showCancelConfirmation: Bool = false
 
     @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"

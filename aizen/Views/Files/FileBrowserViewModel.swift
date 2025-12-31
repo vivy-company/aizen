@@ -79,7 +79,6 @@ class FileBrowserViewModel: ObservableObject {
     private let viewContext: NSManagedObjectContext
     private var session: FileBrowserSession?
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "FileBrowser")
-    private let gitStatusService = GitStatusService()
 
     init(worktree: Worktree, context: NSManagedObjectContext) {
         self.worktree = worktree

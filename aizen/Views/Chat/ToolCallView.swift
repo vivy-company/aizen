@@ -275,22 +275,6 @@ struct ToolCallView: View {
         }
     }
 
-    private var statusBadge: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 7, height: 7)
-
-            Text(statusText)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(statusColor)
-        }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
-        .background(statusColor.opacity(0.12))
-        .cornerRadius(10)
-    }
-
     private var statusColor: Color {
         switch toolCall.status {
         case .pending: return .yellow
@@ -298,28 +282,6 @@ struct ToolCallView: View {
         case .completed: return .green
         case .failed: return .red
         }
-    }
-
-    private var editPreviewText: String? {
-        guard toolCall.kind == .some(.edit) else { return nil }
-
-        for block in toolCall.content {
-            switch block {
-            case .content(let contentBlock):
-                if case .text(let content) = contentBlock {
-                    let trimmed = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if let firstLine = trimmed.split(separator: "\n").map(String.init).first, !firstLine.isEmpty {
-                        return firstLine
-                    }
-                }
-            case .diff(let diff):
-                return "Modified: \(diff.path)"
-            case .terminal(let terminal):
-                return "Terminal: \(terminal.terminalId)"
-            }
-        }
-
-        return nil
     }
 
     // MARK: - Tool Icon
@@ -343,16 +305,6 @@ struct ToolCallView: View {
 
     private var backgroundColor: Color {
         Color(.controlBackgroundColor).opacity(0.2)
-    }
-
-    private var borderColor: Color {
-        Color.gray.opacity(0.2)
-    }
-
-    private var displayTitle: String {
-        let trimmed = toolCall.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty { return trimmed }
-        return toolCall.resolvedKind.rawValue
     }
 
 }

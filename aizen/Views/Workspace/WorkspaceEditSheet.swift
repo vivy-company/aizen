@@ -6,10 +6,8 @@
 //
 
 import SwiftUI
-import os.log
 
 struct WorkspaceEditSheet: View {
-    private let logger = Logger.workspace
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var workspace: Workspace
     @ObservedObject var repositoryManager: RepositoryManager

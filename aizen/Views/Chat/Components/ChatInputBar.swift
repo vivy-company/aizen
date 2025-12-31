@@ -34,7 +34,6 @@ struct ChatInputBar: View {
     let onAgentSelect: (String) -> Void
 
     @State private var isHoveringInput = false
-    @State private var dashPhase: CGFloat = 0
     @State private var gradientRotation: Double = 0
     @State private var measuredTextHeight: CGFloat = 0
 

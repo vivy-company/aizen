@@ -51,17 +51,6 @@ struct WorktreeDetailView: View {
         _gitRepositoryService = StateObject(wrappedValue: GitRepositoryService(worktreePath: worktree.path ?? ""))
     }
 
-    // MARK: - Helper Managers
-
-    private var gitOperations: WorktreeGitOperations {
-        WorktreeGitOperations(
-            gitRepositoryService: gitRepositoryService,
-            repositoryManager: repositoryManager,
-            worktree: worktree,
-            logger: logger
-        )
-    }
-
     private var sessionManager: WorktreeSessionManager {
         WorktreeSessionManager(
             worktree: worktree,

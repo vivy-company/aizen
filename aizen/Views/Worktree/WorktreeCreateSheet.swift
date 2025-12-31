@@ -35,12 +35,6 @@ struct WorktreeCreateSheet: View {
         return String(localized: "worktree.create.branchNamePlaceholder")
     }
 
-    private var currentBranch: String {
-        // Get main branch from repository worktrees
-        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-        return worktrees.first(where: { $0.isPrimary })?.branch ?? "main"
-    }
-
     private var existingWorktreeNames: [String] {
         let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
         return worktrees.compactMap { $0.branch }

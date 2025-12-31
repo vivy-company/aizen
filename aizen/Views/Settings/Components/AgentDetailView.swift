@@ -40,7 +40,6 @@ struct AgentDetailView: View {
     @State private var showingMCPRemoveConfirmation = false
     @State private var showingUsageDetails = false
     @ObservedObject private var mcpManager = MCPManager.shared
-    @ObservedObject private var usageStore = AgentUsageStore.shared
     @ObservedObject private var usageMetricsStore = AgentUsageMetricsStore.shared
 
     private var configSpec: AgentConfigSpec {
