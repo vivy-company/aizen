@@ -211,12 +211,6 @@ struct CommandPaletteContent: View {
     @State private var hoveredIndex: Int?
     @AppStorage("selectedWorktreeId") private var currentWorktreeId: String?
 
-    private func hasActiveSessions(_ worktree: Worktree) -> Bool {
-        let chats = (worktree.chatSessions as? Set<ChatSession>)?.count ?? 0
-        let terminals = (worktree.terminalSessions as? Set<TerminalSession>)?.count ?? 0
-        return chats > 0 || terminals > 0
-    }
-
     var body: some View {
         LiquidGlassCard(
             shadowOpacity: 0,

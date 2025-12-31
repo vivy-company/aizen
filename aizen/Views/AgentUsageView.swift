@@ -339,36 +339,6 @@ struct AgentUsageDetailContent: View {
         return "Input \(input) | Output \(output) | Total \(total)"
     }
 
-    private func quotaDetailText(_ window: UsageQuotaWindow) -> String? {
-        var parts: [String] = []
-
-        if let used = window.usedPercent {
-            let remaining = max(0, 100 - used)
-            parts.append("Remaining \(UsageFormatter.percentString(remaining))")
-        }
-
-        if let remainingAmount = window.remainingAmount {
-            parts.append("Remaining \(amountString(remainingAmount, unit: window.unit))")
-        }
-
-        if let usedAmount = window.usedAmount {
-            parts.append("Used \(amountString(usedAmount, unit: window.unit))")
-        }
-
-        if let limitAmount = window.limitAmount {
-            parts.append("Limit \(amountString(limitAmount, unit: window.unit))")
-        }
-
-        if let reset = window.resetDescription {
-            parts.append("Resets \(reset)")
-        } else if let resetsAt = window.resetsAt {
-            parts.append("Resets \(absoluteDateString(resetsAt))")
-        }
-
-        if parts.isEmpty { return nil }
-        return parts.joined(separator: " | ")
-    }
-
     private func amountString(_ value: Double, unit: String?) -> String {
         if unit == "USD" {
             return UsageFormatter.usdString(value)

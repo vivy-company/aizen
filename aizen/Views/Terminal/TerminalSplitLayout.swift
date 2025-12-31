@@ -210,10 +210,6 @@ indirect enum SplitNode: Codable, Equatable {
             ))
         }
     }
-
-    private func containsPane(_ paneId: String) -> Bool {
-        return allPaneIds().contains(paneId)
-    }
 }
 
 // Helper for encoding/decoding layout to JSON
