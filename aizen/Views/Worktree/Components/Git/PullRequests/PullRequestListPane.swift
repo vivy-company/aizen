@@ -278,13 +278,19 @@ struct PRChecksBadge: View {
     let status: PullRequest.ChecksStatus
 
     var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: status.iconName)
-                .font(.system(size: 9))
-            Text(status.displayName)
-                .font(.system(size: 10))
-        }
-        .foregroundStyle(color)
+        TagBadge(
+            text: status.displayName,
+            color: color,
+            cornerRadius: 0,
+            font: .system(size: 10),
+            horizontalPadding: 0,
+            verticalPadding: 0,
+            backgroundOpacity: 0,
+            textColor: color,
+            iconSystemName: status.iconName,
+            iconSize: 9,
+            spacing: 3
+        )
     }
 
     private var color: Color {
@@ -300,13 +306,19 @@ struct PRReviewBadge: View {
     let decision: PullRequest.ReviewDecision
 
     var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: decision.iconName)
-                .font(.system(size: 9))
-            Text(decision.displayName)
-                .font(.system(size: 10))
-        }
-        .foregroundStyle(color)
+        TagBadge(
+            text: decision.displayName,
+            color: color,
+            cornerRadius: 0,
+            font: .system(size: 10),
+            horizontalPadding: 0,
+            verticalPadding: 0,
+            backgroundOpacity: 0,
+            textColor: color,
+            iconSystemName: decision.iconName,
+            iconSize: 9,
+            spacing: 3
+        )
     }
 
     private var color: Color {
