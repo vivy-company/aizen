@@ -95,7 +95,6 @@ struct WorkflowLogTableView: NSViewRepresentable {
             let logsSnapshot = logs
             let structuredSnapshot = structuredLogs
             let fontSizeSnapshot = fontSize
-            let showTimestampsSnapshot = showTimestamps
             let providerSnapshot = provider
 
             parseTask = Task.detached(priority: .userInitiated) {
@@ -106,7 +105,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
                     parsed = Self.parseLogSteps(logsSnapshot, fontSize: fontSizeSnapshot, provider: providerSnapshot)
                 }
 
-                await MainActor.run {
+                await MainActor.run { [weak self] in
                     guard let self = self else { return }
                     self.steps = parsed
                     self.rebuildDisplayRows()
@@ -319,7 +318,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
             return steps.filter { !$0.groups.isEmpty || $0.groups.contains { !$0.lines.isEmpty } }
         }
 
-        private static func parseGitLabLogs(_ lines: [String], fontSize: CGFloat) -> [LogStep] {
+        nonisolated private static func parseGitLabLogs(_ lines: [String], fontSize: CGFloat) -> [LogStep] {
             var groups: [LogGroup] = []
             var currentGroup: LogGroup?
             var ungroupedLines: [(id: Int, raw: String, attributed: NSAttributedString)] = []
@@ -418,7 +417,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
             return [LogStep(id: 0, name: "Job Output", groups: groups, isExpanded: true)]
         }
 
-        private static func extractStepAndMessage(_ line: String) -> (step: String, message: String) {
+        nonisolated private static func extractStepAndMessage(_ line: String) -> (step: String, message: String) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
             // GitHub Actions format: "job-name    step-name    timestamp message"
@@ -450,7 +449,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
             return (stepName, afterTimestamp)
         }
 
-        private static func parseLineToAttributedString(_ text: String, style: ANSITextStyle, fontSize: CGFloat) -> (NSAttributedString, ANSITextStyle) {
+        nonisolated private static func parseLineToAttributedString(_ text: String, style: ANSITextStyle, fontSize: CGFloat) -> (NSAttributedString, ANSITextStyle) {
             let result = NSMutableAttributedString()
             var currentStyle = style
 

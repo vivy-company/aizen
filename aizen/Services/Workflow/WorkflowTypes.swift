@@ -171,7 +171,7 @@ enum WorkflowInputType: Hashable {
 
 // MARK: - Logs
 
-struct WorkflowLogLine: Identifiable, Hashable, Sendable {
+nonisolated struct WorkflowLogLine: Identifiable, Hashable, Sendable {
     let id: Int
     let stepName: String
     let stepNumber: Int?
@@ -205,7 +205,7 @@ struct WorkflowLogLine: Identifiable, Hashable, Sendable {
     }
 }
 
-struct WorkflowLogs: Sendable {
+nonisolated struct WorkflowLogs: Sendable {
     let runId: String
     let jobId: String?
     let lines: [WorkflowLogLine]
@@ -217,7 +217,7 @@ struct WorkflowLogs: Sendable {
 
 // MARK: - Errors
 
-enum WorkflowError: LocalizedError {
+nonisolated enum WorkflowError: LocalizedError {
     case providerNotDetected
     case cliNotInstalled(provider: WorkflowProvider)
     case notAuthenticated(provider: WorkflowProvider)
