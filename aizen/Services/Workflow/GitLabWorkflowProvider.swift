@@ -14,7 +14,7 @@ actor GitLabWorkflowProvider: WorkflowProviderProtocol {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitLabWorkflow")
     private let glabPath: String
 
-    nonisolated init() {
+    init() {
         // Find glab binary
         if FileManager.default.fileExists(atPath: "/opt/homebrew/bin/glab") {
             self.glabPath = "/opt/homebrew/bin/glab"

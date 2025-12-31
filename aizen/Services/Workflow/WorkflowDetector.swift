@@ -191,12 +191,12 @@ actor WorkflowDetector {
     }
 
     private func checkGHAuth() async -> Bool {
-        let provider = GitHubWorkflowProvider()
+        let provider = await MainActor.run { GitHubWorkflowProvider() }
         return await provider.checkAuthentication()
     }
 
     private func checkGLabAuth() async -> Bool {
-        let provider = GitLabWorkflowProvider()
+        let provider = await MainActor.run { GitLabWorkflowProvider() }
         return await provider.checkAuthentication()
     }
 }

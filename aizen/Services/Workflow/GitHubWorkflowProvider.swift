@@ -14,7 +14,7 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitHubWorkflow")
     private let ghPath: String
 
-    nonisolated init() {
+    init() {
         // Find gh binary
         if FileManager.default.fileExists(atPath: "/opt/homebrew/bin/gh") {
             self.ghPath = "/opt/homebrew/bin/gh"
