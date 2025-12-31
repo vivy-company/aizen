@@ -352,13 +352,6 @@ struct AgentUsageDetailContent: View {
         return base
     }
 
-    private func absoluteDateString(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
-    }
-
     private func hasAccountDetails(_ user: UsageUserIdentity) -> Bool {
         user.email != nil || user.organization != nil || user.plan != nil
     }
