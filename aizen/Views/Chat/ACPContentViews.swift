@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CodeEditLanguages
+import CodeEditSourceEditor
 
 // MARK: - Attachment Glass Card
 
