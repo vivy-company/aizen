@@ -180,24 +180,16 @@ struct TerminalOutputPreview: View {
             }
 
             // Terminal-like output area
-            ScrollView([.horizontal, .vertical]) {
-                let displayOutput = output.count > maxDisplayChars
-                    ? String(output.suffix(maxDisplayChars))
-                    : output
-                Text(displayOutput.isEmpty ? "No output yet..." : displayOutput)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(displayOutput.isEmpty ? .tertiary : .primary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(maxHeight: 200)
-            .padding(8)
-            .background(Color(nsColor: .textBackgroundColor))
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
+            let displayOutput = output.count > maxDisplayChars
+                ? String(output.suffix(maxDisplayChars))
+                : output
+            MonospaceTextPanel(
+                text: displayOutput,
+                emptyText: "No output yet...",
+                maxHeight: 200,
+                backgroundColor: Color(nsColor: .textBackgroundColor),
+                showsBorder: true
             )
-            .cornerRadius(4)
         }
         .task {
             await loadOutput()

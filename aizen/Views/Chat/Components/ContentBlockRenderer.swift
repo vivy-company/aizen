@@ -42,16 +42,7 @@ struct ContentBlockRenderer: View {
         case .full:
             MessageContentView(content: text)
         case .compact:
-            ScrollView([.horizontal, .vertical]) {
-                Text(text)
-                    .font(.system(size: 11, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(maxHeight: 200)
-            .padding(8)
-            .background(Color(nsColor: .textBackgroundColor))
-            .cornerRadius(4)
+            MonospaceTextPanel(text: text, maxHeight: 200)
         }
     }
 
@@ -80,16 +71,7 @@ struct ContentBlockRenderer: View {
                     .lineLimit(1)
 
                 if let text = resource.text {
-                    ScrollView([.horizontal, .vertical]) {
-                        Text(text)
-                            .font(.system(size: 11, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(maxHeight: 150)
-                    .padding(8)
-                    .background(Color(nsColor: .textBackgroundColor))
-                    .cornerRadius(4)
+                    MonospaceTextPanel(text: text, maxHeight: 150)
                 }
             }
         }
