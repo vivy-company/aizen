@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - MCP Server Entry (config file format)
 
-struct MCPServerEntry: Codable, Equatable {
+nonisolated struct MCPServerEntry: Codable, Equatable, Sendable {
     let type: String  // "http", "sse", "stdio"
     let url: String?
     let command: String?
@@ -39,7 +39,7 @@ struct MCPServerEntry: Codable, Equatable {
 
 // MARK: - Agent Config Spec
 
-struct AgentMCPConfigSpec {
+nonisolated struct AgentMCPConfigSpec: Sendable {
     let agentId: String
     let configPath: String
     let serverPath: [String]  // JSON path to servers dict

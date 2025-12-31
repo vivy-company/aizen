@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum UsageProvider: String, Codable, CaseIterable {
+nonisolated enum UsageProvider: String, Codable, CaseIterable, Sendable {
     case codex
     case claude
     case gemini
@@ -31,7 +31,7 @@ enum UsageProvider: String, Codable, CaseIterable {
     }
 }
 
-struct UsagePeriodSummary: Codable, Equatable {
+nonisolated struct UsagePeriodSummary: Codable, Equatable, Sendable {
     let label: String
     let inputTokens: Int?
     let outputTokens: Int?
@@ -53,7 +53,7 @@ struct UsagePeriodSummary: Codable, Equatable {
     }
 }
 
-struct UsageQuotaWindow: Codable, Equatable, Identifiable {
+nonisolated struct UsageQuotaWindow: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let title: String
     let usedPercent: Double?
@@ -87,7 +87,7 @@ struct UsageQuotaWindow: Codable, Equatable, Identifiable {
     }
 }
 
-struct UsageUserIdentity: Codable, Equatable {
+nonisolated struct UsageUserIdentity: Codable, Equatable, Sendable {
     let email: String?
     let organization: String?
     let plan: String?
@@ -99,7 +99,7 @@ struct UsageUserIdentity: Codable, Equatable {
     }
 }
 
-struct AgentUsageReport: Codable, Equatable {
+nonisolated struct AgentUsageReport: Codable, Equatable, Sendable {
     var periods: [UsagePeriodSummary]
     var quota: [UsageQuotaWindow]
     var user: UsageUserIdentity?
@@ -131,7 +131,7 @@ struct AgentUsageReport: Codable, Equatable {
     }
 }
 
-enum UsageRefreshState: Equatable {
+nonisolated enum UsageRefreshState: Equatable, Sendable {
     case idle
     case loading
     case failed(String)

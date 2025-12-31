@@ -65,7 +65,7 @@ final class Libgit2Service: @unchecked Sendable {
 }
 
 /// libgit2 compile-time features
-struct Libgit2Features: OptionSet {
+nonisolated struct Libgit2Features: OptionSet {
     let rawValue: Int32
 
     static let threads = Libgit2Features(rawValue: Int32(GIT_FEATURE_THREADS.rawValue))

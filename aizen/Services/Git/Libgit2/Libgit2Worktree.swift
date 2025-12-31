@@ -2,7 +2,7 @@ import Foundation
 import Clibgit2
 
 /// Worktree information
-struct Libgit2WorktreeInfo: Sendable {
+nonisolated struct Libgit2WorktreeInfo: Sendable {
     let name: String
     let path: String
     let isLocked: Bool

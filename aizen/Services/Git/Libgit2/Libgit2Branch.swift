@@ -2,7 +2,7 @@ import Foundation
 import Clibgit2
 
 /// Branch type
-enum Libgit2BranchType {
+nonisolated enum Libgit2BranchType {
     case local
     case remote
     case all
@@ -17,7 +17,7 @@ enum Libgit2BranchType {
 }
 
 /// Branch information
-struct Libgit2BranchInfo: Sendable {
+nonisolated struct Libgit2BranchInfo: Sendable {
     let name: String
     let fullName: String
     let isRemote: Bool

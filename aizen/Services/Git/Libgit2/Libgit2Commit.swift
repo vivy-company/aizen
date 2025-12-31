@@ -2,7 +2,7 @@ import Foundation
 import Clibgit2
 
 /// Commit information
-struct Libgit2CommitInfo: Sendable {
+nonisolated struct Libgit2CommitInfo: Sendable {
     let oid: String
     let shortOid: String
     let message: String
@@ -14,7 +14,7 @@ struct Libgit2CommitInfo: Sendable {
 }
 
 /// Signature (author/committer)
-struct Libgit2Signature: Sendable {
+nonisolated struct Libgit2Signature: Sendable {
     let name: String
     let email: String
     let time: Date

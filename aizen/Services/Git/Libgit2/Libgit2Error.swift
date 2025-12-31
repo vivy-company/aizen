@@ -2,7 +2,7 @@ import Foundation
 import Clibgit2
 
 /// Errors from libgit2 operations
-enum Libgit2Error: LocalizedError {
+nonisolated enum Libgit2Error: LocalizedError {
     case notARepository(String)
     case repositoryPathMissing(String)
     case repositoryCorrupted(String)

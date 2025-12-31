@@ -2,7 +2,7 @@ import Foundation
 import Clibgit2
 
 /// Line change type in diff
-enum Libgit2LineOrigin: Character, Sendable {
+nonisolated enum Libgit2LineOrigin: Character, Sendable {
     case context = " "
     case addition = "+"
     case deletion = "-"
@@ -30,7 +30,7 @@ enum Libgit2LineOrigin: Character, Sendable {
 }
 
 /// A single line in a diff
-struct Libgit2DiffLine: Sendable {
+nonisolated struct Libgit2DiffLine: Sendable {
     let origin: Libgit2LineOrigin
     let oldLineNumber: Int?
     let newLineNumber: Int?
@@ -38,7 +38,7 @@ struct Libgit2DiffLine: Sendable {
 }
 
 /// A hunk in a diff
-struct Libgit2DiffHunk: Sendable {
+nonisolated struct Libgit2DiffHunk: Sendable {
     let header: String
     let oldStart: Int
     let oldLines: Int
@@ -48,7 +48,7 @@ struct Libgit2DiffHunk: Sendable {
 }
 
 /// Diff delta (file change)
-struct Libgit2DiffDelta: Sendable {
+nonisolated struct Libgit2DiffDelta: Sendable {
     let oldPath: String?
     let newPath: String?
     let status: DeltaStatus
@@ -73,7 +73,7 @@ struct Libgit2DiffDelta: Sendable {
 }
 
 /// Diff statistics
-struct Libgit2DiffStats: Sendable {
+nonisolated struct Libgit2DiffStats: Sendable {
     let filesChanged: Int
     let insertions: Int
     let deletions: Int

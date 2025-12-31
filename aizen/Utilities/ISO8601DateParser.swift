@@ -7,7 +7,7 @@
 
 import Foundation
 
-final class ISO8601DateParser: @unchecked Sendable {
+nonisolated final class ISO8601DateParser: @unchecked Sendable {
     static let shared = ISO8601DateParser()
 
     private let lock = NSLock()

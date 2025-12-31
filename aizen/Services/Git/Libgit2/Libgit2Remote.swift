@@ -2,14 +2,14 @@ import Foundation
 import Clibgit2
 
 /// Remote information
-struct Libgit2RemoteInfo: Sendable {
+nonisolated struct Libgit2RemoteInfo: Sendable {
     let name: String
     let url: String?
     let pushUrl: String?
 }
 
 /// Fetch/push progress
-struct Libgit2TransferProgress: Sendable {
+nonisolated struct Libgit2TransferProgress: Sendable {
     let totalObjects: Int
     let indexedObjects: Int
     let receivedObjects: Int

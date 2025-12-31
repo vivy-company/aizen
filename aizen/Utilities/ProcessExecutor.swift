@@ -290,7 +290,7 @@ enum StreamOutput: Sendable {
 }
 
 /// Thread-safe data collector for process output
-private final class DataCollector: @unchecked Sendable {
+nonisolated private final class DataCollector: @unchecked Sendable {
     private var stdoutData = Data()
     private var stderrData = Data()
     private let lock = NSLock()

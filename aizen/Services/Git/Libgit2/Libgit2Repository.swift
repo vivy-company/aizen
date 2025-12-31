@@ -3,7 +3,7 @@ import Clibgit2
 
 /// Swift wrapper for git_repository
 /// Manages repository lifecycle and provides access to git operations
-final class Libgit2Repository {
+nonisolated final class Libgit2Repository {
     /// The underlying libgit2 repository pointer
     private(set) var pointer: OpaquePointer?
 

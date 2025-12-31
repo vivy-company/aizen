@@ -8,7 +8,7 @@
 import Foundation
 import os.log
 
-enum ShellEnvironment {
+nonisolated enum ShellEnvironment {
     /// Cached environment loaded once at first access
     private static var cachedEnvironment: [String: String]?
     private static let cacheLock = NSLock()

@@ -8,7 +8,7 @@
 import Foundation
 
 /// Metadata for an agent configuration
-struct AgentMetadata: Codable, Identifiable {
+nonisolated struct AgentMetadata: Codable, Identifiable, Sendable {
     let id: String
     var name: String
     var description: String?

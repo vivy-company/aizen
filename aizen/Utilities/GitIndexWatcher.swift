@@ -9,7 +9,7 @@
 import Foundation
 import Darwin
 
-class GitIndexWatcher {
+nonisolated final class GitIndexWatcher: @unchecked Sendable {
     private let worktreePath: String
     private let gitIndexPath: String
     private let pollInterval: TimeInterval = 1.0  // Poll every 1 second

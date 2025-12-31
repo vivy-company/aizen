@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct FileIconMapper {
+nonisolated struct FileIconMapper {
     // MARK: - Extension to Icon Mapping
 
     private static let extensionMapping: [String: String] = [

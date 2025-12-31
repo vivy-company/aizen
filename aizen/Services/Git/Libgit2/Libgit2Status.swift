@@ -2,7 +2,7 @@ import Foundation
 import Clibgit2
 
 /// File status flags
-struct Libgit2FileStatus: OptionSet, Sendable {
+nonisolated struct Libgit2FileStatus: OptionSet, Sendable {
     let rawValue: UInt32
 
     static let indexNew = Libgit2FileStatus(rawValue: GIT_STATUS_INDEX_NEW.rawValue)
@@ -43,7 +43,7 @@ struct Libgit2FileStatus: OptionSet, Sendable {
 }
 
 /// Status entry for a single file
-struct Libgit2StatusEntry: Sendable {
+nonisolated struct Libgit2StatusEntry: Sendable {
     let path: String
     let oldPath: String?  // For renames
     let status: Libgit2FileStatus
@@ -68,7 +68,7 @@ struct Libgit2StatusEntry: Sendable {
 }
 
 /// Repository status summary
-struct Libgit2StatusSummary: Sendable {
+nonisolated struct Libgit2StatusSummary: Sendable {
     let entries: [Libgit2StatusEntry]
     let staged: [Libgit2StatusEntry]
     let modified: [Libgit2StatusEntry]
