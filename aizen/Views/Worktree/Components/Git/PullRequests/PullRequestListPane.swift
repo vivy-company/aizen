@@ -249,24 +249,17 @@ struct PRStateBadge: View {
     let isDraft: Bool
 
     var body: some View {
-        Text(isDraft ? "Draft" : state.displayName)
-            .font(.system(size: 10, weight: .medium))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(backgroundColor)
-            .foregroundStyle(foregroundColor)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
-
-    private var backgroundColor: Color {
-        if isDraft {
-            return Color.gray.opacity(0.2)
-        }
-        switch state {
-        case .open: return Color.green.opacity(0.2)
-        case .merged: return Color.purple.opacity(0.2)
-        case .closed: return Color.red.opacity(0.2)
-        }
+        let color = foregroundColor
+        return TagBadge(
+            text: isDraft ? "Draft" : state.displayName,
+            color: color,
+            cornerRadius: 4,
+            font: .system(size: 10, weight: .medium),
+            horizontalPadding: 6,
+            verticalPadding: 2,
+            backgroundOpacity: 0.2,
+            textColor: color
+        )
     }
 
     private var foregroundColor: Color {
