@@ -54,38 +54,50 @@ struct ReviewCommentsPanel: View {
 
     private var footerButtons: some View {
         VStack(spacing: 8) {
-            Button(action: onCopyAll) {
-                HStack(spacing: 6) {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 12))
-                    Text("Copy All")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(Color(NSColor.controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.primary)
+            footerButton(
+                title: "Copy All",
+                systemImage: "doc.on.doc",
+                iconSize: 12,
+                background: Color(NSColor.controlBackgroundColor),
+                foreground: .primary,
+                action: onCopyAll
+            )
 
-            Button(action: onSendToAgent) {
-                HStack(spacing: 6) {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 11))
-                    Text("Send to Agent")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(Color.blue)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white)
+            footerButton(
+                title: "Send to Agent",
+                systemImage: "paperplane.fill",
+                iconSize: 11,
+                background: .blue,
+                foreground: .white,
+                action: onSendToAgent
+            )
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
+    }
+
+    private func footerButton(
+        title: String,
+        systemImage: String,
+        iconSize: CGFloat,
+        background: Color,
+        foreground: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.system(size: iconSize))
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(foreground)
     }
 
     private var emptyState: some View {
