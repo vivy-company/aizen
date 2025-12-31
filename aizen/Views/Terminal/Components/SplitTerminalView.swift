@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import os
 
 // MARK: - Split Terminal View
 

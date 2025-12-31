@@ -331,7 +331,7 @@ private struct AizenProPlansSheet: View {
 
             CircleIconButton(
                 systemName: "xmark",
-                action: dismiss,
+                action: { dismiss() },
                 size: 12,
                 weight: .semibold,
                 foreground: .secondary,
