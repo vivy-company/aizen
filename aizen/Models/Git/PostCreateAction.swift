@@ -124,7 +124,7 @@ struct CustomScriptConfig: Codable, Equatable {
 
 // MARK: - Script Generator
 
-struct PostCreateScriptGenerator {
+nonisolated struct PostCreateScriptGenerator {
 
     /// Generates a bash script from actions
     /// - Parameters:

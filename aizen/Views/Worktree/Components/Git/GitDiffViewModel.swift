@@ -54,40 +54,32 @@ class GitDiffViewModel: ObservableObject {
                 return
             }
 
-            do {
-                var lines: [DiffLine]
+            var lines: [DiffLine]
 
-                if isUntracked {
-                    // For untracked files, read file content and show as all additions
-                    lines = await self.loadUntrackedFileAsDiff(file)
-                } else {
-                    // Use git command for formatted diff output
-                    var diffOutput = await self.runGitDiff(["diff", "HEAD", "--", file])
-                    if diffOutput == nil {
-                        diffOutput = await self.runGitDiff(["diff", "--", file])
-                    }
-                    // Parse off the main actor to avoid blocking UI on large diffs
-                    lines = await Task.detached(priority: .utility) {
-                        DiffParser.parseUnifiedDiff(diffOutput ?? "")
-                    }.value
+            if isUntracked {
+                // For untracked files, read file content and show as all additions
+                lines = await self.loadUntrackedFileAsDiff(file)
+            } else {
+                // Use git command for formatted diff output
+                var diffOutput = await self.runGitDiff(["diff", "HEAD", "--", file])
+                if diffOutput == nil {
+                    diffOutput = await self.runGitDiff(["diff", "--", file])
                 }
+                // Parse off the main actor to avoid blocking UI on large diffs
+                lines = await Task.detached(priority: .utility) {
+                    DiffParser.parseUnifiedDiff(diffOutput ?? "")
+                }.value
+            }
 
+            guard !Task.isCancelled else { return }
+
+            let hash = self.computeHash(file + String(lines.count))
+            await self.cache.cacheDiff(lines, for: file, contentHash: hash)
+
+            await MainActor.run { [weak self] in
                 guard !Task.isCancelled else { return }
-
-                let hash = self.computeHash(file + String(lines.count))
-                await self.cache.cacheDiff(lines, for: file, contentHash: hash)
-
-                await MainActor.run { [weak self] in
-                    guard !Task.isCancelled else { return }
-                    self?.loadedDiffs[file] = lines
-                    self?.loadingFiles.remove(file)
-                }
-            } catch {
-                await MainActor.run { [weak self] in
-                    guard !Task.isCancelled else { return }
-                    self?.errors[file] = error.localizedDescription
-                    self?.loadingFiles.remove(file)
-                }
+                self?.loadedDiffs[file] = lines
+                self?.loadingFiles.remove(file)
             }
         }
 
@@ -122,33 +114,22 @@ class GitDiffViewModel: ObservableObject {
             return
         }
 
-        do {
-            // Load tracked files with single git diff
-            if !filesToLoad.isEmpty {
-                var diffOutput = await runGitDiff(["diff", "HEAD"])
-                if diffOutput == nil {
-                    diffOutput = await runGitDiff(["diff"])
-                }
+        defer { isBatchLoading = false }
 
-                // Parse off the main actor to avoid blocking UI on large diffs
-                let parsedByFile = await Task.detached(priority: .utility) {
-                    DiffParser.splitDiffByFile(diffOutput ?? "")
-                }.value
-
-                for file in filesToLoad {
-                    let lines = parsedByFile[file] ?? []
-                    loadedDiffs[file] = lines
-
-                    if !lines.isEmpty {
-                        let hash = computeHash(file + String(lines.count))
-                        await cache.cacheDiff(lines, for: file, contentHash: hash)
-                    }
-                }
+        // Load tracked files with single git diff
+        if !filesToLoad.isEmpty {
+            var diffOutput = await runGitDiff(["diff", "HEAD"])
+            if diffOutput == nil {
+                diffOutput = await runGitDiff(["diff"])
             }
 
-            // Load untracked files
-            for file in untrackedToLoad {
-                let lines = await loadUntrackedFileAsDiff(file)
+            // Parse off the main actor to avoid blocking UI on large diffs
+            let parsedByFile = await Task.detached(priority: .utility) {
+                DiffParser.splitDiffByFile(diffOutput ?? "")
+            }.value
+
+            for file in filesToLoad {
+                let lines = parsedByFile[file] ?? []
                 loadedDiffs[file] = lines
 
                 if !lines.isEmpty {
@@ -156,13 +137,17 @@ class GitDiffViewModel: ObservableObject {
                     await cache.cacheDiff(lines, for: file, contentHash: hash)
                 }
             }
+        }
 
-            isBatchLoading = false
-        } catch {
-            for file in filesToLoad {
-                errors[file] = error.localizedDescription
+        // Load untracked files
+        for file in untrackedToLoad {
+            let lines = await loadUntrackedFileAsDiff(file)
+            loadedDiffs[file] = lines
+
+            if !lines.isEmpty {
+                let hash = computeHash(file + String(lines.count))
+                await cache.cacheDiff(lines, for: file, contentHash: hash)
             }
-            isBatchLoading = false
         }
     }
 

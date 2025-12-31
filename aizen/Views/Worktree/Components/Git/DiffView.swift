@@ -342,7 +342,7 @@ struct DiffView: NSViewRepresentable {
             }
         }
 
-        private static func parseDiffOutput(diffOutput: String, showFileHeaders: Bool) -> ParsedDiffMetadata {
+        nonisolated private static func parseDiffOutput(diffOutput: String, showFileHeaders: Bool) -> ParsedDiffMetadata {
             var rawLines: [String] = []
             let maxRawLines = 200_000
             rawLines.reserveCapacity(min(max(128, diffOutput.count / 48), maxRawLines))
