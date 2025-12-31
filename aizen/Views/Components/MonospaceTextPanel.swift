@@ -41,7 +41,7 @@ struct MonospaceTextPanel: View {
         }
         return Text(displayText)
             .font(font)
-            .foregroundStyle(resolvedTextColor)
+            .foregroundColor(resolvedTextColor)
     }
 
     var body: some View {
