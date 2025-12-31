@@ -7,14 +7,14 @@
 
 import Foundation
 
-private enum CostUsageTimestampParser {
-    static func parseISO(_ text: String) -> Date? {
+nonisolated private enum CostUsageTimestampParser {
+    nonisolated static func parseISO(_ text: String) -> Date? {
         ISO8601DateParser.shared.parse(text)
     }
 }
 
 extension CostUsageScanner {
-    static func dayKeyFromTimestamp(_ text: String) -> String? {
+    nonisolated static func dayKeyFromTimestamp(_ text: String) -> String? {
         let bytes = Array(text.utf8)
         guard bytes.count >= 20 else { return nil }
         guard bytes[safe: 4] == 45, bytes[safe: 7] == 45 else { return nil }
@@ -93,18 +93,18 @@ extension CostUsageScanner {
         return String(format: "%04d-%02d-%02d", localYear, localMonth, localDay)
     }
 
-    static func dayKeyFromParsedISO(_ text: String) -> String? {
+    nonisolated static func dayKeyFromParsedISO(_ text: String) -> String? {
         guard let date = CostUsageTimestampParser.parseISO(text) else { return nil }
         return CostUsageDayRange.dayKey(from: date)
     }
 
-    fileprivate static func parse2(_ bytes: [UInt8], at index: Int) -> Int? {
+    nonisolated fileprivate static func parse2(_ bytes: [UInt8], at index: Int) -> Int? {
         guard let d0 = parseDigit(bytes[safe: index]),
               let d1 = parseDigit(bytes[safe: index + 1]) else { return nil }
         return d0 * 10 + d1
     }
 
-    fileprivate static func parse4(_ bytes: [UInt8], at index: Int) -> Int? {
+    nonisolated fileprivate static func parse4(_ bytes: [UInt8], at index: Int) -> Int? {
         guard let d0 = parseDigit(bytes[safe: index]),
               let d1 = parseDigit(bytes[safe: index + 1]),
               let d2 = parseDigit(bytes[safe: index + 2]),
@@ -112,7 +112,7 @@ extension CostUsageScanner {
         return d0 * 1000 + d1 * 100 + d2 * 10 + d3
     }
 
-    fileprivate static func parseDigit(_ byte: UInt8?) -> Int? {
+    nonisolated fileprivate static func parseDigit(_ byte: UInt8?) -> Int? {
         guard let byte else { return nil }
         guard byte >= 48, byte <= 57 else { return nil }
         return Int(byte - 48)
