@@ -235,18 +235,11 @@ struct ReviewCommentsPanel: View {
 
     private func lineTypeBadge(_ type: DiffLineType) -> some View {
         Group {
-            switch type {
-            case .added:
-                Text("+")
-                    .foregroundStyle(.green)
-            case .deleted:
-                Text("-")
-                    .foregroundStyle(.red)
-            case .context:
-                Text(" ")
-                    .foregroundStyle(.secondary)
-            case .header:
+            if type == .header || type.marker.isEmpty {
                 EmptyView()
+            } else {
+                Text(type.marker)
+                    .foregroundStyle(type.markerColor)
             }
         }
         .font(.system(size: 10, weight: .bold, design: .monospaced))
