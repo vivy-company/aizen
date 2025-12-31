@@ -75,7 +75,7 @@ struct XcodeBuildLogPopover: View {
             Spacer()
 
             if let duration = duration {
-                Text(String(format: "%.1fs", duration))
+                Text(DurationFormatter.short(duration))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

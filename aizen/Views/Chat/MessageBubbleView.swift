@@ -83,7 +83,7 @@ struct MessageBubbleView: View {
                                     .foregroundStyle(.tertiary)
 
                                 if let executionTime = message.executionTime {
-                                    Text(formatExecutionTime(executionTime))
+                                    Text(DurationFormatter.short(executionTime))
                                         .font(.system(size: 10))
                                         .foregroundStyle(.tertiary)
                                 }
@@ -148,18 +148,6 @@ struct MessageBubbleView: View {
 
     private func formatTimestamp(_ date: Date) -> String {
         DateFormatters.shortTime.string(from: date)
-    }
-
-    private func formatExecutionTime(_ seconds: TimeInterval) -> String {
-        if seconds < 1 {
-            return String(format: "%.2fs", seconds)
-        } else if seconds < 60 {
-            return String(format: "%.1fs", seconds)
-        } else {
-            let minutes = Int(seconds) / 60
-            let remainingSeconds = Int(seconds) % 60
-            return "\(minutes)m \(remainingSeconds)s"
-        }
     }
 }
 
