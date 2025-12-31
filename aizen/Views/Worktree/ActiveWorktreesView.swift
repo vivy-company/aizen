@@ -618,9 +618,9 @@ private struct SummaryPills: View {
         PillBadge(
             text: "\(label) \(count)",
             color: color,
-            backgroundOpacity: 0.12,
             horizontalPadding: 8,
-            verticalPadding: 4
+            verticalPadding: 4,
+            backgroundOpacity: 0.12
         )
     }
 }
