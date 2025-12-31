@@ -156,7 +156,7 @@ nonisolated struct ToolCall: Codable, Identifiable {
     }
 }
 
-extension ToolCallContent {
+nonisolated extension ToolCallContent {
     fileprivate var copyableText: String? {
         switch self {
         case .content(let block):

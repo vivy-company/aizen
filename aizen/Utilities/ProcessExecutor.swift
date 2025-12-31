@@ -277,7 +277,7 @@ nonisolated enum StreamOutput: Sendable {
     case error(String)
 }
 
-private final class ResumeGuard: @unchecked Sendable {
+nonisolated private final class ResumeGuard: @unchecked Sendable {
     private let lock = NSLock()
     private var hasResumed = false
 

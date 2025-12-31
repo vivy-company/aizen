@@ -22,7 +22,6 @@ enum KeyCode {
 @MainActor
 class KeyboardShortcutManager {
     private var isChatViewActive = false
-    private var observers: [NSObjectProtocol] = []
     private var eventMonitor: Any?
 
     init() {
@@ -31,35 +30,25 @@ class KeyboardShortcutManager {
     }
 
     deinit {
-        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        NotificationCenter.default.removeObserver(self)
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
         }
     }
 
     private func setupNotifications() {
-        let appearObserver = NotificationCenter.default.addObserver(
-            forName: .chatViewDidAppear,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.isChatViewActive = true
-            }
-        }
-
-        let disappearObserver = NotificationCenter.default.addObserver(
-            forName: .chatViewDidDisappear,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.isChatViewActive = false
-            }
-        }
-
-        observers.append(appearObserver)
-        observers.append(disappearObserver)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleChatViewDidAppear),
+            name: .chatViewDidAppear,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleChatViewDidDisappear),
+            name: .chatViewDidDisappear,
+            object: nil
+        )
     }
 
     private func setupEventMonitor() {
@@ -102,12 +91,19 @@ class KeyboardShortcutManager {
     }
 
     func cleanup() {
-        observers.forEach { NotificationCenter.default.removeObserver($0) }
-        observers.removeAll()
+        NotificationCenter.default.removeObserver(self)
 
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
         }
+    }
+
+    @objc private func handleChatViewDidAppear() {
+        isChatViewActive = true
+    }
+
+    @objc private func handleChatViewDidDisappear() {
+        isChatViewActive = false
     }
 }

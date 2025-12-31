@@ -11,7 +11,7 @@ import CodeEditSourceEditor
 
 // MARK: - NSColor Hex Extension
 
-extension NSColor {
+nonisolated extension NSColor {
     convenience init(hex: String, alpha: Double = 1.0) {
         let hex = hex.trimmingCharacters(in: .alphanumerics.inverted)
         var int: UInt64 = 0
@@ -82,7 +82,6 @@ nonisolated struct GhosttyThemeParser {
 
             // Map ANSI colors to syntax highlighting
             // ANSI colors: 0=black, 1=red, 2=green, 3=yellow, 4=blue, 5=magenta, 6=cyan, 7=white
-            let red = palette[1] ?? NSColor(hex: "F38BA8")
             let green = palette[2] ?? NSColor(hex: "A6E3A1")
             let yellow = palette[3] ?? NSColor(hex: "F9E2AF")
             let blue = palette[4] ?? NSColor(hex: "89B4FA")

@@ -162,8 +162,6 @@ nonisolated struct ANSIParser {
     static func parse(_ input: String) -> AttributedString {
         var result = AttributedString()
         var style = ANSITextStyle()
-        var currentText = ""
-
         // Regex to match ANSI escape sequences
         let pattern = "\u{001B}\\[([0-9;]*)m"
         let regex = try? NSRegularExpression(pattern: pattern, options: [])
