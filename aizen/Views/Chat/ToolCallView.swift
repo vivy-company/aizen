@@ -266,15 +266,6 @@ struct ToolCallView: View {
 
     // MARK: - Status
 
-    private var statusText: String {
-        switch toolCall.status {
-        case .pending: return String(localized: "chat.tool.status.pending")
-        case .inProgress: return String(localized: "chat.tool.status.running")
-        case .completed: return String(localized: "chat.tool.status.done")
-        case .failed: return String(localized: "chat.tool.status.failed")
-        }
-    }
-
     private var statusColor: Color {
         switch toolCall.status {
         case .pending: return .yellow
