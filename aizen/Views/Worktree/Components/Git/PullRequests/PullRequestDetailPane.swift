@@ -677,15 +677,6 @@ struct PRCommentView: View {
         }
     }
 
-    private func backgroundColor(for state: PRComment.ReviewState) -> Color {
-        switch state {
-        case .approved: return .green.opacity(0.2)
-        case .changesRequested: return .red.opacity(0.2)
-        case .commented: return .blue.opacity(0.2)
-        case .pending: return .orange.opacity(0.2)
-        }
-    }
-
     private func foregroundColor(for state: PRComment.ReviewState) -> Color {
         switch state {
         case .approved: return .green
