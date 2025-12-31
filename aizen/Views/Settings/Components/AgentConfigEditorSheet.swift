@@ -45,9 +45,13 @@ struct AgentConfigEditorSheet: View {
                 }
             } trailing: {
                 if hasChanges {
-                    Text("Unsaved changes")
-                        .font(.caption)
-                        .foregroundColor(.orange)
+                    TagBadge(
+                        text: "Unsaved changes",
+                        color: .orange,
+                        font: .caption,
+                        backgroundOpacity: 0.2,
+                        textColor: .orange
+                    )
                 }
             }
             .background(Color(NSColor.controlBackgroundColor))
