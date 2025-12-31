@@ -278,18 +278,10 @@ struct PRChecksBadge: View {
     let status: PullRequest.ChecksStatus
 
     var body: some View {
-        TagBadge(
+        PRStatusBadge(
             text: status.displayName,
             color: color,
-            cornerRadius: 0,
-            font: .system(size: 10),
-            horizontalPadding: 0,
-            verticalPadding: 0,
-            backgroundOpacity: 0,
-            textColor: color,
-            iconSystemName: status.iconName,
-            iconSize: 9,
-            spacing: 3
+            iconSystemName: status.iconName
         )
     }
 
@@ -306,18 +298,10 @@ struct PRReviewBadge: View {
     let decision: PullRequest.ReviewDecision
 
     var body: some View {
-        TagBadge(
+        PRStatusBadge(
             text: decision.displayName,
             color: color,
-            cornerRadius: 0,
-            font: .system(size: 10),
-            horizontalPadding: 0,
-            verticalPadding: 0,
-            backgroundOpacity: 0,
-            textColor: color,
-            iconSystemName: decision.iconName,
-            iconSize: 9,
-            spacing: 3
+            iconSystemName: decision.iconName
         )
     }
 
@@ -327,5 +311,27 @@ struct PRReviewBadge: View {
         case .changesRequested: return .red
         case .reviewRequired: return .orange
         }
+    }
+}
+
+private struct PRStatusBadge: View {
+    let text: String
+    let color: Color
+    let iconSystemName: String
+
+    var body: some View {
+        TagBadge(
+            text: text,
+            color: color,
+            cornerRadius: 0,
+            font: .system(size: 10),
+            horizontalPadding: 0,
+            verticalPadding: 0,
+            backgroundOpacity: 0,
+            textColor: color,
+            iconSystemName: iconSystemName,
+            iconSize: 9,
+            spacing: 3
+        )
     }
 }
