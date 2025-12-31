@@ -80,45 +80,6 @@ struct WorkflowRun: Identifiable, Hashable {
         }
         return status.rawValue.replacingOccurrences(of: "_", with: " ").capitalized
     }
-
-    var statusIcon: String {
-        if let conclusion = conclusion {
-            switch conclusion {
-            case .success: return "checkmark.circle.fill"
-            case .failure: return "xmark.circle.fill"
-            case .cancelled: return "stop.circle.fill"
-            case .skipped: return "arrow.right.circle.fill"
-            case .timedOut: return "clock.badge.exclamationmark.fill"
-            case .actionRequired: return "exclamationmark.circle.fill"
-            case .neutral: return "minus.circle.fill"
-            }
-        }
-        switch status {
-        case .queued, .pending, .waiting: return "clock.fill"
-        case .inProgress: return "play.circle.fill"
-        case .completed: return "checkmark.circle.fill"
-        case .requested: return "hourglass"
-        }
-    }
-
-    var statusColor: String {
-        if let conclusion = conclusion {
-            switch conclusion {
-            case .success: return "green"
-            case .failure: return "red"
-            case .cancelled: return "gray"
-            case .skipped: return "gray"
-            case .timedOut: return "orange"
-            case .actionRequired: return "yellow"
-            case .neutral: return "gray"
-            }
-        }
-        switch status {
-        case .queued, .pending, .waiting, .requested: return "yellow"
-        case .inProgress: return "yellow"
-        case .completed: return "green"
-        }
-    }
 }
 
 enum RunStatus: String, CaseIterable {

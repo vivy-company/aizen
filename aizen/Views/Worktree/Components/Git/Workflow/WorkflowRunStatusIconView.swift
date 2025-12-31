@@ -22,7 +22,7 @@ struct WorkflowRunStatusIconView: View {
         if run.isInProgress {
             progressView
         } else {
-            Image(systemName: run.statusIcon)
+            Image(systemName: WorkflowStatusIcon.iconName(status: run.status, conclusion: run.conclusion, fillStyle: .fill))
                 .font(.system(size: iconSize))
                 .foregroundStyle(statusColor)
         }
