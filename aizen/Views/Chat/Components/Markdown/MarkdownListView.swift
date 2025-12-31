@@ -86,15 +86,11 @@ struct MathBlockView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var headerBackground: Color {
-        colorScheme == .dark
-            ? Color(white: 0.15)
-            : Color(white: 0.95)
+        CodeBlockColors.headerBackground(for: colorScheme)
     }
 
     private var contentBackground: Color {
-        colorScheme == .dark
-            ? Color(white: 0.1)
-            : Color(white: 0.98)
+        CodeBlockColors.contentBackground(for: colorScheme)
     }
 
     var body: some View {

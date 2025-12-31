@@ -50,15 +50,11 @@ struct CodeBlockView: View {
     }
 
     private var headerBackground: Color {
-        colorScheme == .dark
-            ? Color(white: 0.15)
-            : Color(white: 0.95)
+        CodeBlockColors.headerBackground(for: colorScheme)
     }
 
     private var codeBackground: Color {
-        colorScheme == .dark
-            ? Color(white: 0.1)
-            : Color(white: 0.98)
+        CodeBlockColors.contentBackground(for: colorScheme)
     }
 
     private var languageIcon: String {
