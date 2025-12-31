@@ -9,6 +9,7 @@ import AppKit
 import Foundation
 import UniformTypeIdentifiers
 
+@MainActor
 actor FileIconService {
     // MARK: - Singleton
 
@@ -61,10 +62,8 @@ actor FileIconService {
             return cached
         }
 
-        let resizedIcon = await MainActor.run { () -> NSImage? in
-            guard let icon = NSImage(named: iconName) else { return nil }
-            return icon.resized(to: size)
-        }
+        guard let icon = NSImage(named: iconName) else { return nil }
+        let resizedIcon = icon.resized(to: size)
         guard let resizedIcon else { return nil }
 
         // Cache it (cost = approximate bytes)
@@ -94,9 +93,7 @@ actor FileIconService {
             return cached
         }
 
-        let resizedIcon = await MainActor.run {
-            NSWorkspace.shared.icon(for: .folder).resized(to: size)
-        }
+        let resizedIcon = NSWorkspace.shared.icon(for: .folder).resized(to: size)
 
         let cost = Int(size.width * size.height * 4)
         cache.setObject(resizedIcon, forKey: cacheKey, cost: cost)
@@ -117,9 +114,7 @@ actor FileIconService {
             return cached
         }
 
-        let resizedIcon = await MainActor.run {
-            NSWorkspace.shared.icon(for: .data).resized(to: size)
-        }
+        let resizedIcon = NSWorkspace.shared.icon(for: .data).resized(to: size)
 
         let cost = Int(size.width * size.height * 4)
         cache.setObject(resizedIcon, forKey: cacheKey, cost: cost)
