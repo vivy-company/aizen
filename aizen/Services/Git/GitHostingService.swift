@@ -118,16 +118,6 @@ actor GitHostingService {
 
     // Cache CLI paths
     private var cliPathCache: [GitHostingProvider: String?] = [:]
-    private let iso8601DateFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-    private let iso8601FallbackFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
 
     // MARK: - CLI Execution Helper
 
@@ -147,9 +137,7 @@ actor GitHostingService {
     }
 
     private func parseISO8601Date(_ value: String) -> Date {
-        iso8601DateFormatter.date(from: value)
-            ?? iso8601FallbackFormatter.date(from: value)
-            ?? Date()
+        ISO8601DateParser.shared.parse(value) ?? Date()
     }
 
     // MARK: - Provider Detection

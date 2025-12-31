@@ -429,11 +429,7 @@ private func makeWindow(title: String, quota: GeminiModelQuota) -> UsageQuotaWin
 }
 
 private func parseResetTime(_ isoString: String) -> Date? {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let date = formatter.date(from: isoString) { return date }
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter.date(from: isoString)
+    ISO8601DateParser.shared.parse(isoString)
 }
 
 private func formatResetTime(_ isoString: String) -> String {

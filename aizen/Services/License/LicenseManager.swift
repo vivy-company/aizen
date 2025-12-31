@@ -62,17 +62,6 @@ final class LicenseManager: ObservableObject {
 
     private let store = LicenseStore()
 
-    private static let iso8601Formatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    private static let iso8601FallbackFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
     private let client = LicenseClient()
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "License")
 
@@ -374,8 +363,7 @@ final class LicenseManager: ObservableObject {
 
     private func parseDate(_ string: String?) -> Date? {
         guard let string else { return nil }
-        return Self.iso8601Formatter.date(from: string)
-            ?? Self.iso8601FallbackFormatter.date(from: string)
+        return ISO8601DateParser.shared.parse(string)
     }
 
     private func getOrCreateDeviceFingerprint() -> String {

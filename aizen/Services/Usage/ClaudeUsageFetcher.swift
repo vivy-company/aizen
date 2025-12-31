@@ -375,11 +375,7 @@ private enum ClaudeOAuthUsageFetcher {
 
     static func parseISO8601Date(_ string: String?) -> Date? {
         guard let string, !string.isEmpty else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: string) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: string)
+        return ISO8601DateParser.shared.parse(string)
     }
 }
 
