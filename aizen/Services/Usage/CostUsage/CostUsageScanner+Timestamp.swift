@@ -7,28 +7,9 @@
 
 import Foundation
 
-private final class CostUsageISO8601FormatterBox: @unchecked Sendable {
-    let lock = NSLock()
-    let withFractional: ISO8601DateFormatter = {
-        let fmt = ISO8601DateFormatter()
-        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return fmt
-    }()
-
-    let plain: ISO8601DateFormatter = {
-        let fmt = ISO8601DateFormatter()
-        fmt.formatOptions = [.withInternetDateTime]
-        return fmt
-    }()
-}
-
 private enum CostUsageTimestampParser {
-    static let box = CostUsageISO8601FormatterBox()
-
     static func parseISO(_ text: String) -> Date? {
-        self.box.lock.lock()
-        defer { self.box.lock.unlock() }
-        return self.box.withFractional.date(from: text) ?? self.box.plain.date(from: text)
+        ISO8601DateParser.shared.parse(text)
     }
 }
 
