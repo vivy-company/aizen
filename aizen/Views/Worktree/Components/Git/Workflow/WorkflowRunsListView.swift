@@ -24,12 +24,13 @@ struct WorkflowRunsListView: View {
 
                 Spacer()
 
-                Text(branch)
-                    .font(.caption)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color(nsColor: .controlBackgroundColor))
-                    .cornerRadius(4)
+                TagBadge(
+                    text: branch,
+                    color: Color(nsColor: .controlBackgroundColor),
+                    font: .caption,
+                    backgroundOpacity: 1,
+                    textColor: .secondary
+                )
             }
 
             if isLoading && runs.isEmpty {
