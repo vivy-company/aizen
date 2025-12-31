@@ -74,7 +74,7 @@ struct InlineTerminalView: View {
             guard let session = agentSession else { return }
 
             var exitedIterations = 0
-            let gracePeriodIterations = 3 // Continue polling 3 more times after exit
+            let gracePeriodIterations = TerminalOutputDefaults.gracePeriodIterations
 
             // Poll for output with cancellation support
             for _ in 0..<120 { // 60 seconds max

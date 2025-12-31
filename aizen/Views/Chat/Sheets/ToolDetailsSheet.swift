@@ -189,7 +189,7 @@ struct TerminalOutputPreview: View {
         guard let session = agentSession else { return }
 
         var exitedIterations = 0
-        let gracePeriodIterations = 3 // Continue polling 3 more times after exit
+        let gracePeriodIterations = TerminalOutputDefaults.gracePeriodIterations
 
         // Poll for output updates
         for _ in 0..<60 { // Poll for up to 30 seconds
