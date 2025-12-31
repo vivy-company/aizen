@@ -267,12 +267,7 @@ struct ToolCallView: View {
     // MARK: - Status
 
     private var statusColor: Color {
-        switch toolCall.status {
-        case .pending: return .yellow
-        case .inProgress: return .blue
-        case .completed: return .green
-        case .failed: return .red
-        }
+        ToolStatusPresentation.color(for: toolCall.status)
     }
 
     // MARK: - Tool Icon

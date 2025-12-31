@@ -106,21 +106,11 @@ struct ToolDetailsSheet: View {
     }
 
     private func statusColor(for status: ToolStatus) -> Color {
-        switch status {
-        case .pending: return .yellow
-        case .inProgress: return .blue
-        case .completed: return .green
-        case .failed: return .red
-        }
+        ToolStatusPresentation.color(for: status)
     }
 
     private func statusLabel(for status: ToolStatus) -> String {
-        switch status {
-        case .pending: return String(localized: "chat.status.pending")
-        case .inProgress: return String(localized: "chat.tool.status.running")
-        case .completed: return String(localized: "chat.tool.status.done")
-        case .failed: return String(localized: "chat.tool.status.failed")
-        }
+        ToolStatusPresentation.label(for: status)
     }
 
 }
