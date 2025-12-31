@@ -10,7 +10,8 @@ import Foundation
 import UniformTypeIdentifiers
 
 @MainActor
-actor FileIconService {
+@MainActor
+final class FileIconService {
     // MARK: - Singleton
 
     static let shared = FileIconService()
@@ -64,7 +65,6 @@ actor FileIconService {
 
         guard let icon = NSImage(named: iconName) else { return nil }
         let resizedIcon = icon.resized(to: size)
-        guard let resizedIcon else { return nil }
 
         // Cache it (cost = approximate bytes)
         let cost = Int(size.width * size.height * 4)

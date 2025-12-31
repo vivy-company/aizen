@@ -161,7 +161,7 @@ extension Ghostty {
                 forName: UserDefaults.didChangeNotification,
                 object: nil,
                 queue: .main
-            ) { [weak self] _ in
+            ) { @MainActor [weak self] _ in
                 self?.checkAppearanceSettingChange()
             }
 
