@@ -363,7 +363,6 @@ nonisolated extension Libgit2Repository {
             }
 
             // Update HEAD
-            let refName = "refs/heads/\(branchName)"
             var newRef: OpaquePointer?
             let refError = git_reference_set_target(&newRef, try head(), &targetOid, "pull: fast-forward")
             defer { if let r = newRef { git_reference_free(r) } }

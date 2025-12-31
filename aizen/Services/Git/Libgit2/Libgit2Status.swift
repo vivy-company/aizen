@@ -290,7 +290,7 @@ nonisolated extension Libgit2Repository {
 
     /// Unstage all files
     func unstageAll() throws {
-        guard let ptr = pointer else {
+        guard pointer != nil else {
             throw Libgit2Error.notARepository(path)
         }
 

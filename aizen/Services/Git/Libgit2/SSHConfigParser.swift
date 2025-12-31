@@ -2,14 +2,14 @@ import Foundation
 import Clibgit2
 
 /// Parses ~/.ssh/config to find the IdentityFile for a given host
-struct SSHConfigResolution: Sendable {
+nonisolated struct SSHConfigResolution: Sendable {
     let hostName: String?
     let user: String?
     let port: Int?
     let identityFiles: [String]
 }
 
-func resolveSSHConfig(forHost host: String) -> SSHConfigResolution? {
+nonisolated func resolveSSHConfig(forHost host: String) -> SSHConfigResolution? {
     let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
     let configPath = "\(homeDir)/.ssh/config"
 
@@ -113,7 +113,7 @@ func resolveSSHConfig(forHost host: String) -> SSHConfigResolution? {
     )
 }
 
-func findSSHKeyForHost(_ host: String) -> String? {
+nonisolated func findSSHKeyForHost(_ host: String) -> String? {
     resolveSSHConfig(forHost: host)?.identityFiles.first
 }
 
@@ -139,7 +139,7 @@ private func expandPath(_ path: String) -> String {
 }
 
 /// Extract hostname from SSH URL (e.g., git@github.com:user/repo.git -> github.com)
-func extractHostFromURL(_ urlString: String) -> String? {
+nonisolated func extractHostFromURL(_ urlString: String) -> String? {
     if urlString.contains("@") && urlString.contains(":") && !urlString.hasPrefix("https://") {
         if let atIndex = urlString.firstIndex(of: "@"),
            let colonIndex = urlString.firstIndex(of: ":") {
@@ -169,12 +169,12 @@ func extractHostFromURL(_ urlString: String) -> String? {
 }
 
 /// Payload for libgit2 SSH credential callback to preserve host alias for key selection
-struct SSHCredentialPayload {
+nonisolated struct SSHCredentialPayload {
     let keyHost: UnsafeMutablePointer<CChar>?
 }
 
 /// SSH credential callback for libgit2 - reads SSH config for the correct key
-let sshCredentialCallback: git_credential_acquire_cb = { (cred, url, username_from_url, allowed_types, payload) -> Int32 in
+nonisolated let sshCredentialCallback: git_credential_acquire_cb = { (cred, url, username_from_url, allowed_types, payload) -> Int32 in
     if allowed_types & UInt32(GIT_CREDENTIAL_SSH_KEY.rawValue) != 0 {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
         let sshDir = "\(homeDir)/.ssh"
