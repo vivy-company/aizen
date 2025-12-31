@@ -16,14 +16,11 @@ struct NoteEditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(showsBackground: false) {
                 Text(title)
                     .font(.title2)
                     .fontWeight(.semibold)
-
-                Spacer()
             }
-            .padding()
 
             Divider()
 

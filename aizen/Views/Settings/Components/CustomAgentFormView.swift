@@ -65,16 +65,15 @@ struct CustomAgentFormView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(showsBackground: false) {
                 Text(existingMetadata == nil ? "Add Custom Agent" : "Edit Agent")
                     .font(.headline)
-                Spacer()
+            } trailing: {
                 Button("Cancel") {
                     dismiss()
                     onCancel()
                 }
             }
-            .padding()
             .background(Color(NSColor.controlBackgroundColor))
 
             Divider()

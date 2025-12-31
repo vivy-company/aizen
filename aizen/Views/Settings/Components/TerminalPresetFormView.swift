@@ -42,16 +42,15 @@ struct TerminalPresetFormView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(showsBackground: false) {
                 Text(existingPreset == nil ? "Add Terminal Preset" : "Edit Preset")
                     .font(.headline)
-                Spacer()
+            } trailing: {
                 Button("Cancel") {
                     dismiss()
                     onCancel()
                 }
             }
-            .padding()
             .background(Color(NSColor.controlBackgroundColor))
 
             Divider()

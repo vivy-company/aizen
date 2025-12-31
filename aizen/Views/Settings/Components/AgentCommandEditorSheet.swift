@@ -44,7 +44,7 @@ struct AgentCommandEditorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(showsBackground: false) {
                 VStack(alignment: .leading, spacing: 2) {
                     if isNewCommand {
                         Text("New Command")
@@ -57,16 +57,13 @@ struct AgentCommandEditorSheet: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-
-                Spacer()
-
+            } trailing: {
                 if hasChanges {
                     Text("Unsaved changes")
                         .font(.caption)
                         .foregroundColor(.orange)
                 }
             }
-            .padding()
             .background(Color(NSColor.controlBackgroundColor))
 
             Divider()
