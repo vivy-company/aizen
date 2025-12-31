@@ -20,23 +20,52 @@ struct PillBadge: View {
     var minimumScaleFactor: CGFloat? = nil
 
     var body: some View {
-        var label = Text(text).font(font)
-        if let fontWeight = fontWeight {
-            label = label.fontWeight(fontWeight)
-        }
-        if let lineLimit = lineLimit {
-            label = label.lineLimit(lineLimit)
-        }
-        if let minimumScaleFactor = minimumScaleFactor {
-            label = label.minimumScaleFactor(minimumScaleFactor)
-        }
-
         let resolvedTextColor = textColor ?? (backgroundOpacity >= 0.9 ? .white : color)
 
-        return label
+        return Text(text)
+            .font(font)
+            .modifier(OptionalFontWeightModifier(weight: fontWeight))
+            .modifier(OptionalLineLimitModifier(limit: lineLimit))
+            .modifier(OptionalMinimumScaleFactorModifier(factor: minimumScaleFactor))
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, verticalPadding)
             .foregroundStyle(resolvedTextColor)
             .background(Capsule().fill(color.opacity(backgroundOpacity)))
+    }
+}
+
+private struct OptionalFontWeightModifier: ViewModifier {
+    let weight: Font.Weight?
+
+    func body(content: Content) -> some View {
+        if let weight {
+            content.fontWeight(weight)
+        } else {
+            content
+        }
+    }
+}
+
+private struct OptionalLineLimitModifier: ViewModifier {
+    let limit: Int?
+
+    func body(content: Content) -> some View {
+        if let limit {
+            content.lineLimit(limit)
+        } else {
+            content
+        }
+    }
+}
+
+private struct OptionalMinimumScaleFactorModifier: ViewModifier {
+    let factor: CGFloat?
+
+    func body(content: Content) -> some View {
+        if let factor {
+            content.minimumScaleFactor(factor)
+        } else {
+            content
+        }
     }
 }

@@ -23,29 +23,32 @@ struct MonospaceTextPanel: View {
     var borderWidth: CGFloat = 1
     var cornerRadius: CGFloat = 4
 
+    private var isEmpty: Bool {
+        text.isEmpty && attributedText == nil
+    }
+
+    private var displayText: String {
+        isEmpty ? (emptyText ?? "") : text
+    }
+
+    private var resolvedTextColor: Color {
+        isEmpty ? emptyTextColor : textColor
+    }
+
+    private var baseText: Text {
+        if let attributedText {
+            return Text(attributedText)
+        }
+        return Text(displayText)
+            .font(font)
+            .foregroundStyle(resolvedTextColor)
+    }
+
     var body: some View {
         ScrollView([.horizontal, .vertical]) {
-            let isEmpty = text.isEmpty && attributedText == nil
-            let displayText = isEmpty ? (emptyText ?? "") : text
-            let color = isEmpty ? emptyTextColor : textColor
-
-            let base: Text
-            if let attributedText {
-                base = Text(attributedText)
-            } else {
-                base = Text(displayText)
-                    .font(font)
-                    .foregroundStyle(color)
-            }
-
-            let label = base
+            baseText
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-            if allowsSelection {
-                label.textSelection(.enabled)
-            } else {
-                label
-            }
+                .modifier(OptionalTextSelectionModifier(enabled: allowsSelection))
         }
         .frame(maxHeight: maxHeight)
         .padding(padding)
@@ -59,5 +62,17 @@ struct MonospaceTextPanel: View {
             }
         )
         .cornerRadius(cornerRadius)
+    }
+}
+
+private struct OptionalTextSelectionModifier: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.textSelection(.enabled)
+        } else {
+            content
+        }
     }
 }
