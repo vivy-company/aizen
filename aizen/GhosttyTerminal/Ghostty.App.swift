@@ -161,8 +161,10 @@ extension Ghostty {
                 forName: UserDefaults.didChangeNotification,
                 object: nil,
                 queue: .main
-            ) { @MainActor [weak self] _ in
-                self?.checkAppearanceSettingChange()
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.checkAppearanceSettingChange()
+                }
             }
 
             Ghostty.logger.info("Ghostty app initialized successfully")

@@ -10,7 +10,6 @@ import Foundation
 import UniformTypeIdentifiers
 
 @MainActor
-@MainActor
 final class FileIconService {
     // MARK: - Singleton
 
