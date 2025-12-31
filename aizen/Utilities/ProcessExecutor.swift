@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os.log
 
 /// Result of a process execution
 struct ProcessResult: Sendable {
@@ -38,8 +37,6 @@ enum ProcessExecutorError: Error, LocalizedError {
 /// Actor for non-blocking process execution
 actor ProcessExecutor {
     static let shared = ProcessExecutor()
-
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ProcessExecutor")
 
     /// Execute a process and capture output asynchronously (non-blocking)
     func executeWithOutput(

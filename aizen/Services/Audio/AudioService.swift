@@ -17,8 +17,6 @@ class AudioService: NSObject, ObservableObject {
     private let speechRecognitionService = SpeechRecognitionService()
     private let audioRecordingService = AudioRecordingService()
 
-    private var cancellables = Set<AnyCancellable>()
-
     override init() {
         super.init()
         setupBindings()

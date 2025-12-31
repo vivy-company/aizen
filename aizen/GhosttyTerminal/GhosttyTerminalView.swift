@@ -229,7 +229,6 @@ class GhosttyTerminalView: NSView {
 
     // Track last size sent to Ghostty to avoid redundant updates
     private var lastSurfaceSize: CGSize = .zero
-    private var didForceReattach = false
 
     // Override safe area insets to use full available space, including rounded corners
     // This matches Ghostty's SurfaceScrollView implementation
