@@ -47,16 +47,16 @@ struct ToolDetailsSheet: View {
             // Header
             HStack(spacing: 10) {
                 Circle()
-                    .fill(statusColor(for: toolCall.status))
+                    .fill(ToolStatusPresentation.color(for: toolCall.status))
                     .frame(width: 8, height: 8)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(toolCall.title)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
-                    Text(statusLabel(for: toolCall.status))
+                    Text(ToolStatusPresentation.label(for: toolCall.status))
                         .font(.system(size: 11))
-                        .foregroundStyle(statusColor(for: toolCall.status))
+                        .foregroundStyle(ToolStatusPresentation.color(for: toolCall.status))
                 }
                 Spacer()
             }
@@ -103,14 +103,6 @@ struct ToolDetailsSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.controlBackgroundColor).opacity(0.25))
         .cornerRadius(8)
-    }
-
-    private func statusColor(for status: ToolStatus) -> Color {
-        ToolStatusPresentation.color(for: status)
-    }
-
-    private func statusLabel(for status: ToolStatus) -> String {
-        ToolStatusPresentation.label(for: status)
     }
 
 }
