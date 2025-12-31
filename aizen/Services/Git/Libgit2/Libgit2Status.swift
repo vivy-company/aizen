@@ -93,7 +93,7 @@ nonisolated struct Libgit2StatusSummary: Sendable {
 }
 
 /// Status operations extension for Libgit2Repository
-extension Libgit2Repository {
+nonisolated extension Libgit2Repository {
 
     /// Get repository status
     func status(includeUntracked: Bool = true, includeIgnored: Bool = false) throws -> Libgit2StatusSummary {

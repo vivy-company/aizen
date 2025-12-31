@@ -119,7 +119,7 @@ struct WorkspaceSidebarView: View {
                 try await repositoryManager.refreshRepository(selected)
             } catch let error as Libgit2Error {
                 if case .repositoryPathMissing(let path) = error {
-                    await handleMissingRepository(selected, path: path)
+                    handleMissingRepository(selected, path: path)
                 } else {
                     logger.error("Failed to refresh selected repository \(selected.name ?? "unknown"): \(error.localizedDescription)")
                 }
@@ -136,7 +136,7 @@ struct WorkspaceSidebarView: View {
                 try await Task.sleep(for: .milliseconds(100))
             } catch let error as Libgit2Error {
                 if case .repositoryPathMissing(let path) = error {
-                    await handleMissingRepository(repository, path: path)
+                    handleMissingRepository(repository, path: path)
                 } else {
                     logger.error("Failed to refresh repository \(repository.name ?? "unknown"): \(error.localizedDescription)")
                 }

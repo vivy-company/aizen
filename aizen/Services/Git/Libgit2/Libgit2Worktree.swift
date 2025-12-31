@@ -16,7 +16,7 @@ nonisolated struct Libgit2WorktreeInfo: Sendable {
 }
 
 /// Worktree operations extension for Libgit2Repository
-extension Libgit2Repository {
+nonisolated extension Libgit2Repository {
 
     /// List all worktrees in the repository
     func listWorktrees() throws -> [Libgit2WorktreeInfo] {

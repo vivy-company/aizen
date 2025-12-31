@@ -80,7 +80,7 @@ nonisolated struct Libgit2DiffStats: Sendable {
 }
 
 /// Diff operations extension for Libgit2Repository
-extension Libgit2Repository {
+nonisolated extension Libgit2Repository {
 
     /// Get diff between index and workdir (unstaged changes)
     func diffIndexToWorkdir() throws -> [Libgit2DiffDelta] {

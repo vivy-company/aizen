@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum DiffParser {
+nonisolated enum DiffParser {
     /// Parse unified diff output into DiffLine array
     static func parseUnifiedDiff(_ diffOutput: String) -> [DiffLine] {
         var parsed: [DiffLine] = []

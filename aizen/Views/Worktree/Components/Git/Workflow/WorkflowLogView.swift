@@ -92,12 +92,18 @@ struct WorkflowLogTableView: NSViewRepresentable {
             self.showTimestamps = showTimestamps
 
             parseTask?.cancel()
-            parseTask = Task.detached(priority: .userInitiated) { [weak self] in
+            let logsSnapshot = logs
+            let structuredSnapshot = structuredLogs
+            let fontSizeSnapshot = fontSize
+            let showTimestampsSnapshot = showTimestamps
+            let providerSnapshot = provider
+
+            parseTask = Task.detached(priority: .userInitiated) {
                 let parsed: [LogStep]
-                if let structured = structuredLogs, !structured.lines.isEmpty {
-                    parsed = Self.parseStructuredLogs(structured, fontSize: fontSize)
+                if let structured = structuredSnapshot, !structured.lines.isEmpty {
+                    parsed = Self.parseStructuredLogs(structured, fontSize: fontSizeSnapshot)
                 } else {
-                    parsed = Self.parseLogSteps(logs, fontSize: fontSize, provider: provider)
+                    parsed = Self.parseLogSteps(logsSnapshot, fontSize: fontSizeSnapshot, provider: providerSnapshot)
                 }
 
                 await MainActor.run {
@@ -119,7 +125,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
             tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<displayRows.count))
         }
 
-        private static func parseStructuredLogs(_ logs: WorkflowLogs, fontSize: CGFloat) -> [LogStep] {
+        nonisolated private static func parseStructuredLogs(_ logs: WorkflowLogs, fontSize: CGFloat) -> [LogStep] {
             var steps: [LogStep] = []
             var currentStepName = ""
             var currentGroup: LogGroup?
@@ -203,7 +209,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
             return steps.filter { !$0.groups.isEmpty || $0.groups.contains { !$0.lines.isEmpty } }
         }
 
-        private static func parseLogSteps(_ text: String, fontSize: CGFloat, provider: WorkflowProvider = .github) -> [LogStep] {
+        nonisolated private static func parseLogSteps(_ text: String, fontSize: CGFloat, provider: WorkflowProvider = .github) -> [LogStep] {
             let lines = text.components(separatedBy: "\n")
             var steps: [LogStep] = []
             var stepNameCounts: [String: Int] = [:] // track occurrences of each step name

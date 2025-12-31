@@ -20,6 +20,7 @@ class ChatSessionViewModel: ObservableObject {
     let session: ChatSession
     let sessionManager: ChatSessionManager
     let viewContext: NSManagedObjectContext
+    private let worktreePathSnapshot: String
 
     // MARK: - Handlers
 
@@ -154,6 +155,7 @@ class ChatSessionViewModel: ObservableObject {
         self.session = session
         self.sessionManager = sessionManager
         self.viewContext = viewContext
+        self.worktreePathSnapshot = worktree.path ?? ""
 
         self.agentSwitcher = AgentSwitcher(viewContext: viewContext, session: session)
 
@@ -164,9 +166,9 @@ class ChatSessionViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     deinit {
-        if gitPauseApplied, let path = worktree.path, !path.isEmpty {
+        if gitPauseApplied, !worktreePathSnapshot.isEmpty {
             Task {
-                await GitIndexWatchCenter.shared.resume(worktreePath: path)
+                await GitIndexWatchCenter.shared.resume(worktreePath: worktreePathSnapshot)
             }
         }
         cancellables.removeAll()

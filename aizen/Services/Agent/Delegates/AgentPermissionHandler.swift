@@ -62,7 +62,7 @@ class AgentPermissionHandler: ObservableObject {
                 do {
                     try await Task.sleep(for: self?.permissionTimeout ?? .seconds(300))
                     // Timeout reached - auto-deny
-                    await self?.handleTimeout()
+                    self?.handleTimeout()
                 } catch {
                     // Task cancelled - user responded in time
                 }

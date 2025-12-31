@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct DetailedGitStatus {
+nonisolated struct DetailedGitStatus: Sendable {
     let stagedFiles: [String]
     let modifiedFiles: [String]
     let untrackedFiles: [String]

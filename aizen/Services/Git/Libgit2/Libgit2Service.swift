@@ -3,7 +3,7 @@ import Clibgit2
 
 /// Manages libgit2 library lifecycle
 /// Thread-safe singleton that initializes libgit2 once and shuts it down on app termination
-final class Libgit2Service: @unchecked Sendable {
+nonisolated final class Libgit2Service: @unchecked Sendable {
     static let shared = Libgit2Service()
 
     private let lock = NSLock()

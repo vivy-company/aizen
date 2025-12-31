@@ -11,7 +11,7 @@ import AppKit
 // MARK: - ANSI Color Provider
 
 /// Provides ANSI colors from the user's selected theme
-struct ANSIColorProvider {
+nonisolated struct ANSIColorProvider {
     static let shared = ANSIColorProvider()
 
     private var cachedThemeName: String?
@@ -74,7 +74,7 @@ struct ANSIColorProvider {
 
 // MARK: - ANSI Color Definitions
 
-enum ANSIColor {
+nonisolated enum ANSIColor {
     case `default`
     case black, red, green, yellow, blue, magenta, cyan, white
     case brightBlack, brightRed, brightGreen, brightYellow
@@ -135,7 +135,7 @@ enum ANSIColor {
 
 // MARK: - Text Style
 
-struct ANSITextStyle {
+nonisolated struct ANSITextStyle: Sendable {
     var foreground: ANSIColor = .default
     var background: ANSIColor = .default
     var bold: Bool = false
@@ -157,7 +157,7 @@ struct ANSITextStyle {
 
 // MARK: - ANSI Parser
 
-struct ANSIParser {
+nonisolated struct ANSIParser {
     /// Parse ANSI-encoded string to AttributedString
     static func parse(_ input: String) -> AttributedString {
         var result = AttributedString()
@@ -375,7 +375,7 @@ struct ANSITextView: View {
 
 // MARK: - Parsed Line for Lazy Rendering
 
-struct ANSIParsedLine: Identifiable {
+nonisolated struct ANSIParsedLine: Identifiable, Sendable {
     let id: Int
     let attributedString: AttributedString
     let rawText: String

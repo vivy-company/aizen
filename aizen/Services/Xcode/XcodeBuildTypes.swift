@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Xcode Project
 
-struct XcodeProject: Equatable, Sendable {
+nonisolated struct XcodeProject: Equatable, Sendable {
     let path: String
     let name: String
     let isWorkspace: Bool
@@ -23,7 +23,7 @@ struct XcodeProject: Equatable, Sendable {
 
 // MARK: - Destination Types
 
-enum DestinationType: String, CaseIterable, Sendable {
+nonisolated enum DestinationType: String, CaseIterable, Sendable {
     case simulator
     case device
     case mac
@@ -37,7 +37,7 @@ enum DestinationType: String, CaseIterable, Sendable {
     }
 }
 
-struct XcodeDestination: Identifiable, Hashable, Sendable {
+nonisolated struct XcodeDestination: Identifiable, Hashable, Sendable {
     let id: String
     let name: String
     let type: DestinationType
@@ -64,7 +64,7 @@ struct XcodeDestination: Identifiable, Hashable, Sendable {
 
 // MARK: - Build Phase
 
-enum BuildPhase: Equatable, Sendable {
+nonisolated enum BuildPhase: Equatable, Sendable {
     case idle
     case building(progress: String?)
     case launching
@@ -93,14 +93,14 @@ enum BuildPhase: Equatable, Sendable {
 
 // MARK: - Build Result
 
-struct BuildResult: Sendable {
+nonisolated struct BuildResult: Sendable {
     let success: Bool
     let duration: TimeInterval
     let log: String
     let errors: [BuildError]
 }
 
-struct BuildError: Sendable {
+nonisolated struct BuildError: Sendable {
     let file: String?
     let line: Int?
     let column: Int?
@@ -116,27 +116,27 @@ struct BuildError: Sendable {
 
 // MARK: - JSON Response Types
 
-struct XcodeBuildListResponse: Decodable {
+nonisolated struct XcodeBuildListResponse: Decodable, Sendable {
     let project: ProjectInfo?
     let workspace: WorkspaceInfo?
 
-    struct ProjectInfo: Decodable {
+    nonisolated struct ProjectInfo: Decodable, Sendable {
         let schemes: [String]
         let targets: [String]
         let name: String
     }
 
-    struct WorkspaceInfo: Decodable {
+    nonisolated struct WorkspaceInfo: Decodable, Sendable {
         let schemes: [String]
         let name: String
     }
 }
 
-struct SimctlDevicesResponse: Decodable {
+nonisolated struct SimctlDevicesResponse: Decodable, Sendable {
     let devices: [String: [SimctlDevice]]
 }
 
-struct SimctlDevice: Decodable {
+nonisolated struct SimctlDevice: Decodable, Sendable {
     let udid: String
     let name: String
     let state: String
@@ -150,40 +150,40 @@ struct SimctlDevice: Decodable {
 
 // MARK: - DeviceCtl Response Types
 
-struct DeviceCtlResponse: Decodable {
+nonisolated struct DeviceCtlResponse: Decodable, Sendable {
     let result: DeviceCtlResult
 }
 
-struct DeviceCtlResult: Decodable {
+nonisolated struct DeviceCtlResult: Decodable, Sendable {
     let devices: [DeviceCtlDevice]
 }
 
-struct DeviceCtlDevice: Decodable {
+nonisolated struct DeviceCtlDevice: Decodable, Sendable {
     let identifier: String
     let deviceProperties: DeviceCtlDeviceProperties
     let hardwareProperties: DeviceCtlHardwareProperties
     let connectionProperties: DeviceCtlConnectionProperties?
 }
 
-struct DeviceCtlDeviceProperties: Decodable {
+nonisolated struct DeviceCtlDeviceProperties: Decodable, Sendable {
     let name: String
     let osVersionNumber: String?
 }
 
-struct DeviceCtlHardwareProperties: Decodable {
+nonisolated struct DeviceCtlHardwareProperties: Decodable, Sendable {
     let deviceType: String
     let platform: String
     let udid: String?
 }
 
-struct DeviceCtlConnectionProperties: Decodable {
+nonisolated struct DeviceCtlConnectionProperties: Decodable, Sendable {
     let pairingState: String?
     let tunnelState: String?
 }
 
 // MARK: - Destination Cache Types
 
-struct CachedDestinations: Codable {
+nonisolated struct CachedDestinations: Codable, Sendable {
     let destinations: [CachedDestination]
 
     func toDestinationDict() -> [DestinationType: [XcodeDestination]] {
@@ -196,7 +196,7 @@ struct CachedDestinations: Codable {
     }
 }
 
-struct CachedDestination: Codable {
+nonisolated struct CachedDestination: Codable, Sendable {
     let id: String
     let name: String
     let type: DestinationType

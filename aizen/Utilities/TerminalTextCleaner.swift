@@ -14,7 +14,7 @@ struct TerminalCopySettings {
     var stripAnsiCodes: Bool = true
 }
 
-struct TerminalTextCleaner {
+nonisolated struct TerminalTextCleaner {
     private static let boxDrawingCharacterClass = "[│┃╎╏┆┇┊┋╽╿￨｜]"
     private static let knownCommandPrefixes: [String] = [
         "sudo", "./", "~/", "apt", "brew", "git", "python", "pip", "pnpm", "npm", "yarn", "cargo",

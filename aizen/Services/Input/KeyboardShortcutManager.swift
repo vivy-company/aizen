@@ -43,7 +43,9 @@ class KeyboardShortcutManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.isChatViewActive = true
+            Task { @MainActor in
+                self?.isChatViewActive = true
+            }
         }
 
         let disappearObserver = NotificationCenter.default.addObserver(
@@ -51,7 +53,9 @@ class KeyboardShortcutManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.isChatViewActive = false
+            Task { @MainActor in
+                self?.isChatViewActive = false
+            }
         }
 
         observers.append(appearObserver)

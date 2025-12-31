@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct BranchInfo: Hashable, Identifiable {
+nonisolated struct BranchInfo: Hashable, Identifiable, Sendable {
     let id = UUID()
     let name: String
     let commit: String

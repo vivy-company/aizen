@@ -21,7 +21,7 @@ nonisolated struct Libgit2Signature: Sendable {
 }
 
 /// Commit operations extension for Libgit2Repository
-extension Libgit2Repository {
+nonisolated extension Libgit2Repository {
 
     /// Create a new commit
     func commit(message: String, amend: Bool = false) throws -> String {

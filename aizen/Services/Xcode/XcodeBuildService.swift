@@ -80,9 +80,7 @@ actor XcodeBuildService {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        var outputLog = ""
-        var errorLog = ""
-        let outputLock = NSLock()
+        let logBuffer = LogBuffer()
 
         // Read stdout
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
@@ -93,9 +91,7 @@ actor XcodeBuildService {
             }
 
             if let output = String(data: data, encoding: .utf8) {
-                outputLock.lock()
-                outputLog += output
-                outputLock.unlock()
+                logBuffer.appendStdout(output)
 
                 // Parse progress from output
                 let progress = self.parseProgress(from: output)
@@ -114,9 +110,7 @@ actor XcodeBuildService {
             }
 
             if let output = String(data: data, encoding: .utf8) {
-                outputLock.lock()
-                errorLog += output
-                outputLock.unlock()
+                logBuffer.appendStderr(output)
             }
         }
 
@@ -136,15 +130,13 @@ actor XcodeBuildService {
                     let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
                     let remainingStderr = stderrPipe.fileHandleForReading.readDataToEndOfFile()
 
-                    outputLock.lock()
                     if let str = String(data: remainingStdout, encoding: .utf8) {
-                        outputLog += str
+                        logBuffer.appendStdout(str)
                     }
                     if let str = String(data: remainingStderr, encoding: .utf8) {
-                        errorLog += str
+                        logBuffer.appendStderr(str)
                     }
-                    let fullLog = outputLog + errorLog
-                    outputLock.unlock()
+                    let fullLog = logBuffer.combinedLog
 
                     let duration = Date().timeIntervalSince(startTime)
 
@@ -166,9 +158,7 @@ actor XcodeBuildService {
 
             // Check if cancelled after waiting
             if isCancelled {
-                outputLock.lock()
-                let fullLog = outputLog + errorLog
-                outputLock.unlock()
+                let fullLog = logBuffer.combinedLog
                 continuation.yield(.failed(error: "Build cancelled", log: fullLog))
             }
 
@@ -310,5 +300,29 @@ actor XcodeBuildService {
         }
 
         return errors
+    }
+}
+
+private final class LogBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stdout = ""
+    private var stderr = ""
+
+    func appendStdout(_ text: String) {
+        lock.lock()
+        stdout += text
+        lock.unlock()
+    }
+
+    func appendStderr(_ text: String) {
+        lock.lock()
+        stderr += text
+        lock.unlock()
+    }
+
+    var combinedLog: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return stdout + stderr
     }
 }

@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct WorktreeInfo {
+nonisolated struct WorktreeInfo: Sendable {
     let path: String
     let branch: String
     let commit: String

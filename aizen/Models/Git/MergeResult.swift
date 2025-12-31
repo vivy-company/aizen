@@ -1,6 +1,6 @@
 import Foundation
 
-enum MergeResult: Equatable {
+nonisolated enum MergeResult: Equatable, Sendable {
     case success
     case conflict(files: [String])
     case alreadyUpToDate

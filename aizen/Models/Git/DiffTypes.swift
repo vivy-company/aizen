@@ -10,7 +10,7 @@ import AppKit
 
 // MARK: - Diff Line Type
 
-enum DiffLineType: String, Hashable, Codable {
+nonisolated enum DiffLineType: String, Hashable, Codable, Sendable {
     case added
     case deleted
     case context
@@ -64,7 +64,7 @@ enum DiffLineType: String, Hashable, Codable {
 
 // MARK: - Diff Line
 
-struct DiffLine: Identifiable, Hashable {
+nonisolated struct DiffLine: Identifiable, Hashable, Sendable {
     let lineNumber: Int
     let oldLineNumber: String?
     let newLineNumber: String?

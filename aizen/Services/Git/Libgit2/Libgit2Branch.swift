@@ -27,7 +27,7 @@ nonisolated struct Libgit2BranchInfo: Sendable {
 }
 
 /// Branch operations extension for Libgit2Repository
-extension Libgit2Repository {
+nonisolated extension Libgit2Repository {
 
     /// List all branches
     func listBranches(type: Libgit2BranchType = .all, includeUpstreamInfo: Bool = false) throws -> [Libgit2BranchInfo] {

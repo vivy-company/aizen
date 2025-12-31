@@ -8,7 +8,7 @@
 import Foundation
 
 /// Result of a process execution
-struct ProcessResult: Sendable {
+nonisolated struct ProcessResult: Sendable {
     let exitCode: Int32
     let stdout: String
     let stderr: String
@@ -86,53 +86,46 @@ actor ProcessExecutor {
 
         // Run process and wait asynchronously for termination
         return try await withCheckedThrowingContinuation { continuation in
-            var hasResumed = false
-            let lock = NSLock()
+            let resumeGuard = ResumeGuard()
 
-            process.terminationHandler = { [dataCollector] proc in
-                lock.lock()
-                defer { lock.unlock() }
-                guard !hasResumed else { return }
-                hasResumed = true
+            process.terminationHandler = { [dataCollector, resumeGuard] proc in
+                resumeGuard.runOnce {
+                    // Clean up handlers
+                    stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                    stderrPipe.fileHandleForReading.readabilityHandler = nil
 
-                // Clean up handlers
-                stdoutPipe.fileHandleForReading.readabilityHandler = nil
-                stderrPipe.fileHandleForReading.readabilityHandler = nil
+                    // Read any remaining data
+                    let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                    let remainingStderr = stderrPipe.fileHandleForReading.readDataToEndOfFile()
 
-                // Read any remaining data
-                let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                let remainingStderr = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    dataCollector.appendStdout(remainingStdout)
+                    dataCollector.appendStderr(remainingStderr)
 
-                dataCollector.appendStdout(remainingStdout)
-                dataCollector.appendStderr(remainingStderr)
+                    let result = ProcessResult(
+                        exitCode: proc.terminationStatus,
+                        stdout: dataCollector.stdoutString,
+                        stderr: dataCollector.stderrString
+                    )
 
-                let result = ProcessResult(
-                    exitCode: proc.terminationStatus,
-                    stdout: dataCollector.stdoutString,
-                    stderr: dataCollector.stderrString
-                )
+                    // Close pipes to release file descriptors
+                    try? stdoutPipe.fileHandleForReading.close()
+                    try? stderrPipe.fileHandleForReading.close()
 
-                // Close pipes to release file descriptors
-                try? stdoutPipe.fileHandleForReading.close()
-                try? stderrPipe.fileHandleForReading.close()
-
-                continuation.resume(returning: result)
+                    continuation.resume(returning: result)
+                }
             }
 
             do {
                 try process.run()
             } catch {
-                lock.lock()
-                defer { lock.unlock() }
-                guard !hasResumed else { return }
-                hasResumed = true
+                resumeGuard.runOnce {
+                    stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                    stderrPipe.fileHandleForReading.readabilityHandler = nil
+                    try? stdoutPipe.fileHandleForReading.close()
+                    try? stderrPipe.fileHandleForReading.close()
 
-                stdoutPipe.fileHandleForReading.readabilityHandler = nil
-                stderrPipe.fileHandleForReading.readabilityHandler = nil
-                try? stdoutPipe.fileHandleForReading.close()
-                try? stderrPipe.fileHandleForReading.close()
-
-                continuation.resume(throwing: ProcessExecutorError.executionFailed(error.localizedDescription))
+                    continuation.resume(throwing: ProcessExecutorError.executionFailed(error.localizedDescription))
+                }
             }
         }
     }
@@ -161,25 +154,20 @@ actor ProcessExecutor {
         process.standardError = FileHandle.nullDevice
 
         return try await withCheckedThrowingContinuation { continuation in
-            var hasResumed = false
-            let lock = NSLock()
+            let resumeGuard = ResumeGuard()
 
-            process.terminationHandler = { proc in
-                lock.lock()
-                defer { lock.unlock() }
-                guard !hasResumed else { return }
-                hasResumed = true
-                continuation.resume(returning: proc.terminationStatus)
+            process.terminationHandler = { [resumeGuard] proc in
+                resumeGuard.runOnce {
+                    continuation.resume(returning: proc.terminationStatus)
+                }
             }
 
             do {
                 try process.run()
             } catch {
-                lock.lock()
-                defer { lock.unlock() }
-                guard !hasResumed else { return }
-                hasResumed = true
-                continuation.resume(throwing: ProcessExecutorError.executionFailed(error.localizedDescription))
+                resumeGuard.runOnce {
+                    continuation.resume(throwing: ProcessExecutorError.executionFailed(error.localizedDescription))
+                }
             }
         }
     }
@@ -282,11 +270,24 @@ actor ProcessExecutor {
 }
 
 /// Output types for streaming execution
-enum StreamOutput: Sendable {
+nonisolated enum StreamOutput: Sendable {
     case stdout(String)
     case stderr(String)
     case terminated(Int32)
     case error(String)
+}
+
+private final class ResumeGuard: @unchecked Sendable {
+    private let lock = NSLock()
+    private var hasResumed = false
+
+    func runOnce(_ block: () -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !hasResumed else { return }
+        hasResumed = true
+        block()
+    }
 }
 
 /// Thread-safe data collector for process output

@@ -31,7 +31,7 @@ nonisolated struct Libgit2TransferProgress: Sendable {
 }
 
 /// Remote operations extension for Libgit2Repository
-extension Libgit2Repository {
+nonisolated extension Libgit2Repository {
 
     private struct SSHRemoteURLParts: Sendable {
         let isSSH: Bool
