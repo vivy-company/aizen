@@ -28,23 +28,11 @@ struct MCPServerRowView: View {
                         .font(.headline)
 
                     if let version = server.version {
-                        Text("v\(version)")
-                            .font(.caption2)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.15))
-                            .foregroundColor(.secondary)
-                            .cornerRadius(4)
+                        TagBadge(text: "v\(version)", color: .secondary, cornerRadius: 4)
                     }
 
                     if isInstalled {
-                        Text("Installed")
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.green.opacity(0.2))
-                            .foregroundColor(.green)
-                            .cornerRadius(4)
+                        TagBadge(text: "Installed", color: .green, cornerRadius: 4)
                     }
                 }
 
