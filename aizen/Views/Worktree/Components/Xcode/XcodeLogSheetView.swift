@@ -16,48 +16,39 @@ struct XcodeLogSheetView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(showsBackground: false) {
                 Label("Debug Logs", systemImage: "text.alignleft")
                     .font(.headline)
-
-                Spacer()
-
-                if buildManager.isLogStreamActive {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(.green)
-                            .frame(width: 8, height: 8)
-                        Text("Streaming")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            } trailing: {
+                HStack(spacing: 12) {
+                    if buildManager.isLogStreamActive {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(.green)
+                                .frame(width: 8, height: 8)
+                            Text("Streaming")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                }
 
-                Toggle("Auto-scroll", isOn: $autoScroll)
-                    .toggleStyle(.checkbox)
-                    .controlSize(.small)
+                    Toggle("Auto-scroll", isOn: $autoScroll)
+                        .toggleStyle(.checkbox)
+                        .controlSize(.small)
 
-                Button("Clear") {
-                    buildManager.clearLogs()
-                }
-                .buttonStyle(.borderless)
+                    Button("Clear") {
+                        buildManager.clearLogs()
+                    }
 
-                Button("Copy") {
-                    let text = buildManager.logOutput.joined(separator: "\n")
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(text, forType: .string)
-                }
-                .buttonStyle(.borderless)
+                    Button("Copy") {
+                        let text = buildManager.logOutput.joined(separator: "\n")
+                        Clipboard.copy(text)
+                    }
 
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                    DetailCloseButton(action: dismiss, size: 16)
                 }
                 .buttonStyle(.borderless)
             }
-            .padding()
 
             Divider()
 

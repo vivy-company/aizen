@@ -147,6 +147,29 @@ nonisolated struct ToolCall: Codable, Identifiable {
     var contentBlocks: [ContentBlock] {
         content.compactMap { $0.asContentBlock }
     }
+
+    /// Flatten tool call outputs for clipboard use (text + diff newText).
+    var copyableOutputText: String? {
+        let outputs = content.compactMap { $0.copyableText }
+        let result = outputs.joined(separator: "\n\n")
+        return result.isEmpty ? nil : result
+    }
+}
+
+extension ToolCallContent {
+    fileprivate var copyableText: String? {
+        switch self {
+        case .content(let block):
+            if case .text(let textContent) = block {
+                return textContent.text
+            }
+            return nil
+        case .diff(let diff):
+            return diff.newText
+        case .terminal:
+            return nil
+        }
+    }
 }
 
 nonisolated enum ToolKind: String, Codable {

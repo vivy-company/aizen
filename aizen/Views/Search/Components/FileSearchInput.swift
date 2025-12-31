@@ -12,27 +12,15 @@ struct FileSearchInput: View {
     @FocusState.Binding var isFocused: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .font(.system(size: 14))
-
-            TextField("Search files...", text: $searchQuery)
-                .textFieldStyle(.plain)
-                .font(.system(size: 14))
-                .focused($isFocused)
-
-            if !searchQuery.isEmpty {
-                Button(action: {
-                    searchQuery = ""
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-            }
-        }
+        SearchField(
+            placeholder: "Search files...",
+            text: $searchQuery,
+            iconSize: 14,
+            textFont: .system(size: 14),
+            clearButtonSize: 12,
+            isFocused: $isFocused,
+            trailing: { EmptyView() }
+        )
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))

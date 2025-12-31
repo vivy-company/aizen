@@ -58,10 +58,10 @@ struct MCPServerRowView: View {
                 if server.primaryPackage != nil || server.primaryRemote != nil {
                     HStack(spacing: 8) {
                         if let package = server.primaryPackage {
-                            Badge(text: package.registryBadge, color: .purple)
-                            Badge(text: package.transportType, color: .gray)
+                            TagBadge(text: package.registryBadge, color: .purple)
+                            TagBadge(text: package.transportType, color: .gray)
                         } else if let remote = server.primaryRemote {
-                            Badge(text: remote.transportBadge, color: .blue)
+                            TagBadge(text: remote.transportBadge, color: .blue)
                         }
                     }
                 }
@@ -85,22 +85,5 @@ struct MCPServerRowView: View {
             }
         }
         .padding(.vertical, 8)
-    }
-}
-
-// MARK: - Badge
-
-private struct Badge: View {
-    let text: String
-    let color: Color
-
-    var body: some View {
-        Text(text)
-            .font(.caption2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.15))
-            .foregroundColor(color)
-            .cornerRadius(4)
     }
 }

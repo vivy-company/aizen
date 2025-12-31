@@ -64,24 +64,14 @@ struct WorktreeListView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Search field
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField(String(localized: "worktree.list.search"), text: $searchText)
-                    .textFieldStyle(.plain)
-
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
+            SearchField(
+                placeholder: "worktree.list.search",
+                text: $searchText,
+                iconColor: .secondary,
+                trailing: {
+                    StatusFilterDropdown(selectedStatuses: selectedStatusFiltersBinding)
                 }
-
-                StatusFilterDropdown(selectedStatuses: selectedStatusFiltersBinding)
-            }
+            )
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 

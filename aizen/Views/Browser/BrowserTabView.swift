@@ -302,8 +302,6 @@ struct BrowserTab: View {
     let onSelect: () -> Void
     let onClose: () -> Void
 
-    @State private var isCloseHovering = false
-
     var displayTitle: String {
         // If title exists and is not empty, use it
         if let title = session.title, !title.isEmpty {
@@ -320,49 +318,18 @@ struct BrowserTab: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
-            // Favicon placeholder
-            Image(systemName: "globe")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
-
-            // Title
-            Text(displayTitle)
-                .font(.system(size: 11))
-                .foregroundColor(isSelected ? .primary : .secondary)
-                .lineLimit(1)
-
-            // Close button
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(isCloseHovering ? .primary : .secondary)
+        TabContainer(isSelected: isSelected, onSelect: onSelect) {
+            TabLabel(
+                title: displayTitle,
+                isSelected: isSelected,
+                onClose: onClose
+            ) {
+                Image(systemName: "globe")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            } trailing: {
+                EmptyView()
             }
-            .buttonStyle(.plain)
-            .frame(width: 16, height: 16)
-            .onHover { hovering in
-                isCloseHovering = hovering
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 36)
-        .frame(minWidth: 120, maxWidth: 200)
-        .background(isSelected ? Color(NSColor.textBackgroundColor) : Color(NSColor.controlBackgroundColor).opacity(0.3))
-        .overlay(
-            Rectangle()
-                .fill(isSelected ? Color.accentColor : Color.clear)
-                .frame(height: 2),
-            alignment: .top
-        )
-        .overlay(
-            Rectangle()
-                .fill(Color(NSColor.separatorColor))
-                .frame(width: 1),
-            alignment: .trailing
-        )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onSelect()
         }
     }
 }

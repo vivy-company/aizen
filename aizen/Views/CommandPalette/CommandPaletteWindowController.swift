@@ -336,13 +336,16 @@ struct CommandPaletteContent: View {
                         .foregroundStyle(.primary)
 
                     if worktree.isPrimary {
-                        Text("main")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.blue, in: Capsule())
+                        PillBadge(
+                            text: "main",
+                            color: .blue,
+                            textColor: .white,
+                            font: .caption2,
+                            fontWeight: .semibold,
+                            horizontalPadding: 6,
+                            verticalPadding: 2,
+                            backgroundOpacity: 1
+                        )
                     }
                 }
 

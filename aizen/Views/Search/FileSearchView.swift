@@ -35,15 +35,17 @@ struct FileSearchView: View {
 
             VStack(spacing: 0) {
                 // Search input - circular/pill shaped
-                HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 15))
-
-                    TextField("Search files...", text: $viewModel.searchQuery)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 15))
-                        .focused($isSearchFocused)
+                SearchField(
+                    placeholder: "Search files...",
+                    text: $viewModel.searchQuery,
+                    spacing: 12,
+                    iconSize: 15,
+                    iconColor: .secondary,
+                    textFont: .system(size: 15),
+                    showsClearButton: false,
+                    isFocused: $isSearchFocused
+                ) {
+                    EmptyView()
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
@@ -122,7 +124,7 @@ struct FileSearchView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(viewModel.results.enumerated()), id: \.element.id) { index, result in
-                        resultRow(result: result, index: index, isSelected: index == viewModel.selectedIndex)
+                        resultRow(result: result, isSelected: index == viewModel.selectedIndex)
                             .id(index)
                     }
                 }
@@ -137,31 +139,22 @@ struct FileSearchView: View {
         }
     }
 
-    private func resultRow(result: FileSearchResult, index: Int, isSelected: Bool) -> some View {
-        HStack(spacing: 12) {
-            FileIconView(path: result.path, size: 18)
-                .frame(width: 18, height: 18)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(result.name)
-                    .font(.system(size: 13))
-                    .foregroundColor(isSelected ? .white : .primary)
-
-                Text(result.relativePath)
-                    .font(.system(size: 11))
-                    .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(
+    private func resultRow(result: FileSearchResult, isSelected: Bool) -> some View {
+        FileSearchResultRow(
+            result: result,
+            isSelected: isSelected,
+            iconSize: 18,
+            spacing: 12,
+            titleFont: .system(size: 13),
+            selectedTitleColor: .white,
+            subtitleFont: .system(size: 11),
+            selectedSubtitleColor: .white.opacity(0.7),
+            horizontalPadding: 14,
+            verticalPadding: 8
+        ) { isSelected, _ in
             RoundedRectangle(cornerRadius: 6)
                 .fill(isSelected ? Color.accentColor : Color.clear)
-        )
-        .contentShape(Rectangle())
+        }
         .onTapGesture {
             selectFile(result)
         }

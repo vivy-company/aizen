@@ -29,8 +29,7 @@ struct CopyButton: View {
     }
 
     private func copyToClipboard() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        Clipboard.copy(text)
 
         withAnimation {
             showConfirmation = true

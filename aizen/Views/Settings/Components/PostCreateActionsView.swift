@@ -6,50 +6,6 @@
 import SwiftUI
 import CoreData
 
-// MARK: - Flow Layout
-
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        for (index, position) in result.positions.enumerated() {
-            subviews[index].place(at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y), proposal: .unspecified)
-        }
-    }
-
-    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint]) {
-        let maxWidth = proposal.width ?? .infinity
-        var positions: [CGPoint] = []
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        var totalHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-
-            if currentX + size.width > maxWidth && currentX > 0 {
-                currentX = 0
-                currentY += lineHeight + spacing
-                lineHeight = 0
-            }
-
-            positions.append(CGPoint(x: currentX, y: currentY))
-            currentX += size.width + spacing
-            lineHeight = max(lineHeight, size.height)
-            totalHeight = currentY + lineHeight
-        }
-
-        return (CGSize(width: maxWidth, height: totalHeight), positions)
-    }
-}
-
 struct PostCreateActionsView: View {
     @ObservedObject var repository: Repository
     var showHeader: Bool = true
@@ -499,21 +455,19 @@ struct PostCreateActionEditorSheet: View {
             } else {
                 FlowLayout(spacing: 6) {
                     ForEach(Array(selectedFiles).sorted(), id: \.self) { file in
-                        HStack(spacing: 4) {
-                            Text(file)
-                                .font(.caption)
-                            Button {
-                                selectedFiles.remove(file)
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 8, weight: .bold))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.accentColor.opacity(0.2))
-                        .clipShape(Capsule())
+                        RemovableChip(
+                            text: file,
+                            onRemove: { selectedFiles.remove(file) },
+                            font: .caption,
+                            textColor: .primary,
+                            backgroundColor: .accentColor,
+                            backgroundOpacity: 0.2,
+                            horizontalPadding: 8,
+                            verticalPadding: 4,
+                            spacing: 4,
+                            closeSize: 8,
+                            closeWeight: .bold
+                        )
                     }
                 }
             }
@@ -979,12 +933,15 @@ struct PostCreateTemplatesSheet: View {
                 Spacer()
 
                 if isBuiltIn {
-                    Text("Built-in")
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color(.systemGray).opacity(0.2))
-                        .clipShape(Capsule())
+                    PillBadge(
+                        text: "Built-in",
+                        color: Color(.systemGray),
+                        textColor: .secondary,
+                        font: .caption2,
+                        horizontalPadding: 6,
+                        verticalPadding: 2,
+                        backgroundOpacity: 0.2
+                    )
                 }
 
                 Image(systemName: "chevron.right")
@@ -1010,14 +967,11 @@ struct PostCreateActionsSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(showsBackground: false) {
                 Text("Post-Create Actions")
                     .font(.title2)
                     .fontWeight(.semibold)
-
-                Spacer()
             }
-            .padding()
 
             Divider()
 

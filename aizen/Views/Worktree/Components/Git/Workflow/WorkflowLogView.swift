@@ -8,35 +8,6 @@
 import SwiftUI
 import AppKit
 
-// MARK: - Custom Table View with Copy Support
-
-class LogTableView: NSTableView {
-    weak var coordinator: WorkflowLogTableView.Coordinator?
-
-    override func keyDown(with event: NSEvent) {
-        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "c" {
-            copy(nil)
-        } else {
-            super.keyDown(with: event)
-        }
-    }
-
-    @objc func copy(_ sender: Any?) {
-        guard let coordinator = coordinator else { return }
-        let selectedContent = coordinator.getSelectedContent()
-        guard !selectedContent.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(selectedContent, forType: .string)
-    }
-
-    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
-        if item.action == #selector(copy(_:)) {
-            return selectedRowIndexes.count > 0
-        }
-        return super.validateUserInterfaceItem(item)
-    }
-}
-
 // MARK: - NSViewRepresentable Log Table
 
 struct WorkflowLogTableView: NSViewRepresentable {
@@ -55,8 +26,8 @@ struct WorkflowLogTableView: NSViewRepresentable {
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
 
-        let tableView = LogTableView()
-        tableView.coordinator = context.coordinator
+        let tableView = CopyableTableView()
+        tableView.copyProvider = context.coordinator
         context.coordinator.tableView = tableView
 
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("LogColumn"))
@@ -105,8 +76,8 @@ struct WorkflowLogTableView: NSViewRepresentable {
 
     // MARK: - Coordinator
 
-    class Coordinator: NSObject, NSTableViewDelegate, NSTableViewDataSource {
-        weak var tableView: LogTableView?
+    class Coordinator: NSObject, NSTableViewDelegate, NSTableViewDataSource, CopyableTableViewProvider {
+        weak var tableView: NSTableView?
         var steps: [LogStep] = []
         var displayRows: [LogRow] = []
         var currentLogs: String = ""
@@ -667,8 +638,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
                     }
                 }
             }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(allLines.joined(separator: "\n"), forType: .string)
+            Clipboard.copy(lines: allLines)
         }
 
         func copyStepLogs(_ stepId: Int) {
@@ -679,8 +649,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
                     lines.append(line.raw)
                 }
             }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
+            Clipboard.copy(lines: lines)
         }
 
         private var frameObserver: NSObjectProtocol?
@@ -758,6 +727,10 @@ struct WorkflowLogTableView: NSViewRepresentable {
                 }
             }
             return lines.joined(separator: "\n")
+        }
+
+        func selectedCopyText() -> String {
+            getSelectedContent()
         }
 
         // MARK: - NSTableViewDataSource

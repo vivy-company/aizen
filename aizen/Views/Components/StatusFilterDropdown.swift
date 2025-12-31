@@ -50,11 +50,15 @@ struct StatusFilterDropdown: View {
             HStack(spacing: 4) {
                 Image(systemName: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                 if isFiltering {
-                    Text("\(selectedStatuses.count)")
-                        .font(.caption2)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(.quaternary, in: Capsule())
+                    PillBadge(
+                        text: "\(selectedStatuses.count)",
+                        color: .secondary,
+                        textColor: .secondary,
+                        font: .caption2,
+                        horizontalPadding: 4,
+                        verticalPadding: 1,
+                        backgroundOpacity: 0.25
+                    )
                 }
             }
             .foregroundStyle(isFiltering ? Color.accentColor : Color.secondary)

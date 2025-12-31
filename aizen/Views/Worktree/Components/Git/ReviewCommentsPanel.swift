@@ -37,13 +37,15 @@ struct ReviewCommentsPanel: View {
             Spacer()
 
             if !reviewManager.comments.isEmpty {
-                Text("\(reviewManager.comments.count)")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .clipShape(Capsule())
+                PillBadge(
+                    text: "\(reviewManager.comments.count)",
+                    color: Color(NSColor.controlBackgroundColor),
+                    textColor: .secondary,
+                    font: .system(size: 11, weight: .medium, design: .monospaced),
+                    horizontalPadding: 6,
+                    verticalPadding: 2,
+                    backgroundOpacity: 1
+                )
             }
         }
         .padding(.horizontal, 12)

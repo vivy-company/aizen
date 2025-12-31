@@ -59,7 +59,7 @@ struct WorkflowTriggerFormView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack {
+        DetailHeaderBar(showsBackground: false) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Run Workflow")
                     .font(.headline)
@@ -68,18 +68,9 @@ struct WorkflowTriggerFormView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-
-            Spacer()
-
-            Button {
-                onDismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
+        } trailing: {
+            DetailCloseButton(action: onDismiss, size: 16)
         }
-        .padding()
     }
 
     // MARK: - Loading

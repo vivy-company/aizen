@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import CodeEditSourceEditor
 import CodeEditLanguages
 
 // MARK: - Attachment Glass Card
@@ -60,43 +59,10 @@ struct AttachmentGlassCard<Content: View>: View {
     }
 }
 
-// MARK: - Image Content View
-
-struct ACPImageView: View {
-    let data: String
-    let mimeType: String
-
-    var body: some View {
-        Group {
-            if let imageData = Data(base64Encoded: data),
-               let nsImage = NSImage(data: imageData) {
-                AttachmentGlassCard {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: 400, maxHeight: 300)
-                        .padding(4)
-                }
-            } else {
-                AttachmentGlassCard {
-                    HStack {
-                        Image(systemName: "photo")
-                        Text("chat.image.invalid", bundle: .main)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Image Attachment Card (compact chip with click-to-preview)
 
 struct ImageAttachmentCardView: View {
     let data: String
-    let mimeType: String
 
     @State private var showingDetail = false
 
@@ -109,11 +75,8 @@ struct ImageAttachmentCardView: View {
         return NSImage(data: imageData)
     }
 
-    private var imageDimensions: String {
-        guard let image = nsImage else { return "" }
-        let width = Int(image.size.width)
-        let height = Int(image.size.height)
-        return "\(width)×\(height)"
+    private var stats: ImageAttachmentStats {
+        ImageAttachmentStats(image: nsImage, data: imageData)
     }
 
     var body: some View {
@@ -139,8 +102,8 @@ struct ImageAttachmentCardView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    if !imageDimensions.isEmpty {
-                        Text(imageDimensions)
+                    if let dimensions = stats.dimensionsLabel() {
+                        Text(dimensions)
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                     }
@@ -151,7 +114,7 @@ struct ImageAttachmentCardView: View {
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $showingDetail) {
-            ImageDetailSheet(data: data, mimeType: mimeType)
+            ImageDetailSheet(data: data)
         }
     }
 }
@@ -160,7 +123,6 @@ struct ImageAttachmentCardView: View {
 
 private struct ImageDetailSheet: View {
     let data: String
-    let mimeType: String
     @Environment(\.dismiss) var dismiss
 
     private var imageData: Data? {
@@ -172,70 +134,36 @@ private struct ImageDetailSheet: View {
         return NSImage(data: imageData)
     }
 
-    private var fileSize: String {
-        guard let imageData else { return "" }
-        return ByteCountFormatter.string(fromByteCount: Int64(imageData.count), countStyle: .file)
-    }
-
-    private var imageDimensions: String {
-        guard let image = nsImage else { return "" }
-        let width = Int(image.size.width)
-        let height = Int(image.size.height)
-        return "\(width) × \(height)"
+    private var stats: ImageAttachmentStats {
+        ImageAttachmentStats(image: nsImage, data: imageData)
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            DetailHeaderBar {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Image")
                         .font(.headline)
                     HStack(spacing: 8) {
-                        if !imageDimensions.isEmpty {
-                            Text(imageDimensions)
+                        if let dimensions = stats.dimensionsLabel(separator: " × ") {
+                            Text(dimensions)
                         }
-                        if !fileSize.isEmpty {
+                        if let fileSize = stats.sizeLabel {
                             Text(fileSize)
                         }
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                Spacer()
-                Button {
+            } trailing: {
+                DetailCloseButton {
                     dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
             }
-            .padding()
-            .background(.ultraThinMaterial)
 
             Divider()
 
-            ScrollView {
-                if let image = nsImage {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                } else {
-                    VStack(spacing: 12) {
-                        Image(systemName: "photo")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.secondary)
-                        Text("Unable to display image")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding()
-                }
-            }
+            ImageDetailBody(image: nsImage)
         }
         .frame(width: 700, height: 500)
     }
@@ -246,7 +174,6 @@ private struct ImageDetailSheet: View {
 struct UserAttachmentChip: View {
     let name: String
     let uri: String
-    let mimeType: String?
 
     private var filePath: String {
         if uri.hasPrefix("file://") {
@@ -256,136 +183,12 @@ struct UserAttachmentChip: View {
     }
 
     var body: some View {
-        AttachmentGlassCard(cornerRadius: 10) {
-            HStack(spacing: 6) {
-                FileIconView(path: filePath, size: 16)
-
-                Text(name)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-        }
-    }
-}
-
-// MARK: - Text Attachment Chip (for displaying pasted text in user messages)
-
-struct TextAttachmentChip: View {
-    let text: String
-
-    @State private var showingDetail = false
-
-    private var lineCount: Int {
-        text.components(separatedBy: .newlines).count
-    }
-
-    private var charCount: Int {
-        text.count
-    }
-
-    private var displayInfo: String {
-        if lineCount > 1 {
-            return "\(lineCount) lines"
-        } else {
-            return "\(charCount) chars"
-        }
-    }
-
-    var body: some View {
-        Button {
-            showingDetail = true
-        } label: {
-            AttachmentGlassCard(cornerRadius: 10) {
-                HStack(spacing: 6) {
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.blue)
-
-                    Text("Pasted Text")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    Text(displayInfo)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-            }
-        }
-        .buttonStyle(.plain)
-        .sheet(isPresented: $showingDetail) {
-            TextAttachmentDetailSheet(text: text)
-        }
-    }
-}
-
-// MARK: - Text Attachment Detail Sheet
-
-private struct TextAttachmentDetailSheet: View {
-    let text: String
-    @Environment(\.dismiss) var dismiss
-
-    private var lineCount: Int {
-        text.components(separatedBy: .newlines).count
-    }
-
-    private var charCount: Int {
-        text.count
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Pasted Text")
-                        .font(.headline)
-                    HStack(spacing: 8) {
-                        Text("\(lineCount) lines")
-                        Text("\(charCount) characters")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(text, forType: .string)
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Copy to clipboard")
-
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding()
-            .background(.ultraThinMaterial)
-
-            Divider()
-
-            ScrollView {
-                Text(text)
-                    .font(.system(.body, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-            }
-        }
-        .frame(width: 700, height: 500)
+        AttachmentChip(
+            title: name,
+            icon: AnyView(FileIconView(path: filePath, size: 16)),
+            detailView: nil,
+            style: AttachmentChip.Style(showsDelete: false, showsHoverFade: false)
+        )
     }
 }
 

@@ -36,13 +36,16 @@ struct DetailsTabView: View {
                         .fontWeight(.bold)
 
                     if worktree.isPrimary {
-                        Text("worktree.detail.primary", bundle: .main)
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 4)
-                            .background(.blue, in: Capsule())
+                        PillBadge(
+                            text: String(localized: "worktree.detail.primary"),
+                            color: .blue,
+                            textColor: .white,
+                            font: .caption,
+                            fontWeight: .semibold,
+                            horizontalPadding: 12,
+                            verticalPadding: 4,
+                            backgroundOpacity: 1.0
+                        )
                     }
                 }
                 .padding(.top, 32)

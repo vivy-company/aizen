@@ -20,35 +20,6 @@ private class NonScrollingScrollView: NSScrollView {
     }
 }
 
-// MARK: - Custom Table View with Copy Support
-
-private class ChatDiffTableView: NSTableView {
-    weak var coordinator: SelectableDiffView.Coordinator?
-
-    override func keyDown(with event: NSEvent) {
-        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "c" {
-            copy(nil)
-        } else {
-            super.keyDown(with: event)
-        }
-    }
-
-    @objc func copy(_ sender: Any?) {
-        guard let coordinator = coordinator else { return }
-        let selectedContent = coordinator.getSelectedContent()
-        guard !selectedContent.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(selectedContent, forType: .string)
-    }
-
-    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
-        if item.action == #selector(copy(_:)) {
-            return selectedRowIndexes.count > 0
-        }
-        return super.validateUserInterfaceItem(item)
-    }
-}
-
 // MARK: - Row View
 
 private class ChatDiffRowView: NSTableRowView {
@@ -195,8 +166,8 @@ struct SelectableDiffView: NSViewRepresentable {
         let scrollView = NonScrollingScrollView()
         scrollView.scrollingEnabled = scrollable
         
-        let tableView = ChatDiffTableView()
-        tableView.coordinator = context.coordinator
+        let tableView = CopyableTableView()
+        tableView.copyProvider = context.coordinator
 
         tableView.style = .plain
         tableView.headerView = nil
@@ -251,7 +222,7 @@ struct SelectableDiffView: NSViewRepresentable {
         Coordinator()
     }
 
-    class Coordinator: NSObject, NSTableViewDelegate, NSTableViewDataSource {
+    class Coordinator: NSObject, NSTableViewDelegate, NSTableViewDataSource, CopyableTableViewProvider {
         weak var tableView: NSTableView?
         var lines: [ChatDiffLine] = []
         var rowHeight: CGFloat = 18
@@ -315,6 +286,10 @@ struct SelectableDiffView: NSViewRepresentable {
                 result.append("\(line.type.marker) \(line.content)")
             }
             return result.joined(separator: "\n")
+        }
+
+        func selectedCopyText() -> String {
+            getSelectedContent()
         }
     }
 }

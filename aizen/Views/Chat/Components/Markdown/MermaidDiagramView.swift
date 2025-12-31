@@ -171,8 +171,7 @@ struct MermaidDiagramView: View {
     }
 
     private func copyCode() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(code, forType: .string)
+        Clipboard.copy(code)
 
         withAnimation {
             showCopyConfirmation = true

@@ -35,25 +35,16 @@ struct WorkspaceSwitcherSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(
+                showsBackground: false,
+                padding: EdgeInsets(top: 20, leading: 20, bottom: 16, trailing: 20)
+            ) {
                 Text("workspace.switcher.title")
                     .font(.title2)
                     .fontWeight(.semibold)
-
-                Spacer()
-
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .imageScale(.large)
-                }
-                .buttonStyle(.plain)
+            } trailing: {
+                DetailCloseButton { dismiss() }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
 
             Divider()
 

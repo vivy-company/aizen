@@ -174,15 +174,11 @@ struct AgentDetailView: View {
                             .buttonStyle(.bordered)
 
                             if let path = metadata.executablePath, !path.isEmpty {
-                                if isAgentValid {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                        .help("Executable is valid")
-                                } else {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.red)
-                                        .help("Executable not found or not executable")
-                                }
+                                ValidationStatusIcon(
+                                    isValid: isAgentValid,
+                                    validHelp: "Executable is valid",
+                                    invalidHelp: "Executable not found or not executable"
+                                )
                             }
                         }
 
@@ -409,12 +405,13 @@ struct AgentDetailView: View {
         .formStyle(.grouped)
         .safeAreaInset(edge: .bottom) {
             if let result = testResult {
+                let isSuccess = result.contains("Success") || result.contains("Updated")
                 HStack {
-                    Image(systemName: result.contains("Success") || result.contains("Updated") ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    ValidationStatusIcon(isValid: isSuccess)
                     Text(result)
                 }
                 .font(.callout)
-                .foregroundColor(result.contains("Success") || result.contains("Updated") ? .green : .red)
+                .foregroundColor(isSuccess ? .green : .red)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)

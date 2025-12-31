@@ -80,7 +80,7 @@ enum CodexUsageFetcher {
         guard let data = try? Data(contentsOf: authURL),
               let auth = try? JSONDecoder().decode(AuthFile.self, from: data),
               let idToken = auth.tokens?.idToken,
-              let payload = parseJWT(idToken)
+              let payload = JWTDecoder.payload(from: idToken)
         else {
             return nil
         }
@@ -118,22 +118,6 @@ enum CodexUsageFetcher {
         }
 
         return nil
-    }
-
-    private static func parseJWT(_ token: String) -> [String: Any]? {
-        let parts = token.split(separator: ".")
-        guard parts.count >= 2 else { return nil }
-        let payloadPart = parts[1]
-
-        var padded = String(payloadPart)
-            .replacingOccurrences(of: "-", with: "+")
-            .replacingOccurrences(of: "_", with: "/")
-        while padded.count % 4 != 0 {
-            padded.append("=")
-        }
-        guard let data = Data(base64Encoded: padded) else { return nil }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        return json
     }
 
     private static func userIdentity(from response: RPCAccountResponse) -> UsageUserIdentity? {

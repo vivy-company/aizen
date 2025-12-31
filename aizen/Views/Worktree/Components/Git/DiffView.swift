@@ -8,35 +8,6 @@
 import SwiftUI
 import AppKit
 
-// MARK: - Custom Table View with Copy Support
-
-class DiffTableView: NSTableView {
-    weak var coordinator: DiffView.Coordinator?
-
-    override func keyDown(with event: NSEvent) {
-        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "c" {
-            copy(nil)
-        } else {
-            super.keyDown(with: event)
-        }
-    }
-
-    @objc func copy(_ sender: Any?) {
-        guard let coordinator = coordinator else { return }
-        let selectedContent = coordinator.getSelectedContent()
-        guard !selectedContent.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(selectedContent, forType: .string)
-    }
-
-    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
-        if item.action == #selector(copy(_:)) {
-            return selectedRowIndexes.count > 0
-        }
-        return super.validateUserInterfaceItem(item)
-    }
-}
-
 struct DiffView: NSViewRepresentable {
     // Input mode 1: Raw diff string (for multi-file view)
     private let diffOutput: String?
@@ -104,8 +75,8 @@ struct DiffView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
-        let tableView = DiffTableView()
-        tableView.coordinator = context.coordinator
+        let tableView = CopyableTableView()
+        tableView.copyProvider = context.coordinator
 
         tableView.style = .plain
         tableView.headerView = nil
@@ -189,7 +160,7 @@ struct DiffView: NSViewRepresentable {
 
     // MARK: - Coordinator
 
-    class Coordinator: NSObject, NSTableViewDelegate, NSTableViewDataSource {
+    class Coordinator: NSObject, NSTableViewDelegate, NSTableViewDataSource, CopyableTableViewProvider {
         weak var tableView: NSTableView?
         var rows: [DiffRow] = []
         var rowHeight: CGFloat = 20
@@ -556,6 +527,10 @@ struct DiffView: NSViewRepresentable {
                 }
             }
             return lines.joined(separator: "\n")
+        }
+
+        func selectedCopyText() -> String {
+            getSelectedContent()
         }
     }
 }

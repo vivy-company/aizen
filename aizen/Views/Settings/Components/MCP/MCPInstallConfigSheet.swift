@@ -266,8 +266,8 @@ struct MCPInstallConfigSheet: View {
                     .labelsHidden()
                 } else if let package = selectedPackage {
                     HStack(spacing: 8) {
-                        Badge(text: package.registryBadge, color: .purple)
-                        Badge(text: package.transportType, color: .gray)
+                        TagBadge(text: package.registryBadge, color: .purple)
+                        TagBadge(text: package.transportType, color: .gray)
                         Text(package.packageName)
                             .font(.system(.body, design: .monospaced))
                     }
@@ -319,8 +319,8 @@ struct MCPInstallConfigSheet: View {
                 } else if let remote = selectedRemote {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
-                            Badge(text: remote.transportBadge, color: .blue)
-                            Badge(text: "Remote", color: .teal)
+                            TagBadge(text: remote.transportBadge, color: .blue)
+                            TagBadge(text: "Remote", color: .teal)
                         }
 
                         Text(remote.url)
@@ -489,22 +489,5 @@ struct MCPInstallConfigSheet: View {
         }
 
         isInstalling = false
-    }
-}
-
-// MARK: - Badge
-
-private struct Badge: View {
-    let text: String
-    let color: Color
-
-    var body: some View {
-        Text(text)
-            .font(.caption2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.15))
-            .foregroundColor(color)
-            .cornerRadius(4)
     }
 }

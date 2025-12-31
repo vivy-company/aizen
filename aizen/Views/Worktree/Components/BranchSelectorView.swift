@@ -24,41 +24,23 @@ struct BranchSelectorView: View {
         VStack(spacing: 0) {
             // Header with search and close
             HStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-
-                    TextField(allowCreation ? String(localized: "git.branch.searchOrCreate") : String(localized: "git.branch.search"), text: $searchText)
-                        .textFieldStyle(.plain)
-                        .onSubmit {
-                            if allowCreation && !searchText.isEmpty && filteredBranches.isEmpty {
-                                createBranch()
-                            }
+                SearchField(
+                    placeholder: allowCreation ? "git.branch.searchOrCreate" : "git.branch.search",
+                    text: $searchText,
+                    iconColor: .secondary,
+                    onSubmit: {
+                        if allowCreation && !searchText.isEmpty && filteredBranches.isEmpty {
+                            createBranch()
                         }
-
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                    },
+                    trailing: { EmptyView() }
+                )
                 .padding(8)
                 .background(Color(nsColor: .controlBackgroundColor))
                 .cornerRadius(8)
 
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
+                DetailCloseButton(action: dismiss, size: 20)
+                    .symbolRenderingMode(.hierarchical)
             }
             .padding(12)
 

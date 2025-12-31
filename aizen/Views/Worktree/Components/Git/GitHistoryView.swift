@@ -49,13 +49,15 @@ struct GitHistoryView: View {
             Spacer()
 
             if !commits.isEmpty {
-                Text("\(commits.count)\(hasMoreCommits ? "+" : "")")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .clipShape(Capsule())
+                PillBadge(
+                    text: "\(commits.count)\(hasMoreCommits ? "+" : "")",
+                    color: Color(NSColor.controlBackgroundColor),
+                    textColor: .secondary,
+                    font: .system(size: 11, weight: .medium, design: .monospaced),
+                    horizontalPadding: 6,
+                    verticalPadding: 2,
+                    backgroundOpacity: 1
+                )
             }
 
             Button {

@@ -80,13 +80,16 @@ struct WorktreeListItemView: View {
                         .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
 
                     if worktree.isPrimary {
-                        Text("worktree.detail.main", bundle: .main)
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.blue, in: Capsule())
+                        PillBadge(
+                            text: String(localized: "worktree.detail.main"),
+                            color: .blue,
+                            textColor: .white,
+                            font: .caption2,
+                            fontWeight: .semibold,
+                            horizontalPadding: 6,
+                            verticalPadding: 2,
+                            backgroundOpacity: 1.0
+                        )
                     }
                 }
 
@@ -229,8 +232,7 @@ struct WorktreeListItemView: View {
 
             Button {
                 if let branch = worktree.branch {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(branch, forType: .string)
+                    Clipboard.copy(branch)
                 }
             } label: {
                 Label(String(localized: "worktree.detail.copyBranchName"), systemImage: "doc.on.doc")
@@ -238,8 +240,7 @@ struct WorktreeListItemView: View {
 
             Button {
                 if let path = worktree.path {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(path, forType: .string)
+                    Clipboard.copy(path)
                 }
             } label: {
                 Label(String(localized: "worktree.detail.copyPath"), systemImage: "doc.on.clipboard")

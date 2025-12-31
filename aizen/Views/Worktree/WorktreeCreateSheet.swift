@@ -58,14 +58,11 @@ struct WorktreeCreateSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(showsBackground: false) {
                 Text("worktree.create.title", bundle: .main)
                     .font(.title2)
                     .fontWeight(.semibold)
-
-                Spacer()
             }
-            .padding()
 
             Divider()
 

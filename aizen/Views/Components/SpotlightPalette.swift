@@ -136,33 +136,21 @@ struct SpotlightSearchField<Trailing: View>: View {
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.secondary)
-
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 22, weight: .medium))
-                .focused($isFocused)
-                .disableAutocorrection(true)
-                .onSubmit {
-                    onSubmit?()
-                }
-
-            if !text.isEmpty {
-                Button {
-                    text = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.secondary.opacity(0.9))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("Clear"))
-            }
-
-            trailing()
-        }
+        SearchField(
+            placeholder: placeholder,
+            text: $text,
+            spacing: 12,
+            iconSize: 16,
+            iconWeight: .semibold,
+            iconColor: .secondary,
+            textFont: .system(size: 22, weight: .medium),
+            clearButtonSize: 15,
+            clearButtonWeight: .semibold,
+            clearButtonOpacity: 0.9,
+            onSubmit: onSubmit,
+            isFocused: $isFocused,
+            disableAutocorrection: true,
+            trailing: trailing
+        )
     }
 }

@@ -177,12 +177,15 @@ struct AizenProSettingsView: View {
 
     private var statusBadge: some View {
         let (title, color) = statusPresentation(for: licenseManager.status)
-        return Text(title)
-            .font(.caption)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Capsule().fill(color))
-            .foregroundStyle(.white)
+        return PillBadge(
+            text: title,
+            color: color,
+            textColor: .white,
+            font: .caption,
+            horizontalPadding: 8,
+            verticalPadding: 4,
+            backgroundOpacity: 1
+        )
     }
 
     private func statusPresentation(for status: LicenseManager.Status) -> (String, Color) {
@@ -333,19 +336,16 @@ private struct AizenProPlansSheet: View {
 
             Spacer()
 
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(8)
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(0.06))
-                    )
-            }
-            .buttonStyle(.plain)
+            CircleIconButton(
+                systemName: "xmark",
+                action: dismiss,
+                size: 12,
+                weight: .semibold,
+                foreground: .secondary,
+                backgroundColor: .white,
+                backgroundOpacity: 0.06,
+                padding: 8
+            )
         }
     }
 

@@ -36,16 +36,10 @@ struct AgentSelectorMenu: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
-                AgentIconView(agent: selectedAgent, size: 12)
-                Text(selectedAgentMetadata?.name ?? selectedAgent.capitalized)
-                    .font(.system(size: 11, weight: .medium))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8))
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            AgentMenuLabel(
+                agentId: selectedAgent,
+                title: selectedAgentMetadata?.name ?? selectedAgent.capitalized
+            )
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)

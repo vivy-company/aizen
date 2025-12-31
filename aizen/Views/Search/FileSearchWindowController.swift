@@ -364,35 +364,28 @@ struct FileSearchWindowContent: View {
         isSelected: Bool,
         isHovered: Bool
     ) -> some View {
-        HStack(spacing: 14) {
-            FileIconView(path: result.path, size: 20)
-                .frame(width: 20, height: 20)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(result.name)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.primary)
-
-                Text(result.relativePath)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            if isSelected {
-                HStack(spacing: 6) {
-                    KeyCap(text: "↩")
-                    Text("Open")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
+        FileSearchResultRow(
+            result: result,
+            isSelected: isSelected,
+            isHovered: isHovered,
+            iconSize: 20,
+            spacing: 14,
+            titleFont: .system(size: 14, weight: .semibold),
+            subtitleFont: .system(size: 12),
+            horizontalPadding: 14,
+            verticalPadding: 11
+        ) {
+            Group {
+                if isSelected {
+                    HStack(spacing: 6) {
+                        KeyCap(text: "↩")
+                        Text("Open")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background(
+        } background: { isSelected, isHovered in
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
                     isSelected ? Color.white.opacity(0.12) :
@@ -404,8 +397,7 @@ struct FileSearchWindowContent: View {
                             .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
                     }
                 }
-        )
-        .contentShape(Rectangle())
+        }
         .onTapGesture {
             selectFile(result)
         }

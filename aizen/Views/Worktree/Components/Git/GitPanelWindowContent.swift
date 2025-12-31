@@ -229,8 +229,7 @@ struct GitPanelWindowContent: View {
                 },
                 onCopyAll: {
                     let markdown = reviewManager.exportToMarkdown()
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(markdown, forType: .string)
+                    Clipboard.copy(markdown)
                 },
                 onSendToAgent: {
                     showAgentPicker = true

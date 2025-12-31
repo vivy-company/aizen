@@ -199,8 +199,7 @@ struct CodeBlockView: View {
     }
 
     private func copyCode() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(trimmedCode, forType: .string)
+        Clipboard.copy(trimmedCode)
 
         withAnimation {
             showCopyConfirmation = true

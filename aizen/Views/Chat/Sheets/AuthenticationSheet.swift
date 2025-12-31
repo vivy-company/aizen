@@ -17,22 +17,16 @@ struct AuthenticationSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            DetailHeaderBar(
+                showsBackground: false,
+                padding: EdgeInsets(top: 20, leading: 24, bottom: 20, trailing: 24)
+            ) {
                 Text("chat.authentication.required", bundle: .main)
                     .font(.title2)
                     .fontWeight(.semibold)
-
-                Spacer()
-
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+            } trailing: {
+                DetailCloseButton { dismiss() }
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
 
             Divider()
 
@@ -158,8 +152,7 @@ struct AuthenticationSheet: View {
                                 .background(Color.black.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
 
                             Button {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString("claude /login", forType: .string)
+                                Clipboard.copy("claude /login")
                             } label: {
                                 Image(systemName: "doc.on.doc")
                                     .font(.system(size: 11))

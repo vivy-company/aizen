@@ -390,9 +390,7 @@ class FileBrowserViewModel: ObservableObject {
     }
 
     func copyPathToClipboard(path: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(path, forType: .string)
+        Clipboard.copy(path)
         ToastManager.shared.show("Path copied to clipboard", type: .success)
     }
 

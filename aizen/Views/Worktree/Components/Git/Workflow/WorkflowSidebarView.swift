@@ -461,13 +461,7 @@ struct RunSidebarRow: View {
     }
 
     private var statusColor: Color {
-        switch run.statusColor {
-        case "green": return .green
-        case "red": return .red
-        case "yellow": return .yellow
-        case "orange": return .orange
-        default: return .gray
-        }
+        WorkflowStatusIcon.color(status: run.status, conclusion: run.conclusion)
     }
 
     private func relativeTime(from date: Date) -> String {

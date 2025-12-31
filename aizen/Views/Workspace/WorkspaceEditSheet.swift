@@ -25,14 +25,11 @@ struct WorkspaceEditSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(showsBackground: false) {
                 Text("workspace.edit.title", bundle: .main)
                     .font(.title2)
                     .fontWeight(.semibold)
-
-                Spacer()
             }
-            .padding()
 
             Divider()
 

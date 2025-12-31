@@ -433,8 +433,7 @@ extension Ghostty {
             guard let surface = terminalView.surface?.unsafeCValue else { return }
 
             // Read from macOS clipboard
-            let pasteboard = NSPasteboard.general
-            let clipboardString = pasteboard.string(forType: .string) ?? ""
+            let clipboardString = Clipboard.readString() ?? ""
 
             // Complete the clipboard request by providing data to Ghostty
             clipboardString.withCString { ptr in
@@ -485,9 +484,7 @@ extension Ghostty {
                     )
                     string = TerminalTextCleaner.cleanText(string, settings: settings)
 
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(string, forType: .string)
+                    Clipboard.copy(string)
                     Ghostty.logger.debug("Wrote to clipboard: \(string.prefix(50))...")
                     return
                 }

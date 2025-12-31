@@ -200,15 +200,15 @@ struct SettingsView: View {
 
                 Spacer()
 
-                Text(proBadgeTitle)
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .foregroundStyle(proBadgeColor)
-                    .background(Capsule().fill(proBadgeColor.opacity(0.18)))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                PillBadge(
+                    text: proBadgeTitle,
+                    color: proBadgeColor,
+                    font: .caption2,
+                    fontWeight: .semibold,
+                    backgroundOpacity: 0.18,
+                    lineLimit: 1,
+                    minimumScaleFactor: 0.7
+                )
             }
         }
         .buttonStyle(.plain)

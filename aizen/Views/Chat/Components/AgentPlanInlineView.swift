@@ -53,12 +53,15 @@ struct AgentPlanInlineView: View {
                     }
 
                     // Progress counter
-                    Text("\(completedCount)/\(totalCount)")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.quaternary, in: Capsule())
+                    PillBadge(
+                        text: "\(completedCount)/\(totalCount)",
+                        color: .secondary,
+                        textColor: .secondary,
+                        font: .system(size: 10, weight: .medium),
+                        horizontalPadding: 6,
+                        verticalPadding: 2,
+                        backgroundOpacity: 0.25
+                    )
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -83,26 +86,17 @@ struct AgentPlanSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(showsBackground: false) {
                 Text("Agent Plan")
                     .font(.headline)
-
-                Spacer()
-
-                Text("\(completedCount)/\(plan.entries.count) completed")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
+            } trailing: {
+                HStack(spacing: 12) {
+                    Text("\(completedCount)/\(plan.entries.count) completed")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    DetailCloseButton { dismiss() }
                 }
-                .buttonStyle(.plain)
             }
-            .padding()
 
             Divider()
 

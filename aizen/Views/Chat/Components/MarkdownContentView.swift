@@ -18,14 +18,3 @@ struct MessageContentView: View {
         MarkdownView(content: content, isStreaming: isStreaming)
     }
 }
-
-// MARK: - Simple Markdown View
-
-/// Convenience wrapper for static (non-streaming) markdown content
-struct SimpleMarkdownView: View {
-    let content: String
-
-    var body: some View {
-        MarkdownView(content: content, isStreaming: false)
-    }
-}

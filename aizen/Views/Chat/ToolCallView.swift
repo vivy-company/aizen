@@ -154,8 +154,7 @@ struct ToolCallView: View {
 
             if let output = copyableOutput {
                 Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(output, forType: .string)
+                    Clipboard.copy(output)
                 } label: {
                     Label("Copy Output", systemImage: "doc.on.doc")
                 }
@@ -163,8 +162,7 @@ struct ToolCallView: View {
 
             if let path = filePath {
                 Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(path, forType: .string)
+                    Clipboard.copy(path)
                 } label: {
                     Label("Copy Path", systemImage: "link")
                 }
@@ -184,21 +182,7 @@ struct ToolCallView: View {
     // MARK: - Copyable Output
 
     private var copyableOutput: String? {
-        var outputs: [String] = []
-        for content in toolCall.content {
-            switch content {
-            case .content(let block):
-                if case .text(let textContent) = block {
-                    outputs.append(textContent.text)
-                }
-            case .diff(let diff):
-                outputs.append(diff.newText)
-            case .terminal:
-                break // Terminal output handled separately
-            }
-        }
-        let result = outputs.joined(separator: "\n\n")
-        return result.isEmpty ? nil : result
+        toolCall.copyableOutputText
     }
 
     // MARK: - File Path Extraction

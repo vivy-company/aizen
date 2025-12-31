@@ -129,9 +129,7 @@ struct XcodeBuildLogPopover: View {
     }
 
     private func copyToClipboard() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(log, forType: .string)
+        Clipboard.copy(log)
 
         showCopiedFeedback = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {

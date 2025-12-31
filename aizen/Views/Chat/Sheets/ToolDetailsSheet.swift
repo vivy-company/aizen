@@ -15,22 +15,16 @@ struct ToolDetailsSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            DetailHeaderBar(
+                showsBackground: false,
+                padding: EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+            ) {
                 Text("chat.tool.details.title", bundle: .main)
                     .font(.title2)
                     .fontWeight(.semibold)
-
-                Spacer()
-
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+            } trailing: {
+                DetailCloseButton { dismiss() }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
 
             Divider()
 
@@ -140,7 +134,7 @@ struct ToolCallContentView: View {
     var body: some View {
         switch content {
         case .content(let block):
-            CompactContentBlockView(block: block)
+            ContentBlockRenderer(block: block, style: .compact)
         case .diff(let diff):
             ToolCallDiffView(diff: diff)
         case .terminal(let terminal):
@@ -274,68 +268,6 @@ struct ToolCallDiffView: View {
             .padding(8)
             .background(Color(nsColor: .textBackgroundColor))
             .cornerRadius(4)
-        }
-    }
-}
-
-// MARK: - Compact Content Block View
-
-struct CompactContentBlockView: View {
-    let block: ContentBlock
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            switch block {
-            case .text(let content):
-                ScrollView([.horizontal, .vertical]) {
-                    Text(content.text)
-                        .font(.system(size: 11, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxHeight: 200)
-                .padding(8)
-                .background(Color(nsColor: .textBackgroundColor))
-                .cornerRadius(4)
-
-            case .image(let content):
-                Text(String(localized: "chat.content.imageType \(content.mimeType)"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-
-            case .resource(let content):
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "chat.content.resourceUri \(content.resource.uri ?? "unknown")"))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-
-                    if let text = content.resource.text {
-                        ScrollView([.horizontal, .vertical]) {
-                            Text(text)
-                                .font(.system(size: 11, design: .monospaced))
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(maxHeight: 150)
-                        .padding(8)
-                        .background(Color(nsColor: .textBackgroundColor))
-                        .cornerRadius(4)
-                    }
-                }
-
-            case .audio(let content):
-                Text(String(localized: "chat.content.audioType \(content.mimeType)"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-
-            case .resourceLink(let content):
-                Text(String(localized: "chat.content.resourceUri \(content.uri)"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-            }
         }
     }
 }

@@ -216,8 +216,7 @@ struct MathBlockView: View {
     }
 
     private func copyLatex() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(content, forType: .string)
+        Clipboard.copy(content)
 
         withAnimation {
             showCopyConfirmation = true

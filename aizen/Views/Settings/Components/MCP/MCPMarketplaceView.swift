@@ -94,28 +94,17 @@ struct MCPMarketplaceView: View {
 
     private var headerView: some View {
         HStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-
-                TextField("Search MCP servers...", text: $searchQuery)
-                    .textFieldStyle(.plain)
-                    .onSubmit {
-                        Task { await search() }
-                    }
-
-                if !searchQuery.isEmpty {
-                    Button {
-                        searchQuery = ""
-                        searchTask?.cancel()
-                        Task { await loadServers() }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+            SearchField(
+                placeholder: "Search MCP servers...",
+                text: $searchQuery,
+                iconColor: .secondary,
+                onSubmit: { Task { await search() } },
+                onClear: {
+                    searchTask?.cancel()
+                    Task { await loadServers() }
+                },
+                trailing: { EmptyView() }
+            )
             .padding(8)
             .background(Color(NSColor.textBackgroundColor))
             .cornerRadius(8)

@@ -168,13 +168,7 @@ struct WorkflowRunDetailView: View {
     }
 
     private func statusBackgroundColor(_ run: WorkflowRun) -> Color {
-        switch run.statusColor {
-        case "green": return Color(red: 0.25, green: 0.6, blue: 0.35)
-        case "red": return Color(red: 0.7, green: 0.25, blue: 0.25)
-        case "yellow": return Color(red: 0.7, green: 0.6, blue: 0.2)
-        case "orange": return Color(red: 0.75, green: 0.45, blue: 0.2)
-        default: return Color(nsColor: .controlBackgroundColor)
-        }
+        WorkflowStatusIcon.badgeBackgroundColor(status: run.status, conclusion: run.conclusion)
     }
 
     // MARK: - Jobs Panel
@@ -408,39 +402,10 @@ struct JobRow: View {
                 .controlSize(.mini)
                 .frame(width: 14, height: 14)
         } else {
-            Image(systemName: statusIcon)
+            Image(systemName: WorkflowStatusIcon.iconName(status: job.status, conclusion: job.conclusion, fillStyle: .fill))
                 .font(.system(size: 12))
-                .foregroundStyle(statusColor)
+                .foregroundStyle(WorkflowStatusIcon.color(status: job.status, conclusion: job.conclusion))
         }
-    }
-
-    private var statusIcon: String {
-        if let conclusion = job.conclusion {
-            switch conclusion {
-            case .success: return "checkmark.circle.fill"
-            case .failure: return "xmark.circle.fill"
-            case .cancelled: return "stop.circle.fill"
-            case .skipped: return "arrow.right.circle.fill"
-            default: return "circle.fill"
-            }
-        }
-        switch job.status {
-        case .queued, .pending, .waiting: return "clock.fill"
-        case .inProgress: return "play.circle.fill"
-        default: return "circle.fill"
-        }
-    }
-
-    private var statusColor: Color {
-        if let conclusion = job.conclusion {
-            switch conclusion {
-            case .success: return .green
-            case .failure: return .red
-            case .cancelled, .skipped: return .gray
-            default: return .secondary
-            }
-        }
-        return .yellow
     }
 }
 
@@ -480,38 +445,10 @@ struct StepRow: View {
                 .controlSize(.mini)
                 .frame(width: 10, height: 10)
         } else {
-            Image(systemName: statusIcon)
+            Image(systemName: WorkflowStatusIcon.iconName(status: step.status, conclusion: step.conclusion, fillStyle: .outline))
                 .font(.system(size: 9))
-                .foregroundStyle(statusColor)
+                .foregroundStyle(WorkflowStatusIcon.color(status: step.status, conclusion: step.conclusion))
         }
-    }
-
-    private var statusIcon: String {
-        if let conclusion = step.conclusion {
-            switch conclusion {
-            case .success: return "checkmark"
-            case .failure: return "xmark"
-            case .skipped: return "arrow.right"
-            default: return "circle"
-            }
-        }
-        switch step.status {
-        case .queued, .pending, .waiting: return "clock"
-        case .inProgress: return "play"
-        default: return "circle"
-        }
-    }
-
-    private var statusColor: Color {
-        if let conclusion = step.conclusion {
-            switch conclusion {
-            case .success: return .green
-            case .failure: return .red
-            case .skipped: return .gray
-            default: return .secondary
-            }
-        }
-        return .yellow
     }
 }
 

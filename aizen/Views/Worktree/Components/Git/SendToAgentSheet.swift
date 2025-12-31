@@ -65,20 +65,15 @@ struct SendToAgentSheet: View {
     }
 
     private var header: some View {
-        HStack {
+        DetailHeaderBar(
+            showsBackground: false,
+            padding: EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
+        ) {
             Text(String(localized: "git.sendToAgent.title"))
                 .font(.system(size: 14, weight: .semibold))
-            Spacer()
-            Button {
-                onDismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
+        } trailing: {
+            DetailCloseButton(action: onDismiss, size: 16)
         }
-        .padding(16)
     }
 
     private var content: some View {

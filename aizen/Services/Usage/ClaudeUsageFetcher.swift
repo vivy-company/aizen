@@ -37,16 +37,15 @@ enum ClaudeUsageFetcher {
             let usage = try await ClaudeOAuthUsageFetcher.fetchUsage(accessToken: creds.accessToken)
             let statsigIdentity = loadStatsigIdentity()
 
-            if let window = makeWindow(title: "Session (5h)", window: usage.fiveHour, windowMinutes: 5 * 60) {
+            if let window = makeWindow(title: "Session (5h)", window: usage.fiveHour) {
                 quota.append(window)
             }
-            if let window = makeWindow(title: "Weekly", window: usage.sevenDay, windowMinutes: 7 * 24 * 60) {
+            if let window = makeWindow(title: "Weekly", window: usage.sevenDay) {
                 quota.append(window)
             }
             if let window = makeWindow(
                 title: "Weekly (Sonnet/Opus)",
-                window: usage.sevenDaySonnet ?? usage.sevenDayOpus,
-                windowMinutes: 7 * 24 * 60
+                window: usage.sevenDaySonnet ?? usage.sevenDayOpus
             ) {
                 quota.append(window)
             }
@@ -73,9 +72,11 @@ enum ClaudeUsageFetcher {
                 )
             }
 
-            let email = creds.email ?? parseJWTEmail(creds.idToken) ?? parseJWTEmail(creds.accessToken)
+            let email = creds.email
+                ?? JWTDecoder.string(from: creds.idToken, keys: ["email"])
+                ?? JWTDecoder.string(from: creds.accessToken, keys: ["email"])
             let organization = creds.organization
-                ?? parseJWTOrganization(creds.idToken)
+                ?? JWTDecoder.string(from: creds.idToken, keys: ["org", "organization", "org_name"])
                 ?? statsigIdentity?.organizationID
             let subscription = creds.subscriptionType ?? statsigIdentity?.subscriptionType
             user = UsageUserIdentity(
@@ -97,11 +98,10 @@ enum ClaudeUsageFetcher {
         return ClaudeUsageSnapshot(quotaWindows: quota, user: user, errors: errors, notes: notes)
     }
 
-    private static func makeWindow(title: String, window: OAuthUsageWindow?, windowMinutes: Int?) -> UsageQuotaWindow? {
+    private static func makeWindow(title: String, window: OAuthUsageWindow?) -> UsageQuotaWindow? {
         guard let window, let utilization = window.utilization else { return nil }
         let resetDate = ClaudeOAuthUsageFetcher.parseISO8601Date(window.resetsAt)
         let resetDescription = resetDate.map(formatResetDate)
-        _ = windowMinutes
         return UsageQuotaWindow(
             title: title,
             usedPercent: utilization,
@@ -413,36 +413,6 @@ private func extractStatsigValue(_ key: String, in text: String) -> String? {
     guard let end = text[start...].firstIndex(of: "\"") else { return nil }
     let value = text[start..<end].trimmingCharacters(in: .whitespacesAndNewlines)
     return value.isEmpty ? nil : value
-}
-
-private func parseJWTEmail(_ token: String?) -> String? {
-    guard let token else { return nil }
-    let parts = token.split(separator: ".")
-    guard parts.count >= 2 else { return nil }
-    var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+")
-        .replacingOccurrences(of: "_", with: "/")
-    while payload.count % 4 != 0 { payload.append("=") }
-    guard let data = Data(base64Encoded: payload),
-          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    else { return nil }
-    return json["email"] as? String
-}
-
-private func parseJWTOrganization(_ token: String?) -> String? {
-    guard let token else { return nil }
-    let parts = token.split(separator: ".")
-    guard parts.count >= 2 else { return nil }
-    var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+")
-        .replacingOccurrences(of: "_", with: "/")
-    while payload.count % 4 != 0 { payload.append("=") }
-    guard let data = Data(base64Encoded: payload),
-          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    else { return nil }
-
-    if let org = json["org"] as? String { return org }
-    if let org = json["organization"] as? String { return org }
-    if let org = json["org_name"] as? String { return org }
-    return nil
 }
 
 private struct OAuthUsageResponse: Decodable {

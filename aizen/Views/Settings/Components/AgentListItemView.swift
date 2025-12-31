@@ -122,15 +122,11 @@ struct AgentListItemView: View {
 
                             // Validation indicator
                             if let path = metadata.executablePath, !path.isEmpty {
-                                if isAgentValid {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                        .help("Executable is valid")
-                                } else {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.red)
-                                        .help("Executable not found or not executable")
-                                }
+                                ValidationStatusIcon(
+                                    isValid: isAgentValid,
+                                    validHelp: "Executable is valid",
+                                    invalidHelp: "Executable not found or not executable"
+                                )
                             }
                         }
                     }

@@ -225,6 +225,14 @@ extension EmbeddedResourceType {
         }
     }
 
+    /// Convenience accessor for the resource mime type regardless of variant
+    var mimeType: String? {
+        switch self {
+        case .text(let contents): return contents.mimeType
+        case .blob(let contents): return contents.mimeType
+        }
+    }
+
     /// Convenience accessor for embedded text contents
     var text: String? {
         switch self {

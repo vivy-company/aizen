@@ -44,16 +44,16 @@ struct PlanApprovalDialog: View {
 
                 Spacer()
 
-                Button {
-                    isPresented = false
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24, height: 24)
-                        .background(Color(nsColor: .separatorColor).opacity(0.5), in: Circle())
-                }
-                .buttonStyle(.plain)
+                CircleIconButton(
+                    systemName: "xmark",
+                    action: { isPresented = false },
+                    size: 12,
+                    weight: .semibold,
+                    foreground: .secondary,
+                    backgroundColor: Color(nsColor: .separatorColor),
+                    backgroundOpacity: 0.5,
+                    frameSize: 24
+                )
             }
             .padding(20)
 

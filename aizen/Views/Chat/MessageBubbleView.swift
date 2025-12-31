@@ -7,17 +7,6 @@
 
 import SwiftUI
 
-extension View {
-    @ViewBuilder
-    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
-        }
-    }
-}
-
 // MARK: - Message Bubble View
 
 struct MessageBubbleView: View {
@@ -144,8 +133,7 @@ struct MessageBubbleView: View {
     }
 
     private func copyMessage() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(message.content, forType: .string)
+        Clipboard.copy(message.content)
 
         withAnimation {
             showCopyConfirmation = true
@@ -286,26 +274,48 @@ struct UserBubble<Background: View>: View {
         switch block {
         case .text(let textContent):
             // Pasted text attachment (first .text block is filtered out in attachmentBlocks)
-            TextAttachmentChip(text: textContent.text)
+            textAttachmentChip(textContent.text)
         case .image(let imageContent):
-            ImageAttachmentCardView(data: imageContent.data, mimeType: imageContent.mimeType)
+            ImageAttachmentCardView(data: imageContent.data)
         case .resource(let resourceContent):
             if let uri = resourceContent.resource.uri {
                 UserAttachmentChip(
                     name: URL(string: uri)?.lastPathComponent ?? "File",
-                    uri: uri,
-                    mimeType: nil
+                    uri: uri
                 )
             }
         case .resourceLink(let linkContent):
             UserAttachmentChip(
                 name: linkContent.name,
-                uri: linkContent.uri,
-                mimeType: linkContent.mimeType
+                uri: linkContent.uri
             )
         case .audio:
             EmptyView()
         }
+    }
+
+    private func textAttachmentChip(_ text: String) -> some View {
+        let stats = TextAttachmentStats(text: text)
+        return AttachmentChip(
+            label: AnyView(
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.blue)
+
+                    Text("Pasted Text")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(stats.displayInfo)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            ),
+            detailView: AnyView(TextAttachmentDetailView(content: text, showsCopyButton: true)),
+            style: AttachmentChip.Style(showsDelete: false, showsHoverFade: false)
+        )
     }
 
     private var measureUnwrappedWidth: some View {
@@ -348,14 +358,16 @@ struct AgentBadge: View {
     let name: String
 
     var body: some View {
-        Text(name)
-            .font(.caption)
-            .fontWeight(.medium)
-            .foregroundColor(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.blue)
-            .clipShape(Capsule())
+        PillBadge(
+            text: name,
+            color: .blue,
+            textColor: .white,
+            font: .caption,
+            fontWeight: .medium,
+            horizontalPadding: 8,
+            verticalPadding: 4,
+            backgroundOpacity: 1
+        )
     }
 }
 
@@ -488,4 +500,3 @@ struct AgentBadge: View {
     }
     .frame(width: 600, height: 800)
 }
-

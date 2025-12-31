@@ -40,29 +40,9 @@ struct PermissionRequestView: View {
             HStack(spacing: 6) {
                 if let options = request.options {
                     ForEach(options, id: \.optionId) { option in
-                        Button {
+                        PermissionOptionButton(option: option, style: .inline) {
                             session.respondToPermission(optionId: option.optionId)
-                        } label: {
-                            HStack(spacing: 3) {
-                                if option.kind.contains("allow") {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 10))
-                                } else if option.kind.contains("reject") {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 10))
-                                }
-                                Text(option.name)
-                                    .font(.system(size: 11, weight: .medium))
-                            }
-                            .foregroundStyle(buttonForeground(for: option))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background {
-                                buttonBackground(for: option)
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -70,27 +50,5 @@ struct PermissionRequestView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    private func buttonForeground(for option: PermissionOption) -> Color {
-        if option.kind.contains("allow") {
-            return .white
-        } else if option.kind.contains("reject") {
-            return .white
-        } else {
-            return .primary
-        }
-    }
-
-    private func buttonBackground(for option: PermissionOption) -> Color {
-        if option.kind == "allow_always" {
-            return .green
-        } else if option.kind.contains("allow") {
-            return .blue
-        } else if option.kind.contains("reject") {
-            return .red
-        } else {
-            return .clear
-        }
     }
 }

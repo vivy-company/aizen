@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import AppKit
 
 struct ToolCallGroupView: View {
     let group: ToolCallGroup
@@ -40,8 +39,7 @@ struct ToolCallGroupView: View {
 
             if let output = copyableOutput {
                 Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(output, forType: .string)
+                    Clipboard.copy(output)
                 } label: {
                     Label("Copy All Outputs", systemImage: "doc.on.doc")
                 }
@@ -54,21 +52,8 @@ struct ToolCallGroupView: View {
     private var copyableOutput: String? {
         var outputs: [String] = []
         for toolCall in group.toolCalls {
-            var toolOutputs: [String] = []
-            for content in toolCall.content {
-                switch content {
-                case .content(let block):
-                    if case .text(let textContent) = block {
-                        toolOutputs.append(textContent.text)
-                    }
-                case .diff(let diff):
-                    toolOutputs.append(diff.newText)
-                case .terminal:
-                    break
-                }
-            }
-            if !toolOutputs.isEmpty {
-                outputs.append("# \(toolCall.title)\n\(toolOutputs.joined(separator: "\n"))")
+            if let output = toolCall.copyableOutputText {
+                outputs.append("# \(toolCall.title)\n\(output)")
             }
         }
         let result = outputs.joined(separator: "\n\n---\n\n")

@@ -198,23 +198,12 @@ struct SFSymbolPickerView: View {
 
     private var headerView: some View {
         HStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-
-                TextField("Search symbols...", text: $searchText)
-                    .textFieldStyle(.plain)
-
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+            SearchField(
+                placeholder: "Search symbols...",
+                text: $searchText,
+                iconColor: .secondary,
+                trailing: { EmptyView() }
+            )
             .padding(8)
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(8)

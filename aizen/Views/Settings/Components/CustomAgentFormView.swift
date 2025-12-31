@@ -135,14 +135,12 @@ struct CustomAgentFormView: View {
                             } else if let validation = pathValidationResult {
                                 switch validation {
                                 case .valid:
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
+                                    ValidationStatusIcon(isValid: true)
                                     Text("Valid ACP executable")
                                         .font(.caption)
                                         .foregroundStyle(.green)
                                 case .invalid(let message):
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.red)
+                                    ValidationStatusIcon(isValid: false)
                                     Text(message)
                                         .font(.caption)
                                         .foregroundStyle(.red)

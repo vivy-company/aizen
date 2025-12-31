@@ -21,15 +21,10 @@ struct VoiceRecordingView: View {
             // Main recording pill
             HStack(spacing: 0) {
                 // Cancel Button - flush left
-                Button(action: {
+                DetailCloseButton {
                     audioService.cancelRecording()
                     onCancel()
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.secondary)
                 }
-                .buttonStyle(.plain)
                 .padding(.trailing, 8)
 
                 // Recording indicator + Timer

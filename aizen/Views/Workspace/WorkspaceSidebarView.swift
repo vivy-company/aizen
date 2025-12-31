@@ -188,12 +188,15 @@ struct WorkspaceSidebarView: View {
                             Spacer(minLength: 8)
 
                             let repoCount = (workspace.repositories as? Set<Repository>)?.count ?? 0
-                            Text("\(repoCount)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.quaternary, in: Capsule())
+                            PillBadge(
+                                text: "\(repoCount)",
+                                color: .secondary,
+                                textColor: .secondary,
+                                font: .caption,
+                                horizontalPadding: 6,
+                                verticalPadding: 2,
+                                backgroundOpacity: 0.2
+                            )
 
                             Image(systemName: "chevron.up.chevron.down")
                                 .foregroundStyle(.secondary)
@@ -214,24 +217,14 @@ struct WorkspaceSidebarView: View {
             Divider()
 
             // Search field
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField(LocalizedStringKey("workspace.search.placeholder"), text: $searchText)
-                    .textFieldStyle(.plain)
-
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
+            SearchField(
+                placeholder: "workspace.search.placeholder",
+                text: $searchText,
+                iconColor: .secondary,
+                trailing: {
+                    StatusFilterDropdown(selectedStatuses: selectedStatusFiltersBinding)
                 }
-
-                StatusFilterDropdown(selectedStatuses: selectedStatusFiltersBinding)
-            }
+            )
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
@@ -660,8 +653,7 @@ struct RepositoryRow: View {
 
                 Button {
                     if let path = repository.path {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(path, forType: .string)
+                        Clipboard.copy(path)
                     }
                 } label: {
                     Label("workspace.repository.copyPath", systemImage: "doc.on.doc")
@@ -855,12 +847,15 @@ struct WorkspaceRow: View {
             Spacer(minLength: 8)
 
             let repoCount = (workspace.repositories as? Set<Repository>)?.count ?? 0
-            Text("\(repoCount)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(.quaternary, in: Capsule())
+            PillBadge(
+                text: "\(repoCount)",
+                color: .secondary,
+                textColor: .secondary,
+                font: .caption,
+                horizontalPadding: 6,
+                verticalPadding: 2,
+                backgroundOpacity: 0.2
+            )
 
             if isHovered || isSelected {
                 Button {
@@ -973,15 +968,8 @@ struct SupportSheet: View {
                 .padding(.top, 24)
                 .padding(.bottom, 20)
 
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .padding(12)
+                DetailCloseButton { dismiss() }
+                    .padding(12)
             }
 
             Divider()

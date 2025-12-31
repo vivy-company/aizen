@@ -303,7 +303,10 @@ private struct FullDiffSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(
+                showsBackground: false,
+                padding: EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+            ) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Diff")
                         .font(.headline)
@@ -313,18 +316,9 @@ private struct FullDiffSheet: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-
-                Spacer()
-
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+            } trailing: {
+                DetailCloseButton { dismiss() }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
 
             Divider()
 

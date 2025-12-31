@@ -21,35 +21,28 @@ struct WorktreeDetailsSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            DetailHeaderBar(showsBackground: false) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(worktree.branch ?? String(localized: "worktree.list.unknown"))
                         .font(.title2)
                         .fontWeight(.bold)
 
                     if worktree.isPrimary {
-                        Text("worktree.detail.primary", bundle: .main)
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(.blue, in: Capsule())
+                        PillBadge(
+                            text: String(localized: "worktree.detail.primary"),
+                            color: .blue,
+                            textColor: .white,
+                            font: .caption,
+                            fontWeight: .semibold,
+                            horizontalPadding: 8,
+                            verticalPadding: 3,
+                            backgroundOpacity: 1.0
+                        )
                     }
                 }
-
-                Spacer()
-
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+            } trailing: {
+                DetailCloseButton { dismiss() }
             }
-            .padding()
 
             Divider()
 

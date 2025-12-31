@@ -208,14 +208,7 @@ struct SessionTabsScrollView: View {
             action: { selectedChatSessionId = session.id }
         ) {
             HStack(spacing: 6) {
-                Button {
-                    onCloseChatSession(session)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
+                DetailCloseButton(action: { onCloseChatSession(session) }, size: 10)
 
                 AgentIconView(agent: session.agentName ?? "claude", size: 14)
 
@@ -239,14 +232,7 @@ struct SessionTabsScrollView: View {
             action: { selectedTerminalSessionId = session.id }
         ) {
             HStack(spacing: 6) {
-                Button {
-                    requestCloseTerminalSession(session)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
+                DetailCloseButton(action: { requestCloseTerminalSession(session) }, size: 10)
 
                 Image(systemName: "terminal")
                     .font(.system(size: 12))

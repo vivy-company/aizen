@@ -98,27 +98,9 @@ struct PermissionBannerView: View {
             // Bottom row - action buttons
             HStack(spacing: 8) {
                 ForEach(info.options, id: \.optionId) { option in
-                    Button {
+                    PermissionOptionButton(option: option, style: .banner) {
                         info.handler.respondToPermission(optionId: option.optionId)
-                    } label: {
-                        HStack(spacing: 4) {
-                            if option.kind.contains("allow") {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 10))
-                            } else if option.kind.contains("reject") {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 10))
-                            }
-                            Text(option.name)
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundStyle(buttonForeground(for: option))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(buttonBackground(for: option))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -132,24 +114,6 @@ struct PermissionBannerView: View {
                 .strokeBorder(strokeColor, lineWidth: 1)
         }
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.15), radius: 20, y: 8)
-    }
-
-    private func buttonForeground(for option: PermissionOption) -> Color {
-        if option.kind.contains("allow") || option.kind.contains("reject") {
-            return .white
-        }
-        return .primary
-    }
-
-    private func buttonBackground(for option: PermissionOption) -> Color {
-        if option.kind == "allow_always" {
-            return .green
-        } else if option.kind.contains("allow") {
-            return .blue
-        } else if option.kind.contains("reject") {
-            return .red
-        }
-        return .clear
     }
 
     @ViewBuilder

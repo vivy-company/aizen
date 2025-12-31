@@ -579,26 +579,23 @@ private struct SidebarRow: View {
             }
             Spacer()
             HStack(spacing: 6) {
-                SidebarBadge(text: "\(worktreeCount)")
+                PillBadge(
+                    text: "\(worktreeCount)",
+                    color: .secondary,
+                    textColor: .primary,
+                    backgroundOpacity: 0.12
+                )
                 if counts.total > 0 {
-                    SidebarBadge(text: "\(counts.total)")
+                    PillBadge(
+                        text: "\(counts.total)",
+                        color: .secondary,
+                        textColor: .primary,
+                        backgroundOpacity: 0.12
+                    )
                 }
             }
         }
         .padding(.vertical, 4)
-    }
-}
-
-private struct SidebarBadge: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.caption2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.secondary.opacity(0.12))
-            .clipShape(Capsule())
     }
 }
 
@@ -608,28 +605,23 @@ private struct SummaryPills: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            SummaryBadge(label: "Worktrees", count: worktreeCount, color: .secondary)
-            if counts.chats > 0 { SummaryBadge(label: "Chat", count: counts.chats, color: .blue) }
-            if counts.terminals > 0 { SummaryBadge(label: "Terminal", count: counts.terminals, color: .green) }
-            if counts.browsers > 0 { SummaryBadge(label: "Browser", count: counts.browsers, color: .orange) }
-            if counts.files > 0 { SummaryBadge(label: "Files", count: counts.files, color: .teal) }
+            summaryBadge(label: "Worktrees", count: worktreeCount, color: .secondary)
+            if counts.chats > 0 { summaryBadge(label: "Chat", count: counts.chats, color: .blue) }
+            if counts.terminals > 0 { summaryBadge(label: "Terminal", count: counts.terminals, color: .green) }
+            if counts.browsers > 0 { summaryBadge(label: "Browser", count: counts.browsers, color: .orange) }
+            if counts.files > 0 { summaryBadge(label: "Files", count: counts.files, color: .teal) }
         }
     }
-}
-
-private struct SummaryBadge: View {
-    let label: String
-    let count: Int
-    let color: Color
-
-    var body: some View {
-        Text("\(label) \(count)")
-            .font(.caption2)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(color.opacity(0.12))
-            .foregroundStyle(color)
-            .clipShape(Capsule())
+    
+    @ViewBuilder
+    private func summaryBadge(label: String, count: Int, color: Color) -> some View {
+        PillBadge(
+            text: "\(label) \(count)",
+            color: color,
+            backgroundOpacity: 0.12,
+            horizontalPadding: 8,
+            verticalPadding: 4
+        )
     }
 }
 
@@ -709,16 +701,16 @@ private struct SessionSummaryRow: View {
     var body: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 6) {
-                chip(title: "Chat", systemImage: "message.fill", count: counts.chats, color: .blue)
-                chip(title: "Terminal", systemImage: "terminal.fill", count: counts.terminals, color: .green)
-                chip(title: "Browser", systemImage: "safari.fill", count: counts.browsers, color: .orange)
-                chip(title: "Files", systemImage: "doc.on.doc.fill", count: counts.files, color: .teal)
+                sessionChip(title: "Chat", systemImage: "message.fill", count: counts.chats, color: .blue)
+                sessionChip(title: "Terminal", systemImage: "terminal.fill", count: counts.terminals, color: .green)
+                sessionChip(title: "Browser", systemImage: "safari.fill", count: counts.browsers, color: .orange)
+                sessionChip(title: "Files", systemImage: "doc.on.doc.fill", count: counts.files, color: .teal)
             }
             HStack(spacing: 6) {
-                chip(title: nil, systemImage: "message.fill", count: counts.chats, color: .blue)
-                chip(title: nil, systemImage: "terminal.fill", count: counts.terminals, color: .green)
-                chip(title: nil, systemImage: "safari.fill", count: counts.browsers, color: .orange)
-                chip(title: nil, systemImage: "doc.on.doc.fill", count: counts.files, color: .teal)
+                sessionChip(title: nil, systemImage: "message.fill", count: counts.chats, color: .blue)
+                sessionChip(title: nil, systemImage: "terminal.fill", count: counts.terminals, color: .green)
+                sessionChip(title: nil, systemImage: "safari.fill", count: counts.browsers, color: .orange)
+                sessionChip(title: nil, systemImage: "doc.on.doc.fill", count: counts.files, color: .teal)
             }
             Text("\(counts.total) sessions")
                 .font(.caption2)
@@ -727,23 +719,14 @@ private struct SessionSummaryRow: View {
         .lineLimit(1)
     }
 
-    private func chip(title: String?, systemImage: String, count: Int, color: Color) -> some View {
-        Group {
-            if count > 0 {
-                HStack(spacing: 4) {
-                    Image(systemName: systemImage)
-                    Text(title != nil ? "\(title ?? "") \(count)" : "\(count)")
-                }
-                .font(.caption2)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(color.opacity(0.14))
-                .foregroundStyle(color)
-                .clipShape(Capsule())
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-            }
-        }
+    private func sessionChip(title: String?, systemImage: String, count: Int, color: Color) -> some View {
+        IconCountPill(
+            systemImage: systemImage,
+            count: count,
+            title: title,
+            color: color,
+            backgroundOpacity: 0.14
+        )
     }
 }
 
