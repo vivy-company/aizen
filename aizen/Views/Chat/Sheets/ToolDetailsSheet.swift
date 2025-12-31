@@ -238,29 +238,51 @@ struct ToolCallDiffView: View {
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
 
-            ScrollView([.horizontal, .vertical]) {
-                VStack(alignment: .leading, spacing: 0) {
-                    if let oldText = diff.oldText {
-                        ForEach(oldText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init), id: \.self) { line in
-                            Text("- \(line)")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    ForEach(diff.newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init), id: \.self) { line in
-                        Text("+ \(line)")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.green)
-                    }
-                }
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(maxHeight: 200)
-            .padding(8)
-            .background(Color(nsColor: .textBackgroundColor))
-            .cornerRadius(4)
+            MonospaceTextPanel(
+                text: "",
+                attributedText: diffAttributedText,
+                maxHeight: 200,
+                backgroundColor: Color(nsColor: .textBackgroundColor),
+                padding: 8
+            )
         }
+    }
+
+    private var diffAttributedText: AttributedString {
+        var result = AttributedString()
+        let font = Font.system(size: 11, design: .monospaced)
+
+        if let oldText = diff.oldText {
+            let oldLines = oldText.split(separator: "\n", omittingEmptySubsequences: false)
+            for (index, line) in oldLines.enumerated() {
+                var chunk = AttributedString("- \(line)")
+                chunk.font = font
+                chunk.foregroundColor = .red
+                result.append(chunk)
+                if index < oldLines.count - 1 || !diff.newText.isEmpty {
+                    result.append(AttributedString("\n"))
+                }
+            }
+        }
+
+        let newLines = diff.newText.split(separator: "\n", omittingEmptySubsequences: false)
+        for (index, line) in newLines.enumerated() {
+            var chunk = AttributedString("+ \(line)")
+            chunk.font = font
+            chunk.foregroundColor = .green
+            result.append(chunk)
+            if index < newLines.count - 1 {
+                result.append(AttributedString("\n"))
+            }
+        }
+
+        if result.characters.isEmpty {
+            var placeholder = AttributedString(" ")
+            placeholder.font = font
+            result = placeholder
+        }
+
+        return result
     }
 }
 
@@ -279,19 +301,14 @@ private struct SectionHeader: View {
 private struct JsonBlockView: View {
     let text: String
     var body: some View {
-        ScrollView([.horizontal, .vertical]) {
-            Text(text)
-                .font(.system(size: 11, design: .monospaced))
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxHeight: 160)
-        .padding(6)
-        .background(Color(nsColor: .textBackgroundColor))
-        .cornerRadius(4)
-        .overlay(
-            RoundedRectangle(cornerRadius: 4)
-                .stroke(Color.gray.opacity(0.12), lineWidth: 0.5)
+        MonospaceTextPanel(
+            text: text,
+            maxHeight: 160,
+            backgroundColor: Color(nsColor: .textBackgroundColor),
+            padding: 6,
+            showsBorder: true,
+            borderColor: Color.gray.opacity(0.12),
+            borderWidth: 0.5
         )
     }
 }
