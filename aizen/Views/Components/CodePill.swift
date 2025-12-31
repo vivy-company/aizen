@@ -17,6 +17,7 @@ struct CodePill: View {
     var verticalPadding: CGFloat = 6
     var selectable: Bool = false
     var lineLimit: Int? = nil
+    var truncationMode: Text.TruncationMode? = nil
 
     var body: some View {
         label
@@ -33,6 +34,9 @@ struct CodePill: View {
             .foregroundStyle(textColor)
         if let lineLimit = lineLimit {
             base = base.lineLimit(lineLimit)
+        }
+        if let truncationMode = truncationMode {
+            base = base.truncationMode(truncationMode)
         }
 
         if selectable {

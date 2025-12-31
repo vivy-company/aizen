@@ -181,15 +181,16 @@ struct ReviewCommentsPanel: View {
                 }
 
                 // Code context
-                Text(comment.codeContext)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(NSColor.textBackgroundColor).opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                CodePill(
+                    text: comment.codeContext,
+                    font: .system(size: 10, design: .monospaced),
+                    textColor: .secondary,
+                    backgroundColor: Color(NSColor.textBackgroundColor).opacity(0.5),
+                    horizontalPadding: 8,
+                    verticalPadding: 4,
+                    lineLimit: 2,
+                    truncationMode: .tail
+                )
 
                 // Comment text
                 Text(comment.comment)
