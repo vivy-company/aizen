@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Server
 
-struct MCPServer: Codable, Identifiable {
+nonisolated struct MCPServer: Codable, Identifiable, Sendable {
     let name: String
     let title: String?
     let description: String?
@@ -49,7 +49,7 @@ struct MCPServer: Codable, Identifiable {
 
 // MARK: - Icon
 
-struct MCPIcon: Codable, Identifiable {
+nonisolated struct MCPIcon: Codable, Identifiable, Sendable {
     let url: String?
     let src: String?  // Alternative field name used by some servers
     let type: String?
@@ -64,20 +64,20 @@ struct MCPIcon: Codable, Identifiable {
 
 // MARK: - Repository
 
-struct MCPRepository: Codable {
+nonisolated struct MCPRepository: Codable, Sendable {
     let url: String?
     let source: String?
 }
 
 // MARK: - Transport
 
-struct MCPTransport: Codable {
+nonisolated struct MCPTransport: Codable, Sendable {
     let type: String
 }
 
 // MARK: - Package
 
-struct MCPPackage: Codable, Identifiable {
+nonisolated struct MCPPackage: Codable, Identifiable, Sendable {
     let registryType: String
     let identifier: String
     let transport: MCPTransport?
@@ -126,7 +126,7 @@ struct MCPPackage: Codable, Identifiable {
 
 // MARK: - Remote
 
-struct MCPRemote: Codable, Identifiable {
+nonisolated struct MCPRemote: Codable, Identifiable, Sendable {
     let type: String
     let url: String
     let headers: [MCPHeader]?
@@ -145,7 +145,7 @@ struct MCPRemote: Codable, Identifiable {
 
 // MARK: - Argument
 
-struct MCPArgument: Codable, Identifiable {
+nonisolated struct MCPArgument: Codable, Identifiable, Sendable {
     let name: String?
     let description: String?
     let isRequired: Bool?
@@ -167,7 +167,7 @@ struct MCPArgument: Codable, Identifiable {
 
 // MARK: - Environment Variable
 
-struct MCPEnvVar: Codable, Identifiable {
+nonisolated struct MCPEnvVar: Codable, Identifiable, Sendable {
     let name: String
     let description: String?
     let isRequired: Bool?
@@ -188,7 +188,7 @@ struct MCPEnvVar: Codable, Identifiable {
 
 // MARK: - Header
 
-struct MCPHeader: Codable {
+nonisolated struct MCPHeader: Codable, Sendable {
     let name: String
     let value: String?
     let isRequired: Bool?
@@ -197,13 +197,13 @@ struct MCPHeader: Codable {
 
 // MARK: - Config Schema
 
-struct MCPConfigSchema: Codable {
+nonisolated struct MCPConfigSchema: Codable, Sendable {
     let type: String?
     let properties: [String: MCPConfigProperty]?
     let required: [String]?
 }
 
-struct MCPConfigProperty: Codable {
+nonisolated struct MCPConfigProperty: Codable, Sendable {
     let type: String?
     let description: String?
     let `default`: String?
@@ -211,16 +211,16 @@ struct MCPConfigProperty: Codable {
 
 // MARK: - Search Result
 
-struct MCPSearchResult: Codable {
+nonisolated struct MCPSearchResult: Codable, Sendable {
     let servers: [MCPServerWrapper]
     let metadata: MCPMetadata
 }
 
-struct MCPServerWrapper: Codable {
+nonisolated struct MCPServerWrapper: Codable, Sendable {
     let server: MCPServer
 }
 
-struct MCPMetadata: Codable {
+nonisolated struct MCPMetadata: Codable, Sendable {
     let nextCursor: String?
     let count: Int?
 

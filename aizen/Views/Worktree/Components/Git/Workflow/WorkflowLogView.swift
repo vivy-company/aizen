@@ -496,7 +496,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
             return (result, currentStyle)
         }
 
-        private static func attributesForStyle(_ style: ANSITextStyle, fontSize: CGFloat) -> [NSAttributedString.Key: Any] {
+        nonisolated private static func attributesForStyle(_ style: ANSITextStyle, fontSize: CGFloat) -> [NSAttributedString.Key: Any] {
             var attrs: [NSAttributedString.Key: Any] = [:]
 
             let weight: NSFont.Weight = style.bold ? .bold : .regular
@@ -533,7 +533,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
             return attrs
         }
 
-        private static func parseANSICodes(_ codes: String, style: inout ANSITextStyle) {
+        nonisolated private static func parseANSICodes(_ codes: String, style: inout ANSITextStyle) {
             let parts = codes.split(separator: ";").compactMap { Int($0) }
             if parts.isEmpty { style.reset(); return }
 

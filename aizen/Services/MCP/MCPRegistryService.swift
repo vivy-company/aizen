@@ -108,7 +108,7 @@ actor MCPRegistryService {
         let decoder = JSONDecoder()
         do {
             let result = try decoder.decode(MCPSearchResult.self, from: data)
-            print("[MCPRegistry] Decoded \(result.servers.count) servers, hasMore: \(result.metadata.hasMore ?? false)")
+            print("[MCPRegistry] Decoded \(result.servers.count) servers, hasMore: \(result.metadata.hasMore)")
             return result
         } catch {
             print("[MCPRegistry] Decoding error: \(error)")

@@ -14,7 +14,7 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitHubWorkflow")
     private let ghPath: String
 
-    init() {
+    nonisolated init() {
         // Find gh binary
         if FileManager.default.fileExists(atPath: "/opt/homebrew/bin/gh") {
             self.ghPath = "/opt/homebrew/bin/gh"
@@ -203,7 +203,7 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
     }
 
     // Pre-compiled regex patterns for log parsing
-    private static let timestampRegex = try? NSRegularExpression(pattern: #"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"#)
+    nonisolated private static let timestampRegex = try? NSRegularExpression(pattern: #"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"#)
 
     func getStructuredLogs(repoPath: String, runId: String, jobId: String, steps: [WorkflowStep]) async throws -> WorkflowLogs {
         // Use gh api to get raw logs for the job

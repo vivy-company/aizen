@@ -100,7 +100,7 @@ private class ChatDiffLineCell: NSTableCellView {
 
 // MARK: - Types
 
-enum ChatDiffLineType {
+nonisolated enum ChatDiffLineType {
     case context
     case added
     case deleted

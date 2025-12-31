@@ -167,8 +167,9 @@ class ChatSessionViewModel: ObservableObject {
 
     deinit {
         if gitPauseApplied, !worktreePathSnapshot.isEmpty {
+            let path = worktreePathSnapshot
             Task {
-                await GitIndexWatchCenter.shared.resume(worktreePath: worktreePathSnapshot)
+                await GitIndexWatchCenter.shared.resume(worktreePath: path)
             }
         }
         cancellables.removeAll()

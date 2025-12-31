@@ -20,29 +20,21 @@ class AgentRouter: ObservableObject {
         }
     }
 
-    private var metadataObserver: NSObjectProtocol?
-
     init() {
         // Listen for agent metadata changes
-        metadataObserver = NotificationCenter.default.addObserver(
-            forName: .agentMetadataDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.rebuildLookupCache()
-        }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAgentMetadataDidChange),
+            name: .agentMetadataDidChange,
+            object: nil
+        )
 
-        // Initialize async
-        Task {
-            self.rebuildLookupCache()
-            self.initializeSessions()
-        }
+        rebuildLookupCache()
+        initializeSessions()
     }
 
     deinit {
-        if let observer = metadataObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func rebuildLookupCache() {
@@ -59,6 +51,10 @@ class AgentRouter: ObservableObject {
         for agent in enabledAgents {
             activeSessions[agent.id] = AgentSession(agentName: agent.id)
         }
+    }
+
+    @objc private func handleAgentMetadataDidChange() {
+        rebuildLookupCache()
     }
 
     @MainActor

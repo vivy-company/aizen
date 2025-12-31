@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Provider Detection
 
-enum WorkflowProvider: String, CaseIterable {
+nonisolated enum WorkflowProvider: String, CaseIterable {
     case github
     case gitlab
     case none
