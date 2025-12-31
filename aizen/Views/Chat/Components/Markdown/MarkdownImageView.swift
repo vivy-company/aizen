@@ -317,7 +317,7 @@ actor SVGRenderer {
                 // Store the renderer to keep it alive
                 await self.registerRenderer(renderer, id: rendererId)
 
-                renderer.render(svgData: svgData) { [weak renderer] result in
+                renderer.render(svgData: svgData) { result in
                     guard !hasResumed else { return }
                     hasResumed = true
 

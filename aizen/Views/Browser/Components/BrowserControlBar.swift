@@ -1,9 +1,6 @@
 import SwiftUI
 import WebKit
-import os.log
-
 struct BrowserControlBar: View {
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "BrowserControl")
     @Binding var url: String
     @Binding var canGoBack: Bool
     @Binding var canGoForward: Bool
@@ -128,20 +125,14 @@ struct BrowserControlBar: View {
         let trimmedInput = editingURL.trimmingCharacters(in: .whitespaces)
         guard !trimmedInput.isEmpty else { return }
 
-        // Wrap in do-catch to prevent crashes
-        do {
-            let finalURL = URLNormalizer.normalize(trimmedInput)
+        let finalURL = URLNormalizer.normalize(trimmedInput)
 
-            // Validate URL is not empty before navigating
-            guard !finalURL.isEmpty else { return }
+        // Validate URL is not empty before navigating
+        guard !finalURL.isEmpty else { return }
 
-            onNavigate(finalURL)
+        onNavigate(finalURL)
 
-            // Unfocus the text field so URL updates from navigation will be visible
-            isURLFieldFocused = false
-        } catch {
-            logger.error("Error normalizing URL: \(error)")
-            // Silently fail - don't crash the app
-        }
+        // Unfocus the text field so URL updates from navigation will be visible
+        isURLFieldFocused = false
     }
 }

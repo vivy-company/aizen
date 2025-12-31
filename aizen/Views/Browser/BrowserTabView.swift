@@ -1,10 +1,8 @@
 import SwiftUI
 import CoreData
 import WebKit
-import os.log
 
 struct BrowserTabView: View {
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "BrowserTab")
     let worktree: Worktree
     @Binding var selectedSessionId: UUID?
 
@@ -340,8 +338,6 @@ struct EmptyTabStateView: View {
     @ObservedObject var manager: BrowserSessionManager
     @State private var urlInput: String = ""
 
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "BrowserTab")
-
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "globe")
@@ -379,19 +375,12 @@ struct EmptyTabStateView: View {
         let trimmedInput = urlInput.trimmingCharacters(in: .whitespaces)
         guard !trimmedInput.isEmpty else { return }
 
-        // Wrap in error handling to prevent crashes
-        do {
-            let normalizedURL = URLNormalizer.normalize(trimmedInput)
+        let normalizedURL = URLNormalizer.normalize(trimmedInput)
 
-            // Validate URL before navigating
-            guard !normalizedURL.isEmpty else { return }
+        // Validate URL before navigating
+        guard !normalizedURL.isEmpty else { return }
 
-            manager.navigateToURL(normalizedURL)
-            urlInput = ""
-        } catch {
-            Self.logger.error("Error handling URL submission: \(error)")
-            // Clear input on error
-            urlInput = ""
-        }
+        manager.navigateToURL(normalizedURL)
+        urlInput = ""
     }
 }
