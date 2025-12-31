@@ -162,18 +162,14 @@ extension Ghostty {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                Task { @MainActor in
-                    self?.checkAppearanceSettingChange()
-                }
+                self?.checkAppearanceSettingChange()
             }
 
             Ghostty.logger.info("Ghostty app initialized successfully")
         }
 
         @objc private func systemAppearanceDidChange(_ notification: Notification) {
-            Task { @MainActor in
-                self.handleAppearanceChange()
-            }
+            handleAppearanceChange()
         }
 
         private func handleAppearanceChange() {
