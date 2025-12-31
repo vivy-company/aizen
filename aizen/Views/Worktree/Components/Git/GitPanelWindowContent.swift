@@ -113,7 +113,7 @@ struct GitPanelWindowContent: View {
             }
             gitRepositoryService.reloadStatus()
             reviewManager.load(for: worktreePath)
-            updateChangedFilesCache()
+            _ = updateChangedFilesCache()
             setupGitWatcher()
         }
         .onChange(of: selectedTab) { newTab in
@@ -123,7 +123,7 @@ struct GitPanelWindowContent: View {
                 Task {
                     await workflowService.configure(
                         repoPath: worktreePath,
-                        branch: gitStatus.currentBranch ?? "main"
+                        branch: gitStatus.currentBranch.isEmpty ? "main" : gitStatus.currentBranch
                     )
                 }
             }
@@ -194,7 +194,7 @@ struct GitPanelWindowContent: View {
         .sheet(item: $selectedWorkflowForTrigger) { workflow in
             WorkflowTriggerFormView(
                 workflow: workflow,
-                currentBranch: gitStatus.currentBranch ?? "main",
+                currentBranch: gitStatus.currentBranch.isEmpty ? "main" : gitStatus.currentBranch,
                 service: workflowService,
                 onDismiss: {
                     selectedWorkflowForTrigger = nil
@@ -334,10 +334,10 @@ struct GitPanelWindowContent: View {
                 .controlSize(.small)
             } else {
                 // Viewing working changes
-                Text(gitStatus.currentBranch ?? "HEAD")
+                Text(gitStatus.currentBranch.isEmpty ? "HEAD" : gitStatus.currentBranch)
                     .font(.system(size: 13, weight: .medium))
 
-                CopyButton(text: gitStatus.currentBranch ?? "", iconSize: 11)
+                CopyButton(text: gitStatus.currentBranch, iconSize: 11)
 
                 Spacer()
 
@@ -491,9 +491,7 @@ struct GitPanelWindowContent: View {
         Task {
             let service = gitRepositoryService
             let token = await GitIndexWatchCenter.shared.addSubscriber(worktreePath: worktreePath) { [weak service] in
-                Task { @MainActor in
-                    service?.reloadStatus(lightweight: true)
-                }
+                service?.reloadStatus(lightweight: true)
             }
             await MainActor.run {
                 gitIndexWatchToken = token

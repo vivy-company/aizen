@@ -12,7 +12,7 @@ actor GitIndexWatchCenter {
 
     private struct Entry {
         let watcher: GitIndexWatcher
-        var subscribers: [UUID: @Sendable () -> Void]
+        var subscribers: [UUID: @MainActor @Sendable () -> Void]
         var pauseCount: Int
         var hasPendingNotification: Bool
     }
@@ -20,7 +20,7 @@ actor GitIndexWatchCenter {
     private var entries: [String: Entry] = [:]
     private var pauseCounts: [String: Int] = [:]
 
-    func addSubscriber(worktreePath: String, onChange: @escaping @Sendable () -> Void) -> UUID {
+    func addSubscriber(worktreePath: String, onChange: @escaping @MainActor @Sendable () -> Void) -> UUID {
         let key = worktreePath
         let id = UUID()
 
@@ -89,7 +89,9 @@ actor GitIndexWatchCenter {
 
         if shouldNotify {
             for callback in entry.subscribers.values {
-                callback()
+                Task { @MainActor in
+                    callback()
+                }
             }
         }
     }
@@ -102,7 +104,9 @@ actor GitIndexWatchCenter {
             return
         }
         for callback in entry.subscribers.values {
-            callback()
+            Task { @MainActor in
+                callback()
+            }
         }
     }
 }

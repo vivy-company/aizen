@@ -11,7 +11,7 @@ import os.log
 
 // MARK: - Types
 
-enum GitHostingProvider: String, Sendable {
+nonisolated enum GitHostingProvider: String, Sendable {
     case github
     case gitlab
     case bitbucket

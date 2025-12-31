@@ -594,9 +594,7 @@ struct WorktreeDetailView: View {
 
         let service = gitRepositoryService
         let token = await GitIndexWatchCenter.shared.addSubscriber(worktreePath: worktreePath) { [weak service] in
-            Task { @MainActor in
-                service?.reloadStatus(lightweight: true)
-            }
+            service?.reloadStatus(lightweight: true)
         }
         gitIndexWatchToken = token
         gitIndexWatchPath = worktreePath
