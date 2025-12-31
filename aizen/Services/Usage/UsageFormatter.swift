@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum UsageFormatter {
+nonisolated enum UsageFormatter {
     private static let decimalFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal

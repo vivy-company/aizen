@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct FileSearchIndexResult: Identifiable, Sendable {
+nonisolated struct FileSearchIndexResult: Identifiable, Sendable {
     let basePath: String
     let relativePath: String
     let isDirectory: Bool
@@ -182,7 +182,7 @@ actor FileSearchService {
         let pathComponents = path.components(separatedBy: "/")
 
         for pattern in patterns {
-            var cleanPattern = pattern
+            let cleanPattern = pattern
                 .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
             // Handle glob patterns like *.log

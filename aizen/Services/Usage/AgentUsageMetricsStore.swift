@@ -43,19 +43,9 @@ final class AgentUsageMetricsStore: ObservableObject {
         refreshingAgents.insert(agentId)
         refreshStates[agentId] = .loading
 
-        Task.detached(priority: .utility) { [weak self, agentId] in
+        Task.detached(priority: .utility) { [agentId] in
             let report = await Self.buildReport(agentId: agentId)
-            await MainActor.run {
-                guard let self else { return }
-                self.reports[agentId] = report
-                if let firstError = report.errors.first {
-                    self.refreshStates[agentId] = .failed(firstError)
-                } else {
-                    self.refreshStates[agentId] = .idle
-                }
-                self.lastRefresh[agentId] = Date()
-                self.refreshingAgents.remove(agentId)
-            }
+            await AgentUsageMetricsStore.shared.applyReport(report, agentId: agentId)
         }
     }
 
@@ -140,5 +130,17 @@ final class AgentUsageMetricsStore: ObservableObject {
             period.inputTokens != nil || period.outputTokens != nil || period.totalTokens != nil || period.costUSD != nil
         }
         return hasPeriods || !report.quota.isEmpty || report.user != nil
+    }
+
+    @MainActor
+    private func applyReport(_ report: AgentUsageReport, agentId: String) {
+        reports[agentId] = report
+        if let firstError = report.errors.first {
+            refreshStates[agentId] = .failed(firstError)
+        } else {
+            refreshStates[agentId] = .idle
+        }
+        lastRefresh[agentId] = Date()
+        refreshingAgents.remove(agentId)
     }
 }

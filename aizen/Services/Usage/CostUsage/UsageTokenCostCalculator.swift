@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum UsageTokenCostCalculator {
+nonisolated enum UsageTokenCostCalculator {
     static func periodSummaries(
         from report: UsageDailyReport,
         monthReport: UsageDailyReport? = nil,

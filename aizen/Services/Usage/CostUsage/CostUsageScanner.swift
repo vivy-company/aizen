@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum CostUsageScanner {
+nonisolated enum CostUsageScanner {
     struct Options: Sendable {
         var codexSessionsRoot: URL?
         var claudeProjectsRoots: [URL]?
