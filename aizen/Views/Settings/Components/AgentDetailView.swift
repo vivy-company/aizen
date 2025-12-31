@@ -74,22 +74,21 @@ struct AgentDetailView: View {
                                 .fontWeight(.semibold)
 
                             if let version = installedVersion {
-                                Text(version)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.secondary.opacity(0.1))
-                                    .cornerRadius(4)
+                                TagBadge(
+                                    text: version,
+                                    color: .secondary,
+                                    font: .caption,
+                                    backgroundOpacity: 0.1
+                                )
                             }
 
                             if !metadata.isBuiltIn {
-                                Text("Custom")
-                                    .font(.caption)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.blue.opacity(0.2))
-                                    .cornerRadius(4)
+                                TagBadge(
+                                    text: "Custom",
+                                    color: .blue,
+                                    font: .caption,
+                                    backgroundOpacity: 0.2
+                                )
                             }
                         }
 
