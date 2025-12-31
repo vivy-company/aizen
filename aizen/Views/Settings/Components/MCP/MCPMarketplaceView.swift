@@ -118,13 +118,16 @@ struct MCPMarketplaceView: View {
                 }
             }
 
-            Text(agentName)
-                .font(.caption)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.accentColor.opacity(0.15))
-                .foregroundColor(.accentColor)
-                .cornerRadius(4)
+            TagBadge(
+                text: agentName,
+                color: .accentColor,
+                cornerRadius: 4,
+                font: .caption,
+                horizontalPadding: 8,
+                verticalPadding: 4,
+                backgroundOpacity: 0.15,
+                textColor: .accentColor
+            )
 
             Button("Done") {
                 dismiss()
