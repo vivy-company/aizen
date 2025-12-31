@@ -82,7 +82,6 @@ struct MathBlockView: View {
     @State private var isLoading = true
     @State private var hasError = false
     @State private var errorMessage: String?
-    @State private var showCopyConfirmation = false
     @State private var isHovering = false
     @Environment(\.colorScheme) private var colorScheme
 
@@ -127,26 +126,11 @@ struct MathBlockView: View {
                             .help(errorMessage ?? "Render error")
                     }
 
-                    // Copy button
-                    Button(action: copyLatex) {
-                        HStack(spacing: 4) {
-                            Image(systemName: showCopyConfirmation ? "checkmark" : "doc.on.doc")
-                                .font(.system(size: 10))
-                            if isHovering {
-                                Text(showCopyConfirmation ? "Copied" : "Copy")
-                                    .font(.system(size: 10))
-                            }
-                        }
-                        .foregroundStyle(showCopyConfirmation ? .green : .secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.secondary.opacity(isHovering ? 0.15 : 0))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .help("Copy LaTeX")
+                    CopyHoverButton(
+                        helpText: "Copy LaTeX",
+                        isHovered: isHovering,
+                        action: copyLatex
+                    )
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -217,16 +201,6 @@ struct MathBlockView: View {
 
     private func copyLatex() {
         Clipboard.copy(content)
-
-        withAnimation {
-            showCopyConfirmation = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation {
-                showCopyConfirmation = false
-            }
-        }
     }
 }
 

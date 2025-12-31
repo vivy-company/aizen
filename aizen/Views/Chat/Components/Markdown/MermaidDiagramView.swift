@@ -55,7 +55,6 @@ struct MermaidDiagramView: View {
     @State private var isLoading = true
     @State private var hasError = false
     @State private var errorMessage: String?
-    @State private var showCopyConfirmation = false
     @State private var isHovering = false
     @Environment(\.colorScheme) private var colorScheme
 
@@ -98,26 +97,11 @@ struct MermaidDiagramView: View {
                         .help(errorMessage ?? "Render error")
                 }
 
-                // Copy button
-                Button(action: copyCode) {
-                    HStack(spacing: 4) {
-                        Image(systemName: showCopyConfirmation ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 10))
-                        if isHovering {
-                            Text(showCopyConfirmation ? "Copied" : "Copy")
-                                .font(.system(size: 10))
-                        }
-                    }
-                    .foregroundStyle(showCopyConfirmation ? .green : .secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.secondary.opacity(isHovering ? 0.15 : 0))
-                    )
-                }
-                .buttonStyle(.plain)
-                .help("Copy Mermaid code")
+                CopyHoverButton(
+                    helpText: "Copy Mermaid code",
+                    isHovered: isHovering,
+                    action: copyCode
+                )
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -172,16 +156,6 @@ struct MermaidDiagramView: View {
 
     private func copyCode() {
         Clipboard.copy(code)
-
-        withAnimation {
-            showCopyConfirmation = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation {
-                showCopyConfirmation = false
-            }
-        }
     }
 }
 
