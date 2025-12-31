@@ -13,6 +13,7 @@ import os.log
 @MainActor
 final class CrashReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sendable {
     static let shared = CrashReporter()
+    private static let iso8601Formatter = ISO8601DateFormatter()
 
     private let logger = Logger.forCategory("CrashReporter")
     private let crashLogDirectory: URL
@@ -138,8 +139,7 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber, @unchecked Senda
     }
 
     private func saveReport(_ data: Data, type: String) {
-        let formatter = ISO8601DateFormatter()
-        let timestamp = formatter.string(from: Date())
+        let timestamp = Self.iso8601Formatter.string(from: Date())
         let filename = "\(type)_\(timestamp).json"
         let fileURL = crashLogDirectory.appendingPathComponent(filename)
 
@@ -228,8 +228,7 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber, @unchecked Senda
 
         try? FileManager.default.createDirectory(at: crashDir, withIntermediateDirectories: true)
 
-        let formatter = ISO8601DateFormatter()
-        let timestamp = formatter.string(from: Date())
+        let timestamp = iso8601Formatter.string(from: Date())
         let filename = "emergency_\(type)_\(timestamp).txt"
         let fileURL = crashDir.appendingPathComponent(filename)
 
