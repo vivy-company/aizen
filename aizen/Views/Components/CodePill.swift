@@ -16,6 +16,7 @@ struct CodePill: View {
     var horizontalPadding: CGFloat = 6
     var verticalPadding: CGFloat = 6
     var selectable: Bool = false
+    var lineLimit: Int? = nil
 
     var body: some View {
         label
@@ -27,9 +28,12 @@ struct CodePill: View {
 
     @ViewBuilder
     private var label: some View {
-        let base = Text(text)
+        var base = Text(text)
             .font(font)
             .foregroundStyle(textColor)
+        if let lineLimit = lineLimit {
+            base = base.lineLimit(lineLimit)
+        }
 
         if selectable {
             base.textSelection(.enabled)

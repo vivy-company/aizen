@@ -275,20 +275,25 @@ struct MCPInstallConfigSheet: View {
                         .foregroundColor(.secondary)
 
                     HStack(spacing: 4) {
-                        Text(package.runtimeHint)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundColor(.primary)
+                        CodePill(
+                            text: package.runtimeHint,
+                            font: .system(.caption, design: .monospaced),
+                            backgroundColor: Color(NSColor.textBackgroundColor),
+                            horizontalPadding: 8,
+                            verticalPadding: 4
+                        )
 
                         if let runtimeArgs = package.runtimeArguments, !runtimeArgs.isEmpty {
-                            Text(runtimeArgs.joined(separator: " "))
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundColor(.secondary)
+                            CodePill(
+                                text: runtimeArgs.joined(separator: " "),
+                                font: .system(.caption, design: .monospaced),
+                                textColor: .secondary,
+                                backgroundColor: Color(NSColor.textBackgroundColor),
+                                horizontalPadding: 8,
+                                verticalPadding: 4
+                            )
                         }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(NSColor.textBackgroundColor))
-                    .cornerRadius(4)
                 }
             }
         }
@@ -316,13 +321,15 @@ struct MCPInstallConfigSheet: View {
                             TagBadge(text: "Remote", color: .teal)
                         }
 
-                        Text(remote.url)
-                            .font(.system(.caption, design: .monospaced))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(NSColor.textBackgroundColor))
-                            .cornerRadius(4)
-                            .textSelection(.enabled)
+                        CodePill(
+                            text: remote.url,
+                            font: .system(.caption, design: .monospaced),
+                            backgroundColor: Color(NSColor.textBackgroundColor),
+                            horizontalPadding: 8,
+                            verticalPadding: 4,
+                            selectable: true,
+                            lineLimit: 1
+                        )
                     }
                 }
             }
