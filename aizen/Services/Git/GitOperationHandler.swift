@@ -23,17 +23,17 @@ class GitOperationHandler {
     // MARK: - Staging Operations
 
     func stageFile(_ file: String) {
-        gitService.stageFile(file) { [logger] error in
+        gitService.stageFile(file, onError: { [logger] error in
             ToastManager.shared.show("Failed to stage file", type: .error)
             logger.error("Failed to stage file: \(error)")
-        }
+        })
     }
 
     func unstageFile(_ file: String) {
-        gitService.unstageFile(file) { [logger] error in
+        gitService.unstageFile(file, onError: { [logger] error in
             ToastManager.shared.show("Failed to unstage file", type: .error)
             logger.error("Failed to unstage file: \(error)")
-        }
+        })
     }
 
     func stageAll(onComplete: @escaping () -> Void) {

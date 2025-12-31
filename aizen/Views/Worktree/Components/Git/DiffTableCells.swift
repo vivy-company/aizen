@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - Row View
 
@@ -113,7 +114,9 @@ class FileHeaderCellView: NSTableCellView {
             if let icon = await FileIconService.shared.icon(forFile: fullPath, size: CGSize(width: 16, height: 16)) {
                 self.iconView.image = icon
             } else {
-                self.iconView.image = NSWorkspace.shared.icon(forFileType: (path as NSString).pathExtension)
+                let fileExtension = (path as NSString).pathExtension
+                let contentType = UTType(filenameExtension: fileExtension) ?? .data
+                self.iconView.image = NSWorkspace.shared.icon(forContentType: contentType)
             }
         }
     }

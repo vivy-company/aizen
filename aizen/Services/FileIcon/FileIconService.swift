@@ -118,7 +118,7 @@ actor FileIconService {
             return cached
         }
 
-        let icon = NSWorkspace.shared.icon(forFileType: "public.data")
+        let icon = NSWorkspace.shared.icon(forContentType: .data)
         let resizedIcon = icon.resized(to: size)
 
         let cost = Int(size.width * size.height * 4)
