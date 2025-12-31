@@ -45,7 +45,7 @@ struct XcodeLogSheetView: View {
                         Clipboard.copy(text)
                     }
 
-                    DetailCloseButton(action: dismiss, size: 16)
+                    DetailCloseButton(action: { dismiss() }, size: 16)
                 }
                 .buttonStyle(.borderless)
             }
