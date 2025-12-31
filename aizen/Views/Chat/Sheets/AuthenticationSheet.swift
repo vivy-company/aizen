@@ -151,14 +151,7 @@ struct AuthenticationSheet: View {
                                 .padding(.vertical, 6)
                                 .background(Color.black.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
 
-                            Button {
-                                Clipboard.copy("claude /login")
-                            } label: {
-                                Image(systemName: "doc.on.doc")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
+                            CopyButton(text: "claude /login", iconSize: 11)
                         }
 
                         Text("chat.authentication.skipInstructions", bundle: .main)
