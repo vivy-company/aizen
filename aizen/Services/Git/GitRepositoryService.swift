@@ -468,8 +468,4 @@ class GitRepositoryService: ObservableObject {
         }
     }
 
-    @MainActor
-    private func reloadStatusNowOnMain(lightweight: Bool) async {
-        await reloadStatusNow(lightweight: lightweight)
-    }
 }

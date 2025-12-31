@@ -565,13 +565,6 @@ actor ACPClient {
         }
     }
 
-    private func requestIdDescription(_ id: RequestId) -> String {
-        switch id {
-        case .number(let num): return String(num)
-        case .string(let str): return str
-        }
-    }
-
     private func extractMethod(from data: Data) -> String? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil

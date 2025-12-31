@@ -459,36 +459,6 @@ extension AgentSession {
         }
     }
 
-    /// Extract best-effort string from loosely-typed "text" payloads
-    private func extractText(_ raw: Any?) -> String? {
-        guard let raw else { return nil }
-
-        if let str = raw as? String { return str }
-
-        if let dict = raw as? [String: Any] {
-            // Prefer common output keys
-            let preferredKeys = ["stdout", "stderr", "output", "text", "message", "result"]
-            for key in preferredKeys {
-                if let val = dict[key] as? String {
-                    return val
-                }
-            }
-            // Fallback: pretty-print JSON
-            if let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted]),
-               let string = String(data: data, encoding: .utf8) {
-                return string
-            }
-        }
-
-        if let array = raw as? [Any],
-           let data = try? JSONSerialization.data(withJSONObject: array, options: [.prettyPrinted]),
-           let string = String(data: data, encoding: .utf8) {
-            return string
-        }
-
-        return String(describing: raw)
-    }
-
 }
 
 private extension ToolCallUpdate {
