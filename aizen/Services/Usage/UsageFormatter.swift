@@ -34,4 +34,17 @@ enum UsageFormatter {
         guard let date else { return "N/A" }
         return RelativeDateFormatter.shared.string(from: date)
     }
+
+    static func amountString(_ value: Double, unit: String?) -> String {
+        if unit == "USD" {
+            return usdString(value)
+        }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        let base = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
+        if let unit, !unit.isEmpty {
+            return "\(base) \(unit)"
+        }
+        return base
+    }
 }

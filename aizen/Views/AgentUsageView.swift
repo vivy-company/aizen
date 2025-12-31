@@ -337,19 +337,6 @@ struct AgentUsageDetailContent: View {
         return "Input \(input) | Output \(output) | Total \(total)"
     }
 
-    private func amountString(_ value: Double, unit: String?) -> String {
-        if unit == "USD" {
-            return UsageFormatter.usdString(value)
-        }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        let base = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
-        if let unit, !unit.isEmpty {
-            return "\(base) \(unit)"
-        }
-        return base
-    }
-
     private func hasAccountDetails(_ user: UsageUserIdentity) -> Bool {
         user.email != nil || user.organization != nil || user.plan != nil
     }
@@ -483,13 +470,13 @@ struct UsageQuotaRow: View {
     private var detailText: String? {
         var parts: [String] = []
         if let remaining = window.remainingAmount {
-            parts.append("Remaining \(amountString(remaining, unit: window.unit))")
+            parts.append("Remaining \(UsageFormatter.amountString(remaining, unit: window.unit))")
         }
         if let used = window.usedAmount {
-            parts.append("Used \(amountString(used, unit: window.unit))")
+            parts.append("Used \(UsageFormatter.amountString(used, unit: window.unit))")
         }
         if let limit = window.limitAmount {
-            parts.append("Limit \(amountString(limit, unit: window.unit))")
+            parts.append("Limit \(UsageFormatter.amountString(limit, unit: window.unit))")
         }
         if let reset = window.resetDescription {
             parts.append("Resets \(reset)")
@@ -498,18 +485,6 @@ struct UsageQuotaRow: View {
         return parts.joined(separator: " | ")
     }
 
-    private func amountString(_ value: Double, unit: String?) -> String {
-        if unit == "USD" {
-            return UsageFormatter.usdString(value)
-        }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        let base = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
-        if let unit, !unit.isEmpty {
-            return "\(base) \(unit)"
-        }
-        return base
-    }
 }
 
 struct UsageRing: View {
