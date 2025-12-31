@@ -27,22 +27,48 @@ struct CodePill: View {
             .cornerRadius(cornerRadius)
     }
 
-    @ViewBuilder
     private var label: some View {
-        var base = Text(text)
+        Text(text)
             .font(font)
             .foregroundStyle(textColor)
-        if let lineLimit = lineLimit {
-            base = base.lineLimit(lineLimit)
-        }
-        if let truncationMode = truncationMode {
-            base = base.truncationMode(truncationMode)
-        }
+            .modifier(OptionalLineLimitModifier(limit: lineLimit))
+            .modifier(OptionalTruncationModeModifier(mode: truncationMode))
+            .modifier(OptionalTextSelectionModifier(enabled: selectable))
+    }
+}
 
-        if selectable {
-            base.textSelection(.enabled)
+private struct OptionalLineLimitModifier: ViewModifier {
+    let limit: Int?
+
+    func body(content: Content) -> some View {
+        if let limit {
+            content.lineLimit(limit)
         } else {
-            base
+            content
+        }
+    }
+}
+
+private struct OptionalTruncationModeModifier: ViewModifier {
+    let mode: Text.TruncationMode?
+
+    func body(content: Content) -> some View {
+        if let mode {
+            content.truncationMode(mode)
+        } else {
+            content
+        }
+    }
+}
+
+private struct OptionalTextSelectionModifier: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.textSelection(.enabled)
+        } else {
+            content
         }
     }
 }
