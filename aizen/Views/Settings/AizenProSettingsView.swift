@@ -45,7 +45,7 @@ struct AizenProSettingsView: View {
                     HStack {
                         Text("Expires")
                         Spacer()
-                        Text(Self.dateFormatter.string(from: expiresAt))
+                        Text(DateFormatters.mediumDateTime.string(from: expiresAt))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -54,7 +54,7 @@ struct AizenProSettingsView: View {
                     HStack {
                         Text("Last Checked")
                         Spacer()
-                        Text(Self.dateFormatter.string(from: validatedAt))
+                        Text(DateFormatters.mediumDateTime.string(from: validatedAt))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -206,13 +206,6 @@ struct AizenProSettingsView: View {
             return ("Error", .red)
         }
     }
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }()
 
     private func handlePendingDeepLink() {
         guard let pending = licenseManager.consumePendingDeepLink() else { return }

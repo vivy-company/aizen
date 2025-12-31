@@ -147,7 +147,7 @@ struct MessageBubbleView: View {
     }
 
     private func formatTimestamp(_ date: Date) -> String {
-        messageTimestampFormatter.string(from: date)
+        DateFormatters.shortTime.string(from: date)
     }
 
     private func formatExecutionTime(_ seconds: TimeInterval) -> String {
@@ -334,16 +334,9 @@ struct UserBubble<Background: View>: View {
     }
 
     private func formatTimestamp(_ date: Date) -> String {
-        messageTimestampFormatter.string(from: date)
+        DateFormatters.shortTime.string(from: date)
     }
 }
-
-private let messageTimestampFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.timeStyle = .short
-    formatter.dateStyle = .none
-    return formatter
-}()
 
 // MARK: - Agent Badge
 
