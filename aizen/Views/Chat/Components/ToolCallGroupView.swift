@@ -136,9 +136,9 @@ struct ToolCallGroupView: View {
     // MARK: - Status
 
     private var statusColor: Color {
-        if group.hasFailed { return .red }
-        if group.isInProgress { return .blue }
-        return .green
+        if group.hasFailed { return ToolStatusPresentation.color(for: .failed) }
+        if group.isInProgress { return ToolStatusPresentation.color(for: .inProgress) }
+        return ToolStatusPresentation.color(for: .completed)
     }
 
     private var backgroundColor: Color {
