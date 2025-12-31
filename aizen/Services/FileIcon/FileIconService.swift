@@ -9,7 +9,6 @@ import AppKit
 import Foundation
 import UniformTypeIdentifiers
 
-@MainActor
 actor FileIconService {
     // MARK: - Singleton
 
@@ -34,19 +33,19 @@ actor FileIconService {
     ///   - filePath: The file path
     ///   - size: The desired icon size (default: 16x16)
     /// - Returns: The icon image, or nil if not found
-    func icon(forFile filePath: String, size: CGSize = CGSize(width: 16, height: 16)) -> NSImage? {
+    func icon(forFile filePath: String, size: CGSize = CGSize(width: 16, height: 16)) async -> NSImage? {
         // Check if it's a directory
         var isDirectory: ObjCBool = false
         if FileManager.default.fileExists(atPath: filePath, isDirectory: &isDirectory), isDirectory.boolValue {
-            return folderIcon(size: size)
+            return await folderIcon(size: size)
         }
 
         // Try to get file type icon
         guard let iconName = FileIconMapper.iconName(for: filePath) else {
-            return defaultFileIcon(size: size)
+            return await defaultFileIcon(size: size)
         }
 
-        return icon(named: iconName, size: size)
+        return await icon(named: iconName, size: size)
     }
 
     /// Loads an icon by name with caching
@@ -54,7 +53,7 @@ actor FileIconService {
     ///   - iconName: The icon name (e.g., "file_swift")
     ///   - size: The desired icon size
     /// - Returns: The icon image, or nil if not found
-    func icon(named iconName: String, size: CGSize) -> NSImage? {
+    func icon(named iconName: String, size: CGSize) async -> NSImage? {
         let cacheKey = "\(iconName)_\(Int(size.width))x\(Int(size.height))" as NSString
 
         // Check cache first
@@ -62,13 +61,11 @@ actor FileIconService {
             return cached
         }
 
-        // Load from asset catalog
-        guard let icon = NSImage(named: iconName) else {
-            return nil
+        let resizedIcon = await MainActor.run { () -> NSImage? in
+            guard let icon = NSImage(named: iconName) else { return nil }
+            return icon.resized(to: size)
         }
-
-        // Resize if needed
-        let resizedIcon = icon.resized(to: size)
+        guard let resizedIcon else { return nil }
 
         // Cache it (cost = approximate bytes)
         let cost = Int(size.width * size.height * 4)
@@ -84,9 +81,9 @@ actor FileIconService {
 
     // MARK: - Private Helpers
 
-    private func folderIcon(size: CGSize) -> NSImage {
+    private func folderIcon(size: CGSize) async -> NSImage {
         // Use Catppuccin folder icon instead of system icon
-        if let catppuccinFolder = icon(named: "file_folder", size: size) {
+        if let catppuccinFolder = await icon(named: "file_folder", size: size) {
             return catppuccinFolder
         }
 
@@ -97,8 +94,9 @@ actor FileIconService {
             return cached
         }
 
-        let icon = NSWorkspace.shared.icon(for: .folder)
-        let resizedIcon = icon.resized(to: size)
+        let resizedIcon = await MainActor.run {
+            NSWorkspace.shared.icon(for: .folder).resized(to: size)
+        }
 
         let cost = Int(size.width * size.height * 4)
         cache.setObject(resizedIcon, forKey: cacheKey, cost: cost)
@@ -106,9 +104,9 @@ actor FileIconService {
         return resizedIcon
     }
 
-    private func defaultFileIcon(size: CGSize) -> NSImage {
+    private func defaultFileIcon(size: CGSize) async -> NSImage {
         // Use Catppuccin default file icon instead of system icon
-        if let catppuccinFile = icon(named: "file_default", size: size) {
+        if let catppuccinFile = await icon(named: "file_default", size: size) {
             return catppuccinFile
         }
 
@@ -119,8 +117,9 @@ actor FileIconService {
             return cached
         }
 
-        let icon = NSWorkspace.shared.icon(forContentType: .data)
-        let resizedIcon = icon.resized(to: size)
+        let resizedIcon = await MainActor.run {
+            NSWorkspace.shared.icon(forContentType: .data).resized(to: size)
+        }
 
         let cost = Int(size.width * size.height * 4)
         cache.setObject(resizedIcon, forKey: cacheKey, cost: cost)
