@@ -7,7 +7,6 @@
 
 import Foundation
 import UniformTypeIdentifiers
-import os.log
 
 // MARK: - AgentSession + Messaging
 
