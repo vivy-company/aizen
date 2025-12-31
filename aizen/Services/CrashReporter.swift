@@ -116,9 +116,8 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber, @unchecked Senda
         logger.warning("  Duration: \(hang.hangDuration.description)")
 
         // Log call stack for debugging
-        if let jsonData = try? hang.jsonRepresentation() {
-            saveReport(jsonData, type: "hang")
-        }
+        let jsonData = hang.jsonRepresentation()
+        saveReport(jsonData, type: "hang")
     }
 
     private func handleCPUException(_ exception: MXCPUExceptionDiagnostic) {
@@ -130,10 +129,7 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber, @unchecked Senda
     // MARK: - Report Storage
 
     private func saveCrashReport(_ crash: MXCrashDiagnostic) {
-        guard let jsonData = try? crash.jsonRepresentation() else {
-            logger.error("Failed to serialize crash report")
-            return
-        }
+        let jsonData = crash.jsonRepresentation()
 
         saveReport(jsonData, type: "crash")
     }

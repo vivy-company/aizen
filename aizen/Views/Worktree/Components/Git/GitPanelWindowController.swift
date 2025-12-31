@@ -380,7 +380,7 @@ struct GitPanelWindowContentWithToolbar: View {
                         }
                     }
                     .buttonStyle(.bordered)
-                    .disabled(isOperationPending || gitStatus.currentBranch == nil)
+                    .disabled(isOperationPending || gitStatus.currentBranch.isEmpty)
 
                 case .open(let number, let url, let mergeable, let title):
                     HStack(spacing: 4) {
@@ -420,7 +420,7 @@ struct GitPanelWindowContentWithToolbar: View {
                         }
                     }
                     .buttonStyle(.bordered)
-                    .disabled(isOperationPending || gitStatus.currentBranch == nil)
+                    .disabled(isOperationPending || gitStatus.currentBranch.isEmpty)
                 }
             }
         }

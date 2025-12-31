@@ -20,7 +20,7 @@ struct ActiveTabIndicatorView: View {
     }
 
     private var activeTabInfo: (icon: String, title: String)? {
-        guard let worktreeId = worktree.id else { return nil }
+        guard worktree.id != nil else { return nil }
 
         let viewType = tabState.viewType
 

@@ -9,6 +9,7 @@ import AppKit
 import Foundation
 import UniformTypeIdentifiers
 
+@MainActor
 actor FileIconService {
     // MARK: - Singleton
 

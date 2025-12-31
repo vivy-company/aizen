@@ -32,7 +32,7 @@ actor GitIndexWatchCenter {
 
         let watcher = GitIndexWatcher(worktreePath: worktreePath)
         let pauseCount = pauseCounts[key] ?? 0
-        var entry = Entry(
+        let entry = Entry(
             watcher: watcher,
             subscribers: [id: onChange],
             pauseCount: pauseCount,
