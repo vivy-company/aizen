@@ -124,7 +124,7 @@ struct WorkflowRunRow: View {
 
                 // Time
                 if let startedAt = run.startedAt {
-                    Text(WorkflowRelativeTimeFormatter.string(from: startedAt))
+                    Text(RelativeDateFormatter.shared.string(from: startedAt))
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 }

@@ -419,7 +419,7 @@ struct RunSidebarRow: View {
                         .foregroundStyle(.tertiary)
 
                     if let startedAt = run.startedAt {
-                        Text(WorkflowRelativeTimeFormatter.string(from: startedAt))
+                        Text(RelativeDateFormatter.shared.string(from: startedAt))
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }
