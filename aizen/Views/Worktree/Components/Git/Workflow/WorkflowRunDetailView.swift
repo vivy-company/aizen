@@ -149,12 +149,12 @@ struct WorkflowRunDetailView: View {
 
     private func statusBadge(_ run: WorkflowRun) -> some View {
         HStack(spacing: 4) {
-            if run.isInProgress {
-                ProgressView()
-                    .controlSize(.mini)
-            } else {
-                Image(systemName: run.statusIcon)
-            }
+            WorkflowRunStatusIconView(
+                run: run,
+                iconSize: 11,
+                progressFrame: 12,
+                progressStyle: .mini
+            )
 
             Text(run.displayStatus)
                 .font(.system(size: 11, weight: .semibold))
