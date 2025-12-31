@@ -39,7 +39,7 @@ struct BranchSelectorView: View {
                 .background(Color(nsColor: .controlBackgroundColor))
                 .cornerRadius(8)
 
-                DetailCloseButton(action: dismiss, size: 20)
+                DetailCloseButton(action: { dismiss() }, size: 20)
                     .symbolRenderingMode(.hierarchical)
             }
             .padding(12)
