@@ -204,11 +204,6 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
 
     // Pre-compiled regex patterns for log parsing
     private static let timestampRegex = try? NSRegularExpression(pattern: #"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"#)
-    private static let dateFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
 
     func getStructuredLogs(repoPath: String, runId: String, jobId: String, steps: [WorkflowStep]) async throws -> WorkflowLogs {
         // Use gh api to get raw logs for the job
@@ -242,7 +237,7 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
             if let match = Self.timestampRegex?.firstMatch(in: line, range: range),
                let timestampRange = Range(match.range(at: 1), in: line) {
                 let timestampStr = String(line[timestampRange])
-                timestamp = Self.dateFormatter.date(from: timestampStr + "Z")
+                timestamp = ISO8601DateParser.shared.parse(timestampStr + "Z")
 
                 // Remove timestamp from content
                 if let fullRange = Range(match.range, in: line) {
