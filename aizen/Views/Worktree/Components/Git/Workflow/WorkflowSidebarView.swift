@@ -394,7 +394,12 @@ struct RunSidebarRow: View {
     var body: some View {
         HStack(spacing: 8) {
             // Status icon
-            statusIcon
+            WorkflowRunStatusIconView(
+                run: run,
+                iconSize: 12,
+                progressFrame: 14,
+                progressStyle: .mini
+            )
                 .frame(width: 14)
 
             // Run info
@@ -414,7 +419,7 @@ struct RunSidebarRow: View {
                         .foregroundStyle(.tertiary)
 
                     if let startedAt = run.startedAt {
-                        Text(relativeTime(from: startedAt))
+                        Text(WorkflowRelativeTimeFormatter.string(from: startedAt))
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }
@@ -449,28 +454,6 @@ struct RunSidebarRow: View {
         }
     }
 
-    @ViewBuilder
-    private var statusIcon: some View {
-        if run.isInProgress {
-            ProgressView()
-                .controlSize(.mini)
-                .frame(width: 14, height: 14)
-        } else {
-            Image(systemName: run.statusIcon)
-                .font(.system(size: 12))
-                .foregroundStyle(statusColor)
-        }
-    }
-
-    private var statusColor: Color {
-        WorkflowStatusIcon.color(status: run.status, conclusion: run.conclusion)
-    }
-
-    private func relativeTime(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
 }
 
 // MARK: - Selectable Row Modifier with Liquid Glass

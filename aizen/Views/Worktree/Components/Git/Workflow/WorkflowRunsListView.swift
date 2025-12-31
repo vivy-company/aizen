@@ -87,7 +87,12 @@ struct WorkflowRunRow: View {
         Button(action: onSelect) {
             HStack(spacing: 10) {
                 // Status icon
-                statusIcon
+                WorkflowRunStatusIconView(
+                    run: run,
+                    iconSize: 14,
+                    progressFrame: 16,
+                    progressStyle: .scaled(0.5)
+                )
                     .frame(width: 16)
 
                 // Run info
@@ -119,7 +124,7 @@ struct WorkflowRunRow: View {
 
                 // Time
                 if let startedAt = run.startedAt {
-                    Text(relativeTime(from: startedAt))
+                    Text(WorkflowRelativeTimeFormatter.string(from: startedAt))
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 }
@@ -156,27 +161,4 @@ struct WorkflowRunRow: View {
         }
     }
 
-    @ViewBuilder
-    private var statusIcon: some View {
-        if run.isInProgress {
-            // Animated spinner for in-progress
-            ProgressView()
-                .scaleEffect(0.5)
-                .frame(width: 16, height: 16)
-        } else {
-            Image(systemName: run.statusIcon)
-                .font(.system(size: 14))
-                .foregroundStyle(statusColor)
-        }
-    }
-
-    private var statusColor: Color {
-        WorkflowStatusIcon.color(status: run.status, conclusion: run.conclusion)
-    }
-
-    private func relativeTime(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
 }
