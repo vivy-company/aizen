@@ -98,37 +98,17 @@ struct MathBlockView: View {
             // Block math with container
             VStack(alignment: .leading, spacing: 0) {
                 // Header
-                HStack(spacing: 8) {
-                    Image(systemName: "function")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-
-                    Text("LATEX")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-
-                    Spacer()
-
-                    if isLoading {
-                        ScaledProgressView(size: 16)
-                    }
-
-                    if hasError {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.orange)
-                            .help(errorMessage ?? "Render error")
-                    }
-
-                    CopyHoverButton(
-                        helpText: "Copy LaTeX",
-                        isHovered: isHovering,
-                        action: copyLatex
-                    )
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(headerBackground)
+                CodeBlockHeader(
+                    iconSystemName: "function",
+                    title: "LATEX",
+                    showsLoading: isLoading,
+                    hasError: hasError,
+                    errorMessage: errorMessage,
+                    copyHelpText: "Copy LaTeX",
+                    isHovered: isHovering,
+                    headerBackground: headerBackground,
+                    onCopy: copyLatex
+                )
 
                 // Content
                 Group {

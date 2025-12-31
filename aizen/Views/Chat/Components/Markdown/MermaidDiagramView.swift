@@ -69,37 +69,17 @@ struct MermaidDiagramView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
-            HStack(spacing: 8) {
-                Image(systemName: "chart.bar.doc.horizontal")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-
-                Text("MERMAID")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                if isLoading && !isStreaming {
-                    ScaledProgressView(size: 16)
-                }
-
-                if hasError {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.orange)
-                        .help(errorMessage ?? "Render error")
-                }
-
-                CopyHoverButton(
-                    helpText: "Copy Mermaid code",
-                    isHovered: isHovering,
-                    action: copyCode
-                )
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(headerBackground)
+            CodeBlockHeader(
+                iconSystemName: "chart.bar.doc.horizontal",
+                title: "MERMAID",
+                showsLoading: isLoading && !isStreaming,
+                hasError: hasError,
+                errorMessage: errorMessage,
+                copyHelpText: "Copy Mermaid code",
+                isHovered: isHovering,
+                headerBackground: headerBackground,
+                onCopy: copyCode
+            )
 
             // Content
             Group {
