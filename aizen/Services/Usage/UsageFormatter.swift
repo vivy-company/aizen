@@ -8,20 +8,28 @@
 import Foundation
 
 enum UsageFormatter {
-    static func tokenString(_ value: Int?) -> String {
-        guard let value else { return "N/A" }
+    private static let decimalFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
-        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
-    }
+        return formatter
+    }()
 
-    static func usdString(_ value: Double?) -> String {
-        guard let value else { return "N/A" }
+    private static let currencyFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.currencyCode = "USD"
         formatter.maximumFractionDigits = 2
-        return formatter.string(from: NSNumber(value: value)) ?? String(format: "$%.2f", value)
+        return formatter
+    }()
+
+    static func tokenString(_ value: Int?) -> String {
+        guard let value else { return "N/A" }
+        return decimalFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+
+    static func usdString(_ value: Double?) -> String {
+        guard let value else { return "N/A" }
+        return currencyFormatter.string(from: NSNumber(value: value)) ?? String(format: "$%.2f", value)
     }
 
     static func percentString(_ value: Double?) -> String {
@@ -39,9 +47,7 @@ enum UsageFormatter {
         if unit == "USD" {
             return usdString(value)
         }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        let base = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
+        let base = decimalFormatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
         if let unit, !unit.isEmpty {
             return "\(base) \(unit)"
         }
