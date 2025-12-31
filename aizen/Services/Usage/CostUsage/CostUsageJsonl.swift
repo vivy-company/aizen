@@ -7,8 +7,8 @@
 
 import Foundation
 
-enum CostUsageJsonl {
-    struct Line: Sendable {
+nonisolated enum CostUsageJsonl {
+    nonisolated struct Line: Sendable {
         let bytes: Data
         let wasTruncated: Bool
     }

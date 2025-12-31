@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum CostUsageCacheIO {
+nonisolated enum CostUsageCacheIO {
     private static func defaultCacheRoot() -> URL {
         let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         return root.appendingPathComponent("Aizen", isDirectory: true)
@@ -50,7 +50,7 @@ enum CostUsageCacheIO {
     }
 }
 
-struct CostUsageCache: Codable, Sendable {
+nonisolated struct CostUsageCache: Codable, Sendable {
     var version: Int = 1
     var lastScanUnixMs: Int64 = 0
 
@@ -64,7 +64,7 @@ struct CostUsageCache: Codable, Sendable {
     var roots: [String: Int64]?
 }
 
-struct CostUsageFileUsage: Codable, Sendable {
+nonisolated struct CostUsageFileUsage: Codable, Sendable {
     var mtimeUnixMs: Int64
     var size: Int64
     var days: [String: [String: [Int]]]
@@ -73,7 +73,7 @@ struct CostUsageFileUsage: Codable, Sendable {
     var lastTotals: CostUsageCodexTotals?
 }
 
-struct CostUsageCodexTotals: Codable, Sendable {
+nonisolated struct CostUsageCodexTotals: Codable, Sendable {
     var input: Int
     var cached: Int
     var output: Int

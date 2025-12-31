@@ -7,8 +7,8 @@
 
 import Foundation
 
-struct UsageDailyReport: Sendable, Equatable {
-    struct Entry: Sendable, Equatable {
+nonisolated struct UsageDailyReport: Sendable, Equatable {
+    nonisolated struct Entry: Sendable, Equatable {
         let date: String
         let inputTokens: Int?
         let outputTokens: Int?
@@ -33,7 +33,7 @@ struct UsageDailyReport: Sendable, Equatable {
         }
     }
 
-    struct Summary: Sendable, Equatable {
+    nonisolated struct Summary: Sendable, Equatable {
         let totalInputTokens: Int?
         let totalOutputTokens: Int?
         let totalTokens: Int?

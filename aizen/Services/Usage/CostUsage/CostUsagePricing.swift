@@ -7,14 +7,14 @@
 
 import Foundation
 
-enum CostUsagePricing {
-    struct CodexPricing: Sendable {
+nonisolated enum CostUsagePricing {
+    nonisolated struct CodexPricing: Sendable {
         let inputCostPerToken: Double
         let outputCostPerToken: Double
         let cacheReadInputCostPerToken: Double
     }
 
-    struct ClaudePricing: Sendable {
+    nonisolated struct ClaudePricing: Sendable {
         let inputCostPerToken: Double
         let outputCostPerToken: Double
         let cacheCreationInputCostPerToken: Double
