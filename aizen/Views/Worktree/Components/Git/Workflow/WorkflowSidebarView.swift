@@ -211,11 +211,12 @@ struct WorkflowSidebarView: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
 
-            Text("brew install \(service.provider.cliCommand)")
-                .font(.system(.caption, design: .monospaced))
-                .padding(6)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .cornerRadius(4)
+            CodePill(
+                text: "brew install \(service.provider.cliCommand)",
+                backgroundColor: Color(nsColor: .controlBackgroundColor),
+                horizontalPadding: 6,
+                verticalPadding: 6
+            )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
@@ -231,11 +232,12 @@ struct WorkflowSidebarView: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
 
-            Text("\(service.provider.cliCommand) auth login")
-                .font(.system(.caption, design: .monospaced))
-                .padding(6)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .cornerRadius(4)
+            CodePill(
+                text: "\(service.provider.cliCommand) auth login",
+                backgroundColor: Color(nsColor: .controlBackgroundColor),
+                horizontalPadding: 6,
+                verticalPadding: 6
+            )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()

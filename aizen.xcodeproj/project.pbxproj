@@ -742,6 +742,7 @@
 				Views/Components/CircleIconButton.swift,
 				Views/Components/CopyableTableView.swift,
 				Views/Components/CopyButton.swift,
+				Views/Components/CodePill.swift,
 				Views/Components/SearchField.swift,
 				Views/Components/FlowLayout.swift,
 				Views/Components/IconCountPill.swift,
