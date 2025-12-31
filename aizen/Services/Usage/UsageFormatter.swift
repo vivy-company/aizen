@@ -32,8 +32,6 @@ enum UsageFormatter {
 
     static func relativeDateString(_ date: Date?) -> String {
         guard let date else { return "N/A" }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        return RelativeDateFormatter.shared.string(from: date)
     }
 }

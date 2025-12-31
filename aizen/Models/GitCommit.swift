@@ -18,8 +18,6 @@ struct GitCommit: Identifiable, Equatable {
     let deletions: Int
 
     var relativeDate: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        RelativeDateFormatter.shared.string(from: date)
     }
 }

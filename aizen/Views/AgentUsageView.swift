@@ -24,9 +24,7 @@ struct AgentActivityRowsView: View {
 
     private var lastUsedText: String {
         guard let lastUsedAt = stats.lastUsedAt else { return "Never" }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: lastUsedAt, relativeTo: Date())
+        return RelativeDateFormatter.shared.string(from: lastUsedAt)
     }
 
     private func usageRow(_ title: String, value: String) -> some View {
