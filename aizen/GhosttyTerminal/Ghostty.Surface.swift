@@ -6,6 +6,9 @@ extension Ghostty {
     /// Wraps a `ghostty_surface_t`
     final class Surface: Sendable {
         private let surface: ghostty_surface_t
+        private struct Handle: @unchecked Sendable {
+            let value: ghostty_surface_t
+        }
 
         /// Read the underlying C value for this surface. This is unsafe because the value will be
         /// freed when the Surface class is deinitialized.
@@ -24,9 +27,9 @@ extension Ghostty {
             // value so we don't capture `self` and then we detach it in a task.
             // We can't wait for the task to succeed so this will happen sometime
             // but that's okay.
-            let surface = self.surface
+            let handle = Handle(value: surface)
             Task.detached { @MainActor in
-                ghostty_surface_free(surface)
+                ghostty_surface_free(handle.value)
             }
         }
 

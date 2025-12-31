@@ -152,7 +152,7 @@ class TerminalScrollView: NSView {
 
     private func synchronizeAppearance() {
         // Update scroller appearance based on terminal background
-        let hasLightBackground = false  // Assume dark background for now
+        let hasLightBackground = scrollView.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .aqua
         scrollView.appearance = NSAppearance(named: hasLightBackground ? .aqua : .darkAqua)
         updateTrackingAreas()
     }

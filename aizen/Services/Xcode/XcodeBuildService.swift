@@ -40,8 +40,6 @@ actor XcodeBuildService {
         continuation: AsyncStream<BuildPhase>.Continuation
     ) async {
         isCancelled = false
-        let startTime = Date()
-
         continuation.yield(.building(progress: nil))
 
         let process = Process()
@@ -137,8 +135,6 @@ actor XcodeBuildService {
                         logBuffer.appendStderr(str)
                     }
                     let fullLog = logBuffer.combinedLog
-
-                    let duration = Date().timeIntervalSince(startTime)
 
                     if proc.terminationStatus == 0 {
                         continuation.yield(.succeeded)
@@ -303,7 +299,7 @@ actor XcodeBuildService {
     }
 }
 
-private final class LogBuffer: @unchecked Sendable {
+nonisolated private final class LogBuffer: @unchecked Sendable {
     private let lock = NSLock()
     private var stdout = ""
     private var stderr = ""

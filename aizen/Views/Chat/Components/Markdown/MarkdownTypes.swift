@@ -278,7 +278,7 @@ class FootnoteStorage: ObservableObject {
 // MARK: - Markdown Parser
 
 /// Production-ready markdown parser using swift-markdown AST
-final class MarkdownParser {
+nonisolated final class MarkdownParser {
 
     struct Options {
         var parseSymbolLinks: Bool = true
@@ -458,7 +458,8 @@ final class MarkdownParser {
 
     private func parseParagraph(_ paragraph: Paragraph, index: Int) -> MarkdownBlock? {
         // Check if paragraph contains only an image
-        if paragraph.childCount == 1, let image = paragraph.children.first as? Markdown.Image {
+        if paragraph.childCount == 1,
+           let image = paragraph.children.first(where: { _ in true }) as? Markdown.Image {
             return MarkdownBlock(.image(url: image.source ?? "", alt: extractAltText(from: image)), index: index)
         }
 

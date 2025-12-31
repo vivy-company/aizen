@@ -13,7 +13,7 @@ import SwiftUI
 /// Manages Metal rendering setup and configuration for Ghostty terminal
 @MainActor
 class GhosttyRenderingSetup {
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "GhosttyRendering")
+    nonisolated private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "GhosttyRendering")
 
     // MARK: - Terminal Settings from AppStorage
 

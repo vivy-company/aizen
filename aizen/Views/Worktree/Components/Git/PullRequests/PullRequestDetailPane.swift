@@ -653,7 +653,7 @@ struct PRCommentView: View {
     @ViewBuilder
     private func reviewBadge(for state: PRComment.ReviewState) -> some View {
         let color = foregroundColor(for: state)
-        return TagBadge(
+        TagBadge(
             text: state.displayName,
             color: color,
             cornerRadius: 4,

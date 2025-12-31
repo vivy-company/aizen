@@ -162,7 +162,9 @@ extension Ghostty {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                self?.checkAppearanceSettingChange()
+                Task { @MainActor in
+                    self?.checkAppearanceSettingChange()
+                }
             }
 
             Ghostty.logger.info("Ghostty app initialized successfully")
