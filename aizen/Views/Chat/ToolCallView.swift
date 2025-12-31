@@ -432,33 +432,16 @@ struct HighlightedTextContentView: View {
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            if shouldHighlight, let highlighted = highlightedText {
-                let highlightedView = Text(highlighted)
-                    .font(.system(size: 10, design: .monospaced))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if allowSelection {
-                    highlightedView.textSelection(.enabled)
-                } else {
-                    highlightedView
-                }
-            } else {
-                let displayText = parsedContent.code.isEmpty ? " " : parsedContent.code
-                let plainView = Text(displayText)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if allowSelection {
-                    plainView.textSelection(.enabled)
-                } else {
-                    plainView
-                }
-            }
-        }
-        .frame(maxHeight: 150)
-        .padding(6)
-        .background(Color(nsColor: .textBackgroundColor))
-        .cornerRadius(4)
+        let displayText = parsedContent.code.isEmpty ? " " : parsedContent.code
+        MonospaceTextPanel(
+            text: displayText,
+            attributedText: shouldHighlight ? highlightedText : nil,
+            maxHeight: 150,
+            font: .system(size: 10, design: .monospaced),
+            backgroundColor: Color(nsColor: .textBackgroundColor),
+            padding: 6,
+            allowsSelection: allowSelection
+        )
         .task(id: allowHighlight ? text : "highlight-disabled") {
             guard shouldHighlight else { return }
             await performHighlight()
