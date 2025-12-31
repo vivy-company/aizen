@@ -134,13 +134,21 @@ struct PullRequestDetailPane: View {
     }
 
     private var mergeabilityBadge: some View {
-        HStack(spacing: 3) {
-            Image(systemName: pr.mergeable.isMergeable ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .font(.system(size: 9))
-            Text(pr.mergeable.isMergeable ? "Mergeable" : "Conflicts")
-                .font(.system(size: 10))
-        }
-        .foregroundStyle(pr.mergeable.isMergeable ? .green : .red)
+        let isMergeable = pr.mergeable.isMergeable
+        let color: Color = isMergeable ? .green : .red
+        return TagBadge(
+            text: isMergeable ? "Mergeable" : "Conflicts",
+            color: color,
+            cornerRadius: 0,
+            font: .system(size: 10),
+            horizontalPadding: 0,
+            verticalPadding: 0,
+            backgroundOpacity: 0,
+            textColor: color,
+            iconSystemName: isMergeable ? "checkmark.circle.fill" : "xmark.circle.fill",
+            iconSize: 9,
+            spacing: 3
+        )
     }
 
     // MARK: - Tab Bar
