@@ -644,17 +644,20 @@ struct PRCommentView: View {
 
     @ViewBuilder
     private func reviewBadge(for state: PRComment.ReviewState) -> some View {
-        HStack(spacing: 3) {
-            Image(systemName: iconName(for: state))
-                .font(.system(size: 9))
-            Text(state.displayName)
-                .font(.system(size: 10, weight: .medium))
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(backgroundColor(for: state))
-        .foregroundStyle(foregroundColor(for: state))
-        .cornerRadius(4)
+        let color = foregroundColor(for: state)
+        return TagBadge(
+            text: state.displayName,
+            color: color,
+            cornerRadius: 4,
+            font: .system(size: 10, weight: .medium),
+            horizontalPadding: 6,
+            verticalPadding: 2,
+            backgroundOpacity: 0.2,
+            textColor: color,
+            iconSystemName: iconName(for: state),
+            iconSize: 9,
+            spacing: 3
+        )
     }
 
     private func iconName(for state: PRComment.ReviewState) -> String {

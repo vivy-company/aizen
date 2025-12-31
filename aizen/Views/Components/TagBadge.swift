@@ -17,6 +17,9 @@ struct TagBadge: View {
     var verticalPadding: CGFloat = 2
     var backgroundOpacity: Double = 0.15
     var textColor: Color? = nil
+    var iconSystemName: String? = nil
+    var iconSize: CGFloat? = nil
+    var spacing: CGFloat = 4
 
     var body: some View {
         var label = Text(text).font(font)
@@ -25,11 +28,26 @@ struct TagBadge: View {
         }
         let resolvedTextColor = textColor ?? color
 
-        return label
-            .padding(.horizontal, horizontalPadding)
-            .padding(.vertical, verticalPadding)
-            .background(color.opacity(backgroundOpacity))
-            .foregroundColor(resolvedTextColor)
-            .cornerRadius(cornerRadius)
+        return HStack(spacing: spacing) {
+            if let iconSystemName = iconSystemName {
+                let image = Image(systemName: iconSystemName)
+                if let iconSize = iconSize {
+                    image
+                        .font(.system(size: iconSize))
+                        .foregroundStyle(resolvedTextColor)
+                } else {
+                    image
+                        .font(font)
+                        .foregroundStyle(resolvedTextColor)
+                }
+            }
+
+            label
+        }
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
+        .background(color.opacity(backgroundOpacity))
+        .foregroundColor(resolvedTextColor)
+        .cornerRadius(cornerRadius)
     }
 }
