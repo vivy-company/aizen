@@ -81,9 +81,7 @@ struct MermaidDiagramView: View {
                 Spacer()
 
                 if isLoading && !isStreaming {
-                    ProgressView()
-                        .scaleEffect(0.5)
-                        .frame(width: 16, height: 16)
+                    ScaledProgressView(size: 16)
                 }
 
                 if hasError {

@@ -49,9 +49,7 @@ struct InlineTerminalView: View {
             // Running indicator below
             if isRunning {
                 HStack(spacing: 4) {
-                    ProgressView()
-                        .scaleEffect(0.5)
-                        .frame(width: 12, height: 12)
+                    ScaledProgressView(size: 12)
                     Text("Running...")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)

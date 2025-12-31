@@ -169,9 +169,7 @@ struct TerminalOutputPreview: View {
 
                 if isRunning {
                     HStack(spacing: 4) {
-                        ProgressView()
-                            .scaleEffect(0.5)
-                            .frame(width: 10, height: 10)
+                        ScaledProgressView(size: 10)
                         Text("Running")
                             .font(.system(size: 9))
                             .foregroundStyle(.blue)

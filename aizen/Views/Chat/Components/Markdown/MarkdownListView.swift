@@ -110,9 +110,7 @@ struct MathBlockView: View {
                     Spacer()
 
                     if isLoading {
-                        ProgressView()
-                            .scaleEffect(0.5)
-                            .frame(width: 16, height: 16)
+                        ScaledProgressView(size: 16)
                     }
 
                     if hasError {
