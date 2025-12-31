@@ -444,49 +444,6 @@ actor AgentTerminalDelegate {
         }
     }
 
-    /// Drain remaining output when process has exited (removes handlers)
-    private func drainRemainingOutput(terminalId: String, process: Process) {
-        // Drain stdout
-        if let outputPipe = process.standardOutput as? Pipe {
-            let handle = outputPipe.fileHandleForReading
-            // Only drain if handler is still set (not already cleaned up)
-            if handle.readabilityHandler != nil {
-                handle.readabilityHandler = nil
-                do {
-                    while true {
-                        guard let data = try handle.read(upToCount: 65536), !data.isEmpty else {
-                            break
-                        }
-                        if let output = String(data: data, encoding: .utf8) {
-                            appendOutput(terminalId: terminalId, output: output)
-                        }
-                    }
-                } catch {
-                    // Handle already closed
-                }
-            }
-        }
-        // Drain stderr
-        if let errorPipe = process.standardError as? Pipe {
-            let handle = errorPipe.fileHandleForReading
-            if handle.readabilityHandler != nil {
-                handle.readabilityHandler = nil
-                do {
-                    while true {
-                        guard let data = try handle.read(upToCount: 65536), !data.isEmpty else {
-                            break
-                        }
-                        if let output = String(data: data, encoding: .utf8) {
-                            appendOutput(terminalId: terminalId, output: output)
-                        }
-                    }
-                } catch {
-                    // Handle already closed
-                }
-            }
-        }
-    }
-
     // MARK: - Private Helpers
 
     private func appendOutput(terminalId: String, output: String) {

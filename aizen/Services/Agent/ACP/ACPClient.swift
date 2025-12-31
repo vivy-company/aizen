@@ -572,17 +572,6 @@ actor ACPClient {
         }
     }
 
-    private func describeMessage(_ message: ACPMessage) -> String {
-        switch message {
-        case .request(let request):
-            return "request \(request.method) [id: \(requestIdDescription(request.id))]"
-        case .response(let response):
-            return "response [id: \(requestIdDescription(response.id))]"
-        case .notification(let notification):
-            return "notification \(notification.method)"
-        }
-    }
-
     private func extractMethod(from data: Data) -> String? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil

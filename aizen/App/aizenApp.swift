@@ -205,10 +205,6 @@ struct aizenApp: App {
 
     // MARK: - Settings Window
 
-    private func showSettingsWindow() {
-        SettingsWindowManager.shared.show()
-    }
-
     // MARK: - tmux Session Cleanup
 
     /// Clean up orphaned tmux sessions that no longer have matching Core Data panes

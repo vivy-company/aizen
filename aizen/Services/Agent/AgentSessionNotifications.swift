@@ -209,52 +209,6 @@ extension AgentSession {
     }
 
     // MARK: - Content Decoding
-
-    
-    private func decodeContentBlocks(_ content: AnyCodable?) -> [ContentBlock] {
-        guard let value = content?.value else { return [] }
-
-        // 1) simple shapes
-        if let string = value as? String {
-            return [.text(TextContent(text: string))]
-        }
-
-        if let strings = value as? [String] {
-            return [.text(TextContent(text: strings.joined(separator: "\n")))]
-        }
-
-        // 2) try direct decode of standard content blocks
-        if let array = value as? [[String: Any]] {
-            do {
-                let data = try JSONSerialization.data(withJSONObject: array)
-                return try JSONDecoder().decode([ContentBlock].self, from: data)
-            } catch {
-                // Attempt to unwrap MCP-style {"type":"content","content":{...}}
-                let flattened = array.compactMap { dict -> String? in
-                    if let inner = dict["content"] as? [String: Any] {
-                        return extractText(inner["text"])
-                    }
-                    return extractText(dict["text"])
-                }
-                if !flattened.isEmpty {
-                    return [.text(TextContent(text: flattened.joined()))]
-                }
-            }
-        }
-
-        // 3) single dict
-        if let dict = value as? [String: Any] {
-            if let text = extractText(dict["text"]) {
-                return [.text(TextContent(text: text))]
-            }
-            if let inner = dict["content"] as? [String: Any], let text = extractText(inner["text"]) {
-                return [.text(TextContent(text: text))]
-            }
-        }
-
-        return []
-    }
-
     /// Merge adjacent text blocks to avoid fragment spam from streamed chunks
     private func coalesceAdjacentTextBlocks(_ blocks: [ContentBlock]) -> [ContentBlock] {
         var result: [ContentBlock] = []

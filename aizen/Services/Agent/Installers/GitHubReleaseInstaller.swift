@@ -140,14 +140,4 @@ actor GitHubReleaseInstaller {
 
         return url
     }
-
-    private func getArchitecture() -> String {
-        #if arch(arm64)
-        return "aarch64"
-        #elseif arch(x86_64)
-        return "x86_64"
-        #else
-        return "unknown"
-        #endif
-    }
 }

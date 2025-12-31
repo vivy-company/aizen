@@ -335,13 +335,6 @@ class GitRepositoryService: ObservableObject {
         }
     }
 
-    /// Force immediate status reload without debouncing (for use after operations)
-    private func reloadStatusImmediate() {
-        Task { @MainActor [weak self] in
-            await self?.reloadStatusNowOnMain(lightweight: false)
-        }
-    }
-
     func updateWorktreePath(_ newPath: String) {
         Task { @MainActor [weak self] in
             guard let self else { return }

@@ -462,19 +462,6 @@ class XcodeBuildManager: ObservableObject {
         }
     }
 
-    private func getPIDForApp(appPath: String) async -> Int32? {
-        let appName = (appPath as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: "")
-
-        guard let result = try? await ProcessExecutor.shared.executeWithOutput(
-            executable: "/usr/bin/pgrep",
-            arguments: ["-n", appName]
-        ) else {
-            return nil
-        }
-
-        return Int32(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
     private func startAppMonitoring() {
         // Cancel any existing monitor
         appMonitorTask?.cancel()
