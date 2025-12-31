@@ -35,7 +35,6 @@ struct CodeBlockView: View {
         return lines[startIndex...endIndex].joined(separator: "\n")
     }
 
-    @State private var showCopyConfirmation = false
     @State private var highlightedText: AttributedString?
     @State private var isHovering = false
     @State private var isExpanded = false
@@ -126,26 +125,11 @@ struct CodeBlockView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
 
-                // Copy button
-                Button(action: copyCode) {
-                    HStack(spacing: 4) {
-                        Image(systemName: showCopyConfirmation ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 10))
-                        if isHovering {
-                            Text(showCopyConfirmation ? "Copied" : "Copy")
-                                .font(.system(size: 10))
-                        }
-                    }
-                    .foregroundStyle(showCopyConfirmation ? .green : .secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.secondary.opacity(isHovering ? 0.15 : 0))
-                    )
-                }
-                .buttonStyle(.plain)
-                .help("Copy code")
+                CopyHoverButton(
+                    helpText: "Copy code",
+                    isHovered: isHovering,
+                    action: copyCode
+                )
 
                 Button(action: toggleExpanded) {
                     HStack(spacing: 4) {
@@ -200,16 +184,6 @@ struct CodeBlockView: View {
 
     private func copyCode() {
         Clipboard.copy(trimmedCode)
-
-        withAnimation {
-            showCopyConfirmation = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation {
-                showCopyConfirmation = false
-            }
-        }
     }
 
     private var highlightTaskKey: String {
