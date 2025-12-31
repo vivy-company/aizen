@@ -7,10 +7,11 @@
 
 import Foundation
 
-final class RelativeDateFormatter {
+nonisolated final class RelativeDateFormatter: @unchecked Sendable {
     static let shared = RelativeDateFormatter()
 
     private let formatter: RelativeDateTimeFormatter
+    private let lock = NSLock()
 
     private init() {
         formatter = RelativeDateTimeFormatter()
@@ -18,6 +19,9 @@ final class RelativeDateFormatter {
     }
 
     func string(from date: Date) -> String {
-        formatter.localizedString(for: date, relativeTo: Date())
+        lock.lock()
+        let value = formatter.localizedString(for: date, relativeTo: Date())
+        lock.unlock()
+        return value
     }
 }
