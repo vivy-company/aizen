@@ -617,7 +617,7 @@ struct GitPanelWindowContent: View {
         }
     }
 
-    private static func buildFileDiff(file: String, basePath: String) -> String {
+    nonisolated private static func buildFileDiff(file: String, basePath: String) -> String {
         let fullPath = (basePath as NSString).appendingPathComponent(file)
         guard let data = FileManager.default.contents(atPath: fullPath),
               let content = String(data: data, encoding: .utf8) else {

@@ -411,7 +411,7 @@ struct DiffView: NSViewRepresentable {
             )
         }
 
-        private static func parseFilePathFromDiffHeader(_ line: String) -> String? {
+        nonisolated private static func parseFilePathFromDiffHeader(_ line: String) -> String? {
             // Format: "diff --git a/<path> b/<path>"
             let parts = line.split(separator: " ")
             guard parts.count >= 4 else { return nil }
