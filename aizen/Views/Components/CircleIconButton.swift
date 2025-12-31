@@ -19,17 +19,11 @@ struct CircleIconButton: View {
     var padding: CGFloat? = nil
 
     var body: some View {
-        var content = Image(systemName: systemName)
+        let content = Image(systemName: systemName)
             .font(.system(size: size, weight: weight))
             .foregroundStyle(foreground)
-
-        if let frameSize = frameSize {
-            content = content.frame(width: frameSize, height: frameSize)
-        }
-
-        if let padding = padding {
-            content = content.padding(padding)
-        }
+            .modifier(OptionalFrameModifier(size: frameSize))
+            .modifier(OptionalPaddingModifier(padding: padding))
 
         return Button(action: action) {
             content
@@ -39,5 +33,29 @@ struct CircleIconButton: View {
                 )
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct OptionalFrameModifier: ViewModifier {
+    let size: CGFloat?
+
+    func body(content: Content) -> some View {
+        if let size {
+            content.frame(width: size, height: size)
+        } else {
+            content
+        }
+    }
+}
+
+private struct OptionalPaddingModifier: ViewModifier {
+    let padding: CGFloat?
+
+    func body(content: Content) -> some View {
+        if let padding {
+            content.padding(padding)
+        } else {
+            content
+        }
     }
 }
