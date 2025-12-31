@@ -32,7 +32,7 @@ struct MCPServerRowView: View {
                     }
 
                     if isInstalled {
-                        TagBadge(text: "Installed", color: .green, cornerRadius: 4)
+                        TagBadge(text: "Installed", color: .green, cornerRadius: 4, backgroundOpacity: 0.2)
                     }
                 }
 

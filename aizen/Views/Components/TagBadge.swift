@@ -11,14 +11,25 @@ struct TagBadge: View {
     let text: String
     let color: Color
     var cornerRadius: CGFloat = 4
+    var font: Font = .caption2
+    var fontWeight: Font.Weight? = nil
+    var horizontalPadding: CGFloat = 6
+    var verticalPadding: CGFloat = 2
+    var backgroundOpacity: Double = 0.15
+    var textColor: Color? = nil
 
     var body: some View {
-        Text(text)
-            .font(.caption2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.15))
-            .foregroundColor(color)
+        var label = Text(text).font(font)
+        if let fontWeight = fontWeight {
+            label = label.fontWeight(fontWeight)
+        }
+        let resolvedTextColor = textColor ?? color
+
+        return label
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
+            .background(color.opacity(backgroundOpacity))
+            .foregroundColor(resolvedTextColor)
             .cornerRadius(cornerRadius)
     }
 }

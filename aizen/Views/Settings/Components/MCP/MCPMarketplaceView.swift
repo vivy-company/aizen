@@ -163,12 +163,14 @@ struct MCPMarketplaceView: View {
                 if filter == .installed {
                     let count = mcpManager.servers(for: agentId).count
                     if count > 0 {
-                        Text("\(count)")
-                            .font(.system(size: 10, weight: .medium))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.accentColor.opacity(0.2))
-                            .cornerRadius(4)
+                        TagBadge(
+                            text: "\(count)",
+                            color: .accentColor,
+                            font: .system(size: 10, weight: .medium),
+                            horizontalPadding: 5,
+                            verticalPadding: 1,
+                            backgroundOpacity: 0.2
+                        )
                     }
                 }
             }
