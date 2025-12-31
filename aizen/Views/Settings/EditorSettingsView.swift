@@ -91,13 +91,14 @@ struct EditorSettingsView: View {
                     .frame(width: 120)
                 }
 
-                Text("Preview: \(editorFontFamily) \(Int(editorFontSize))pt")
-                    .font(.custom(editorFontFamily, size: editorFontSize))
-                    .monospaced()
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(4)
+                CodePill(
+                    text: "Preview: \(editorFontFamily) \(Int(editorFontSize))pt",
+                    font: .custom(editorFontFamily, size: editorFontSize).monospaced(),
+                    backgroundColor: Color.secondary.opacity(0.1),
+                    horizontalPadding: 8,
+                    verticalPadding: 8
+                )
+                .frame(maxWidth: .infinity)
             } header: {
                 Text("Font")
             }
