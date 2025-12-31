@@ -41,7 +41,7 @@ extension NSColor {
 
 typealias Attribute = EditorTheme.Attribute
 
-struct GitStatusColors {
+nonisolated struct GitStatusColors {
     let modified: NSColor   // yellow - modified/mixed files
     let added: NSColor      // green - staged/added files
     let untracked: NSColor  // blue - untracked files
@@ -57,7 +57,7 @@ struct GitStatusColors {
     )
 }
 
-struct GhosttyThemeParser {
+nonisolated struct GhosttyThemeParser {
     struct ParsedTheme {
         var background: NSColor?
         var foreground: NSColor?

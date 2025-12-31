@@ -383,7 +383,7 @@ nonisolated struct ANSIParsedLine: Identifiable, Sendable {
 
 // MARK: - Line-Based Parser for Lazy Loading
 
-extension ANSIParser {
+nonisolated extension ANSIParser {
     /// Parse log text into lines for lazy rendering
     static func parseLines(_ text: String) -> [ANSIParsedLine] {
         let lines = text.components(separatedBy: "\n")
