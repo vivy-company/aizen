@@ -90,78 +90,83 @@ struct GitFileList: View {
     }
 
     private func fileRow(file: String, isStaged: Bool?, statusColor: Color, statusIcon: String) -> some View {
-        HStack(spacing: 8) {
-            if let staged = isStaged {
-                // Normal checkbox for fully staged or unstaged files
-                Toggle(isOn: Binding(
-                    get: { staged },
-                    set: { newValue in
-                        // No optimistic updates - just call the operation
-                        if newValue {
-                            onStageFile(file)
-                        } else {
-                            onUnstageFile(file)
+        rowContainer(file: file) {
+            HStack(spacing: 8) {
+                if let staged = isStaged {
+                    // Normal checkbox for fully staged or unstaged files
+                    Toggle(isOn: Binding(
+                        get: { staged },
+                        set: { newValue in
+                            // No optimistic updates - just call the operation
+                            if newValue {
+                                onStageFile(file)
+                            } else {
+                                onUnstageFile(file)
+                            }
                         }
+                    )) {
+                        EmptyView()
                     }
-                )) {
-                    EmptyView()
+                    .toggleStyle(.checkbox)
+                    .labelsHidden()
+                    .disabled(isOperationPending)
+                } else {
+                    // Mixed state checkbox (shows dash/minus)
+                    Button {
+                        // Clicking stages the remaining changes
+                        onStageFile(file)
+                    } label: {
+                        Image(systemName: "minus.square")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isOperationPending)
                 }
-                .toggleStyle(.checkbox)
-                .labelsHidden()
-                .disabled(isOperationPending)
-            } else {
-                // Mixed state checkbox (shows dash/minus)
-                Button {
-                    // Clicking stages the remaining changes
-                    onStageFile(file)
-                } label: {
-                    Image(systemName: "minus.square")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .disabled(isOperationPending)
+
+                Image(systemName: statusIcon)
+                    .font(.system(size: 8))
+                    .foregroundStyle(statusColor)
+
+                Text(file)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
-
-            Image(systemName: statusIcon)
-                .font(.system(size: 8))
-                .foregroundStyle(statusColor)
-
-            Text(file)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.middle)
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onFileClick(file)
-        }
-        .padding(.vertical, 2)
-        .background(selectedFile == file ? Color.accentColor.opacity(0.2) : Color.clear)
-        .cornerRadius(4)
     }
 
     private func conflictRow(file: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 12))
-                .foregroundStyle(.red)
-                .frame(width: 14)
+        rowContainer(file: file, leadingPadding: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.red)
+                    .frame(width: 14)
 
-            Text(file)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.middle)
+                Text(file)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onFileClick(file)
-        }
-        .padding(.vertical, 2)
-        .padding(.leading, 8)
-        .background(selectedFile == file ? Color.accentColor.opacity(0.2) : Color.clear)
-        .cornerRadius(4)
+    }
+
+    private func rowContainer<Content: View>(
+        file: String,
+        leadingPadding: CGFloat = 0,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onFileClick(file)
+            }
+            .padding(.vertical, 2)
+            .padding(.leading, leadingPadding)
+            .background(selectedFile == file ? Color.accentColor.opacity(0.2) : Color.clear)
+            .cornerRadius(4)
     }
 }
