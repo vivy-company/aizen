@@ -36,9 +36,7 @@ struct WorkflowRunStatusIconView: View {
                 .controlSize(.mini)
                 .frame(width: progressFrame, height: progressFrame)
         case .scaled(let scale):
-            ProgressView()
-                .scaleEffect(scale)
-                .frame(width: progressFrame, height: progressFrame)
+            ScaledProgressView(size: progressFrame, scale: scale)
         }
     }
 
