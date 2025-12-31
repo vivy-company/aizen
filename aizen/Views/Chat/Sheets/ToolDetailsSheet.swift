@@ -133,7 +133,6 @@ struct TerminalOutputPreview: View {
 
     @State private var output: String = ""
     @State private var isRunning: Bool = false
-    private let maxDisplayChars = TerminalOutputDefaults.maxDisplayChars
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -160,9 +159,7 @@ struct TerminalOutputPreview: View {
             }
 
             // Terminal-like output area
-            let displayOutput = output.count > maxDisplayChars
-                ? String(output.suffix(maxDisplayChars))
-                : output
+            let displayOutput = TerminalOutputDefaults.trimmedOutput(output)
             MonospaceTextPanel(
                 text: displayOutput,
                 emptyText: "No output yet...",

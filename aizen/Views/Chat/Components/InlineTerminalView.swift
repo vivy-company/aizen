@@ -16,7 +16,6 @@ struct InlineTerminalView: View {
     @State private var output: String = ""
     @State private var isRunning: Bool = false
     @State private var loadTask: Task<Void, Never>?
-    private let maxDisplayChars = TerminalOutputDefaults.maxDisplayChars
 
     private var fontSize: CGFloat {
         max(terminalFontSize - 2, 9) // Slightly smaller for inline view
@@ -26,9 +25,7 @@ struct InlineTerminalView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Terminal output with ANSI colors
             ScrollView {
-                let displayOutput = output.count > maxDisplayChars
-                    ? String(output.suffix(maxDisplayChars))
-                    : output
+                let displayOutput = TerminalOutputDefaults.trimmedOutput(output)
                 if displayOutput.isEmpty {
                     Text("Waiting for output...")
                         .font(.custom(terminalFontName, size: fontSize))

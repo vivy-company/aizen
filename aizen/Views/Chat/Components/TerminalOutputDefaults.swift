@@ -11,4 +11,8 @@ enum TerminalOutputDefaults {
     static let pollIntervalNanoseconds: UInt64 = 500_000_000
     static let maxPollIterationsDetail = 60 // 30s @ 0.5s
     static let maxPollIterationsInline = 120 // 60s @ 0.5s
+
+    static func trimmedOutput(_ output: String) -> String {
+        output.count > maxDisplayChars ? String(output.suffix(maxDisplayChars)) : output
+    }
 }
