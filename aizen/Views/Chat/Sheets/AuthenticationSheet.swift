@@ -14,6 +14,7 @@ struct AuthenticationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedMethodId: String?
     @State private var isAuthenticating = false
+    @State private var authErrorMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,6 +36,11 @@ struct AuthenticationSheet: View {
                     if !session.authMethods.isEmpty {
                         ForEach(session.authMethods, id: \.id) { method in
                             authMethodButton(for: method)
+                        }
+                        if let authErrorMessage {
+                            Text(authErrorMessage)
+                                .font(.callout)
+                                .foregroundStyle(.orange)
                         }
                     } else {
                         VStack(spacing: 12) {
@@ -75,6 +81,7 @@ struct AuthenticationSheet: View {
                 Button(String(localized: "chat.authentication.skip")) {
                     Task {
                         isAuthenticating = true
+                        authErrorMessage = nil
                         do {
                             try await session.createSessionWithoutAuth()
                             await MainActor.run {
@@ -84,6 +91,7 @@ struct AuthenticationSheet: View {
                         } catch {
                             await MainActor.run {
                                 isAuthenticating = false
+                                authErrorMessage = error.localizedDescription
                                 logger.error("Skip auth failed: \(error.localizedDescription)")
                             }
                         }
@@ -173,6 +181,7 @@ struct AuthenticationSheet: View {
 
     private func performAuthentication(methodId: String) {
         isAuthenticating = true
+        authErrorMessage = nil
 
         Task {
             do {
@@ -184,6 +193,7 @@ struct AuthenticationSheet: View {
             } catch {
                 await MainActor.run {
                     isAuthenticating = false
+                    authErrorMessage = error.localizedDescription
                     logger.error("Authentication failed: \(error.localizedDescription)")
                 }
             }

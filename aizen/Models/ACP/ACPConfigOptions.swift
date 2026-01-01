@@ -12,12 +12,39 @@ import Foundation
 nonisolated struct SessionConfigOption: Codable {
     let id: SessionConfigId
     let name: String
+    let description: String?
     let kind: SessionConfigKind
 
     enum CodingKeys: String, CodingKey {
         case id
         case name
+        case description
         case kind
+        case type
+        case currentValue
+        case options
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(SessionConfigId.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+
+        if container.contains(.kind) {
+            let nested = try container.superDecoder(forKey: .kind)
+            kind = try SessionConfigKind(from: nested)
+        } else {
+            kind = try SessionConfigKind(from: decoder)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(description, forKey: .description)
+        try kind.encode(to: encoder)
     }
 }
 
@@ -153,22 +180,98 @@ nonisolated enum SessionConfigSelectOptions: Codable {
 
 nonisolated struct SessionConfigSelectOption: Codable {
     let value: SessionConfigValueId
-    let label: String
+    let name: String
+    let description: String?
 
     enum CodingKeys: String, CodingKey {
         case value
+        case name
         case label
+        case description
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        value = try container.decode(SessionConfigValueId.self, forKey: .value)
+        if let name = try container.decodeIfPresent(String.self, forKey: .name) {
+            self.name = name
+        } else if let label = try container.decodeIfPresent(String.self, forKey: .label) {
+            self.name = label
+        } else {
+            throw DecodingError.keyNotFound(
+                CodingKeys.name,
+                DecodingError.Context(
+                    codingPath: container.codingPath,
+                    debugDescription: "Missing name/label for SessionConfigSelectOption"
+                )
+            )
+        }
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(value, forKey: .value)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(description, forKey: .description)
     }
 }
 
 // MARK: - Session Config Select Group
 
+nonisolated struct SessionConfigGroupId: Codable, Hashable {
+    let value: String
+
+    init(_ value: String) {
+        self.value = value
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        value = try container.decode(String.self)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(value)
+    }
+}
+
 nonisolated struct SessionConfigSelectGroup: Codable {
-    let label: String
+    let group: SessionConfigGroupId
+    let name: String
     let options: [SessionConfigSelectOption]
 
     enum CodingKeys: String, CodingKey {
+        case group
+        case name
         case label
         case options
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let name = try container.decodeIfPresent(String.self, forKey: .name) {
+            self.name = name
+        } else if let label = try container.decodeIfPresent(String.self, forKey: .label) {
+            self.name = label
+        } else {
+            throw DecodingError.keyNotFound(
+                CodingKeys.name,
+                DecodingError.Context(
+                    codingPath: container.codingPath,
+                    debugDescription: "Missing name/label for SessionConfigSelectGroup"
+                )
+            )
+        }
+        group = try container.decodeIfPresent(SessionConfigGroupId.self, forKey: .group) ?? SessionConfigGroupId(self.name)
+        options = try container.decode([SessionConfigSelectOption].self, forKey: .options)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(group, forKey: .group)
+        try container.encode(name, forKey: .name)
+        try container.encode(options, forKey: .options)
     }
 }

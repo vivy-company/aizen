@@ -128,6 +128,10 @@ extension AgentSession {
         } catch {
             // Reset streaming state on error (e.g., timeout)
             isStreaming = false
+            if isAuthRequiredError(error) {
+                needsAuthentication = true
+                addSystemMessage("Authentication required. Use the login button or configure API keys in environment variables.")
+            }
             throw error
         }
 

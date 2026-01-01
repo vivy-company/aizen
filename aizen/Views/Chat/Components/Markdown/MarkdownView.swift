@@ -483,10 +483,12 @@ final class MarkdownViewModel: ObservableObject {
     private var lastContent: String = ""
     private var lastIsStreaming: Bool = false
     private var parseTask: Task<Void, Never>?
-    private let streamingDebounceNanos: UInt64 = 300_000_000
-    private let streamingLargeDebounceNanos: UInt64 = 600_000_000
+    private var streamingTask: Task<Void, Never>?
+    private var pendingContent: String = ""
+    private var pendingIsStreaming: Bool = false
+    private let streamingIntervalNanos: UInt64 = 50_000_000
+    private let streamingLargeIntervalNanos: UInt64 = 100_000_000
     private let streamingLargeContentThreshold = 6000
-    private let streamingMinDelta = 120
     private var lastParsedLength: Int = 0
     private var parseGeneration: Int = 0
 
@@ -495,44 +497,70 @@ final class MarkdownViewModel: ObservableObject {
         guard content != lastContent || isStreaming != lastIsStreaming else { return }
         lastContent = content
         lastIsStreaming = isStreaming
+        pendingContent = content
+        pendingIsStreaming = isStreaming
 
-        let contentSnapshot = content
-        let isStreamingSnapshot = isStreaming
-        let delta = abs(contentSnapshot.count - lastParsedLength)
-        if isStreamingSnapshot && delta < streamingMinDelta {
+        if isStreaming {
+            scheduleStreamingParse()
             return
         }
+
+        streamingTask?.cancel()
+        streamingTask = nil
 
         parseTask?.cancel()
         parseGeneration += 1
         let generation = parseGeneration
+        let contentSnapshot = content
 
-        if isStreamingSnapshot {
-            let debounce = contentSnapshot.count > streamingLargeContentThreshold
-                ? streamingLargeDebounceNanos
-                : streamingDebounceNanos
-            parseTask = Task.detached(priority: .userInitiated) {
-                try? await Task.sleep(nanoseconds: debounce)
+        parseTask = Task.detached(priority: .userInitiated) {
+            let parser = MarkdownParser()
+            let document = parser.parse(contentSnapshot)
+            await MainActor.run { [weak self] in
+                guard let self, generation == self.parseGeneration else { return }
+                self.blocks = document.blocks
+                self.streamingBuffer = document.streamingBuffer
+                self.lastParsedLength = contentSnapshot.count
+            }
+        }
+    }
+
+    private func scheduleStreamingParse() {
+        guard streamingTask == nil else { return }
+        streamingTask = Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            while true {
+                let interval = await MainActor.run { [weak self] in
+                    guard let self else { return 40_000_000 }
+                    return Int(self.pendingContent.count > self.streamingLargeContentThreshold
+                        ? self.streamingLargeIntervalNanos
+                        : self.streamingIntervalNanos)
+                }
+
+                try? await Task.sleep(nanoseconds: UInt64(interval))
                 guard !Task.isCancelled else { return }
+
+                let (contentSnapshot, isStreamingSnapshot) = await MainActor.run { [weak self] in
+                    guard let self else { return ("", false) }
+                    return (self.pendingContent, self.pendingIsStreaming)
+                }
+
                 let parser = MarkdownParser()
                 let document = parser.parseStreaming(contentSnapshot, isComplete: false)
                 await MainActor.run { [weak self] in
-                    guard let self, generation == self.parseGeneration else { return }
+                    guard let self else { return }
                     self.blocks = document.blocks
                     self.streamingBuffer = document.streamingBuffer
                     self.lastParsedLength = contentSnapshot.count
+                }
+
+                if !isStreamingSnapshot {
+                    break
                 }
             }
-        } else {
-            parseTask = Task.detached(priority: .userInitiated) {
-                let parser = MarkdownParser()
-                let document = parser.parse(contentSnapshot)
-                await MainActor.run { [weak self] in
-                    guard let self, generation == self.parseGeneration else { return }
-                    self.blocks = document.blocks
-                    self.streamingBuffer = document.streamingBuffer
-                    self.lastParsedLength = contentSnapshot.count
-                }
+
+            await MainActor.run { [weak self] in
+                self?.streamingTask = nil
             }
         }
     }

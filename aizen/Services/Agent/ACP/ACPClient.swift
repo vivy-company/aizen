@@ -208,7 +208,7 @@ actor ACPClient {
             credentials: credentials
         )
 
-        let response = try await sendRequest(method: "authenticate", params: request)
+        let response = try await sendRequest(method: "authenticate", params: request, timeout: nil)
 
         // Check for errors first
         if let error = response.error {

@@ -483,10 +483,10 @@ struct MCPMarketplaceView: View {
             )
 
             var transports: Set<String> = ["stdio"]
-            if initResponse.agentCapabilities?.mcpCapabilities?.http == true {
+            if initResponse.agentCapabilities.mcpCapabilities?.http == true {
                 transports.insert("http")
             }
-            if initResponse.agentCapabilities?.mcpCapabilities?.sse == true {
+            if initResponse.agentCapabilities.mcpCapabilities?.sse == true {
                 transports.insert("sse")
             }
 

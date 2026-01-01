@@ -91,11 +91,11 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     private var isModeChanging = false
     private var thoughtBuffer: String = ""
     private var thoughtFlushTask: Task<Void, Never>?
-    private static let thoughtUpdateInterval: TimeInterval = 0.15
+    private static let thoughtUpdateInterval: TimeInterval = 0.06
     private var pendingAgentText: String = ""
     private var pendingAgentBlocks: [ContentBlock] = []
     private var agentMessageFlushTask: Task<Void, Never>?
-    private static let agentMessageFlushInterval: TimeInterval = 0.25
+    private static let agentMessageFlushInterval: TimeInterval = 0.0
     var pendingToolCallContentById: [String: [ToolCallContent]] = [:]
     var toolCallContentFlushTasks: [String: Task<Void, Never>] = [:]
     static let toolCallContentFlushInterval: TimeInterval = 0.25
@@ -180,6 +180,8 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                 executionTime: lastAgentMessage.executionTime,
                 requestId: lastAgentMessage.requestId
             )
+            // Force @Published update for in-place array mutation.
+            messages = messages
         }
 
         pendingAgentText = ""
@@ -197,7 +199,11 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         guard agentMessageFlushTask == nil else { return }
         agentMessageFlushTask = Task { @MainActor in
             defer { agentMessageFlushTask = nil }
-            try? await Task.sleep(for: .seconds(Self.agentMessageFlushInterval))
+            if Self.agentMessageFlushInterval > 0 {
+                try? await Task.sleep(for: .seconds(Self.agentMessageFlushInterval))
+            } else {
+                await Task.yield()
+            }
             flushAgentMessageBuffer()
         }
     }
