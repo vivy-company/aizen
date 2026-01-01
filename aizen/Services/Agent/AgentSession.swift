@@ -761,21 +761,60 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         if before.kind?.rawValue != after.kind?.rawValue { return true }
         if before.status != after.status { return true }
         if before.content.count != after.content.count { return true }
-        if before.locations?.count != after.locations?.count { return true }
+        if !toolCallLocationsEqual(before.locations, after.locations) { return true }
 
         let beforeLast = before.content.last?.displayText
         let afterLast = after.content.last?.displayText
         if beforeLast != afterLast { return true }
 
-        let beforeRawInput = before.rawInput != nil
-        let afterRawInput = after.rawInput != nil
-        if beforeRawInput != afterRawInput { return true }
-
-        let beforeRawOutput = before.rawOutput != nil
-        let afterRawOutput = after.rawOutput != nil
-        if beforeRawOutput != afterRawOutput { return true }
+        if !anyCodableEqual(before.rawInput, after.rawInput) { return true }
+        if !anyCodableEqual(before.rawOutput, after.rawOutput) { return true }
 
         return false
+    }
+
+    private func toolCallLocationsEqual(_ lhs: [ToolLocation]?, _ rhs: [ToolLocation]?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case (nil, _), (_, nil):
+            return false
+        case (let left?, let right?):
+            guard left.count == right.count else { return false }
+            for (l, r) in zip(left, right) {
+                if l.path != r.path { return false }
+                if l.line != r.line { return false }
+            }
+            return true
+        }
+    }
+
+    private func anyCodableEqual(_ lhs: AnyCodable?, _ rhs: AnyCodable?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case (nil, _), (_, nil):
+            return false
+        case (let left?, let right?):
+            return anyCodableSnapshot(left) == anyCodableSnapshot(right)
+        }
+    }
+
+    private func anyCodableSnapshot(_ value: AnyCodable) -> String {
+        let raw = value.value
+        if let string = raw as? String { return "s:\(string)" }
+        if let int = raw as? Int { return "i:\(int)" }
+        if let double = raw as? Double { return "d:\(double)" }
+        if let bool = raw as? Bool { return "b:\(bool)" }
+        if raw is NSNull { return "null" }
+
+        if JSONSerialization.isValidJSONObject(raw),
+           let data = try? JSONSerialization.data(withJSONObject: raw, options: [.sortedKeys]),
+           let json = String(data: data, encoding: .utf8) {
+            return "j:\(json)"
+        }
+
+        return "d:\(String(describing: raw))"
     }
 
     /// Clear all tool calls
@@ -835,7 +874,29 @@ struct MessageItem: Identifiable, Equatable {
     var requestId: String?
 
     static func == (lhs: MessageItem, rhs: MessageItem) -> Bool {
-        lhs.id == rhs.id && lhs.content == rhs.content && lhs.isComplete == rhs.isComplete
+        lhs.id == rhs.id &&
+            lhs.content == rhs.content &&
+            lhs.isComplete == rhs.isComplete &&
+            lhs.contentBlocksSignature == rhs.contentBlocksSignature
+    }
+
+    private var contentBlocksSignature: (Int, String?) {
+        let count = contentBlocks.count
+        guard let last = contentBlocks.last else { return (count, nil) }
+        let lastSignature: String
+        switch last {
+        case .text(let text):
+            lastSignature = "text:\(text.text.count)"
+        case .image(let image):
+            lastSignature = "image:\(image.mimeType):\(image.data.count)"
+        case .audio(let audio):
+            lastSignature = "audio:\(audio.mimeType):\(audio.data.count)"
+        case .resource(let resource):
+            lastSignature = "resource:\(resource.resource.uri ?? ""):\(resource.resource.mimeType ?? "")"
+        case .resourceLink(let link):
+            lastSignature = "link:\(link.uri)"
+        }
+        return (count, lastSignature)
     }
 }
 

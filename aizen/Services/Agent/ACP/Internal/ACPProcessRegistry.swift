@@ -54,7 +54,7 @@ actor ACPProcessRegistry {
     }
 
     func cleanupOrphanedProcesses() async {
-        var entries = loadEntries()
+        let entries = loadEntries()
         guard !entries.isEmpty else { return }
 
         let now = Date().timeIntervalSince1970

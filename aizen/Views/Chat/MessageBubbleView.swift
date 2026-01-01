@@ -37,10 +37,21 @@ struct MessageBubbleView: View {
         }
     }
 
+    private var agentAttachmentBlocks: [ContentBlock] {
+        message.contentBlocks.filter { block in
+            switch block {
+            case .text:
+                return false
+            case .image, .audio, .resource, .resourceLink:
+                return true
+            }
+        }
+    }
+
     private var shouldShowAgentMessage: Bool {
         guard message.role == .agent else { return true }
         let hasContent = !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return hasContent
+        return hasContent || !agentAttachmentBlocks.isEmpty
     }
 
     var body: some View {
@@ -75,7 +86,17 @@ struct MessageBubbleView: View {
                 if shouldShowAgentMessage {
                     HStack {
                         VStack(alignment: .leading, spacing: 6) {
-                            MessageContentView(content: message.content, isStreaming: !message.isComplete)
+                            if !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                MessageContentView(content: message.content, isStreaming: !message.isComplete)
+                            }
+
+                            if !agentAttachmentBlocks.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ForEach(Array(agentAttachmentBlocks.enumerated()), id: \.offset) { _, block in
+                                        ContentBlockRenderer(block: block, style: .full)
+                                    }
+                                }
+                            }
 
                             HStack(spacing: 8) {
                                 Text(formatTimestamp(message.timestamp))
@@ -245,9 +266,9 @@ struct UserBubble<Background: View>: View {
     private var bubbleContent: some View {
         Text(content)
             .textSelection(.enabled)
-            .multilineTextAlignment(.trailing)
+            .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: maxContentWidth, alignment: .trailing)
+            .frame(maxWidth: maxContentWidth, alignment: .leading)
     }
 
     @ViewBuilder

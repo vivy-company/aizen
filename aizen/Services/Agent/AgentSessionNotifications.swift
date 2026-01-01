@@ -342,18 +342,23 @@ extension AgentSession {
     }
 
     private func flushToolCallContent(for toolCallId: String) {
-        guard let pending = pendingToolCallContentById.removeValue(forKey: toolCallId),
-              !pending.isEmpty else {
-            return
-        }
-        toolCallContentFlushTasks[toolCallId]?.cancel()
-        toolCallContentFlushTasks[toolCallId] = nil
+        let pending = popBufferedToolCallContent(for: toolCallId)
+        guard !pending.isEmpty else { return }
 
         updateToolCallInPlace(id: toolCallId) { updated in
             var allContent = updated.content
             allContent.append(contentsOf: pending)
             updated.content = coalesceAdjacentTextBlocks(allContent)
         }
+    }
+
+    private func popBufferedToolCallContent(for toolCallId: String) -> [ToolCallContent] {
+        let pending = pendingToolCallContentById.removeValue(forKey: toolCallId) ?? []
+        if let task = toolCallContentFlushTasks[toolCallId] {
+            task.cancel()
+            toolCallContentFlushTasks[toolCallId] = nil
+        }
+        return pending
     }
 
     private func applyBufferedToolCallUpdatesIfPresent(for toolCallId: String) {
@@ -441,15 +446,23 @@ extension AgentSession {
         if !incomingContent.isEmpty {
             let shouldFlushNow = status == .completed || status == .failed
             if shouldFlushNow {
-                flushToolCallContent(for: details.toolCallId)
+                let buffered = popBufferedToolCallContent(for: details.toolCallId)
                 var allContent = updated.content
+                if !buffered.isEmpty {
+                    allContent.append(contentsOf: buffered)
+                }
                 allContent.append(contentsOf: incomingContent)
                 updated.content = coalesceAdjacentTextBlocks(allContent)
             } else {
                 bufferToolCallContent(incomingContent, for: details.toolCallId)
             }
         } else if status == .completed || status == .failed {
-            flushToolCallContent(for: details.toolCallId)
+            let buffered = popBufferedToolCallContent(for: details.toolCallId)
+            if !buffered.isEmpty {
+                var allContent = updated.content
+                allContent.append(contentsOf: buffered)
+                updated.content = coalesceAdjacentTextBlocks(allContent)
+            }
         }
     }
 
