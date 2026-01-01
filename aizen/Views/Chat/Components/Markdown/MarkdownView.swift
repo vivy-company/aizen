@@ -238,18 +238,17 @@ private enum BlockGroup {
 
 // MARK: - Combined Text Block View
 
-/// Renders multiple text blocks using SwiftUI Text with selection support
+/// Renders multiple text blocks using NSTextView for stable layout and selection
 struct CombinedTextBlockView: View {
     let blocks: [MarkdownBlock]
 
     var body: some View {
-        Text(buildAttributedString())
-            .textSelection(.enabled)
+        CombinedSelectableTextView(attributedText: buildAttributedText())
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func buildAttributedString() -> AttributedString {
-        var result = AttributedString()
+    private func buildAttributedText() -> NSAttributedString {
+        let result = NSMutableAttributedString()
 
         for (index, block) in blocks.enumerated() {
             if index == 0, case .heading = block.type {
@@ -264,10 +263,16 @@ struct CombinedTextBlockView: View {
 
             switch block.type {
             case .paragraph(let content):
-                result.append(content.attributedString(baseFont: .body))
+                result.append(content.nsAttributedString(
+                    baseFont: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                    baseColor: .labelColor
+                ))
 
             case .heading(let content, let level):
-                result.append(content.attributedString(baseFont: fontForHeading(level: level)))
+                result.append(content.nsAttributedString(
+                    baseFont: fontForHeading(level: level),
+                    baseColor: .labelColor
+                ))
 
             case .blockQuote(let nestedBlocks):
                 result.append(buildQuoteAttributedString(nestedBlocks))
@@ -276,26 +281,41 @@ struct CombinedTextBlockView: View {
                 result.append(buildListAttributedString(items))
 
             case .thematicBreak:
-                var hr = AttributedString("───────────────────────────────")
-                hr.foregroundColor = .secondary
+                let hr = NSAttributedString(
+                    string: "───────────────────────────────",
+                    attributes: [
+                        .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                        .foregroundColor: NSColor.secondaryLabelColor
+                    ]
+                )
                 result.append(hr)
 
             case .footnoteReference(let id):
-                var fn = AttributedString("[\(id)]")
-                fn.font = .footnote
-                fn.foregroundColor = .accentColor
-                fn.baselineOffset = 4
+                let fn = NSAttributedString(
+                    string: "[\(id)]",
+                    attributes: [
+                        .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                        .foregroundColor: NSColor.controlAccentColor,
+                        .baselineOffset: 4
+                    ]
+                )
                 result.append(fn)
 
             case .footnoteDefinition(let id, let defBlocks):
-                var fnDef = AttributedString("[\(id)]: ")
-                fnDef.font = .callout
-                fnDef.foregroundColor = .secondary
+                let fnDef = NSAttributedString(
+                    string: "[\(id)]: ",
+                    attributes: [
+                        .font: NSFont.systemFont(ofSize: NSFont.systemFontSize - 1),
+                        .foregroundColor: NSColor.secondaryLabelColor
+                    ]
+                )
                 result.append(fnDef)
                 for defBlock in defBlocks {
                     if case .paragraph(let content) = defBlock.type {
-                        var contentAttr = content.attributedString(baseFont: .callout)
-                        contentAttr.foregroundColor = .secondary
+                        let contentAttr = content.nsAttributedString(
+                            baseFont: NSFont.systemFont(ofSize: NSFont.systemFontSize - 1),
+                            baseColor: .secondaryLabelColor
+                        )
                         result.append(contentAttr)
                     }
                 }
@@ -308,24 +328,34 @@ struct CombinedTextBlockView: View {
         return result
     }
 
-    private func fontForHeading(level: Int) -> Font {
+    private func fontForHeading(level: Int) -> NSFont {
+        let baseSize = NSFont.systemFontSize
         switch level {
-        case 1: return .title.bold()
-        case 2: return .title2.bold()
-        case 3: return .title3.weight(.semibold)
-        case 4: return .headline
-        default: return .body.weight(.medium)
+        case 1: return NSFont.systemFont(ofSize: baseSize * 1.5, weight: .bold)
+        case 2: return NSFont.systemFont(ofSize: baseSize * 1.3, weight: .bold)
+        case 3: return NSFont.systemFont(ofSize: baseSize * 1.15, weight: .semibold)
+        case 4: return NSFont.systemFont(ofSize: baseSize * 1.05, weight: .semibold)
+        default: return NSFont.systemFont(ofSize: baseSize, weight: .medium)
         }
     }
 
-    private func buildQuoteAttributedString(_ blocks: [MarkdownBlock]) -> AttributedString {
-        var result = AttributedString("│ ")
-        result.foregroundColor = .secondary
+    private func buildQuoteAttributedString(_ blocks: [MarkdownBlock]) -> NSAttributedString {
+        let result = NSMutableAttributedString(
+            string: "│ ",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                .foregroundColor: NSColor.secondaryLabelColor
+            ]
+        )
 
         for block in blocks {
             if case .paragraph(let content) = block.type {
-                var contentAttr = content.attributedString(baseFont: .body.italic())
-                contentAttr.foregroundColor = .secondary
+                let base = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+                let italic = NSFontManager.shared.convert(base, toHaveTrait: .italicFontMask)
+                let contentAttr = content.nsAttributedString(
+                    baseFont: italic,
+                    baseColor: .secondaryLabelColor
+                )
                 result.append(contentAttr)
             }
         }
@@ -333,12 +363,15 @@ struct CombinedTextBlockView: View {
         return result
     }
 
-    private func buildListAttributedString(_ items: [MarkdownListItem]) -> AttributedString {
-        var result = AttributedString()
+    private func buildListAttributedString(_ items: [MarkdownListItem]) -> NSAttributedString {
+        let result = NSMutableAttributedString()
 
         for (index, item) in items.enumerated() {
             if index > 0 || item.depth > 0 {
-                result.append(AttributedString("\n"))
+                result.append(NSAttributedString(
+                    string: "\n",
+                    attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize)]
+                ))
             }
 
             let indent = String(repeating: "    ", count: item.depth)
@@ -351,14 +384,29 @@ struct CombinedTextBlockView: View {
                 bullet = item.depth == 0 ? "• " : (item.depth == 1 ? "◦ " : "▪ ")
             }
 
-            var bulletAttr = AttributedString(indent + bullet)
-            bulletAttr.foregroundColor = .secondary
+            let bulletAttr = NSAttributedString(
+                string: indent + bullet,
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                    .foregroundColor: NSColor.secondaryLabelColor
+                ]
+            )
             result.append(bulletAttr)
 
-            var contentAttr = item.content.attributedString(baseFont: .body)
+            var contentAttr = item.content.nsAttributedString(
+                baseFont: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                baseColor: .labelColor
+            )
             if item.checkbox == .checked {
-                contentAttr.foregroundColor = .secondary
-                contentAttr.strikethroughStyle = .single
+                let mutable = NSMutableAttributedString(attributedString: contentAttr)
+                mutable.addAttributes(
+                    [
+                        .foregroundColor: NSColor.secondaryLabelColor,
+                        .strikethroughStyle: NSUnderlineStyle.single.rawValue
+                    ],
+                    range: NSRange(location: 0, length: mutable.length)
+                )
+                contentAttr = mutable
             }
             result.append(contentAttr)
 
@@ -371,30 +419,40 @@ struct CombinedTextBlockView: View {
     }
 
     /// Determine spacing between blocks based on their types
-    private func spacingBetween(prev: MarkdownBlockType, current: MarkdownBlockType) -> AttributedString {
-        var spacing = AttributedString("\n")
-        spacing.font = .body
+    private func spacingBetween(prev: MarkdownBlockType, current: MarkdownBlockType) -> NSAttributedString {
+        let spacing = NSMutableAttributedString(
+            string: "\n",
+            attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize)]
+        )
 
         var extra: CGFloat = 0
+        let prevIsHeading = {
+            if case .heading = prev { return true }
+            return false
+        }()
+        let currentIsHeading = {
+            if case .heading = current { return true }
+            return false
+        }()
 
-        if case .heading = prev {
-            extra = max(extra, 6)
+        if prevIsHeading {
+            extra = max(extra, 3)
         }
 
-        if case .heading = current {
-            extra = max(extra, 6)
+        if currentIsHeading {
+            extra = max(extra, 3)
         }
 
         switch prev {
         case .list, .blockQuote, .thematicBreak:
-            extra = max(extra, 4)
+            extra = max(extra, 3)
         default:
             break
         }
 
         switch current {
         case .list, .blockQuote, .thematicBreak:
-            extra = max(extra, 4)
+            extra = max(extra, 3)
         default:
             break
         }
@@ -406,10 +464,11 @@ struct CombinedTextBlockView: View {
         return spacing
     }
 
-    private func spacerLine(height: CGFloat) -> AttributedString {
-        var spacer = AttributedString("\n")
-        spacer.font = .system(size: height)
-        return spacer
+    private func spacerLine(height: CGFloat) -> NSAttributedString {
+        return NSAttributedString(
+            string: "\n",
+            attributes: [.font: NSFont.systemFont(ofSize: height)]
+        )
     }
 }
 
@@ -495,8 +554,8 @@ final class MarkdownViewModel: ObservableObject {
     private var streamingTask: Task<Void, Never>?
     private var pendingContent: String = ""
     private var pendingIsStreaming: Bool = false
-    private let streamingIntervalNanos: UInt64 = 30_000_000
-    private let streamingLargeIntervalNanos: UInt64 = 60_000_000
+    private let streamingIntervalNanos: UInt64 = 8_000_000
+    private let streamingLargeIntervalNanos: UInt64 = 16_000_000
     private let streamingLargeContentThreshold = 6000
     private var lastParsedLength: Int = 0
     private var parseGeneration: Int = 0
@@ -861,6 +920,46 @@ struct SelectableTextView: NSViewRepresentable {
         // Only update if content changed
         if textView.attributedString() != attributed {
             textView.textStorage?.setAttributedString(attributed)
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: FixedTextView, context: Context) -> CGSize? {
+        guard let layoutManager = nsView.layoutManager,
+              let container = nsView.textContainer else {
+            return nil
+        }
+
+        let width = proposal.width ?? 500
+        container.containerSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: container)
+
+        let rect = layoutManager.usedRect(for: container)
+        return CGSize(width: width, height: max(rect.height + 2, 16))
+    }
+}
+
+/// NSTextView-based text view for combined attributed markdown blocks
+struct CombinedSelectableTextView: NSViewRepresentable {
+    let attributedText: NSAttributedString
+
+    func makeNSView(context: Context) -> FixedTextView {
+        let textView = FixedTextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = false
+        textView.textContainerInset = .zero
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.isVerticallyResizable = false
+        textView.isHorizontallyResizable = false
+        textView.translatesAutoresizingMaskIntoConstraints = false
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        textView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return textView
+    }
+
+    func updateNSView(_ textView: FixedTextView, context: Context) {
+        if !textView.attributedString().isEqual(to: attributedText) {
+            textView.textStorage?.setAttributedString(attributedText)
         }
     }
 

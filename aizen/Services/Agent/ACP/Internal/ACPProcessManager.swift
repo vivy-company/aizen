@@ -285,16 +285,31 @@ actor ACPProcessManager {
     private func drainAndClosePipes() async {
         if let stdoutHandle = stdoutPipe?.fileHandleForReading {
             stdoutHandle.readabilityHandler = nil
-            let remaining = stdoutHandle.readDataToEndOfFile()
-            if !remaining.isEmpty {
-                await processIncomingData(remaining)
+            do {
+                while true {
+                    guard let chunk = try stdoutHandle.read(upToCount: 65536), !chunk.isEmpty else {
+                        break
+                    }
+                    await processIncomingData(chunk)
+                }
+            } catch {
+                // Handle already closed or invalid file handles safely
             }
             try? stdoutHandle.close()
         }
 
         if let stderrHandle = stderrPipe?.fileHandleForReading {
             stderrHandle.readabilityHandler = nil
-            _ = stderrHandle.readDataToEndOfFile()
+            do {
+                while true {
+                    guard let chunk = try stderrHandle.read(upToCount: 65536), !chunk.isEmpty else {
+                        break
+                    }
+                    _ = chunk
+                }
+            } catch {
+                // Handle already closed or invalid file handles safely
+            }
             try? stderrHandle.close()
         }
 

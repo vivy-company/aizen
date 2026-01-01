@@ -98,7 +98,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     private static let agentMessageFlushInterval: TimeInterval = 0.0
     var pendingToolCallContentById: [String: [ToolCallContent]] = [:]
     var toolCallContentFlushTasks: [String: Task<Void, Never>] = [:]
-    static let toolCallContentFlushInterval: TimeInterval = 0.25
+    static let toolCallContentFlushInterval: TimeInterval = 0.1
 
     /// Currently pending Task tool calls (subagents) - used for parent tracking
     /// When only one Task is active, child tool calls are assigned to it
@@ -203,14 +203,15 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     }
 
     private func scheduleAgentMessageFlush() {
+        if Self.agentMessageFlushInterval == 0 {
+            flushAgentMessageBuffer()
+            return
+        }
+
         guard agentMessageFlushTask == nil else { return }
         agentMessageFlushTask = Task { @MainActor in
             defer { agentMessageFlushTask = nil }
-            if Self.agentMessageFlushInterval > 0 {
-                try? await Task.sleep(for: .seconds(Self.agentMessageFlushInterval))
-            } else {
-                await Task.yield()
-            }
+            try? await Task.sleep(for: .seconds(Self.agentMessageFlushInterval))
             flushAgentMessageBuffer()
         }
     }

@@ -12,6 +12,7 @@ struct ChatSessionView: View {
     let worktree: Worktree
     @ObservedObject var session: ChatSession
     let sessionManager: ChatSessionManager
+    let isSelected: Bool
 
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -40,10 +41,17 @@ struct ChatSessionView: View {
         }
     }
 
-    init(worktree: Worktree, session: ChatSession, sessionManager: ChatSessionManager, viewContext: NSManagedObjectContext) {
+    init(
+        worktree: Worktree,
+        session: ChatSession,
+        sessionManager: ChatSessionManager,
+        viewContext: NSManagedObjectContext,
+        isSelected: Bool
+    ) {
         self.worktree = worktree
         self.session = session
         self.sessionManager = sessionManager
+        self.isSelected = isSelected
         self._viewContext = Environment(\.managedObjectContext)
 
         let vm = ChatSessionViewModel(
@@ -174,14 +182,26 @@ struct ChatSessionView: View {
             if let draft = viewModel.loadDraftInputText() {
                 inputText = draft
             }
-            viewModel.setupAgentSession()
-            setupAutocompleteWindow()
-            NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
+            if isSelected {
+                viewModel.setupAgentSession()
+                setupAutocompleteWindow()
+                NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
+            }
         }
         .onDisappear {
             viewModel.persistDraftState(inputText: inputText)
             autocompleteWindow?.dismiss()
             NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
+        }
+        .onChange(of: isSelected) { selected in
+            if selected {
+                viewModel.setupAgentSession()
+                setupAutocompleteWindow()
+                NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
+            } else {
+                autocompleteWindow?.dismiss()
+                NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
+            }
         }
         .onChange(of: inputText) { newText in
             viewModel.debouncedPersistDraft(inputText: newText)

@@ -247,26 +247,26 @@ class ChatSessionViewModel: ObservableObject {
             return
         }
 
-        Task {
-            // Create a dedicated AgentSession for this chat session to avoid cross-tab interference
-            let newSession = AgentSession(agentName: self.selectedAgent, workingDirectory: worktreePath)
-            let worktreeName = worktree.branch ?? "Chat"
-            sessionManager.setAgentSession(newSession, for: sessionId, worktreeName: worktreeName)
-            currentAgentSession = newSession
-            autocompleteHandler.agentSession = newSession
-            updateDerivedState(from: newSession)
+        // Create a dedicated AgentSession for this chat session to avoid cross-tab interference
+        let newSession = AgentSession(agentName: self.selectedAgent, workingDirectory: worktreePath)
+        let worktreeName = worktree.branch ?? "Chat"
+        sessionManager.setAgentSession(newSession, for: sessionId, worktreeName: worktreeName)
+        currentAgentSession = newSession
+        autocompleteHandler.agentSession = newSession
+        updateDerivedState(from: newSession)
 
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            // Reset previous IDs and rebuild timeline from new session
+            previousMessageIds = Set(messages.map { $0.id })
+            previousToolCallIds = Set(newSession.toolCalls.map { $0.id })
+            rebuildTimeline()
+        }
+
+        setupSessionObservers(session: newSession)
+
+        Task {
             // Index worktree files for autocomplete
             await autocompleteHandler.indexWorktree()
-
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                // Reset previous IDs and rebuild timeline from new session
-                previousMessageIds = Set(messages.map { $0.id })
-                previousToolCallIds = Set(newSession.toolCalls.map { $0.id })
-                rebuildTimeline()
-            }
-
-            setupSessionObservers(session: newSession)
 
             if !newSession.isActive {
                 do {
@@ -489,7 +489,7 @@ class ChatSessionViewModel: ObservableObject {
         // Observe toolCallsById changes (dictionary-based storage)
         session.$toolCallsById
             .receive(on: DispatchQueue.main)
-            .throttle(for: .milliseconds(120), scheduler: DispatchQueue.main, latest: true)
+            .throttle(for: .milliseconds(60), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] _ in
                 guard let self = self, let session = self.currentAgentSession else { return }
                 let newToolCalls = session.toolCalls

@@ -40,7 +40,7 @@ struct ChatInputBar: View {
     @State private var isTextEditorFocused = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
-    private let disableAnimatedBordersForPerfProbe = true
+    private let disableAnimatedBordersForPerfProbe = false
 
     private let gradientColors: [Color] = [
         .accentColor.opacity(0.7), .accentColor.opacity(0.4), .accentColor.opacity(0.7)

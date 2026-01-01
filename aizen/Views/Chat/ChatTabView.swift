@@ -52,7 +52,8 @@ struct ChatTabView: View {
                         worktree: worktree,
                         session: session,
                         sessionManager: sessionManager,
-                        viewContext: viewContext
+                        viewContext: viewContext,
+                        isSelected: isSelected
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .opacity(isSelected ? 1 : 0)

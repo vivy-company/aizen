@@ -443,14 +443,14 @@ struct ChatMessageList: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                    .modifier(ShimmerEffect())
+                    .modifier(ShimmerEffect(bandSize: 0.38, duration: 2.2, baseOpacity: 0.08, highlightOpacity: 1.0))
                     .transition(.opacity)
             } else {
                 Text("chat.agent.thinking", bundle: .main)
                     .font(.callout)
                     .fontWeight(.bold)
                     .foregroundStyle(.secondary)
-                    .modifier(ShimmerEffect())
+                    .modifier(ShimmerEffect(bandSize: 0.38, duration: 2.2, baseOpacity: 0.08, highlightOpacity: 1.0))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
