@@ -15,10 +15,12 @@ extension AgentSession {
     /// Helper to create session directly without authentication
     func createSessionDirectly(workingDir: String, client: ACPClient, timeout: TimeInterval = 60.0) async throws {
         logger.info("[\(self.agentName)] createSessionDirectly with timeout \(timeout)s...")
+        let mcpServers = await resolveMCPServers()
+        let sessionTimeout = effectiveSessionTimeout(mcpServers: mcpServers, defaultTimeout: timeout)
         let sessionResponse = try await client.newSession(
             workingDirectory: workingDir,
-            mcpServers: [],
-            timeout: timeout
+            mcpServers: mcpServers,
+            timeout: sessionTimeout
         )
         logger.info("[\(self.agentName)] Session created, sessionId: \(sessionResponse.sessionId.value)")
 
@@ -59,8 +61,8 @@ extension AgentSession {
             ])
         }
 
-        needsAuthentication = false
         try await createSessionDirectly(workingDir: workingDir, client: client)
+        needsAuthentication = false
     }
 
     /// Create session without authentication (for when auth method doesn't work)
@@ -69,10 +71,9 @@ extension AgentSession {
             throw AgentSessionError.clientNotInitialized
         }
 
-        AgentRegistry.shared.saveSkipAuth(for: agentName)
-
-        needsAuthentication = false
         try await createSessionDirectly(workingDir: workingDirectory, client: client)
+        AgentRegistry.shared.saveSkipAuth(for: agentName)
+        needsAuthentication = false
     }
 
     /// Authenticate with the agent

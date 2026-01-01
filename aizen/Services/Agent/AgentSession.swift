@@ -111,6 +111,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     private let fileSystemDelegate = AgentFileSystemDelegate()
     private let terminalDelegate = AgentTerminalDelegate()
     let permissionHandler = AgentPermissionHandler()
+    private var agentCapabilities: AgentCapabilities?
 
     // MARK: - Initialization
 
@@ -333,6 +334,8 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             throw error
         }
 
+        self.agentCapabilities = initResponse.agentCapabilities
+
         // Check agent version in background (non-blocking)
         versionCheckTask = Task { [weak self] in
             guard let self = self else { return }
@@ -398,11 +401,14 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                         "[\(agentName)] Session without auth failed: \(error.localizedDescription)")
                     // Check if error indicates API key/custom endpoint issue
                     let errorMessage = error.localizedDescription.lowercased()
-                    if errorMessage.contains("api key") || errorMessage.contains("invalid") ||
-                       errorMessage.contains("unauthorized") || errorMessage.contains("401") {
-                        // Show actual error for custom API configuration issues
+                    if isAuthRequiredError(error) {
                         self.needsAuthentication = true
-                        addSystemMessage("⚠️ \(error.localizedDescription)")
+                        if errorMessage.contains("api key") || errorMessage.contains("invalid") ||
+                            errorMessage.contains("unauthorized") || errorMessage.contains("401") {
+                            addSystemMessage("⚠️ \(error.localizedDescription)")
+                        } else {
+                            addSystemMessage("Authentication required. Use the login button or configure API keys in environment variables.")
+                        }
                         return
                     }
                     // Fall through to show auth dialog for other errors
@@ -419,9 +425,12 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         logger.info("[\(agentName)] Creating new session...")
         let sessionResponse: NewSessionResponse
         do {
+            let mcpServers = await resolveMCPServers()
+            let sessionTimeout = effectiveSessionTimeout(mcpServers: mcpServers, defaultTimeout: 30.0)
             sessionResponse = try await client.newSession(
                 workingDirectory: workingDir,
-                mcpServers: []
+                mcpServers: mcpServers,
+                timeout: sessionTimeout
             )
             logger.info(
                 "[\(agentName)] Session created in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms, sessionId: \(sessionResponse.sessionId.value)"
@@ -452,6 +461,74 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         let displayName = metadata?.name ?? agentName
         AgentUsageStore.shared.recordSessionStart(agentId: agentName)
         addSystemMessage("Session started with \(displayName) in \(workingDir)")
+    }
+
+    func resolveMCPServers() async -> [MCPServerConfig] {
+        let servers = await MCPConfigManager.shared.listServers(agentId: agentName)
+        guard !servers.isEmpty else { return [] }
+
+        let mcpCapabilities = agentCapabilities?.mcpCapabilities
+        let allowHTTP = mcpCapabilities?.http ?? true
+        let allowSSE = mcpCapabilities?.sse ?? true
+
+        var configs: [MCPServerConfig] = []
+        for name in servers.keys.sorted() {
+            guard let entry = servers[name] else { continue }
+            switch entry.type {
+            case "stdio":
+                guard let command = entry.command else {
+                    logger.warning("[\(self.agentName)] MCP server '\(name)' missing command")
+                    continue
+                }
+                let env = (entry.env ?? [:]).sorted { $0.key < $1.key }.map { EnvVariable(name: $0.key, value: $0.value, _meta: nil) }
+                let config = StdioServerConfig(
+                    name: name,
+                    command: command,
+                    args: entry.args ?? [],
+                    env: env,
+                    _meta: nil
+                )
+                configs.append(.stdio(config))
+            case "http":
+                guard allowHTTP else {
+                    logger.info("[\(self.agentName)] MCP server '\(name)' skipped (HTTP not supported)")
+                    continue
+                }
+                guard let url = entry.url else {
+                    logger.warning("[\(self.agentName)] MCP server '\(name)' missing url")
+                    continue
+                }
+                let config = HTTPServerConfig(name: name, url: url, headers: nil, _meta: nil)
+                configs.append(.http(config))
+            case "sse":
+                guard allowSSE else {
+                    logger.info("[\(self.agentName)] MCP server '\(name)' skipped (SSE not supported)")
+                    continue
+                }
+                guard let url = entry.url else {
+                    logger.warning("[\(self.agentName)] MCP server '\(name)' missing url")
+                    continue
+                }
+                let config = SSEServerConfig(name: name, url: url, headers: nil, _meta: nil)
+                configs.append(.sse(config))
+            default:
+                logger.warning("[\(self.agentName)] MCP server '\(name)' has unknown type '\(entry.type)'")
+            }
+        }
+
+        return configs
+    }
+
+    func effectiveSessionTimeout(mcpServers: [MCPServerConfig], defaultTimeout: TimeInterval) -> TimeInterval {
+        let hasRemote = mcpServers.contains { config in
+            switch config {
+            case .http, .sse:
+                return true
+            case .stdio:
+                return false
+            }
+        }
+        return hasRemote ? max(defaultTimeout, 180.0) : defaultTimeout
     }
 
     /// Set mode by ID
@@ -668,6 +745,25 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             toolCallsById.removeValue(forKey: id)
         }
         toolCallOrder.removeFirst(excess)
+    }
+
+    func isAuthRequiredError(_ error: Error) -> Bool {
+        if let acpError = error as? ACPClientError {
+            if case .agentError(let jsonError) = acpError {
+                if jsonError.code == -32000 { return true }
+                let message = jsonError.message.lowercased()
+                if message.contains("auth") && message.contains("required") { return true }
+            }
+        }
+
+        let message = error.localizedDescription.lowercased()
+        if message.contains("authentication required") || message.contains("auth required") {
+            return true
+        }
+        if message.contains("not authenticated") {
+            return true
+        }
+        return message.contains("unauthorized") || message.contains("401")
     }
 }
 
