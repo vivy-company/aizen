@@ -48,7 +48,7 @@ class PullRequestsViewModel: ObservableObject {
 
     // MARK: - Private
 
-    private let hostingService = GitHostingService()
+    private let hostingService = GitHostingService.shared
     private var repoPath: String = ""
     private var currentPage = 0
     private let pageSize = 30

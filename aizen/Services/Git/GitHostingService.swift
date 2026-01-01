@@ -114,10 +114,28 @@ enum GitHostingError: LocalizedError {
 // MARK: - Service
 
 actor GitHostingService {
+    static let shared = GitHostingService()
+
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitHostingService")
 
     // Cache CLI paths
     private var cliPathCache: [GitHostingProvider: String?] = [:]
+    // Cache hosting info and auth checks to avoid redundant CLI calls.
+    private struct CachedHostingInfo {
+        let info: GitHostingInfo
+        let timestamp: Date
+    }
+    private struct CachedAuthStatus {
+        let authenticated: Bool
+        let timestamp: Date
+    }
+    private var hostingInfoCache: [String: CachedHostingInfo] = [:]
+    private var hostingInfoTasks: [String: Task<GitHostingInfo?, Never>] = [:]
+    private var authStatusCache: [GitHostingProvider: CachedAuthStatus] = [:]
+    private var authStatusTasks: [GitHostingProvider: Task<Bool, Never>] = [:]
+
+    private let hostingInfoTTL: TimeInterval = 60
+    private let authStatusTTL: TimeInterval = 60
 
     // MARK: - CLI Execution Helper
 
@@ -189,6 +207,29 @@ actor GitHostingService {
     }
 
     func getHostingInfo(for repoPath: String) async -> GitHostingInfo? {
+        if let cached = hostingInfoCache[repoPath],
+           Date().timeIntervalSince(cached.timestamp) < hostingInfoTTL {
+            return cached.info
+        }
+
+        if let task = hostingInfoTasks[repoPath] {
+            return await task.value
+        }
+
+        let task = Task { [repoPath] in
+            return await self.computeHostingInfo(repoPath: repoPath)
+        }
+        hostingInfoTasks[repoPath] = task
+
+        let info = await task.value
+        hostingInfoTasks[repoPath] = nil
+        if let info = info {
+            hostingInfoCache[repoPath] = CachedHostingInfo(info: info, timestamp: Date())
+        }
+        return info
+    }
+
+    private func computeHostingInfo(repoPath: String) async -> GitHostingInfo? {
         // Run libgit2 operations on background thread
         let remoteURL: String?
         do {
@@ -299,6 +340,27 @@ actor GitHostingService {
     }
 
     func checkCLIAuthenticated(for provider: GitHostingProvider, repoPath: String) async -> Bool {
+        if let cached = authStatusCache[provider],
+           Date().timeIntervalSince(cached.timestamp) < authStatusTTL {
+            return cached.authenticated
+        }
+
+        if let task = authStatusTasks[provider] {
+            return await task.value
+        }
+
+        let task = Task { [provider, repoPath] in
+            return await self.computeCLIAuthenticated(for: provider, repoPath: repoPath)
+        }
+        authStatusTasks[provider] = task
+
+        let authenticated = await task.value
+        authStatusTasks[provider] = nil
+        authStatusCache[provider] = CachedAuthStatus(authenticated: authenticated, timestamp: Date())
+        return authenticated
+    }
+
+    private func computeCLIAuthenticated(for provider: GitHostingProvider, repoPath: String) async -> Bool {
         let (installed, path) = await checkCLIInstalled(for: provider)
         guard installed, let cliPath = path else { return false }
 

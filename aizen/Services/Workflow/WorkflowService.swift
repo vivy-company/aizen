@@ -490,6 +490,15 @@ class WorkflowService: ObservableObject {
         refreshTimer = nil
     }
 
+    func setAutoRefreshEnabled(_ enabled: Bool) {
+        guard isConfigured else { return }
+        if enabled {
+            startAutoRefresh()
+        } else {
+            stopAutoRefresh()
+        }
+    }
+
     // MARK: - Log Polling
 
     private func startLogPolling(runId: String) {

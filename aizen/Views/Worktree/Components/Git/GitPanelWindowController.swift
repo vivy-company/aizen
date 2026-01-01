@@ -93,10 +93,11 @@ struct GitPanelWindowContentWithToolbar: View {
     @State private var hostingInfo: GitHostingInfo?
     @State private var showCLIInstallAlert: Bool = false
     @State private var prOperationInProgress: Bool = false
+    @State private var hostingInfoTask: Task<Void, Never>?
 
     @ObservedObject private var gitRepositoryService: GitRepositoryService
 
-    private let gitHostingService = GitHostingService()
+    private let gitHostingService = GitHostingService.shared
 
     private var worktree: Worktree { context.worktree }
     private var gitStatus: GitStatus { gitRepositoryService.currentStatus }
@@ -183,9 +184,9 @@ struct GitPanelWindowContentWithToolbar: View {
                 gitActionsToolbar
             }
         }
-        .onAppear {
-            Task {
-                await loadHostingInfo()
+        .onChange(of: selectedTab) { newTab in
+            if newTab == .prs {
+                loadHostingInfoIfNeeded()
             }
         }
         .onChange(of: gitStatus.currentBranch) { _ in
@@ -430,6 +431,16 @@ struct GitPanelWindowContentWithToolbar: View {
         guard let path = worktree.path else { return }
         hostingInfo = await gitHostingService.getHostingInfo(for: path)
         await refreshPRStatus()
+    }
+
+    private func loadHostingInfoIfNeeded() {
+        guard hostingInfo == nil, hostingInfoTask == nil else { return }
+        hostingInfoTask = Task {
+            await loadHostingInfo()
+            await MainActor.run {
+                hostingInfoTask = nil
+            }
+        }
     }
 
     private func refreshPRStatus() async {

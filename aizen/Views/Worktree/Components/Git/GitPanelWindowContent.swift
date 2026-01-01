@@ -116,18 +116,6 @@ struct GitPanelWindowContent: View {
             _ = updateChangedFilesCache()
             setupGitWatcher()
         }
-        .onChange(of: selectedTab) { newTab in
-            // Lazy-load workflow service when workflows tab is selected
-            if newTab == .workflows && !workflowServiceInitialized {
-                workflowServiceInitialized = true
-                Task {
-                    await workflowService.configure(
-                        repoPath: worktreePath,
-                        branch: gitStatus.currentBranch.isEmpty ? "main" : gitStatus.currentBranch
-                    )
-                }
-            }
-        }
         .onDisappear {
             if let token = gitIndexWatchToken {
                 Task {
@@ -136,6 +124,8 @@ struct GitPanelWindowContent: View {
             }
             gitIndexWatchToken = nil
             workflowService.stopAutoRefresh()
+            // Ensure any workflow log polling stops when the window closes.
+            workflowService.clearSelection()
         }
         .onChange(of: gitStatus) { _ in
             let changed = updateChangedFilesCache()
@@ -246,6 +236,26 @@ struct GitPanelWindowContent: View {
                     selectedWorkflowForTrigger = workflow
                 }
             )
+            .onAppear {
+                if !workflowServiceInitialized {
+                    workflowServiceInitialized = true
+                    Task {
+                        await workflowService.configure(
+                            repoPath: worktreePath,
+                            branch: gitStatus.currentBranch.isEmpty ? "main" : gitStatus.currentBranch
+                        )
+                    }
+                } else {
+                    workflowService.setAutoRefreshEnabled(true)
+                    Task {
+                        await workflowService.refresh()
+                    }
+                }
+            }
+            .onDisappear {
+                workflowService.setAutoRefreshEnabled(false)
+                workflowService.clearSelection()
+            }
         case .prs:
             EmptyView()
         }
