@@ -498,7 +498,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                     logger.warning("[\(self.agentName)] MCP server '\(name)' missing url")
                     continue
                 }
-                let config = HTTPServerConfig(name: name, url: url, headers: nil, _meta: nil)
+                let config = HTTPServerConfig(name: name, url: url, headers: [], _meta: nil)
                 configs.append(.http(config))
             case "sse":
                 guard allowSSE else {
@@ -509,7 +509,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                     logger.warning("[\(self.agentName)] MCP server '\(name)' missing url")
                     continue
                 }
-                let config = SSEServerConfig(name: name, url: url, headers: nil, _meta: nil)
+                let config = SSEServerConfig(name: name, url: url, headers: [], _meta: nil)
                 configs.append(.sse(config))
             default:
                 logger.warning("[\(self.agentName)] MCP server '\(name)' has unknown type '\(entry.type)'")
