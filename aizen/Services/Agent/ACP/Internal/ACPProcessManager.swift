@@ -17,10 +17,16 @@ actor ACPProcessManager {
     private var stderrPipe: Pipe?
 
     private var readBuffer: Data = Data()
+    private var largeBufferDumpCount: Int = 0
+    private var lastLargeBufferDumpSize: Int = 0
 
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let logger: Logger
+
+    private static let largeBufferWarningThreshold = 200000
+    private static let largeBufferDumpMinGrowth = 8192
+    private static let maxLargeBufferDumps = 3
 
     // Callback for incoming data
     private var onDataReceived: ((Data) async -> Void)?
@@ -353,11 +359,36 @@ actor ACPProcessManager {
             }
         }
 
-        if readBuffer.count > 200000 {
+        if readBuffer.count > Self.largeBufferWarningThreshold {
             logger.warning("Large buffer (\(self.readBuffer.count) bytes) without complete JSON message")
+            dumpLargeBufferIfEnabled(reason: "incomplete_json")
         }
 
         return nil
+    }
+
+    private func dumpLargeBufferIfEnabled(reason: String) {
+        guard ProcessInfo.processInfo.environment["AIZEN_ACP_DUMP_STDOUT"] == "1" else {
+            return
+        }
+        guard largeBufferDumpCount < Self.maxLargeBufferDumps else { return }
+
+        let size = readBuffer.count
+        guard size - lastLargeBufferDumpSize >= Self.largeBufferDumpMinGrowth else { return }
+
+        largeBufferDumpCount += 1
+        lastLargeBufferDumpSize = size
+
+        let timestamp = String(Int(Date().timeIntervalSince1970))
+        let filename = "aizen-acp-stdout-\(reason)-\(timestamp)-\(size).bin"
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+
+        do {
+            try readBuffer.write(to: fileURL, options: [.atomic])
+            logger.warning("Dumped ACP stdout buffer to \(fileURL.path)")
+        } catch {
+            logger.error("Failed to dump ACP stdout buffer: \(error.localizedDescription)")
+        }
     }
 
     private func flushRemainingBufferIfNeeded() async {

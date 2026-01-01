@@ -7,10 +7,43 @@ import os.log
 class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     var parent: WebViewWrapper
     var lastFailedURL: String?
+    weak var webView: WKWebView?
+    private var observersAttached = false
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "WebView")
 
     init(_ parent: WebViewWrapper) {
         self.parent = parent
+    }
+
+    func attach(to webView: WKWebView) {
+        if self.webView === webView && observersAttached {
+            return
+        }
+
+        detach()
+        self.webView = webView
+
+        webView.addObserver(self, forKeyPath: "estimatedProgress", options: .new, context: nil)
+        webView.addObserver(self, forKeyPath: "URL", options: .new, context: nil)
+        webView.addObserver(self, forKeyPath: "title", options: .new, context: nil)
+        observersAttached = true
+    }
+
+    func detach() {
+        guard let webView = webView else { return }
+
+        webView.stopLoading()
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+
+        if observersAttached {
+            webView.removeObserver(self, forKeyPath: "estimatedProgress")
+            webView.removeObserver(self, forKeyPath: "URL")
+            webView.removeObserver(self, forKeyPath: "title")
+            observersAttached = false
+        }
+
+        self.webView = nil
     }
 
     // MARK: - WKUIDelegate
@@ -130,7 +163,7 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     // MARK: - KVO for Progress and URL
 
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        guard let webView = object as? WKWebView else { return }
+        guard let webView = object as? WKWebView, webView === self.webView else { return }
 
         if keyPath == "estimatedProgress" {
             parent.loadingProgress = webView.estimatedProgress
@@ -251,9 +284,7 @@ struct WebViewWrapper: NSViewRepresentable {
         }
 
         // Observe loading progress, URL changes, and title changes
-        webView.addObserver(context.coordinator, forKeyPath: "estimatedProgress", options: .new, context: nil)
-        webView.addObserver(context.coordinator, forKeyPath: "URL", options: .new, context: nil)
-        webView.addObserver(context.coordinator, forKeyPath: "title", options: .new, context: nil)
+        context.coordinator.attach(to: webView)
 
         // Create wrapper view to fix Web Inspector flickering
         // Wrapping WKWebView prevents autolayout conflicts with inspector
@@ -282,15 +313,7 @@ struct WebViewWrapper: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: WebViewCoordinator) {
-        // Find WKWebView in container and remove all observers
-        if let webView = nsView.subviews.first(where: { $0 is WKWebView }) as? WKWebView {
-            webView.stopLoading()
-            webView.navigationDelegate = nil
-            webView.uiDelegate = nil
-            webView.removeObserver(coordinator, forKeyPath: "estimatedProgress")
-            webView.removeObserver(coordinator, forKeyPath: "URL")
-            webView.removeObserver(coordinator, forKeyPath: "title")
-        }
+        coordinator.detach()
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {

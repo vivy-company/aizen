@@ -218,6 +218,8 @@ struct ChatMessageList: View {
     @State private var loadingStartTime: Date?
     private let minimumLoadingDuration: TimeInterval = 0.6
     @State private var allowAnimations = false
+    @State private var cachedThoughtText: String? = nil
+    @State private var cachedThoughtRendered: AttributedString = AttributedString("")
 
     private var shouldShowLoading: Bool {
         isSessionInitializing && timelineItems.isEmpty
@@ -262,6 +264,7 @@ struct ChatMessageList: View {
                 showLoadingView = true
                 loadingStartTime = Date()
             }
+            updateCachedThought(currentThought)
         }
         .task {
             // Enable animations after a brief delay to avoid modifying state during view update
@@ -269,6 +272,9 @@ struct ChatMessageList: View {
                 try? await Task.sleep(nanoseconds: 50_000_000)  // 50ms
                 allowAnimations = true
             }
+        }
+        .onChange(of: currentThought) { newThought in
+            updateCachedThought(newThought)
         }
     }
 
@@ -421,11 +427,11 @@ struct ChatMessageList: View {
     private var processingIndicator: some View {
         HStack(spacing: 8) {
             ProgressView()
-                .scaleEffect(0.7)
-                .controlSize(.small)
+                .controlSize(.mini)
+                .frame(width: 14, height: 14)
 
             if let thought = currentThought {
-                Text(renderInlineMarkdown(thought))
+                Text(cachedThoughtRendered)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -440,5 +446,15 @@ struct ChatMessageList: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func updateCachedThought(_ thought: String?) {
+        guard thought != cachedThoughtText else { return }
+        cachedThoughtText = thought
+        if let thought {
+            cachedThoughtRendered = renderInlineMarkdown(thought)
+        } else {
+            cachedThoughtRendered = AttributedString("")
+        }
     }
 }

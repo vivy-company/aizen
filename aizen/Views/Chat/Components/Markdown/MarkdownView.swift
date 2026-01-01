@@ -252,11 +252,14 @@ struct CombinedTextBlockView: View {
         var result = AttributedString()
 
         for (index, block) in blocks.enumerated() {
+            if index == 0, case .heading = block.type {
+                result.append(spacerLine(height: 6))
+            }
             if index > 0 {
                 // Smart spacing based on previous and current block types
                 let prevBlock = blocks[index - 1]
                 let spacing = spacingBetween(prev: prevBlock.type, current: block.type)
-                result.append(AttributedString(spacing))
+                result.append(spacing)
             }
 
             switch block.type {
@@ -368,39 +371,45 @@ struct CombinedTextBlockView: View {
     }
 
     /// Determine spacing between blocks based on their types
-    private func spacingBetween(prev: MarkdownBlockType, current: MarkdownBlockType) -> String {
-        // Heading followed by content: single newline (tight)
+    private func spacingBetween(prev: MarkdownBlockType, current: MarkdownBlockType) -> AttributedString {
+        var spacing = AttributedString("\n")
+        spacing.font = .body
+
+        var extra: CGFloat = 0
+
         if case .heading = prev {
-            return "\n"
+            extra = max(extra, 6)
         }
 
-        // Before a heading: add extra space
         if case .heading = current {
-            return "\n\n"
+            extra = max(extra, 6)
         }
 
-        // Between paragraphs: double newline
-        if case .paragraph = prev, case .paragraph = current {
-            return "\n\n"
-        }
-
-        // List, quote, thematic break: single newline
         switch prev {
         case .list, .blockQuote, .thematicBreak:
-            return "\n"
+            extra = max(extra, 4)
         default:
             break
         }
 
         switch current {
         case .list, .blockQuote, .thematicBreak:
-            return "\n"
+            extra = max(extra, 4)
         default:
             break
         }
 
-        // Default: single newline for tighter spacing
-        return "\n"
+        if extra > 0 {
+            spacing.append(spacerLine(height: extra))
+        }
+
+        return spacing
+    }
+
+    private func spacerLine(height: CGFloat) -> AttributedString {
+        var spacer = AttributedString("\n")
+        spacer.font = .system(size: height)
+        return spacer
     }
 }
 
