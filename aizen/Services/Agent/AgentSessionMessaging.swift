@@ -326,7 +326,7 @@ extension AgentSession {
         if let lastIndex = messages.lastIndex(where: { $0.role == .agent && !$0.isComplete }) {
             let completedMessage = messages[lastIndex]
             let executionTime = completedMessage.startTime.map { Date().timeIntervalSince($0) }
-            messages[lastIndex] = MessageItem(
+            let updatedMessage = MessageItem(
                 id: completedMessage.id,
                 role: completedMessage.role,
                 content: completedMessage.content,
@@ -338,7 +338,9 @@ extension AgentSession {
                 executionTime: executionTime,
                 requestId: completedMessage.requestId
             )
-            messages = messages
+            var updatedMessages = messages
+            updatedMessages[lastIndex] = updatedMessage
+            messages = updatedMessages
         }
     }
 

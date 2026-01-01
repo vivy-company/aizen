@@ -38,13 +38,21 @@ extension ChatSessionViewModel {
         }
     }
 
-    /// Rebuild the timeline index from current items (uses stableId for consistent lookups)
-    private func rebuildTimelineIndex() {
+    private func makeTimelineIndex(from items: [TimelineItem]) -> [String: Int] {
         // Use uniquingKeysWith to handle duplicates gracefully (keep last index)
-        timelineIndex = Dictionary(
-            timelineItems.enumerated().map { ($1.stableId, $0) },
+        Dictionary(
+            items.enumerated().map { ($1.stableId, $0) },
             uniquingKeysWith: { _, new in new }
         )
+    }
+
+    /// Rebuild the timeline index from current items (uses stableId for consistent lookups)
+    private func rebuildTimelineIndex() {
+        rebuildTimelineIndex(from: timelineItems)
+    }
+
+    private func rebuildTimelineIndex(from items: [TimelineItem]) {
+        timelineIndex = makeTimelineIndex(from: items)
     }
 
     /// Rebuild child tool call index for quick lookup in views
@@ -322,38 +330,48 @@ extension ChatSessionViewModel {
                     previousMessageIds = newIds
                     return
                 }
-                timelineItems[idx] = .message(lastAgentMessage)
-                timelineItems = timelineItems
+                var updatedItems = timelineItems
+                updatedItems[idx] = .message(lastAgentMessage)
+                timelineItems = updatedItems
                 previousMessageIds = newIds
                 return
             }
         }
 
-        var didMutate = false
-
         let updateBlock = { [self] in
+            var updatedItems = timelineItems
+            var updatedIndex = timelineIndex
+            var didMutate = false
+
             // 0. Remove any messages that no longer exist
             if !removedIds.isEmpty {
-                timelineItems.removeAll { removedIds.contains($0.stableId) }
+                updatedItems.removeAll { removedIds.contains($0.stableId) }
                 didMutate = true
             }
 
             // 1. Insert new messages FIRST (changes structure/indices)
             for newMsg in newMessages where addedIds.contains(newMsg.id) {
-                insertTimelineItem(.message(newMsg))
+                insertTimelineItem(.message(newMsg), into: &updatedItems)
                 didMutate = true
             }
 
             // 2. Rebuild index IMMEDIATELY after structural changes
             if hasStructuralChanges {
-                rebuildTimelineIndex()
+                updatedIndex = makeTimelineIndex(from: updatedItems)
             }
 
             // 3. Update existing messages AFTER index is fresh
             for newMsg in newMessages where previousMessageIds.contains(newMsg.id) {
-                if let idx = timelineIndex[newMsg.id], idx < timelineItems.count {
-                    timelineItems[idx] = .message(newMsg)
+                if let idx = updatedIndex[newMsg.id], idx < updatedItems.count {
+                    updatedItems[idx] = .message(newMsg)
                     didMutate = true
+                }
+            }
+
+            if didMutate {
+                timelineItems = updatedItems
+                if hasStructuralChanges {
+                    timelineIndex = updatedIndex
                 }
             }
         }
@@ -363,11 +381,6 @@ extension ChatSessionViewModel {
             withAnimation(.easeInOut(duration: 0.2)) { updateBlock() }
         } else {
             updateBlock()
-        }
-
-        // Force publish for in-place mutations (content updates during streaming).
-        if didMutate {
-            timelineItems = timelineItems
         }
 
         // Update tracked IDs for next sync
@@ -395,31 +408,40 @@ extension ChatSessionViewModel {
         let addedIds = newIds.subtracting(previousToolCallIds)
         let removedIds = previousToolCallIds.subtracting(newIds)
         let hasStructuralChanges = !addedIds.isEmpty || !removedIds.isEmpty
-        var didMutate = false
-
         let updateBlock = { [self] in
+            var updatedItems = timelineItems
+            var updatedIndex = timelineIndex
+            var didMutate = false
+
             // 0. Remove any tool calls that no longer exist
             if !removedIds.isEmpty {
-                timelineItems.removeAll { removedIds.contains($0.stableId) }
+                updatedItems.removeAll { removedIds.contains($0.stableId) }
                 didMutate = true
             }
 
             // 1. Insert new tool calls FIRST (changes structure/indices)
             for newCall in newToolCalls where addedIds.contains(newCall.id) {
-                insertTimelineItem(.toolCall(newCall))
+                insertTimelineItem(.toolCall(newCall), into: &updatedItems)
                 didMutate = true
             }
 
             // 2. Rebuild index IMMEDIATELY after structural changes
             if hasStructuralChanges {
-                rebuildTimelineIndex()
+                updatedIndex = makeTimelineIndex(from: updatedItems)
             }
 
             // 3. Update existing tool calls AFTER index is fresh
             for newCall in newToolCalls where previousToolCallIds.contains(newCall.id) {
-                if let idx = timelineIndex[newCall.id], idx < timelineItems.count {
-                    timelineItems[idx] = .toolCall(newCall)
+                if let idx = updatedIndex[newCall.id], idx < updatedItems.count {
+                    updatedItems[idx] = .toolCall(newCall)
                     didMutate = true
+                }
+            }
+
+            if didMutate {
+                timelineItems = updatedItems
+                if hasStructuralChanges {
+                    timelineIndex = updatedIndex
                 }
             }
         }
@@ -432,11 +454,6 @@ extension ChatSessionViewModel {
             updateBlock()
         }
 
-        // Force publish for in-place mutations.
-        if didMutate {
-            timelineItems = timelineItems
-        }
-
         rebuildChildToolCallsIndex()
 
         // Update tracked IDs for next sync
@@ -444,9 +461,9 @@ extension ChatSessionViewModel {
     }
 
     /// Insert timeline item maintaining sorted order by timestamp
-    private func insertTimelineItem(_ item: TimelineItem) {
+    private func insertTimelineItem(_ item: TimelineItem, into items: inout [TimelineItem]) {
         // Skip if item already exists (prevent duplicates)
-        if timelineItems.contains(where: { $0.stableId == item.stableId }) {
+        if items.contains(where: { $0.stableId == item.stableId }) {
             return
         }
 
@@ -454,18 +471,18 @@ extension ChatSessionViewModel {
 
         // Binary search for insert position
         var low = 0
-        var high = timelineItems.count
+        var high = items.count
 
         while low < high {
             let mid = (low + high) / 2
-            if timelineItems[mid].timestamp < timestamp {
+            if items[mid].timestamp < timestamp {
                 low = mid + 1
             } else {
                 high = mid
             }
         }
 
-        timelineItems.insert(item, at: low)
+        items.insert(item, at: low)
     }
 
     // MARK: - Tool Call Grouping

@@ -168,7 +168,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             if !pendingAgentBlocks.isEmpty {
                 newBlocks.append(contentsOf: pendingAgentBlocks)
             }
-            messages[lastIndex] = MessageItem(
+            let updatedMessage = MessageItem(
                 id: lastAgentMessage.id,
                 role: .agent,
                 content: newContent,
@@ -180,8 +180,9 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                 executionTime: lastAgentMessage.executionTime,
                 requestId: lastAgentMessage.requestId
             )
-            // Force @Published update for in-place array mutation.
-            messages = messages
+            var updatedMessages = messages
+            updatedMessages[lastIndex] = updatedMessage
+            messages = updatedMessages
         }
 
         pendingAgentText = ""
