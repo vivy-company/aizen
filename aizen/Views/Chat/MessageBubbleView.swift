@@ -40,7 +40,7 @@ struct MessageBubbleView: View {
     private var shouldShowAgentMessage: Bool {
         guard message.role == .agent else { return true }
         let hasContent = !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return hasContent || !message.isComplete
+        return hasContent
     }
 
     var body: some View {

@@ -486,8 +486,8 @@ final class MarkdownViewModel: ObservableObject {
     private var streamingTask: Task<Void, Never>?
     private var pendingContent: String = ""
     private var pendingIsStreaming: Bool = false
-    private let streamingIntervalNanos: UInt64 = 50_000_000
-    private let streamingLargeIntervalNanos: UInt64 = 100_000_000
+    private let streamingIntervalNanos: UInt64 = 30_000_000
+    private let streamingLargeIntervalNanos: UInt64 = 60_000_000
     private let streamingLargeContentThreshold = 6000
     private var lastParsedLength: Int = 0
     private var parseGeneration: Int = 0
@@ -497,11 +497,13 @@ final class MarkdownViewModel: ObservableObject {
         guard content != lastContent || isStreaming != lastIsStreaming else { return }
         lastContent = content
         lastIsStreaming = isStreaming
+        parseGeneration += 1
+        let generation = parseGeneration
         pendingContent = content
         pendingIsStreaming = isStreaming
 
         if isStreaming {
-            scheduleStreamingParse()
+            scheduleStreamingParse(generation: generation)
             return
         }
 
@@ -509,8 +511,6 @@ final class MarkdownViewModel: ObservableObject {
         streamingTask = nil
 
         parseTask?.cancel()
-        parseGeneration += 1
-        let generation = parseGeneration
         let contentSnapshot = content
 
         parseTask = Task.detached(priority: .userInitiated) {
@@ -525,30 +525,31 @@ final class MarkdownViewModel: ObservableObject {
         }
     }
 
-    private func scheduleStreamingParse() {
+    private func scheduleStreamingParse(generation: Int) {
         guard streamingTask == nil else { return }
         streamingTask = Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             while true {
-                let interval = await MainActor.run { [weak self] in
-                    guard let self else { return 40_000_000 }
-                    return Int(self.pendingContent.count > self.streamingLargeContentThreshold
-                        ? self.streamingLargeIntervalNanos
-                        : self.streamingIntervalNanos)
+                let isStale = await MainActor.run { [weak self] in
+                    guard let self else { return true }
+                    return generation != self.parseGeneration
+                }
+                if isStale {
+                    break
                 }
 
-                try? await Task.sleep(nanoseconds: UInt64(interval))
-                guard !Task.isCancelled else { return }
-
-                let (contentSnapshot, isStreamingSnapshot) = await MainActor.run { [weak self] in
-                    guard let self else { return ("", false) }
-                    return (self.pendingContent, self.pendingIsStreaming)
+                let (contentSnapshot, isStreamingSnapshot, interval) = await MainActor.run { [weak self] in
+                    guard let self else { return ("", false, UInt64(0)) }
+                    let interval = self.pendingContent.count > self.streamingLargeContentThreshold
+                        ? self.streamingLargeIntervalNanos
+                        : self.streamingIntervalNanos
+                    return (self.pendingContent, self.pendingIsStreaming, interval)
                 }
 
                 let parser = MarkdownParser()
                 let document = parser.parseStreaming(contentSnapshot, isComplete: false)
                 await MainActor.run { [weak self] in
-                    guard let self else { return }
+                    guard let self, generation == self.parseGeneration else { return }
                     self.blocks = document.blocks
                     self.streamingBuffer = document.streamingBuffer
                     self.lastParsedLength = contentSnapshot.count
@@ -557,6 +558,9 @@ final class MarkdownViewModel: ObservableObject {
                 if !isStreamingSnapshot {
                     break
                 }
+
+                try? await Task.sleep(nanoseconds: interval)
+                guard !Task.isCancelled else { return }
             }
 
             await MainActor.run { [weak self] in

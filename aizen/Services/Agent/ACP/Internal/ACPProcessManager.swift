@@ -291,7 +291,8 @@ actor ACPProcessManager {
             if first != 0x7B && first != 0x5B {
                 if let newline = readBuffer.firstIndex(of: 0x0A) {
                     let dropped = readBuffer.prefix(upTo: newline)
-                    readBuffer.removeFirst(newline + 1)
+                    let removeCount = readBuffer.distance(from: readBuffer.startIndex, to: newline) + 1
+                    readBuffer.removeFirst(min(removeCount, readBuffer.count))
                     if !dropped.isEmpty {
                         logger.debug("Discarded non-JSON stdout line (\(dropped.count) bytes)")
                     }
