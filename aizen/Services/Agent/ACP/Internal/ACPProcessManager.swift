@@ -299,8 +299,8 @@ actor ACPProcessManager {
                 }
 
                 if readBuffer.count > 4096 {
-                    logger.warning("Discarding \(readBuffer.count) bytes of non-JSON stdout")
-                    readBuffer.removeAll(keepingCapacity: true)
+                    logger.warning("Discarding \(self.readBuffer.count) bytes of non-JSON stdout")
+                    self.readBuffer.removeAll(keepingCapacity: true)
                 }
                 return nil
             }
