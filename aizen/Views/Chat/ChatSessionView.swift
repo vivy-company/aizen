@@ -27,6 +27,15 @@ struct ChatSessionView: View {
     @State private var fileToOpenInEditor: String?
     @State private var autocompleteWindow: AutocompleteWindowController?
 
+    private var supportsUsageMetrics: Bool {
+        switch UsageProvider.fromAgentId(viewModel.selectedAgent) {
+        case .codex, .claude, .gemini:
+            return true
+        default:
+            return false
+        }
+    }
+
     init(worktree: Worktree, session: ChatSession, sessionManager: ChatSessionManager, viewContext: NSManagedObjectContext) {
         self.worktree = worktree
         self.session = session
@@ -118,7 +127,8 @@ struct ChatSessionView: View {
                         onRemoveAttachment: viewModel.removeAttachment,
                         plan: viewModel.currentAgentPlan,
                         onShowUsage: { showingUsageSheet = true },
-                        onNewSession: viewModel.restartSession
+                        onNewSession: viewModel.restartSession,
+                        showsUsage: supportsUsageMetrics
                     )
                     .padding(.horizontal, 20)
 

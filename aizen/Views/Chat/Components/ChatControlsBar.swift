@@ -16,6 +16,7 @@ struct ChatControlsBar: View {
     let plan: Plan?
     let onShowUsage: () -> Void
     let onNewSession: () -> Void
+    let showsUsage: Bool
 
     @State private var showingAuthClearedMessage = false
 
@@ -48,12 +49,14 @@ struct ChatControlsBar: View {
                 ModeSelectorView(session: agentSession)
             }
 
-            Button(action: onShowUsage) {
-                Image(systemName: "chart.bar")
-                    .foregroundColor(.secondary)
+            if showsUsage {
+                Button(action: onShowUsage) {
+                    Image(systemName: "chart.bar")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Usage")
             }
-            .buttonStyle(.plain)
-            .help("Usage")
 
             Menu {
                 Button("New Session") {
