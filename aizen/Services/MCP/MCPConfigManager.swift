@@ -165,7 +165,7 @@ actor MCPConfigManager {
         }
 
         do {
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            guard var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 return [:]
             }
 
@@ -179,14 +179,48 @@ actor MCPConfigManager {
                 current = next
             }
 
-            guard let serversDict = current as? [String: [String: Any]] else {
+            guard var serversContainer = current as? [String: Any] else {
                 return [:]
             }
 
             var servers: [String: MCPServerEntry] = [:]
-            for (name, config) in serversDict {
-                let type = config["type"] as? String ?? "stdio"
-                let url = config["url"] as? String
+            var needsRewrite = false
+
+            // OpenCode legacy format used "mcp.servers"; flatten to "mcp"
+            if spec.agentId == "opencode",
+               let legacyServers = serversContainer["servers"] as? [String: Any] {
+                var merged = serversContainer
+                merged.removeValue(forKey: "servers")
+                for (name, config) in legacyServers {
+                    merged[name] = config
+                }
+                serversContainer = merged
+                needsRewrite = true
+            }
+
+            var normalizedContainer = serversContainer
+
+            for (name, value) in serversContainer {
+                guard var config = value as? [String: Any] else { continue }
+
+                if spec.agentId == "opencode" {
+                    let normalization = normalizeOpenCodeServerConfig(config)
+                    if normalization.didChange {
+                        config = normalization.config
+                        normalizedContainer[name] = config
+                        needsRewrite = true
+                    }
+                } else if spec.agentId == "gemini" || spec.agentId == "qwen" {
+                    let normalization = normalizeGeminiServerConfig(config)
+                    if normalization.didChange {
+                        config = normalization.config
+                        normalizedContainer[name] = config
+                        needsRewrite = true
+                    }
+                }
+
+                let type = resolveServerType(from: config, agentId: spec.agentId)
+                let url = resolveServerURL(from: config, agentId: spec.agentId, type: type)
 
                 // Handle command - can be string or array (OpenCode uses array)
                 var command: String?
@@ -210,6 +244,11 @@ actor MCPConfigManager {
                     args: args,
                     env: env
                 )
+            }
+
+            if needsRewrite, spec.serverPath.count == 1 {
+                json[spec.serverPath[0]] = normalizedContainer
+                try? writeConfigJSON(json, to: path)
             }
 
             return servers
@@ -370,11 +409,14 @@ actor MCPConfigManager {
     }
 
     private func configToDict(_ config: MCPServerEntry, agentId: String) -> [String: Any] {
-        // OpenCode uses different format
-        if agentId == "opencode" {
+        switch agentId {
+        case "opencode":
             return configToDictOpenCode(config)
+        case "gemini", "qwen":
+            return configToDictGemini(config)
+        default:
+            return configToDictStandard(config)
         }
-        return configToDictStandard(config)
     }
 
     private func configToDictStandard(_ config: MCPServerEntry) -> [String: Any] {
@@ -415,6 +457,133 @@ actor MCPConfigManager {
         }
 
         return dict
+    }
+
+    /// Gemini/Qwen format: no "type"; http uses httpUrl, sse uses url
+    private func configToDictGemini(_ config: MCPServerEntry) -> [String: Any] {
+        var dict: [String: Any] = [:]
+        switch config.type {
+        case "http":
+            if let url = config.url { dict["httpUrl"] = url }
+        case "sse":
+            if let url = config.url { dict["url"] = url }
+        default:
+            if let url = config.url { dict["url"] = url }
+        }
+        if let command = config.command { dict["command"] = command }
+        if let args = config.args { dict["args"] = args }
+        if let env = config.env, !env.isEmpty { dict["env"] = env }
+        return dict
+    }
+
+    private func normalizeGeminiServerConfig(_ config: [String: Any]) -> (config: [String: Any], didChange: Bool) {
+        var updated = config
+        var didChange = false
+
+        if let type = updated["type"] as? String {
+            switch type {
+            case "http":
+                if updated["httpUrl"] == nil, let url = updated["url"] as? String {
+                    updated["httpUrl"] = url
+                    updated.removeValue(forKey: "url")
+                }
+            case "sse":
+                break
+            case "stdio":
+                break
+            default:
+                break
+            }
+            updated.removeValue(forKey: "type")
+            didChange = true
+        }
+
+        return (updated, didChange)
+    }
+
+    private func normalizeOpenCodeServerConfig(_ config: [String: Any]) -> (config: [String: Any], didChange: Bool) {
+        var updated = config
+        var didChange = false
+
+        if let env = updated["env"] as? [String: String] {
+            updated["environment"] = env
+            updated.removeValue(forKey: "env")
+            didChange = true
+        }
+
+        if let command = updated["command"] as? String {
+            var cmdArray = [command]
+            if let args = updated["args"] as? [String] {
+                cmdArray.append(contentsOf: args)
+            }
+            updated["command"] = cmdArray
+            updated.removeValue(forKey: "args")
+            didChange = true
+        }
+
+        if let type = updated["type"] as? String {
+            switch type {
+            case "local", "remote":
+                break
+            case "stdio":
+                updated["type"] = "local"
+                didChange = true
+            case "http", "sse":
+                updated["type"] = "remote"
+                didChange = true
+            default:
+                break
+            }
+        } else if updated["command"] != nil {
+            updated["type"] = "local"
+            didChange = true
+        } else if updated["url"] != nil {
+            updated["type"] = "remote"
+            didChange = true
+        }
+
+        return (updated, didChange)
+    }
+
+    private func resolveServerType(from config: [String: Any], agentId: String) -> String {
+        if agentId == "opencode" {
+            return mapOpenCodeTypeToInternal(config["type"] as? String)
+        }
+
+        if agentId == "gemini" || agentId == "qwen" {
+            if config["httpUrl"] != nil { return "http" }
+            if config["url"] != nil { return "sse" }
+            if config["command"] != nil { return "stdio" }
+        }
+
+        return config["type"] as? String ?? "stdio"
+    }
+
+    private func resolveServerURL(from config: [String: Any], agentId: String, type: String) -> String? {
+        if agentId == "gemini" || agentId == "qwen" {
+            if let httpUrl = config["httpUrl"] as? String { return httpUrl }
+            if type == "http", let legacyUrl = config["url"] as? String { return legacyUrl }
+            return config["url"] as? String
+        }
+
+        return config["url"] as? String
+    }
+
+    private func mapOpenCodeTypeToInternal(_ type: String?) -> String {
+        switch type {
+        case "local":
+            return "stdio"
+        case "remote":
+            return "http"
+        case "http":
+            return "http"
+        case "sse":
+            return "sse"
+        case "stdio":
+            return "stdio"
+        default:
+            return "stdio"
+        }
     }
 
     private func ensurePath(in dict: [String: Any], path: [String], finalValue: [String: Any], serverName: String) -> [String: Any] {
