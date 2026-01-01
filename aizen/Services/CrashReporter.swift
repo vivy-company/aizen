@@ -47,8 +47,6 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber, @unchecked Senda
 
         // Set up signal handlers for Swift runtime crashes
         setupSignalHandlers()
-
-        logger.info("CrashReporter initialized")
     }
 
     /// Start crash reporting (call from app init)

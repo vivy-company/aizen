@@ -5,6 +5,7 @@
 //  Chat input bar with attachments, voice, and model selection
 //
 
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import os.log
@@ -35,8 +36,11 @@ struct ChatInputBar: View {
     let onAgentSelect: (String) -> Void
 
     @State private var isHoveringInput = false
-    @State private var gradientRotation: Double = 0
     @State private var measuredTextHeight: CGFloat = 0
+    @State private var isTextEditorFocused = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    private let disableAnimatedBordersForPerfProbe = true
 
     private let gradientColors: [Color] = [
         .accentColor.opacity(0.7), .accentColor.opacity(0.4), .accentColor.opacity(0.7)
@@ -86,6 +90,7 @@ struct ChatInputBar: View {
                     CustomTextEditor(
                         text: $inputText,
                         measuredHeight: $measuredTextHeight,
+                        isFocused: $isTextEditorFocused,
                         onSubmit: {
                             if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 onSend()
@@ -180,45 +185,29 @@ struct ChatInputBar: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: inputCornerRadius, style: .continuous))
         .overlay {
             if isProcessing {
-                RoundedRectangle(cornerRadius: inputCornerRadius, style: .continuous)
-                    .strokeBorder(
-                        AngularGradient(
-                            colors: gradientColors,
-                            center: .center,
-                            angle: .degrees(gradientRotation)
-                        ),
-                        lineWidth: 2
-                    )
+                AnimatedGradientBorder(
+                    cornerRadius: inputCornerRadius,
+                    colors: gradientColors,
+                    dashed: false,
+                    reduceMotion: reduceMotion,
+                    isActive: shouldAnimateBorder
+                )
+                .allowsHitTesting(false)
             } else if currentModeId != "plan" {
                 RoundedRectangle(cornerRadius: inputCornerRadius, style: .continuous)
                     .strokeBorder(.separator.opacity(isHoveringInput ? 0.5 : 0.2), lineWidth: 0.5)
+                    .allowsHitTesting(false)
             }
 
             if currentModeId == "plan" && !isProcessing {
-                RoundedRectangle(cornerRadius: inputCornerRadius, style: .continuous)
-                    .stroke(
-                        AngularGradient(
-                            colors: gradientColors,
-                            center: .center,
-                            angle: .degrees(gradientRotation)
-                        ),
-                        style: StrokeStyle(lineWidth: 2, dash: [8])
-                    )
-            }
-        }
-        .onChange(of: isProcessing) { newValue in
-            if newValue {
-                startGradientAnimation()
-            }
-        }
-        .onChange(of: currentModeId) { newMode in
-            if newMode == "plan" {
-                startGradientAnimation()
-            }
-        }
-        .onAppear {
-            if currentModeId == "plan" {
-                startGradientAnimation()
+                AnimatedGradientBorder(
+                    cornerRadius: inputCornerRadius,
+                    colors: gradientColors,
+                    dashed: true,
+                    reduceMotion: reduceMotion,
+                    isActive: shouldAnimateBorder
+                )
+                .allowsHitTesting(false)
             }
         }
         .onHover { hovering in
@@ -291,9 +280,156 @@ struct ChatInputBar: View {
         return min(max(measured, minHeight), maxHeight)
     }
 
-    private func startGradientAnimation() {
-        withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-            gradientRotation = 360
+    private var shouldAnimateBorder: Bool {
+        !disableAnimatedBordersForPerfProbe && scenePhase == .active && isTextEditorFocused
+    }
+
+}
+
+private struct AnimatedGradientBorder: NSViewRepresentable {
+    let cornerRadius: CGFloat
+    let colors: [Color]
+    let dashed: Bool
+    let reduceMotion: Bool
+    let isActive: Bool
+    private let lineWidth: CGFloat = 2
+    private let cycleSeconds: TimeInterval = 10
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> GradientBorderView {
+        let view = GradientBorderView()
+        context.coordinator.attach(to: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: GradientBorderView, context: Context) {
+        context.coordinator.update(
+            in: nsView,
+            cornerRadius: cornerRadius,
+            colors: colors,
+            dashed: dashed,
+            reduceMotion: reduceMotion,
+            isActive: isActive,
+            lineWidth: lineWidth,
+            cycleSeconds: cycleSeconds
+        )
+    }
+
+    final class Coordinator {
+        private let containerLayer = CALayer()
+        private let gradientLayer = CAGradientLayer()
+        private let maskLayer = CAShapeLayer()
+        private var isAnimating = false
+        private var currentCornerRadius: CGFloat = 0
+        private var currentLineWidth: CGFloat = 0
+        private weak var hostView: GradientBorderView?
+        private let pulseKey = "aizen.gradientBorder.pulse"
+
+        func attach(to view: GradientBorderView) {
+            guard hostView == nil else { return }
+            hostView = view
+            view.wantsLayer = true
+            view.layer = CALayer()
+            view.layer?.masksToBounds = false
+            view.layer?.addSublayer(containerLayer)
+            containerLayer.masksToBounds = false
+            containerLayer.addSublayer(gradientLayer)
+            containerLayer.mask = maskLayer
+            gradientLayer.type = .conic
+            gradientLayer.startPoint = CGPoint(x: 0.5, y: 0.5)
+            gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+            maskLayer.fillColor = nil
+            maskLayer.strokeColor = NSColor.white.cgColor
+            maskLayer.lineCap = .round
+            view.layoutHandler = { [weak self] bounds in
+                self?.layout(in: bounds)
+            }
         }
+
+        func update(
+            in view: GradientBorderView,
+            cornerRadius: CGFloat,
+            colors: [Color],
+            dashed: Bool,
+            reduceMotion: Bool,
+            isActive: Bool,
+            lineWidth: CGFloat,
+            cycleSeconds: TimeInterval
+        ) {
+            if hostView == nil {
+                attach(to: view)
+            }
+
+            currentCornerRadius = cornerRadius
+            currentLineWidth = lineWidth
+
+            let nsColors = colors.map { NSColor($0).cgColor }
+            gradientLayer.colors = nsColors + [nsColors.first].compactMap { $0 }
+            maskLayer.lineWidth = lineWidth
+            maskLayer.lineDashPattern = dashed ? [6, 6] : nil
+
+            if let scale = view.window?.backingScaleFactor {
+                view.layer?.contentsScale = scale
+                containerLayer.contentsScale = scale
+                gradientLayer.contentsScale = scale
+                maskLayer.contentsScale = scale
+            }
+
+            layout(in: view.bounds)
+            updateAnimation(reduceMotion: reduceMotion, isActive: isActive, cycleSeconds: cycleSeconds)
+        }
+
+        private func layout(in bounds: CGRect) {
+            guard !bounds.isEmpty else { return }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            containerLayer.frame = bounds
+            gradientLayer.frame = bounds
+            maskLayer.frame = bounds
+            let inset = max(currentLineWidth / 2, 0.5)
+            let rect = bounds.insetBy(dx: inset, dy: inset)
+            maskLayer.path = CGPath(
+                roundedRect: rect,
+                cornerWidth: currentCornerRadius,
+                cornerHeight: currentCornerRadius,
+                transform: nil
+            )
+            CATransaction.commit()
+        }
+
+        private func updateAnimation(reduceMotion: Bool, isActive: Bool, cycleSeconds: TimeInterval) {
+            if reduceMotion || !isActive {
+                if isAnimating {
+                    gradientLayer.removeAnimation(forKey: pulseKey)
+                    isAnimating = false
+                }
+                gradientLayer.opacity = 1
+                return
+            }
+
+            guard !isAnimating else { return }
+            let pulse = CABasicAnimation(keyPath: "opacity")
+            pulse.fromValue = 0.55
+            pulse.toValue = 1.0
+            pulse.duration = cycleSeconds
+            pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            pulse.autoreverses = true
+            pulse.repeatCount = .infinity
+            pulse.isRemovedOnCompletion = false
+            gradientLayer.add(pulse, forKey: pulseKey)
+            isAnimating = true
+        }
+    }
+}
+
+private final class GradientBorderView: NSView {
+    var layoutHandler: ((CGRect) -> Void)?
+
+    override func layout() {
+        super.layout()
+        layoutHandler?(bounds)
     }
 }

@@ -94,6 +94,7 @@ struct FileContentView: View {
                     isEditable: true,
                     filePath: file.path,
                     repoPath: repoPath,
+                    hasUnsavedChanges: file.hasUnsavedChanges,
                     onContentChange: onContentChange
                 )
                 .id(file.id)
@@ -107,4 +108,3 @@ struct FileContentView: View {
         return ext.isEmpty ? nil : ext
     }
 }
-

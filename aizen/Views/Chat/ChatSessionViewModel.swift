@@ -33,8 +33,6 @@ class ChatSessionViewModel: ObservableObject {
 
     // MARK: - State
 
-    @Published var inputText = ""
-    @Published var pendingCursorPosition: Int?
     @Published var isProcessing = false
     @Published var currentAgentSession: AgentSession?
     @Published var currentPermissionRequest: RequestPermissionRequest?
@@ -104,6 +102,7 @@ class ChatSessionViewModel: ObservableObject {
     var autoScrollTask: Task<Void, Never>?
     var suppressNextAutoScroll: Bool = false
     private var gitPauseApplied: Bool = false
+    private var isSettingUpSession: Bool = false
 
     // MARK: - Computed Properties
 
@@ -167,7 +166,6 @@ class ChatSessionViewModel: ObservableObject {
         self.agentSwitcher = AgentSwitcher(viewContext: viewContext, session: session)
 
         setupNotificationObservers()
-        setupInputTextObserver()
     }
 
     // MARK: - Lifecycle
@@ -185,9 +183,10 @@ class ChatSessionViewModel: ObservableObject {
 
     func setupAgentSession() {
         guard let sessionId = session.id else { return }
+        guard !isSettingUpSession else { return }
+        isSettingUpSession = true
 
-        // Check for pending input text or attachments (e.g., from review comments)
-        prefillInputTextIfNeeded()
+        // Check for pending attachments (e.g., from review comments)
         loadPendingAttachmentsIfNeeded()
 
         // Configure autocomplete handler
@@ -219,6 +218,7 @@ class ChatSessionViewModel: ObservableObject {
             if !existingSession.isActive {
                 guard !worktreePath.isEmpty else {
                     logger.error("Chat session missing worktree path; cannot start agent session.")
+                    isSettingUpSession = false
                     return
                 }
                 Task { [self] in
@@ -229,11 +229,13 @@ class ChatSessionViewModel: ObservableObject {
                         self.logger.error("Failed to start session for \(self.selectedAgent): \(error.localizedDescription)")
                         // Session will show auth dialog or setup dialog automatically via needsAuthentication/needsAgentSetup
                     }
+                    self.isSettingUpSession = false
                 }
             } else {
                 // Session already active, check for pending message
                 Task {
                     await sendPendingMessageIfNeeded()
+                    self.isSettingUpSession = false
                 }
             }
             return
@@ -241,6 +243,7 @@ class ChatSessionViewModel: ObservableObject {
 
         guard !worktreePath.isEmpty else {
             logger.error("Chat session missing worktree path; cannot start agent session.")
+            isSettingUpSession = false
             return
         }
 
@@ -278,10 +281,11 @@ class ChatSessionViewModel: ObservableObject {
                 // Session already active, check for pending message
                 await sendPendingMessageIfNeeded()
             }
+            self.isSettingUpSession = false
         }
     }
 
-    func persistDraftState() {
+    func persistDraftState(inputText: String) {
         guard let sessionId = session.id else { return }
         let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
@@ -289,6 +293,28 @@ class ChatSessionViewModel: ObservableObject {
         }
         if !attachments.isEmpty {
             sessionManager.setPendingAttachments(attachments, for: sessionId)
+        }
+    }
+
+    func loadDraftInputText() -> String? {
+        guard let sessionId = session.id else { return nil }
+        return sessionManager.getDraftInputText(for: sessionId)
+    }
+
+    private var draftPersistTask: Task<Void, Never>?
+
+    func debouncedPersistDraft(inputText: String) {
+        draftPersistTask?.cancel()
+        draftPersistTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            guard let sessionId = session.id else { return }
+            let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                sessionManager.clearDraftInputText(for: sessionId)
+            } else {
+                sessionManager.setPendingInputText(inputText, for: sessionId)
+            }
         }
     }
 
@@ -304,16 +330,6 @@ class ChatSessionViewModel: ObservableObject {
         } catch {
             logger.error("Failed to send pending message: \(error.localizedDescription)")
         }
-    }
-
-    private func prefillInputTextIfNeeded() {
-        guard let sessionId = session.id,
-              let pendingText = sessionManager.getDraftInputText(for: sessionId) else {
-            return
-        }
-
-        // Prefill the input field so user can add context before sending
-        inputText = pendingText
     }
 
     private func loadPendingAttachmentsIfNeeded() {
@@ -407,21 +423,6 @@ class ChatSessionViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Autocomplete
-
-    func handleAutocompleteSelection() {
-        guard let (replacement, range) = autocompleteHandler.selectCurrent() else { return }
-
-        // Defer state changes to avoid "Publishing changes from within view updates" warning
-        Task { @MainActor in
-            let nsString = self.inputText as NSString
-            self.inputText = nsString.replacingCharacters(in: range, with: replacement)
-
-            // Set cursor position to end of inserted text
-            self.pendingCursorPosition = range.location + replacement.count
-        }
-    }
-
     // MARK: - Markdown Rendering
 
     func renderInlineMarkdown(_ text: String) -> AttributedString {
@@ -463,27 +464,12 @@ class ChatSessionViewModel: ObservableObject {
             .store(in: &notificationCancellables)
     }
 
-    private func setupInputTextObserver() {
-        // Persist draft text as user types (debounced to avoid excessive writes)
-        $inputText
-            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .sink { [weak self] text in
-                guard let self = self, let sessionId = self.session.id else { return }
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty {
-                    self.sessionManager.clearDraftInputText(for: sessionId)
-                } else {
-                    self.sessionManager.setPendingInputText(text, for: sessionId)
-                }
-            }
-            .store(in: &cancellables)
-    }
-
     private func setupSessionObservers(session: AgentSession) {
         cancellables.removeAll()
 
         session.$messages
             // Stream message updates as they arrive for smoother chunk rendering.
+            .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newMessages in
                 guard let self = self else { return }

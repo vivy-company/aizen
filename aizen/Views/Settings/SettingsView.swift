@@ -109,6 +109,10 @@ struct SettingsView: View {
         } detail: {
             detailView
         }
+        .toolbar {
+            // Forces creation of an NSToolbar so the window's unified toolbar style applies.
+            ToolbarItem(placement: .principal) { Text("") }
+        }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 750, minHeight: 500)
         .onAppear {

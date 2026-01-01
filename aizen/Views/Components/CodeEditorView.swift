@@ -15,12 +15,14 @@ struct CodeEditorView: View {
     var isEditable: Bool = false
     var filePath: String? = nil
     var repoPath: String? = nil
+    var hasUnsavedChanges: Bool = false
     var onContentChange: ((String) -> Void)?
 
     @State private var text: String
     @State private var editorState = SourceEditorState()
     @State private var gitDiffStatus: [Int: GitDiffLineStatus] = [:]
     @State private var gitDiffCoordinator = GitDiffCoordinator()
+    @State private var diffReloadTask: Task<Void, Never>?
 
     // Editor settings from AppStorage
     @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
@@ -45,6 +47,7 @@ struct CodeEditorView: View {
         isEditable: Bool = false,
         filePath: String? = nil,
         repoPath: String? = nil,
+        hasUnsavedChanges: Bool = false,
         onContentChange: ((String) -> Void)? = nil
     ) {
         self.content = content
@@ -52,6 +55,7 @@ struct CodeEditorView: View {
         self.isEditable = isEditable
         self.filePath = filePath
         self.repoPath = repoPath
+        self.hasUnsavedChanges = hasUnsavedChanges
         self.onContentChange = onContentChange
         _text = State(initialValue: content)
     }
@@ -93,12 +97,19 @@ struct CodeEditorView: View {
         }
         .task {
             // Load git diff status when view appears
-            await loadGitDiff()
+            scheduleDiffReload()
         }
         .onChange(of: content) { _ in
-            // Reload git diff when content changes
-            Task {
-                await loadGitDiff()
+            guard !hasUnsavedChanges else { return }
+            // Reload git diff when saved content changes
+            scheduleDiffReload()
+        }
+        .onChange(of: hasUnsavedChanges) { isDirty in
+            if isDirty {
+                diffReloadTask?.cancel()
+            } else {
+                // Refresh diff after save/revert so it reflects on-disk state
+                scheduleDiffReload()
             }
         }
     }
@@ -118,6 +129,20 @@ struct CodeEditorView: View {
             }
         } catch {
             // Silently fail if git diff isn't available
+        }
+    }
+
+    private func scheduleDiffReload() {
+        diffReloadTask?.cancel()
+        diffReloadTask = Task { [hasUnsavedChanges] in
+            guard !hasUnsavedChanges else { return }
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            await loadGitDiff()
         }
     }
 

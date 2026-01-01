@@ -225,6 +225,10 @@ struct ChatMessageList: View {
         isSessionInitializing && timelineItems.isEmpty
     }
 
+    private var enableScrollObserver: Bool {
+        true
+    }
+
     var body: some View {
         ZStack {
             if showLoadingView {
@@ -356,17 +360,19 @@ struct ChatMessageList: View {
                         transaction.disablesAnimations = true
                     }
                 }
-                .background(
-                    ScrollViewObserver(
-                        onScroll: { offset, contentHeight, viewportHeight in
-                            updateScrollState(
-                                offset: offset, content: contentHeight, viewport: viewportHeight)
-                        },
-                        scrollToBottomRequest: scrollToBottomRequestId,
-                        animated: scrollRequest?.animated ?? true,
-                        force: scrollRequest?.force ?? false
-                    )
-                )
+                .background {
+                    if enableScrollObserver {
+                        ScrollViewObserver(
+                            onScroll: { offset, contentHeight, viewportHeight in
+                                updateScrollState(
+                                    offset: offset, content: contentHeight, viewport: viewportHeight)
+                            },
+                            scrollToBottomRequest: scrollToBottomRequestId,
+                            animated: scrollRequest?.animated ?? true,
+                            force: scrollRequest?.force ?? false
+                        )
+                    }
+                }
             }
             .onChange(of: scrollRequest) { request in
                 guard let request = request else { return }
@@ -395,8 +401,9 @@ struct ChatMessageList: View {
     }
 
     private var scrollToBottomRequestId: UUID? {
-        guard shouldTriggerScroll, let request = scrollRequest else { return nil }
+        guard let request = scrollRequest else { return nil }
         guard case .bottom = request.target else { return nil }
+        guard shouldTriggerScroll else { return nil }
         return request.id
     }
 
@@ -411,16 +418,17 @@ struct ChatMessageList: View {
         let distanceFromBottom = content + offset - viewport
         let isNearBottom = distanceFromBottom <= 50 || content <= viewport
 
-        // Always report on first calculation (when lastReportedNearBottom is nil)
-        // or when the state changes
-        if lastReportedNearBottom == nil || isNearBottom != lastReportedNearBottom {
-            let nextValue = isNearBottom
-            DispatchQueue.main.async {
-                if lastReportedNearBottom == nil || nextValue != lastReportedNearBottom {
-                    lastReportedNearBottom = nextValue
-                    onScrollPositionChange(nextValue)
-                }
-            }
+        // Only report when state changes
+        guard isNearBottom != lastReportedNearBottom else { return }
+        let nextValue = isNearBottom
+        let callback = onScrollPositionChange
+
+        // Use Task to defer state modification to next run loop iteration
+        // This avoids "Modifying state during view update" warnings
+        Task { @MainActor in
+            guard nextValue != lastReportedNearBottom else { return }
+            lastReportedNearBottom = nextValue
+            callback(nextValue)
         }
     }
 
@@ -430,7 +438,7 @@ struct ChatMessageList: View {
                 .controlSize(.mini)
                 .frame(width: 14, height: 14)
 
-            if let thought = currentThought {
+            if currentThought != nil {
                 Text(cachedThoughtRendered)
                     .font(.callout)
                     .foregroundStyle(.secondary)

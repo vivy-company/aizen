@@ -137,6 +137,9 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         thoughtBuffer = ""
         thoughtFlushTask?.cancel()
         thoughtFlushTask = nil
+        if currentThought != nil {
+            currentThought = nil
+        }
     }
 
     private func scheduleThoughtFlush() {
@@ -144,7 +147,10 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         thoughtFlushTask = Task { @MainActor in
             defer { thoughtFlushTask = nil }
             try? await Task.sleep(for: .seconds(Self.thoughtUpdateInterval))
-            currentThought = thoughtBuffer
+            let nextThought: String? = thoughtBuffer.isEmpty ? nil : thoughtBuffer
+            if currentThought != nextThought {
+                currentThought = nextThought
+            }
         }
     }
 
@@ -742,8 +748,33 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     /// Update an existing tool call in place (O(1) operation)
     func updateToolCallInPlace(id: String, update: (inout ToolCall) -> Void) {
         guard var toolCall = toolCallsById[id] else { return }
+        let before = toolCall
         update(&toolCall)
-        toolCallsById[id] = toolCall
+        if toolCallChanged(before: before, after: toolCall) {
+            toolCallsById[id] = toolCall
+        }
+    }
+
+    private func toolCallChanged(before: ToolCall, after: ToolCall) -> Bool {
+        if before.title != after.title { return true }
+        if before.kind?.rawValue != after.kind?.rawValue { return true }
+        if before.status != after.status { return true }
+        if before.content.count != after.content.count { return true }
+        if before.locations?.count != after.locations?.count { return true }
+
+        let beforeLast = before.content.last?.displayText
+        let afterLast = after.content.last?.displayText
+        if beforeLast != afterLast { return true }
+
+        let beforeRawInput = before.rawInput != nil
+        let afterRawInput = after.rawInput != nil
+        if beforeRawInput != afterRawInput { return true }
+
+        let beforeRawOutput = before.rawOutput != nil
+        let afterRawOutput = after.rawOutput != nil
+        if beforeRawOutput != afterRawOutput { return true }
+
+        return false
     }
 
     /// Clear all tool calls

@@ -111,10 +111,7 @@ extension AgentSession {
             // Send to agent - notifications arrive asynchronously via AsyncStream
             // Response comes AFTER all notifications are sent, but our notification
             // listener Task may not have processed them all yet
-            let response = try await client.sendPrompt(sessionId: sessionId, content: contentBlocks)
-
-            logger.debug(
-                "Prompt response received with stop reason: \(response.stopReason.rawValue)")
+            _ = try await client.sendPrompt(sessionId: sessionId, content: contentBlocks)
 
             // Delay setting isStreaming = false to allow buffered notifications to be processed
             // The AsyncStream may still have notifications queued that need to update messages
@@ -123,7 +120,6 @@ extension AgentSession {
                 try? await Task.sleep(for: .milliseconds(100))
                 self.isStreaming = false
                 self.scheduleFinalizeLastMessage()
-                logger.debug("Streaming ended after notification drain")
             }
         } catch {
             // Reset streaming state on error (e.g., timeout)

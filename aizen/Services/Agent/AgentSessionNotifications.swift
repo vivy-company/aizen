@@ -31,12 +31,6 @@ extension AgentSession {
 
         let params = notification.params?.value as? [String: Any] ?? [:]
 
-        // Log the update type for debugging
-        if let update = params["update"] as? [String: Any],
-           let updateType = update["sessionUpdate"] as? String {
-            logger.debug("Processing session update: \(updateType)")
-        }
-
         let previousTask = notificationProcessingTask
         let logger = self.logger
         let rawParams = notification.params

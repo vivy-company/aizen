@@ -27,6 +27,10 @@ struct ChatSessionView: View {
     @State private var fileToOpenInEditor: String?
     @State private var autocompleteWindow: AutocompleteWindowController?
 
+    // Input state (local to avoid re-rendering entire view on keystroke)
+    @State private var inputText = ""
+    @State private var pendingCursorPosition: Int?
+
     private var supportsUsageMetrics: Bool {
         switch UsageProvider.fromAgentId(viewModel.selectedAgent) {
         case .codex, .claude, .gemini:
@@ -133,8 +137,8 @@ struct ChatSessionView: View {
                     .padding(.horizontal, 20)
 
                     ChatInputBar(
-                        inputText: $viewModel.inputText,
-                        pendingCursorPosition: $viewModel.pendingCursorPosition,
+                        inputText: $inputText,
+                        pendingCursorPosition: $pendingCursorPosition,
                         attachments: $viewModel.attachments,
                         isProcessing: $viewModel.isProcessing,
                         showingVoiceRecording: $showingVoiceRecording,
@@ -148,9 +152,9 @@ struct ChatSessionView: View {
                         isSessionReady: viewModel.isSessionReady,
                         audioService: viewModel.audioService,
                         autocompleteHandler: viewModel.autocompleteHandler,
-                        onSend: viewModel.sendMessage,
+                        onSend: { sendMessage() },
                         onCancel: viewModel.cancelCurrentPrompt,
-                        onAutocompleteSelect: viewModel.handleAutocompleteSelection,
+                        onAutocompleteSelect: { handleAutocompleteSelection() },
                         onImagePaste: { data, mimeType in
                             viewModel.attachments.append(.image(data, mimeType: mimeType))
                         },
@@ -166,14 +170,21 @@ struct ChatSessionView: View {
         }
         .focusedSceneValue(\.chatActions, ChatActions(cycleModeForward: viewModel.cycleModeForward))
         .onAppear {
+            // Load draft input text if available
+            if let draft = viewModel.loadDraftInputText() {
+                inputText = draft
+            }
             viewModel.setupAgentSession()
             setupAutocompleteWindow()
             NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
         }
         .onDisappear {
-            viewModel.persistDraftState()
+            viewModel.persistDraftState(inputText: inputText)
             autocompleteWindow?.dismiss()
             NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
+        }
+        .onChange(of: inputText) { newText in
+            viewModel.debouncedPersistDraft(inputText: newText)
         }
         .onReceive(viewModel.autocompleteHandler.$state) { state in
             updateAutocompleteWindow(state: state)
@@ -286,6 +297,21 @@ struct ChatSessionView: View {
         viewModel.scrollToBottom()
     }
 
+    // MARK: - Input Handling
+
+    private func sendMessage() {
+        let text = inputText
+        inputText = ""
+        viewModel.sendMessage(text)
+    }
+
+    private func handleAutocompleteSelection() {
+        guard let (replacement, range) = viewModel.autocompleteHandler.selectCurrent() else { return }
+        let nsString = inputText as NSString
+        inputText = nsString.replacingCharacters(in: range, with: replacement)
+        pendingCursorPosition = range.location + replacement.count
+    }
+
     // MARK: - Autocomplete Window
 
     private func setupAutocompleteWindow() {
@@ -295,11 +321,11 @@ struct ChatSessionView: View {
                 // Defer to avoid "Publishing changes from within view updates" warning
                 Task { @MainActor in
                     viewModel.autocompleteHandler.selectItem(item)
-                    viewModel.handleAutocompleteSelection()
+                    handleAutocompleteSelection()
                 }
             },
             onSelect: {
-                viewModel.handleAutocompleteSelection()
+                handleAutocompleteSelection()
             }
         )
         autocompleteWindow = window

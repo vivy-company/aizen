@@ -9,6 +9,7 @@ import Foundation
 import ObjectiveC
 import SwiftUI
 import Combine
+import os
 
 // MARK: - Timeline Index Storage
 private var timelineIndexKey: UInt8 = 0

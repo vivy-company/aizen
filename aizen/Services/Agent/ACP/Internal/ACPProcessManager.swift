@@ -6,12 +6,14 @@
 //
 
 import Foundation
+import Darwin
 import os.log
 
 actor ACPProcessManager {
     // MARK: - Properties
 
     private var process: Process?
+    private var processGroupId: pid_t?
     private var stdinPipe: Pipe?
     private var stdoutPipe: Pipe?
     private var stderrPipe: Pipe?
@@ -137,6 +139,22 @@ actor ACPProcessManager {
 
         try proc.run()
         process = proc
+        processGroupId = nil
+        if proc.processIdentifier > 0 {
+            let pid = proc.processIdentifier
+            if setpgid(pid, pid) == 0 {
+                processGroupId = pid
+            } else {
+                logger.warning("Failed to set process group for pid=\(pid): \(String(cString: strerror(errno)))")
+            }
+        }
+        if proc.processIdentifier > 0 {
+            let pid = proc.processIdentifier
+            let pgid = processGroupId
+            Task {
+                await ACPProcessRegistry.shared.recordProcess(pid: pid, pgid: pgid, agentPath: actualPath)
+            }
+        }
 
         startReading()
         startReadingStderr()
@@ -146,7 +164,11 @@ actor ACPProcessManager {
         return process?.isRunning == true
     }
 
-    func terminate() {
+    func terminate() async {
+        let proc = process
+        let pgid = processGroupId
+        let pid = proc?.processIdentifier
+
         // Clear readability handlers first
         stdoutPipe?.fileHandleForReading.readabilityHandler = nil
         stderrPipe?.fileHandleForReading.readabilityHandler = nil
@@ -156,8 +178,27 @@ actor ACPProcessManager {
         try? stdoutPipe?.fileHandleForReading.close()
         try? stderrPipe?.fileHandleForReading.close()
 
-        process?.terminate()
+        if let proc, proc.isRunning {
+            if let pgid {
+                _ = killpg(pgid, SIGTERM)
+            } else {
+                proc.terminate()
+            }
+        }
+
+        if let proc {
+            let exited = await waitForExit(proc, timeout: 2.0)
+            if !exited, proc.processIdentifier > 0 {
+                if let pgid {
+                    _ = killpg(pgid, SIGKILL)
+                } else {
+                    _ = kill(proc.processIdentifier, SIGKILL)
+                }
+            }
+        }
+        await ACPProcessRegistry.shared.removeProcess(pid: pid, pgid: pgid)
         process = nil
+        processGroupId = nil
 
         stdinPipe = nil
         stdoutPipe = nil
@@ -233,8 +274,11 @@ actor ACPProcessManager {
     }
 
     private func handleTermination(exitCode: Int32) async {
+        let pid = process?.processIdentifier
+        let pgid = processGroupId
         await drainAndClosePipes()
         logger.info("Agent process terminated with code: \(exitCode)")
+        await ACPProcessRegistry.shared.removeProcess(pid: pid, pgid: pgid)
         await onTermination?(exitCode)
     }
 
@@ -262,6 +306,7 @@ actor ACPProcessManager {
         stdoutPipe = nil
         stderrPipe = nil
         process = nil
+        processGroupId = nil
         readBuffer.removeAll()
     }
 
@@ -353,7 +398,6 @@ actor ACPProcessManager {
                     let testData = Data(bytes[0...endIndex])
                     let removeCount = min(endIndex + 1, readBuffer.count)
                     readBuffer.removeFirst(removeCount)
-                    logger.debug("Parsed JSON message, \(testData.count) bytes")
                     return testData
                 }
             }
@@ -402,5 +446,13 @@ actor ACPProcessManager {
                 await onDataReceived?(remaining)
             }
         }
+    }
+
+    private func waitForExit(_ proc: Process, timeout: TimeInterval) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while proc.isRunning, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return !proc.isRunning
     }
 }

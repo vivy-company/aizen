@@ -11,8 +11,8 @@ import SwiftUI
 extension ChatSessionViewModel {
     // MARK: - Message Operations
 
-    func sendMessage() {
-        let messageText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+    func sendMessage(_ text: String) {
+        let messageText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let messageAttachments = attachments
 
         // Allow sending if we have text OR attachments
@@ -22,7 +22,6 @@ extension ChatSessionViewModel {
         let wasProcessing = isProcessing
 
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            inputText = ""
             attachments = []
             isProcessing = true
             // Re-enable auto-scroll when user sends a message

@@ -5,15 +5,17 @@
 //  Loading view shown when agent session is starting
 //
 
+import AppKit
 import SwiftUI
 import Combine
 
 struct AgentLoadingView: View {
     let agentName: String
 
-    @State private var rotation: Double = 0
     @State private var currentTipIndex: Int = 0
     @State private var tipOpacity: Double = 1.0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     private let tips = [
         "⌘D to split terminal right, ⇧⌘D to split down",
@@ -36,15 +38,14 @@ struct AgentLoadingView: View {
 
             // Animated agent icon with spinning ring
             ZStack {
-                // Spinning arc
-                Circle()
-                    .trim(from: 0, to: 0.3)
-                    .stroke(
-                        agentColor,
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .frame(width: 88, height: 88)
-                    .rotationEffect(.degrees(rotation))
+                // Spinning arc (Core Animation)
+                SpinningArcView(
+                    color: NSColor(agentColor),
+                    lineWidth: 3,
+                    isActive: scenePhase == .active && !reduceMotion,
+                    duration: 3
+                )
+                .frame(width: 88, height: 88)
 
                 // Icon container
                 Circle()
@@ -73,9 +74,6 @@ struct AgentLoadingView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            startAnimations()
-        }
         .onReceive(tipRotationTimer) { _ in
             rotateTip()
         }
@@ -107,15 +105,6 @@ struct AgentLoadingView: View {
 
     // MARK: - Animations
 
-    private func startAnimations() {
-        withAnimation(
-            .linear(duration: 1.2)
-            .repeatForever(autoreverses: false)
-        ) {
-            rotation = 360
-        }
-    }
-
     private func rotateTip() {
         // Fade out
         withAnimation(.easeOut(duration: 0.2)) {
@@ -129,6 +118,110 @@ struct AgentLoadingView: View {
                 tipOpacity = 1
             }
         }
+    }
+}
+
+private struct SpinningArcView: NSViewRepresentable {
+    let color: NSColor
+    let lineWidth: CGFloat
+    let isActive: Bool
+    let duration: CFTimeInterval
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> ArcSpinnerView {
+        let view = ArcSpinnerView()
+        context.coordinator.attach(to: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: ArcSpinnerView, context: Context) {
+        context.coordinator.update(in: nsView, color: color, lineWidth: lineWidth, isActive: isActive, duration: duration)
+    }
+
+    final class Coordinator {
+        private let shapeLayer = CAShapeLayer()
+        private var isAnimating = false
+        private weak var hostView: ArcSpinnerView?
+        private let rotationKey = "aizen.spinner.rotation"
+
+        func attach(to view: ArcSpinnerView) {
+            guard hostView == nil else { return }
+            hostView = view
+            view.wantsLayer = true
+            view.layer = CALayer()
+            view.layer?.addSublayer(shapeLayer)
+            shapeLayer.fillColor = nil
+            shapeLayer.lineCap = .round
+            view.layoutHandler = { [weak self] bounds in
+                self?.layout(in: bounds)
+            }
+        }
+
+        func update(in view: ArcSpinnerView, color: NSColor, lineWidth: CGFloat, isActive: Bool, duration: CFTimeInterval) {
+            if hostView == nil {
+                attach(to: view)
+            }
+            shapeLayer.strokeColor = color.cgColor
+            shapeLayer.lineWidth = lineWidth
+
+            if let scale = view.window?.backingScaleFactor {
+                view.layer?.contentsScale = scale
+                shapeLayer.contentsScale = scale
+            }
+
+            layout(in: view.bounds)
+            updateAnimation(isActive: isActive, duration: duration)
+        }
+
+        private func layout(in bounds: CGRect) {
+            guard !bounds.isEmpty else { return }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            shapeLayer.frame = bounds
+            let inset = max(shapeLayer.lineWidth / 2, 0.5)
+            let rect = bounds.insetBy(dx: inset, dy: inset)
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let radius = min(rect.width, rect.height) / 2
+            let startAngle = -CGFloat.pi / 2
+            let endAngle = startAngle + CGFloat.pi * 2 * 0.3
+            let path = CGMutablePath()
+            path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
+            shapeLayer.path = path
+            CATransaction.commit()
+        }
+
+        private func updateAnimation(isActive: Bool, duration: CFTimeInterval) {
+            if !isActive {
+                if isAnimating {
+                    shapeLayer.removeAnimation(forKey: rotationKey)
+                    isAnimating = false
+                }
+                return
+            }
+
+            guard !isAnimating else { return }
+            let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
+            rotation.fromValue = 0
+            rotation.toValue = -Double.pi * 2
+            rotation.duration = duration
+            rotation.timingFunction = CAMediaTimingFunction(name: .linear)
+            rotation.repeatCount = .infinity
+            rotation.isRemovedOnCompletion = false
+            shapeLayer.add(rotation, forKey: rotationKey)
+            isAnimating = true
+        }
+    }
+}
+
+private final class ArcSpinnerView: NSView {
+    var layoutHandler: ((CGRect) -> Void)?
+
+    override func layout() {
+        super.layout()
+        layoutHandler?(bounds)
     }
 }
 

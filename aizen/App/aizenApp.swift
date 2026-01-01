@@ -73,6 +73,11 @@ struct aizenApp: App {
         // Preload shell environment in background (speeds up agent session start)
         ShellEnvironment.preloadEnvironment()
 
+        // Best-effort cleanup for orphaned ACP agents from a previous crash
+        Task {
+            await ACPProcessRegistry.shared.cleanupOrphanedProcesses()
+        }
+
         // Initialize Sparkle updater
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true,

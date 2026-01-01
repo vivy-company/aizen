@@ -63,8 +63,6 @@ actor AgentVersionChecker {
         versionCache[agentName] = info
         lastCheckTime[agentName] = Date()
 
-        logger.info("Version check for \(agentName): current=\(info.current ?? "nil"), latest=\(info.latest ?? "nil"), outdated=\(info.isOutdated)")
-
         return info
     }
 

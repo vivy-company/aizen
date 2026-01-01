@@ -43,7 +43,11 @@ struct ModelSelectorMenu: View {
                         }
                     }
                 } header: {
-                    Label(selectedAgentMetadata?.name ?? selectedAgent.capitalized, image: "agent-\(selectedAgent)")
+                    Label {
+                        Text(selectedAgentMetadata?.name ?? selectedAgent.capitalized)
+                    } icon: {
+                        AgentIconView(agent: selectedAgent, size: 14)
+                    }
                 }
             }
 

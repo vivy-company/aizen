@@ -53,7 +53,6 @@ nonisolated enum ShellEnvironment {
     }
 
     private nonisolated static func loadEnvironmentFromShell() -> [String: String] {
-        let startTime = CFAbsoluteTimeGetCurrent()
         let shell = getLoginShell()
         let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
 
@@ -105,9 +104,6 @@ nonisolated enum ShellEnvironment {
             logger.error("Failed to load shell environment: \(error.localizedDescription)")
             return ProcessInfo.processInfo.environment
         }
-
-        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-        logger.debug("Shell environment loaded in \(String(format: "%.2f", elapsed * 1000))ms")
 
         return shellEnv.isEmpty ? ProcessInfo.processInfo.environment : shellEnv
     }

@@ -346,8 +346,6 @@ actor ACPClient {
         let requestId = RequestId.number(nextRequestId)
         nextRequestId += 1
 
-        logger.debug("Sending request: \(method) id=\(requestId)")
-
         let paramsData = try encoder.encode(params)
         let paramsValue = try decoder.decode(AnyCodable.self, from: paramsData)
 
@@ -466,15 +464,12 @@ actor ACPClient {
 
             switch message {
             case .response(let response):
-                logger.debug("Received response for id=\(response.id)")
                 await handleResponse(response)
 
             case .notification(let notification):
-                logger.debug("Received notification: \(notification.method)")
                 notificationContinuation.yield(notification)
 
             case .request(let request):
-                logger.debug("Received request: \(request.method)")
                 await handleIncomingRequest(request)
             }
         } catch {
@@ -488,16 +483,12 @@ actor ACPClient {
     }
 
     private func handleResponse(_ response: JSONRPCResponse) async {
-        let pendingIds = pendingRequests.keys.map { String(describing: $0) }
-        logger.debug("Handling response for id=\(response.id), pending requests: \(pendingIds)")
-
         guard let continuation = pendingRequests.removeValue(forKey: response.id) else {
             let stillPending = pendingRequests.keys.map { String(describing: $0) }
             logger.warning("Received response for unknown request id=\(response.id), no pending request found. Pending: \(stillPending)")
             return
         }
 
-        logger.debug("Resuming continuation for request id=\(response.id)")
         continuation.resume(returning: response)
     }
 

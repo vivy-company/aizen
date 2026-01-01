@@ -10,6 +10,7 @@ import SwiftUI
 struct CustomTextEditor: NSViewRepresentable {
     @Binding var text: String
     @Binding var measuredHeight: CGFloat
+    @Binding var isFocused: Bool
     let onSubmit: () -> Void
 
     // Autocomplete callbacks - passes (text, cursorPosition, cursorRect)
@@ -98,12 +99,21 @@ struct CustomTextEditor: NSViewRepresentable {
         context.coordinator.onImagePaste = onImagePaste
         context.coordinator.onLargeTextPaste = onLargeTextPaste
         context.coordinator.updateMeasuredHeightIfNeeded()
+
+        let hasFocus = textView.window?.firstResponder === textView
+        if hasFocus != context.coordinator.lastKnownFocus {
+            context.coordinator.lastKnownFocus = hasFocus
+            Task { @MainActor in
+                context.coordinator.isFocused = hasFocus
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             text: $text,
             measuredHeight: $measuredHeight,
+            isFocused: $isFocused,
             onSubmit: onSubmit,
             onCursorChange: onCursorChange,
             onAutocompleteNavigate: onAutocompleteNavigate,
@@ -115,6 +125,7 @@ struct CustomTextEditor: NSViewRepresentable {
     class Coordinator: NSObject, NSTextViewDelegate {
         @Binding var text: String
         @Binding var measuredHeight: CGFloat
+        @Binding var isFocused: Bool
         let onSubmit: () -> Void
         var onCursorChange: ((String, Int, NSRect) -> Void)?
         var onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?
@@ -126,6 +137,7 @@ struct CustomTextEditor: NSViewRepresentable {
         private var lastMeasuredText: String = ""
         private var lastMeasuredWidth: CGFloat = 0
         private var lastCursorPosition: Int = -1
+        var lastKnownFocus: Bool = false
         private var lastCursorText: String = ""
         private var didApplyMentionHighlight = false
         private static let mentionRegex = try? NSRegularExpression(pattern: "@[^\\s]+", options: [])
@@ -133,6 +145,7 @@ struct CustomTextEditor: NSViewRepresentable {
         init(
             text: Binding<String>,
             measuredHeight: Binding<CGFloat>,
+            isFocused: Binding<Bool>,
             onSubmit: @escaping () -> Void,
             onCursorChange: ((String, Int, NSRect) -> Void)?,
             onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?,
@@ -141,6 +154,7 @@ struct CustomTextEditor: NSViewRepresentable {
         ) {
             _text = text
             _measuredHeight = measuredHeight
+            _isFocused = isFocused
             self.onSubmit = onSubmit
             self.onCursorChange = onCursorChange
             self.onAutocompleteNavigate = onAutocompleteNavigate
@@ -259,6 +273,20 @@ struct CustomTextEditor: NSViewRepresentable {
             updateMeasuredHeightIfNeeded()
         }
 
+        func textDidBeginEditing(_ notification: Notification) {
+            lastKnownFocus = true
+            Task { @MainActor in
+                isFocused = true
+            }
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            lastKnownFocus = false
+            Task { @MainActor in
+                isFocused = false
+            }
+        }
+
         func applyHighlighting(to textView: NSTextView) {
             highlightMentions(in: textView)
         }
@@ -328,7 +356,7 @@ struct CustomTextEditor: NSViewRepresentable {
             let newHeight = usedRect.height + inset
 
             if abs(newHeight - measuredHeight) > 0.5 {
-                DispatchQueue.main.async { [weak self] in
+                Task { @MainActor [weak self] in
                     self?.measuredHeight = newHeight
                 }
             }
