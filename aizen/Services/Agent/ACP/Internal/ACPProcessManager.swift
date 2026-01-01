@@ -276,22 +276,40 @@ actor ACPProcessManager {
     private func popNextMessage() -> Data? {
         // Skip leading whitespace
         let whitespace: Set<UInt8> = [0x20, 0x09, 0x0D, 0x0A]  // space, tab, CR, LF
-        while let first = readBuffer.first, whitespace.contains(first) {
-            readBuffer.removeFirst()
-        }
+        while true {
+            while let first = readBuffer.first, whitespace.contains(first) {
+                readBuffer.removeFirst()
+            }
 
-        guard !readBuffer.isEmpty else {
-            return nil
+            guard !readBuffer.isEmpty else {
+                return nil
+            }
+
+            guard let first = readBuffer.first else { return nil }
+
+            // JSON-RPC messages should start with object/array
+            if first != 0x7B && first != 0x5B {
+                if let newline = readBuffer.firstIndex(of: 0x0A) {
+                    let dropped = readBuffer.prefix(upTo: newline)
+                    readBuffer.removeFirst(newline + 1)
+                    if !dropped.isEmpty {
+                        logger.debug("Discarded non-JSON stdout line (\(dropped.count) bytes)")
+                    }
+                    continue
+                }
+
+                if readBuffer.count > 4096 {
+                    logger.warning("Discarding \(readBuffer.count) bytes of non-JSON stdout")
+                    readBuffer.removeAll(keepingCapacity: true)
+                }
+                return nil
+            }
+
+            break
         }
 
         // Convert to byte array for safe subscript access
         let bytes = Array(readBuffer)
-        guard let first = bytes.first else { return nil }
-
-        // JSON-RPC messages should start with object/array
-        guard first == 0x7B || first == 0x5B else {
-            return nil
-        }
 
         var depth = 0
         var inString = false
