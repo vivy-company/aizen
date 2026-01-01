@@ -468,10 +468,11 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         guard !servers.isEmpty else { return [] }
 
         let mcpCapabilities = agentCapabilities?.mcpCapabilities
-        let allowHTTP = mcpCapabilities?.http ?? true
-        let allowSSE = mcpCapabilities?.sse ?? true
+        let allowHTTP = mcpCapabilities?.http == true
+        let allowSSE = mcpCapabilities?.sse == true
 
         var configs: [MCPServerConfig] = []
+        var skippedRemote: [String] = []
         for name in servers.keys.sorted() {
             guard let entry = servers[name] else { continue }
             switch entry.type {
@@ -491,6 +492,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                 configs.append(.stdio(config))
             case "http":
                 guard allowHTTP else {
+                    skippedRemote.append(name)
                     logger.info("[\(self.agentName)] MCP server '\(name)' skipped (HTTP not supported)")
                     continue
                 }
@@ -502,6 +504,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                 configs.append(.http(config))
             case "sse":
                 guard allowSSE else {
+                    skippedRemote.append(name)
                     logger.info("[\(self.agentName)] MCP server '\(name)' skipped (SSE not supported)")
                     continue
                 }
@@ -513,6 +516,17 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                 configs.append(.sse(config))
             default:
                 logger.warning("[\(self.agentName)] MCP server '\(name)' has unknown type '\(entry.type)'")
+            }
+        }
+
+        if !skippedRemote.isEmpty {
+            let serverList = skippedRemote.joined(separator: ", ")
+            await MainActor.run {
+                if mcpCapabilities == nil {
+                    addSystemMessage("⚠️ \(agentName) ACP did not advertise HTTP/SSE MCP support. Skipping remote MCP servers: \(serverList)")
+                } else {
+                    addSystemMessage("⚠️ \(agentName) does not support HTTP/SSE MCP servers. Skipping: \(serverList)")
+                }
             }
         }
 
