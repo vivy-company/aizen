@@ -53,10 +53,17 @@ class ChatSessionViewModel: ObservableObject {
     var messages: [MessageItem] {
         // If we have a live session, use its messages
         // Historical messages are only shown before session starts
+        let source: [MessageItem]
         if let session = currentAgentSession, session.isActive {
-            return session.messages
+            source = session.messages
+        } else {
+            source = historicalMessages
         }
-        return historicalMessages
+
+        return source.filter { message in
+            guard message.role == .agent else { return true }
+            return !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     }
 
     /// Tool calls - derives from AgentSession (no duplicate storage)
@@ -194,7 +201,7 @@ class ChatSessionViewModel: ObservableObject {
 
             // Initialize sync state from existing session BEFORE setting up observers
             // This prevents all existing messages/tool calls from appearing as "new"
-            previousMessageIds = Set(existingSession.messages.map { $0.id })
+            previousMessageIds = Set(messages.map { $0.id })
             previousToolCallIds = Set(existingSession.toolCalls.map { $0.id })
 
             // Rebuild timeline with proper grouping for existing data
@@ -251,7 +258,7 @@ class ChatSessionViewModel: ObservableObject {
 
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 // Reset previous IDs and rebuild timeline from new session
-                previousMessageIds = Set(newSession.messages.map { $0.id })
+                previousMessageIds = Set(messages.map { $0.id })
                 previousToolCallIds = Set(newSession.toolCalls.map { $0.id })
                 rebuildTimeline()
             }
@@ -615,7 +622,7 @@ class ChatSessionViewModel: ObservableObject {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             self.rebuildTimelineWithGrouping(isStreaming: false)
                         }
-                        self.previousMessageIds = Set(session.messages.map { $0.id })
+                        self.previousMessageIds = Set(self.messages.map { $0.id })
                         self.previousToolCallIds = Set(session.toolCalls.map { $0.id })
                     }
                 }
