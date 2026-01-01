@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import Foundation
 
 struct MCPMarketplaceView: View {
     @Environment(\.dismiss) private var dismiss
@@ -30,6 +31,7 @@ struct MCPMarketplaceView: View {
     @State private var showingRemoveConfirmation = false
 
     @State private var searchTask: Task<Void, Never>?
+    @State private var supportedTransports: Set<String> = ["stdio"]
 
     private enum ServerFilter: String, CaseIterable {
         case all = "All"
@@ -58,6 +60,7 @@ struct MCPMarketplaceView: View {
         .frame(width: 600, height: 520)
         .background(Color(NSColor.windowBackgroundColor))
         .task {
+            await loadTransportSupport()
             await mcpManager.syncInstalled(agentId: agentId, agentPath: agentPath)
             await loadServers()
         }
@@ -193,15 +196,16 @@ struct MCPMarketplaceView: View {
     // MARK: - Content
 
     private var filteredServers: [MCPServer] {
+        let compatibleServers = servers.filter { isCompatible(server: $0) }
         switch selectedFilter {
         case .all:
-            return servers
+            return compatibleServers
         case .installed:
             return [] // Handled separately by installedServerListView
         case .remote:
-            return servers.filter { $0.isRemoteOnly }
+            return compatibleServers.filter { $0.isRemoteOnly }
         case .package:
-            return servers.filter { !$0.isRemoteOnly }
+            return compatibleServers.filter { !$0.isRemoteOnly }
         }
     }
 
@@ -269,6 +273,9 @@ struct MCPMarketplaceView: View {
     }
 
     private var emptyMessage: String {
+        if selectedFilter != .installed, !servers.isEmpty, filteredServers.isEmpty {
+            return "No compatible servers for \(agentName)"
+        }
         switch selectedFilter {
         case .installed:
             return "No MCP servers installed"
@@ -441,6 +448,80 @@ struct MCPMarketplaceView: View {
         }
 
         isLoading = false
+    }
+
+    private func loadTransportSupport() async {
+        await MainActor.run {
+            supportedTransports = ["stdio"]
+        }
+
+        guard let path = agentPath,
+              FileManager.default.isExecutableFile(atPath: path) else {
+            return
+        }
+
+        let launchArgs = AgentRegistry.shared.getMetadata(for: agentId)?.launchArgs ?? []
+        let tempClient = ACPClient()
+
+        do {
+            try await tempClient.launch(agentPath: path, arguments: launchArgs)
+            let capabilities = ClientCapabilities(
+                fs: FileSystemCapabilities(
+                    readTextFile: true,
+                    writeTextFile: true
+                ),
+                terminal: true,
+                meta: [
+                    "terminal_output": AnyCodable(true),
+                    "terminal-auth": AnyCodable(true)
+                ]
+            )
+
+            let initResponse = try await tempClient.initialize(
+                protocolVersion: 1,
+                capabilities: capabilities
+            )
+
+            var transports: Set<String> = ["stdio"]
+            if initResponse.agentCapabilities?.mcpCapabilities?.http == true {
+                transports.insert("http")
+            }
+            if initResponse.agentCapabilities?.mcpCapabilities?.sse == true {
+                transports.insert("sse")
+            }
+
+            await MainActor.run {
+                supportedTransports = transports
+            }
+        } catch {
+            // Keep stdio-only support on failure
+        }
+        await tempClient.terminate()
+    }
+
+    private func isCompatible(server: MCPServer) -> Bool {
+        let packageSupported = server.packages?.contains { package in
+            supportsTransport(package.transportType)
+        } ?? false
+
+        let remoteSupported = server.remotes?.contains { remote in
+            supportsTransport(remote.type)
+        } ?? false
+
+        return packageSupported || remoteSupported
+    }
+
+    private func supportsTransport(_ type: String) -> Bool {
+        switch type.lowercased() {
+        case "stdio":
+            return supportedTransports.contains("stdio")
+        case "http", "streamable-http":
+            return supportedTransports.contains("http")
+        case "sse":
+            return supportedTransports.contains("sse")
+        default:
+            return supportedTransports.contains(type.lowercased())
+        }
     }
 
     private func search() async {
