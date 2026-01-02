@@ -215,7 +215,7 @@ struct ChatInputBar: View {
                 isHoveringInput = hovering
             }
         }
-        .onChange(of: showingAttachmentPicker) { isShowing in
+        .onChange(of: showingAttachmentPicker) { _, isShowing in
             guard isShowing else { return }
             showingAttachmentPicker = false
 

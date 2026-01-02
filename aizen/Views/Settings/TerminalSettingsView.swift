@@ -17,6 +17,7 @@ struct TerminalSettingsView: View {
     @AppStorage("terminalUsePerAppearanceTheme") private var usePerAppearanceTheme = false
     @AppStorage("terminalNotificationsEnabled") private var terminalNotificationsEnabled = true
     @AppStorage("terminalProgressEnabled") private var terminalProgressEnabled = true
+    @AppStorage("terminalVoiceButtonEnabled") private var terminalVoiceButtonEnabled = true
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
 
     // Copy settings
@@ -120,6 +121,7 @@ struct TerminalSettingsView: View {
             Section("Terminal Behavior") {
                 Toggle("Enable terminal notifications", isOn: $terminalNotificationsEnabled)
                 Toggle("Show progress overlays", isOn: $terminalProgressEnabled)
+                Toggle("Show voice input button", isOn: $terminalVoiceButtonEnabled)
             }
 
             Section {

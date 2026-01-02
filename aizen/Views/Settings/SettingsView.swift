@@ -22,6 +22,7 @@ private extension View {
 
 enum SettingsSelection: Hashable {
     case general
+    case transcription
     case pro
     case git
     case terminal
@@ -49,6 +50,9 @@ struct SettingsView: View {
                     // Static settings items
                     Label("General", systemImage: "gear")
                         .tag(SettingsSelection.general)
+
+                    Label("Transcription", systemImage: "waveform")
+                        .tag(SettingsSelection.transcription)
 
                     Label("Git", systemImage: "arrow.triangle.branch")
                         .tag(SettingsSelection.git)
@@ -141,6 +145,10 @@ struct SettingsView: View {
             GeneralSettingsView(defaultEditor: $defaultEditor)
                 .navigationTitle("General")
                 .navigationSubtitle("Default apps, layout, and toolbar")
+        case .transcription:
+            TranscriptionSettingsView()
+                .navigationTitle("Transcription")
+                .navigationSubtitle("Speech-to-text engine and models")
         case .pro:
             AizenProSettingsView(licenseManager: licenseManager)
                 .navigationTitle("Aizen Pro")

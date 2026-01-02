@@ -1,10 +1,10 @@
 import Foundation
-import AVFoundation
-import Speech
 import Combine
+import os.log
 
 @MainActor
 class AudioService: NSObject, ObservableObject {
+    private let logger = Logger.audio
     @Published var isRecording = false
     @Published var transcribedText = ""
     @Published var partialTranscription = ""
@@ -15,7 +15,11 @@ class AudioService: NSObject, ObservableObject {
     // Services
     private let permissionManager = AudioPermissionManager()
     private let speechRecognitionService = SpeechRecognitionService()
-    private let audioRecordingService = AudioRecordingService()
+    private let audioCaptureService = AudioCaptureService()
+    private let mlxWhisperProvider = MLXWhisperProvider.shared
+    private let mlxParakeetProvider = MLXParakeetProvider.shared
+
+    private var activeProvider: TranscriptionProvider = .system
 
     override init() {
         super.init()
@@ -36,30 +40,40 @@ class AudioService: NSObject, ObservableObject {
         speechRecognitionService.$partialTranscription
             .assign(to: &$partialTranscription)
 
-        // Audio recording
-        audioRecordingService.$audioLevel
+        // Audio capture
+        audioCaptureService.$audioLevel
             .assign(to: &$audioLevel)
 
-        audioRecordingService.$recordingDuration
+        audioCaptureService.$recordingDuration
             .assign(to: &$recordingDuration)
     }
 
     // MARK: - Permission Handling
 
-    func requestPermissions() async -> Bool {
-        return await permissionManager.requestPermissions()
+    func requestPermissions(includeSpeech: Bool) async -> Bool {
+        return await permissionManager.requestPermissions(includeSpeech: includeSpeech)
     }
 
-    func checkPermissions() async -> Bool {
-        return await permissionManager.checkPermissions()
+    func checkPermissions(includeSpeech: Bool) async -> Bool {
+        return await permissionManager.checkPermissions(includeSpeech: includeSpeech)
     }
 
     // MARK: - Recording Control
 
     func startRecording() async throws {
-        let hasPermissions = await checkPermissions()
+        let requestedProvider = TranscriptionSettingsStore.currentProvider()
+        let effectiveProvider = resolveProvider(for: requestedProvider)
+        if requestedProvider == .mlxWhisper && effectiveProvider == .system {
+            logger.warning("MLX Whisper not available; falling back to Apple Speech")
+        } else if requestedProvider == .mlxParakeet && effectiveProvider == .system {
+            logger.warning("MLX Parakeet not available; falling back to Apple Speech")
+        }
+        activeProvider = effectiveProvider
+
+        let needsSpeech = effectiveProvider == .system
+        let hasPermissions = await checkPermissions(includeSpeech: needsSpeech)
         if !hasPermissions {
-            let granted = await requestPermissions()
+            let granted = await requestPermissions(includeSpeech: needsSpeech)
             guard granted else {
                 throw RecordingError.permissionDenied
             }
@@ -67,11 +81,15 @@ class AudioService: NSObject, ObservableObject {
 
         // Reset state
         speechRecognitionService.resetTranscriptions()
-        audioRecordingService.stopRecording()
+        audioCaptureService.cancel()
 
         // Start services
-        try await speechRecognitionService.startRecognition()
-        audioRecordingService.startRecording()
+        switch effectiveProvider {
+        case .system:
+            try await startAppleSpeech()
+        case .mlxWhisper, .mlxParakeet:
+            try startMLXCapture()
+        }
 
         isRecording = true
     }
@@ -79,22 +97,50 @@ class AudioService: NSObject, ObservableObject {
     func stopRecording() async -> String {
         isRecording = false
 
-        // Stop services
-        audioRecordingService.stopRecording()
-        let finalText = await speechRecognitionService.stopRecognition()
+        let samples = audioCaptureService.stop()
 
-        // Reset state
-        speechRecognitionService.resetTranscriptions()
-
-        return finalText
+        switch activeProvider {
+        case .system:
+            let finalText = await speechRecognitionService.stopRecognition()
+            speechRecognitionService.resetTranscriptions()
+            return finalText
+        case .mlxWhisper:
+            do {
+                let text = try await mlxWhisperProvider.transcribe(samples: samples)
+                transcribedText = text
+                return text
+            } catch {
+                logger.error("MLX Whisper failed: \(error.localizedDescription)")
+                if let fallback = await fallbackToAppleSpeech(samples: samples) {
+                    transcribedText = fallback
+                    return fallback
+                }
+                return ""
+            }
+        case .mlxParakeet:
+            do {
+                let text = try await mlxParakeetProvider.transcribe(samples: samples)
+                transcribedText = text
+                return text
+            } catch {
+                logger.error("MLX Parakeet failed: \(error.localizedDescription)")
+                if let fallback = await fallbackToAppleSpeech(samples: samples) {
+                    transcribedText = fallback
+                    return fallback
+                }
+                return ""
+            }
+        }
     }
 
     func cancelRecording() {
         isRecording = false
 
-        audioRecordingService.cancelRecording()
+        audioCaptureService.cancel()
         speechRecognitionService.cancelRecognition()
         speechRecognitionService.resetTranscriptions()
+        transcribedText = ""
+        partialTranscription = ""
     }
 
     // MARK: - Errors
@@ -103,16 +149,90 @@ class AudioService: NSObject, ObservableObject {
         case permissionDenied
         case speechRecognitionUnavailable
         case recordingFailed
+        case mlxUnavailable
 
         var errorDescription: String? {
             switch self {
             case .permissionDenied:
-                return "Speech Recognition permission is required. The microphone will be automatically requested when recording starts."
+                return "Microphone permission is required. The microphone will be automatically requested when recording starts."
             case .speechRecognitionUnavailable:
                 return "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight."
             case .recordingFailed:
                 return "Failed to start recording. Please check microphone permissions in System Settings > Privacy & Security > Microphone."
+            case .mlxUnavailable:
+                return "MLX transcription is not available on this Mac. Switching to Apple Speech."
             }
+        }
+    }
+
+    // MARK: - Provider Resolution
+
+    private func resolveProvider(for requested: TranscriptionProvider) -> TranscriptionProvider {
+        switch requested {
+        case .system:
+            return .system
+        case .mlxWhisper:
+            guard MLXWhisperProvider.isSupported else { return .system }
+            let modelId = TranscriptionSettingsStore.currentWhisperModelId()
+            guard MLXModelManager.isModelAvailable(kind: .whisper, modelId: modelId) else { return .system }
+            return .mlxWhisper
+        case .mlxParakeet:
+            guard MLXParakeetProvider.isSupported else { return .system }
+            let modelId = TranscriptionSettingsStore.currentParakeetModelId()
+            guard MLXModelManager.isModelAvailable(kind: .parakeetTDT, modelId: modelId) else { return .system }
+            return .mlxParakeet
+        }
+    }
+
+    // MARK: - Apple Speech
+
+    private func startAppleSpeech() async throws {
+        guard speechRecognitionService.isAvailable else {
+            throw RecordingError.speechRecognitionUnavailable
+        }
+
+        audioCaptureService.bufferHandler = { [weak speechRecognitionService] buffer in
+            speechRecognitionService?.appendAudioBuffer(buffer)
+        }
+
+        try await speechRecognitionService.startRecognition()
+        do {
+            try audioCaptureService.start()
+        } catch {
+            throw RecordingError.recordingFailed
+        }
+    }
+
+    // MARK: - MLX
+
+    private func startMLXCapture() throws {
+        audioCaptureService.bufferHandler = nil
+        do {
+            try audioCaptureService.start()
+        } catch {
+            throw RecordingError.recordingFailed
+        }
+    }
+
+    private func fallbackToAppleSpeech(samples: [Float]) async -> String? {
+        guard !samples.isEmpty else { return nil }
+        guard speechRecognitionService.isAvailable else { return nil }
+
+        let hasPermissions = await checkPermissions(includeSpeech: true)
+        if !hasPermissions {
+            let granted = await requestPermissions(includeSpeech: true)
+            guard granted else { return nil }
+        }
+
+        do {
+            let text = try await speechRecognitionService.transcribe(
+                samples: samples,
+                sampleRate: audioCaptureService.sampleRate
+            )
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            logger.error("Apple Speech fallback failed: \(error.localizedDescription)")
+            return nil
         }
     }
 }
