@@ -20,6 +20,17 @@ class AgentRouter: ObservableObject {
         }
     }
 
+    /// Get a valid default agent, falling back to "claude" if the configured default doesn't exist
+    func getValidDefaultAgent() -> String {
+        let configuredDefault = defaultAgent
+        if let metadata = AgentRegistry.shared.getMetadata(for: configuredDefault),
+           metadata.isEnabled {
+            return configuredDefault
+        }
+        defaultAgent = "claude"
+        return "claude"
+    }
+
     init() {
         // Listen for agent metadata changes
         NotificationCenter.default.addObserver(
