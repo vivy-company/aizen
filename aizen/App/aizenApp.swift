@@ -31,6 +31,13 @@ class AizenAppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+
+        // Best-effort CLI symlink install (non-blocking)
+        DispatchQueue.global(qos: .utility).async {
+            if CLISymlinkManager.installedSymlinkURL() == nil {
+                _ = CLISymlinkManager.install()
+            }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

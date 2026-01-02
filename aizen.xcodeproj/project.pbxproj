@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CCF00000000000000000000C /* aizen-cli in Copy Files */ = {isa = PBXBuildFile; fileRef = CCF000000000000000000001 /* aizen-cli */; };
+		CCF00000000000000000000D /* aizen-cli in Copy Files */ = {isa = PBXBuildFile; fileRef = CCF000000000000000000001 /* aizen-cli */; };
 		CC1234572EA241B30007DBB1 /* libghostty.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* libghostty.a */; };
 		CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC128B1A2EAF8DD600EA9A50 /* Sparkle */; };
 		CC2917C82EFBDAE300440062 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917C32EFBDAE300440062 /* CodeEditSourceEditor */; };
@@ -52,7 +54,46 @@
 			remoteGlobalIDString = CCB04B412EA241B30007DBB1;
 			remoteInfo = aizen;
 		};
+		CCF00000000000000000000F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CCB04B3A2EA241B30007DBB1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CCF000000000000000000002;
+			remoteInfo = "aizen-cli";
+		};
+		CCF000000000000000000010 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CCB04B3A2EA241B30007DBB1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CCF000000000000000000002;
+			remoteInfo = "aizen-cli";
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CCF00000000000000000000A /* Copy CLI */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "cli";
+			dstSubfolderSpec = 7;
+			files = (
+				CCF00000000000000000000C /* aizen-cli in Copy Files */,
+			);
+			name = "Copy CLI";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCF00000000000000000000B /* Copy CLI */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "cli";
+			dstSubfolderSpec = 7;
+			files = (
+				CCF00000000000000000000D /* aizen-cli in Copy Files */,
+			);
+			name = "Copy CLI";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		CC1234562EA241B30007DBB1 /* libghostty.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libghostty.a; path = Vendor/libghostty/lib/libghostty.a; sourceTree = "<group>"; };
@@ -61,6 +102,7 @@
 		CCB04B422EA241B30007DBB1 /* aizen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = aizen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCB04B542EA241B50007DBB1 /* aizenTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = aizenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCB04B5E2EA241B50007DBB1 /* aizenUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = aizenUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CCF000000000000000000001 /* aizen-cli */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "aizen-cli"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -100,6 +142,11 @@
 			path = aizenUITests;
 			sourceTree = "<group>";
 		};
+		CCF000000000000000000006 /* cli */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = cli;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -121,6 +168,13 @@
 				CC2917D32EFBDAE300440062 /* libghostty.a in Frameworks */,
 				CC2917D42EFBDAE300440062 /* Markdown in Frameworks */,
 				CC2917D52EFBDAE300440062 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCF000000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -174,6 +228,7 @@
 			isa = PBXGroup;
 			children = (
 				CCB04B442EA241B30007DBB1 /* aizen */,
+				CCF000000000000000000006 /* cli */,
 				CCB04B572EA241B50007DBB1 /* aizenTests */,
 				CCB04B612EA241B50007DBB1 /* aizenUITests */,
 				CCB04B432EA241B30007DBB1 /* Products */,
@@ -189,6 +244,7 @@
 				CCB04B542EA241B50007DBB1 /* aizenTests.xctest */,
 				CCB04B5E2EA241B50007DBB1 /* aizenUITests.xctest */,
 				CC2917DB2EFBDAE300440062 /* aizen nightly.app */,
+				CCF000000000000000000001 /* aizen-cli */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -203,11 +259,13 @@
 				CC2917C62EFBDAE300440062 /* Sources */,
 				CC2917C72EFBDAE300440062 /* Frameworks */,
 				CC2917D62EFBDAE300440062 /* Resources */,
+				CCF00000000000000000000B /* Copy CLI */,
 				CC2917D72EFBDAE300440062 /* Organize Ghostty Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CCF000000000000000000011 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				CCB04B442EA241B30007DBB1 /* aizen */,
@@ -239,11 +297,13 @@
 				CCB04B3E2EA241B30007DBB1 /* Sources */,
 				CCB04B3F2EA241B30007DBB1 /* Frameworks */,
 				CCB04B402EA241B30007DBB1 /* Resources */,
+				CCF00000000000000000000A /* Copy CLI */,
 				CC1234582EA241B30007DBC1 /* Organize Ghostty Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CCF00000000000000000000E /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				CCB04B442EA241B30007DBB1 /* aizen */,
@@ -267,6 +327,28 @@
 			productName = aizen;
 			productReference = CCB04B422EA241B30007DBB1 /* aizen.app */;
 			productType = "com.apple.product-type.application";
+		};
+		CCF000000000000000000002 /* aizen-cli */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CCF000000000000000000007 /* Build configuration list for PBXNativeTarget "aizen-cli" */;
+			buildPhases = (
+				CCF000000000000000000003 /* Sources */,
+				CCF000000000000000000004 /* Frameworks */,
+				CCF000000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CCF000000000000000000006 /* cli */,
+			);
+			name = "aizen-cli";
+			packageProductDependencies = (
+			);
+			productName = "aizen-cli";
+			productReference = CCF000000000000000000001 /* aizen-cli */;
+			productType = "com.apple.product-type.tool";
 		};
 		CCB04B532EA241B50007DBB1 /* aizenTests */ = {
 			isa = PBXNativeTarget;
@@ -335,6 +417,9 @@
 						CreatedOnToolsVersion = 26.0.1;
 						TestTargetID = CCB04B412EA241B30007DBB1;
 					};
+					CCF000000000000000000002 = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
 				};
 			};
 			buildConfigurationList = CCB04B3D2EA241B30007DBB1 /* Build configuration list for PBXProject "aizen" */;
@@ -365,6 +450,7 @@
 				CC2917B42EFBDAE300440062 /* aizen nightly */,
 				CCB04B532EA241B50007DBB1 /* aizenTests */,
 				CCB04B5D2EA241B50007DBB1 /* aizenUITests */,
+				CCF000000000000000000002 /* aizen-cli */,
 			);
 		};
 /* End PBXProject section */
@@ -392,6 +478,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CCB04B5C2EA241B50007DBB1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCF000000000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -462,6 +555,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CCF000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CCB04B502EA241B50007DBB1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -488,6 +588,16 @@
 			isa = PBXTargetDependency;
 			target = CCB04B412EA241B30007DBB1 /* aizen */;
 			targetProxy = CCB04B5F2EA241B50007DBB1 /* PBXContainerItemProxy */;
+		};
+		CCF00000000000000000000E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CCF000000000000000000002 /* aizen-cli */;
+			targetProxy = CCF00000000000000000000F /* PBXContainerItemProxy */;
+		};
+		CCF000000000000000000011 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CCF000000000000000000002 /* aizen-cli */;
+			targetProxy = CCF000000000000000000010 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1018,6 +1128,79 @@
 			};
 			name = Release;
 		};
+		CCF000000000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				DEAD_CODE_STRIPPING = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/Vendor/libgit2/include",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/Vendor/libgit2/lib",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
+				OTHER_LDFLAGS = (
+					"-lc++",
+					"-lgit2",
+					"-lssh2",
+					"-lssl",
+					"-lcrypto",
+					"-lz",
+					"-liconv",
+					"-framework",
+					Security,
+					"-framework",
+					CoreFoundation,
+					"-framework",
+					CoreData,
+				);
+				OTHER_SWIFT_FLAGS = "-Xcc -fmodule-map-file=$(PROJECT_DIR)/Vendor/libgit2/include/module.modulemap";
+				PRODUCT_BUNDLE_IDENTIFIER = win.aizen.app.cli;
+				PRODUCT_NAME = "aizen-cli";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		CCF000000000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				DEAD_CODE_STRIPPING = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/Vendor/libgit2/include",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/Vendor/libgit2/lib",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
+				OTHER_LDFLAGS = (
+					"-lc++",
+					"-lgit2",
+					"-lssh2",
+					"-lssl",
+					"-lcrypto",
+					"-lz",
+					"-liconv",
+					"-framework",
+					Security,
+					"-framework",
+					CoreFoundation,
+					"-framework",
+					CoreData,
+				);
+				OTHER_SWIFT_FLAGS = "-Xcc -fmodule-map-file=$(PROJECT_DIR)/Vendor/libgit2/include/module.modulemap";
+				PRODUCT_BUNDLE_IDENTIFIER = win.aizen.app.cli;
+				PRODUCT_NAME = "aizen-cli";
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1062,6 +1245,15 @@
 			buildConfigurations = (
 				CCB04B6F2EA241B50007DBB1 /* Debug */,
 				CCB04B702EA241B50007DBB1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CCF000000000000000000007 /* Build configuration list for PBXNativeTarget "aizen-cli" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CCF000000000000000000008 /* Debug */,
+				CCF000000000000000000009 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
