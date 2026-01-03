@@ -1,5 +1,6 @@
 import Accelerate
 import Foundation
+#if arch(arm64)
 import MLX
 
 // MARK: - Audio Processing Functions
@@ -320,3 +321,4 @@ extension MLXArray {
         return MLX.stacked(arrays, axis: axis)
     }
 }
+#endif

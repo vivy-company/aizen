@@ -1,4 +1,5 @@
 import Foundation
+#if arch(arm64)
 import MLX
 @preconcurrency import MLXNN
 
@@ -328,3 +329,4 @@ import MLX
         return (output, ht)
     }
 }
+#endif

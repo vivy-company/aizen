@@ -1,4 +1,5 @@
 import Foundation
+#if arch(arm64)
 import MLX
 @preconcurrency import MLXNN
 
@@ -714,3 +715,4 @@ nonisolated private func sqrt(_ x: Float) -> Float {
 nonisolated private func matmul(_ a: MLXArray, _ b: MLXArray) -> MLXArray {
     return MLX.matmul(a, b)
 }
+#endif
