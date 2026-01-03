@@ -142,8 +142,10 @@ struct aizenApp: App {
             }
 
             CommandGroup(after: .appSettings) {
-                Button("Install CLI...") {
+                Button {
                     installCLIFromMenu()
+                } label: {
+                    Label("Install CLI...", systemImage: "terminal")
                 }
             }
 
