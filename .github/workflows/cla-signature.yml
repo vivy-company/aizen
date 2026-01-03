@@ -6,7 +6,7 @@ on:
 
 jobs:
   cla-sign:
-    if: github.event.issue.pull_request && contains(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA')
+    if: github.event.issue.pull_request && contains(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA') && github.event.comment.user.login != 'cla-bot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
