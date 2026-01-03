@@ -228,25 +228,8 @@ jobs:
         if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_ID != '' && env.APPLE_APP_PASSWORD != '' }}
         run: |
           DMG_PATH="build/Aizen-${{ github.event.inputs.marketing_version }}.dmg"
-          ATTEMPTS=8
-          SLEEP_SECONDS=15
-
-          for i in $(seq 1 $ATTEMPTS); do
-            echo "Stapling attempt $i/$ATTEMPTS..."
-            if xcrun stapler staple -v "$DMG_PATH"; then
-              echo "Staple succeeded"
-              xcrun stapler validate -v "$DMG_PATH"
-              exit 0
-            fi
-
-            if [ $i -lt $ATTEMPTS ]; then
-              echo "Staple failed; waiting ${SLEEP_SECONDS}s before retry..."
-              sleep "$SLEEP_SECONDS"
-            fi
-          done
-
-          echo "Error: Staple failed after $ATTEMPTS attempts"
-          exit 1
+          xcrun stapler staple -v "$DMG_PATH"
+          xcrun stapler validate -v "$DMG_PATH"
 
       - name: Generate Sparkle signature
         run: |
