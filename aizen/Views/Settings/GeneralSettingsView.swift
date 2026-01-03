@@ -7,6 +7,8 @@
 
 import SwiftUI
 import os.log
+import AppKit
+import CoreData
 
 enum AppearanceMode: String, CaseIterable {
     case system = "system"
@@ -189,6 +191,12 @@ struct GeneralSettingsView: View {
 
     @Binding var defaultEditor: String
 
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)],
+        animation: .default
+    )
+    private var workspaces: FetchedResults<Workspace>
+
     // Appearance
     @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
 
@@ -201,6 +209,8 @@ struct GeneralSettingsView: View {
     @AppStorage("defaultTerminalBundleId") private var defaultTerminalBundleId: String?
     @AppStorage("defaultEditorBundleId") private var defaultEditorBundleId: String?
     @AppStorage("useCliEditor") private var useCliEditor = false
+    @AppStorage("defaultCloneLocation") private var defaultCloneLocation = ""
+    @AppStorage("defaultWorkspaceId") private var defaultWorkspaceId = ""
 
     // Layout
     @AppStorage("showChatTab") private var showChatTab = true
@@ -217,6 +227,9 @@ struct GeneralSettingsView: View {
     @StateObject private var tabConfig = TabConfigurationManager.shared
 
     @State private var showingResetConfirmation = false
+    @State private var cliStatus = CLISymlinkManager.status()
+    @State private var showingCLIAlert = false
+    @State private var cliAlertMessage = ""
 
     var body: some View {
         Form {
@@ -299,6 +312,29 @@ struct GeneralSettingsView: View {
                 }
             }
 
+            // MARK: - Repositories
+
+            Section("Repositories") {
+                HStack(spacing: 12) {
+                    TextField("Default Clone Location", text: $defaultCloneLocation)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Choose") {
+                        selectDefaultCloneLocation()
+                    }
+                }
+                .help("Used by the CLI when cloning repositories without --destination")
+
+                Picker("Default Workspace", selection: $defaultWorkspaceId) {
+                    Text("None")
+                        .tag("")
+                    ForEach(workspaces) { workspace in
+                        Text(workspace.name ?? "")
+                            .tag(workspace.id?.uuidString ?? "")
+                    }
+                }
+                .help("Used by the CLI when adding repositories without --workspace")
+            }
+
             // MARK: - Layout
 
             Section {
@@ -364,29 +400,69 @@ struct GeneralSettingsView: View {
                     .help("Show Xcode build button for projects with .xcodeproj or .xcworkspace")
             }
 
-            // MARK: - Advanced
+            // MARK: - CLI
 
-            Section("Advanced") {
+            Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("settings.advanced.reset.title")
-                        .font(.headline)
+                    if let linkPath = cliStatus.linkPath {
+                        Text("Symlink: \(linkPath)")
+                            .font(.footnote)
+                            .textSelection(.enabled)
+                            .foregroundStyle(.secondary)
+                    }
 
-                    Text("settings.advanced.reset.description")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    if let targetPath = cliStatus.targetPath {
+                        Text("Target: \(targetPath)")
+                            .font(.footnote)
+                            .textSelection(.enabled)
+                            .foregroundStyle(.secondary)
+                    }
 
-                    Button(role: .destructive) {
-                        showingResetConfirmation = true
-                    } label: {
-                        Label("settings.advanced.reset.button", systemImage: "trash")
+                    HStack(spacing: 12) {
+                        Button(cliStatus.isInstalled ? "Reinstall CLI" : "Install CLI") {
+                            installCLI()
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Button("Refresh") {
+                            refreshCLIStatus()
+                        }
                     }
                 }
-                .padding(.vertical, 8)
+            } header: {
+                HStack(spacing: 8) {
+                    Text("CLI")
+                    Text(cliStatus.isInstalled ? "Installed" : "Not installed")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(cliStatus.isInstalled ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                        .foregroundStyle(cliStatus.isInstalled ? .green : .orange)
+                        .clipShape(Capsule())
+                }
+            }
+
+            // MARK: - Danger Zone
+
+            Section {
+                Text("settings.advanced.reset.description")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Button(role: .destructive) {
+                    showingResetConfirmation = true
+                } label: {
+                    Label("settings.advanced.reset.button", systemImage: "trash")
+                }
+            } header: {
+                Text("settings.advanced.reset.title")
+                    .foregroundStyle(.red)
             }
         }
         .formStyle(.grouped)
         .onAppear {
             loadCurrentLanguage()
+            refreshCLIStatus()
         }
         .alert(LocalizedStringKey("settings.advanced.reset.alert.title"), isPresented: $showingResetConfirmation) {
             Button(LocalizedStringKey("settings.advanced.reset.alert.cancel"), role: .cancel) {}
@@ -395,6 +471,11 @@ struct GeneralSettingsView: View {
             }
         } message: {
             Text("settings.advanced.reset.alert.message")
+        }
+        .alert("CLI Installation", isPresented: $showingCLIAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(cliAlertMessage)
         }
         .alert("Restart Required", isPresented: $showingRestartAlert) {
             Button("Later", role: .cancel) {}
@@ -473,6 +554,31 @@ struct GeneralSettingsView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 NSApplication.shared.terminate(nil)
             }
+        }
+    }
+
+    // MARK: - CLI
+
+    private func refreshCLIStatus() {
+        cliStatus = CLISymlinkManager.status()
+    }
+
+    private func installCLI() {
+        let result = CLISymlinkManager.install()
+        cliAlertMessage = result.message
+        showingCLIAlert = true
+        refreshCLIStatus()
+    }
+
+    private func selectDefaultCloneLocation() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Select default clone location"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            defaultCloneLocation = url.path
         }
     }
 

@@ -8,6 +8,7 @@
 import SwiftUI
 import CoreData
 import Sparkle
+import AppKit
 
 // App delegate to handle window restoration cleanup
 class AizenAppDelegate: NSObject, NSApplicationDelegate {
@@ -29,6 +30,13 @@ class AizenAppDelegate: NSObject, NSApplicationDelegate {
                 for window in windows.dropFirst() {
                     window.close()
                 }
+            }
+        }
+
+        // Best-effort CLI symlink install (non-blocking)
+        DispatchQueue.global(qos: .utility).async {
+            if CLISymlinkManager.installedSymlinkURL() == nil {
+                _ = CLISymlinkManager.install()
             }
         }
     }
@@ -133,6 +141,14 @@ struct aizenApp: App {
                 .keyboardShortcut(",", modifiers: .command)
             }
 
+            CommandGroup(after: .appSettings) {
+                Button {
+                    installCLIFromMenu()
+                } label: {
+                    Label("Install CLI...", systemImage: "terminal")
+                }
+            }
+
             CommandGroup(after: .newItem) {
                 Button("Active Worktrees...") {
                     ActiveWorktreesWindowManager.shared.show(context: persistenceController.container.viewContext)
@@ -206,6 +222,15 @@ struct aizenApp: App {
         window.makeKeyAndOrderFront(nil)
 
         aboutWindow = window
+    }
+
+    private func installCLIFromMenu() {
+        let result = CLISymlinkManager.install()
+        let alert = NSAlert()
+        alert.messageText = "CLI Installation"
+        alert.informativeText = result.message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     // MARK: - Settings Window
