@@ -8,6 +8,7 @@
 import SwiftUI
 import CoreData
 import Sparkle
+import AppKit
 
 // App delegate to handle window restoration cleanup
 class AizenAppDelegate: NSObject, NSApplicationDelegate {
@@ -140,6 +141,12 @@ struct aizenApp: App {
                 .keyboardShortcut(",", modifiers: .command)
             }
 
+            CommandGroup(after: .appSettings) {
+                Button("Install CLI...") {
+                    installCLIFromMenu()
+                }
+            }
+
             CommandGroup(after: .newItem) {
                 Button("Active Worktrees...") {
                     ActiveWorktreesWindowManager.shared.show(context: persistenceController.container.viewContext)
@@ -213,6 +220,15 @@ struct aizenApp: App {
         window.makeKeyAndOrderFront(nil)
 
         aboutWindow = window
+    }
+
+    private func installCLIFromMenu() {
+        let result = CLISymlinkManager.install()
+        let alert = NSAlert()
+        alert.messageText = "CLI Installation"
+        alert.informativeText = result.message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     // MARK: - Settings Window

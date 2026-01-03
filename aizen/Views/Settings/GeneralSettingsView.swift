@@ -227,7 +227,7 @@ struct GeneralSettingsView: View {
     @StateObject private var tabConfig = TabConfigurationManager.shared
 
     @State private var showingResetConfirmation = false
-    @State private var cliStatusMessage = CLISymlinkManager.statusMessage()
+    @State private var cliStatus = CLISymlinkManager.status()
     @State private var showingCLIAlert = false
     @State private var cliAlertMessage = ""
 
@@ -403,17 +403,63 @@ struct GeneralSettingsView: View {
             // MARK: - CLI
 
             Section {
-                Text(cliStatusMessage)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .center, spacing: 10) {
+                            Label("Aizen CLI", systemImage: "terminal")
+                                .font(.headline)
 
-                HStack(spacing: 12) {
-                    Button("Install CLI") {
-                        installCLI()
+                            Spacer()
+
+                            Text(cliStatus.isInstalled ? "Installed" : "Not Installed")
+                                .font(.caption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(cliStatus.isInstalled ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                                .foregroundStyle(cliStatus.isInstalled ? .green : .orange)
+                                .clipShape(Capsule())
+                        }
+
+                        Text("Install the aizen command in your PATH to manage repositories from the terminal.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        if let linkPath = cliStatus.linkPath {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Symlink")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(linkPath)
+                                    .font(.footnote)
+                                    .textSelection(.enabled)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        if let targetPath = cliStatus.targetPath {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Target")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(targetPath)
+                                    .font(.footnote)
+                                    .textSelection(.enabled)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        HStack(spacing: 12) {
+                            Button(cliStatus.isInstalled ? "Reinstall CLI" : "Install CLI") {
+                                installCLI()
+                            }
+                            .buttonStyle(.borderedProminent)
+
+                            Button("Refresh") {
+                                refreshCLIStatus()
+                            }
+                        }
                     }
-                    Button("Refresh") {
-                        refreshCLIStatus()
-                    }
+                    .padding(.vertical, 4)
                 }
             } header: {
                 Text("CLI")
@@ -537,7 +583,7 @@ struct GeneralSettingsView: View {
     // MARK: - CLI
 
     private func refreshCLIStatus() {
-        cliStatusMessage = CLISymlinkManager.statusMessage()
+        cliStatus = CLISymlinkManager.status()
     }
 
     private func installCLI() {

@@ -4,6 +4,12 @@ enum CLISymlinkManager {
     private static let cliName = "aizen"
     private static let bundledCLIName = "aizen-cli"
 
+    struct CLIStatus {
+        let isInstalled: Bool
+        let linkPath: String?
+        let targetPath: String?
+    }
+
     static func cliBinaryURL() -> URL? {
         return Bundle.main.resourceURL?
             .appendingPathComponent("cli", isDirectory: true)
@@ -31,13 +37,25 @@ enum CLISymlinkManager {
     }
 
     static func statusMessage() -> String {
-        guard let link = installedSymlinkURL() else {
+        let status = self.status()
+        guard status.isInstalled else {
             return "Not installed"
         }
-        if let target = try? FileManager.default.destinationOfSymbolicLink(atPath: link.path) {
-            return "Installed at \(link.path) → \(target)"
+        if let linkPath = status.linkPath, let targetPath = status.targetPath {
+            return "Installed at \(linkPath) → \(targetPath)"
         }
-        return "Installed at \(link.path)"
+        if let linkPath = status.linkPath {
+            return "Installed at \(linkPath)"
+        }
+        return "Installed"
+    }
+
+    static func status() -> CLIStatus {
+        guard let link = installedSymlinkURL() else {
+            return CLIStatus(isInstalled: false, linkPath: nil, targetPath: nil)
+        }
+        let target = (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path))
+        return CLIStatus(isInstalled: true, linkPath: link.path, targetPath: target)
     }
 
     static func install() -> (success: Bool, message: String) {
