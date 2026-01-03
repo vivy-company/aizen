@@ -195,16 +195,16 @@ jobs:
 
           echo "$NOTARY_JSON"
           NOTARY_ID=$(printf '%s' "$NOTARY_JSON" | python3 - <<'PY'
-import json, sys
-data = json.load(sys.stdin)
-print(data.get("id", ""))
-PY
+          import json, sys
+          data = json.load(sys.stdin)
+          print(data.get("id", ""))
+          PY
           )
           NOTARY_STATUS=$(printf '%s' "$NOTARY_JSON" | python3 - <<'PY'
-import json, sys
-data = json.load(sys.stdin)
-print(data.get("status", ""))
-PY
+          import json, sys
+          data = json.load(sys.stdin)
+          print(data.get("status", ""))
+          PY
           )
 
           if [ -z "$NOTARY_ID" ]; then
