@@ -317,12 +317,14 @@ typedef struct {
 typedef enum {
   GHOSTTY_TRIGGER_PHYSICAL,
   GHOSTTY_TRIGGER_UNICODE,
+  GHOSTTY_TRIGGER_CATCH_ALL,
 } ghostty_input_trigger_tag_e;
 
 typedef union {
   ghostty_input_key_e translated;
   ghostty_input_key_e physical;
   uint32_t unicode;
+  // catch_all has no payload
 } ghostty_input_trigger_key_u;
 
 typedef struct {
@@ -452,6 +454,12 @@ typedef struct {
   size_t len;
 } ghostty_config_color_list_s;
 
+// config.RepeatableCommand
+typedef struct {
+  const ghostty_command_s* commands;
+  size_t len;
+} ghostty_config_command_list_s;
+
 // config.Palette
 typedef struct {
   ghostty_config_color_s colors[256];
@@ -511,6 +519,12 @@ typedef enum {
   GHOSTTY_GOTO_SPLIT_DOWN,
   GHOSTTY_GOTO_SPLIT_RIGHT,
 } ghostty_action_goto_split_e;
+
+// apprt.action.GotoWindow
+typedef enum {
+  GHOSTTY_GOTO_WINDOW_PREVIOUS,
+  GHOSTTY_GOTO_WINDOW_NEXT,
+} ghostty_action_goto_window_e;
 
 // apprt.action.ResizeSplit.Direction
 typedef enum {
@@ -573,6 +587,12 @@ typedef enum {
   GHOSTTY_QUIT_TIMER_STOP,
 } ghostty_action_quit_timer_e;
 
+// apprt.action.Readonly
+typedef enum {
+  GHOSTTY_READONLY_OFF,
+  GHOSTTY_READONLY_ON,
+} ghostty_action_readonly_e;
+
 // apprt.action.DesktopNotification.C
 typedef struct {
   const char* title;
@@ -583,6 +603,12 @@ typedef struct {
 typedef struct {
   const char* title;
 } ghostty_action_set_title_s;
+
+// apprt.action.PromptTitle
+typedef enum {
+  GHOSTTY_PROMPT_TITLE_SURFACE,
+  GHOSTTY_PROMPT_TITLE_TAB,
+} ghostty_action_prompt_title_e;
 
 // apprt.action.Pwd.C
 typedef struct {
@@ -670,6 +696,27 @@ typedef struct {
   bool active;
   ghostty_input_trigger_s trigger;
 } ghostty_action_key_sequence_s;
+
+// apprt.action.KeyTable.Tag
+typedef enum {
+  GHOSTTY_KEY_TABLE_ACTIVATE,
+  GHOSTTY_KEY_TABLE_DEACTIVATE,
+  GHOSTTY_KEY_TABLE_DEACTIVATE_ALL,
+} ghostty_action_key_table_tag_e;
+
+// apprt.action.KeyTable.CValue
+typedef union {
+  struct {
+    const char *name;
+    size_t len;
+  } activate;
+} ghostty_action_key_table_u;
+
+// apprt.action.KeyTable.C
+typedef struct {
+  ghostty_action_key_table_tag_e tag;
+  ghostty_action_key_table_u value;
+} ghostty_action_key_table_s;
 
 // apprt.action.ColorKind
 typedef enum {
@@ -785,9 +832,11 @@ typedef enum {
   GHOSTTY_ACTION_TOGGLE_QUICK_TERMINAL,
   GHOSTTY_ACTION_TOGGLE_COMMAND_PALETTE,
   GHOSTTY_ACTION_TOGGLE_VISIBILITY,
+  GHOSTTY_ACTION_TOGGLE_BACKGROUND_OPACITY,
   GHOSTTY_ACTION_MOVE_TAB,
   GHOSTTY_ACTION_GOTO_TAB,
   GHOSTTY_ACTION_GOTO_SPLIT,
+  GHOSTTY_ACTION_GOTO_WINDOW,
   GHOSTTY_ACTION_RESIZE_SPLIT,
   GHOSTTY_ACTION_EQUALIZE_SPLITS,
   GHOSTTY_ACTION_TOGGLE_SPLIT_ZOOM,
@@ -814,6 +863,7 @@ typedef enum {
   GHOSTTY_ACTION_FLOAT_WINDOW,
   GHOSTTY_ACTION_SECURE_INPUT,
   GHOSTTY_ACTION_KEY_SEQUENCE,
+  GHOSTTY_ACTION_KEY_TABLE,
   GHOSTTY_ACTION_COLOR_CHANGE,
   GHOSTTY_ACTION_RELOAD_CONFIG,
   GHOSTTY_ACTION_CONFIG_CHANGE,
@@ -831,7 +881,8 @@ typedef enum {
   GHOSTTY_ACTION_END_SEARCH,
   GHOSTTY_ACTION_SEARCH_TOTAL,
   GHOSTTY_ACTION_SEARCH_SELECTED,
-} ghostty_action_tag_e;
+  GHOSTTY_ACTION_READONLY,
+  } ghostty_action_tag_e;
 
 typedef union {
   ghostty_action_split_direction_e new_split;
@@ -839,6 +890,7 @@ typedef union {
   ghostty_action_move_tab_s move_tab;
   ghostty_action_goto_tab_e goto_tab;
   ghostty_action_goto_split_e goto_split;
+  ghostty_action_goto_window_e goto_window;
   ghostty_action_resize_split_s resize_split;
   ghostty_action_size_limit_s size_limit;
   ghostty_action_initial_size_s initial_size;
@@ -847,6 +899,7 @@ typedef union {
   ghostty_action_inspector_e inspector;
   ghostty_action_desktop_notification_s desktop_notification;
   ghostty_action_set_title_s set_title;
+  ghostty_action_prompt_title_e prompt_title;
   ghostty_action_pwd_s pwd;
   ghostty_action_mouse_shape_e mouse_shape;
   ghostty_action_mouse_visibility_e mouse_visibility;
@@ -856,6 +909,7 @@ typedef union {
   ghostty_action_float_window_e float_window;
   ghostty_action_secure_input_e secure_input;
   ghostty_action_key_sequence_s key_sequence;
+  ghostty_action_key_table_s key_table;
   ghostty_action_color_change_s color_change;
   ghostty_action_reload_config_s reload_config;
   ghostty_action_config_change_s config_change;
@@ -867,6 +921,7 @@ typedef union {
   ghostty_action_start_search_s start_search;
   ghostty_action_search_total_s search_total;
   ghostty_action_search_selected_s search_selected;
+  ghostty_action_readonly_e readonly;
 } ghostty_action_u;
 
 typedef struct {
@@ -995,7 +1050,6 @@ void ghostty_surface_set_color_scheme(ghostty_surface_t,
                                       ghostty_color_scheme_e);
 ghostty_input_mods_e ghostty_surface_key_translation_mods(ghostty_surface_t,
                                                           ghostty_input_mods_e);
-void ghostty_surface_commands(ghostty_surface_t, ghostty_command_s**, size_t*);
 bool ghostty_surface_key(ghostty_surface_t, ghostty_input_key_s);
 bool ghostty_surface_key_is_binding(ghostty_surface_t, ghostty_input_key_s);
 void ghostty_surface_text(ghostty_surface_t, const char*, uintptr_t);
