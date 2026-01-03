@@ -11,10 +11,13 @@ class SpeechRecognitionService: ObservableObject {
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    private var audioEngine: AVAudioEngine?
 
     init() {
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    }
+
+    var isAvailable: Bool {
+        speechRecognizer?.isAvailable ?? false
     }
 
     // MARK: - Recognition Control
@@ -24,36 +27,16 @@ class SpeechRecognitionService: ObservableObject {
             throw SpeechRecognitionError.recognitionUnavailable
         }
 
+        recognitionRequest?.endAudio()
+        recognitionRequest = nil
+
         recognitionTask?.cancel()
         recognitionTask = nil
-
-        let audioEngine = AVAudioEngine()
-        self.audioEngine = audioEngine
-
-        let inputNode = audioEngine.inputNode
 
         let recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         self.recognitionRequest = recognitionRequest
         recognitionRequest.shouldReportPartialResults = true
         recognitionRequest.requiresOnDeviceRecognition = false
-
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-
-        guard recordingFormat.sampleRate > 0 && recordingFormat.channelCount > 0 else {
-            throw SpeechRecognitionError.invalidAudioFormat
-        }
-
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, when in
-            self?.recognitionRequest?.append(buffer)
-        }
-
-        audioEngine.prepare()
-
-        do {
-            try audioEngine.start()
-        } catch {
-            throw SpeechRecognitionError.engineStartFailed
-        }
 
         recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             guard let self = self else { return }
@@ -71,22 +54,21 @@ class SpeechRecognitionService: ObservableObject {
             }
 
             if error != nil || result?.isFinal == true {
-                audioEngine.stop()
-                inputNode.removeTap(onBus: 0)
+                // No audio engine to stop here; AudioCaptureService handles input
             }
         }
     }
 
-    func stopRecognition() async -> String {
-        audioEngine?.stop()
-        audioEngine?.inputNode.removeTap(onBus: 0)
+    func appendAudioBuffer(_ buffer: AVAudioPCMBuffer) {
+        recognitionRequest?.append(buffer)
+    }
 
+    func stopRecognition() async -> String {
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
 
         recognitionRequest = nil
         recognitionTask = nil
-        audioEngine = nil
 
         // Wait for final transcription
         try? await Task.sleep(for: .milliseconds(500))
@@ -95,16 +77,73 @@ class SpeechRecognitionService: ObservableObject {
         return finalText
     }
 
-    func cancelRecognition() {
-        audioEngine?.stop()
-        audioEngine?.inputNode.removeTap(onBus: 0)
+    func transcribe(samples: [Float], sampleRate: Double) async throws -> String {
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            throw SpeechRecognitionError.recognitionUnavailable
+        }
 
+        recognitionTask?.cancel()
+        recognitionTask = nil
+
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("aizen-transcription-\(UUID().uuidString)")
+            .appendingPathExtension("caf")
+
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
+        let file = try AVAudioFile(forWriting: tempURL, settings: format.settings)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+
+        if let channel = buffer.floatChannelData?.pointee {
+            samples.withUnsafeBufferPointer { ptr in
+                channel.assign(from: ptr.baseAddress!, count: samples.count)
+            }
+        }
+
+        try file.write(from: buffer)
+
+        let request = SFSpeechURLRecognitionRequest(url: tempURL)
+        request.shouldReportPartialResults = false
+        request.requiresOnDeviceRecognition = false
+
+        return try await withCheckedThrowingContinuation { continuation in
+            var finished = false
+            let cleanup: () -> Void = {
+                try? FileManager.default.removeItem(at: tempURL)
+            }
+
+            recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
+                if finished { return }
+
+                if let error {
+                    finished = true
+                    cleanup()
+                    Task { @MainActor in
+                        self?.recognitionTask = nil
+                    }
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let result else { return }
+                if result.isFinal {
+                    finished = true
+                    cleanup()
+                    Task { @MainActor in
+                        self?.recognitionTask = nil
+                    }
+                    continuation.resume(returning: result.bestTranscription.formattedString)
+                }
+            }
+        }
+    }
+
+    func cancelRecognition() {
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
 
         recognitionRequest = nil
         recognitionTask = nil
-        audioEngine = nil
 
         transcribedText = ""
         partialTranscription = ""
@@ -119,18 +158,13 @@ class SpeechRecognitionService: ObservableObject {
 
     enum SpeechRecognitionError: LocalizedError {
         case recognitionUnavailable
-        case invalidAudioFormat
-        case engineStartFailed
 
         var errorDescription: String? {
             switch self {
             case .recognitionUnavailable:
                 return "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight."
-            case .invalidAudioFormat:
-                return "Invalid audio format detected."
-            case .engineStartFailed:
-                return "Failed to start audio engine."
             }
         }
     }
+
 }

@@ -27,6 +27,7 @@ struct ChatSessionView: View {
     @State private var selectedToolCall: ToolCall?
     @State private var fileToOpenInEditor: String?
     @State private var autocompleteWindow: AutocompleteWindowController?
+    @State private var keyMonitor: Any?
 
     // Input state (local to avoid re-rendering entire view on keystroke)
     @State private var inputText = ""
@@ -186,30 +187,42 @@ struct ChatSessionView: View {
                 viewModel.setupAgentSession()
                 setupAutocompleteWindow()
                 NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
+                startKeyMonitorIfNeeded()
             }
         }
         .onDisappear {
             viewModel.persistDraftState(inputText: inputText)
             autocompleteWindow?.dismiss()
             NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
+            stopKeyMonitorIfNeeded()
+            if showingVoiceRecording {
+                viewModel.audioService.cancelRecording()
+                showingVoiceRecording = false
+            }
         }
-        .onChange(of: isSelected) { selected in
+        .onChange(of: isSelected) { _, selected in
             if selected {
                 viewModel.setupAgentSession()
                 setupAutocompleteWindow()
                 NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
+                startKeyMonitorIfNeeded()
             } else {
                 autocompleteWindow?.dismiss()
                 NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
+                stopKeyMonitorIfNeeded()
+                if showingVoiceRecording {
+                    viewModel.audioService.cancelRecording()
+                    showingVoiceRecording = false
+                }
             }
         }
-        .onChange(of: inputText) { newText in
+        .onChange(of: inputText) { _, newText in
             viewModel.debouncedPersistDraft(inputText: newText)
         }
         .onReceive(viewModel.autocompleteHandler.$state) { state in
             updateAutocompleteWindow(state: state)
         }
-        .onChange(of: fileToOpenInEditor) { path in
+        .onChange(of: fileToOpenInEditor) { _, path in
             guard let path = path else { return }
             NotificationCenter.default.post(
                 name: .openFileInEditor,
@@ -315,6 +328,94 @@ struct ChatSessionView: View {
     private func scrollToBottom() {
         viewModel.isNearBottom = true
         viewModel.scrollToBottom()
+    }
+
+    private func startKeyMonitorIfNeeded() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            handleVoiceShortcut(event)
+        }
+    }
+
+    private func stopKeyMonitorIfNeeded() {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
+    }
+
+    private func handleVoiceShortcut(_ event: NSEvent) -> NSEvent? {
+        guard isSelected else { return event }
+
+        let keyCodeEscape: UInt16 = 53
+        let keyCodeReturn: UInt16 = 36
+
+        if showingVoiceRecording {
+            if event.keyCode == keyCodeEscape {
+                cancelChatVoiceRecording()
+                return nil
+            }
+            if event.keyCode == keyCodeReturn {
+                acceptChatVoiceRecording()
+                return nil
+            }
+        }
+
+        if event.modifierFlags.contains(.command),
+           event.modifierFlags.contains(.shift),
+           event.charactersIgnoringModifiers?.lowercased() == "m" {
+            toggleChatVoiceRecording()
+            return nil
+        }
+
+        return event
+    }
+
+    private func toggleChatVoiceRecording() {
+        if showingVoiceRecording {
+            acceptChatVoiceRecording()
+        } else {
+            startChatVoiceRecording()
+        }
+    }
+
+    private func startChatVoiceRecording() {
+        Task {
+            do {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingVoiceRecording = true
+                }
+                try await viewModel.audioService.startRecording()
+            } catch {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingVoiceRecording = false
+                }
+                if let recordingError = error as? AudioService.RecordingError {
+                    permissionErrorMessage = recordingError.localizedDescription + "\n\nPlease enable Microphone and Speech Recognition permissions in System Settings."
+                } else {
+                    permissionErrorMessage = error.localizedDescription
+                }
+                showingPermissionError = true
+            }
+        }
+    }
+
+    private func acceptChatVoiceRecording() {
+        Task {
+            let text = await viewModel.audioService.stopRecording()
+            let finalText = text.isEmpty ? viewModel.audioService.partialTranscription : text
+            await MainActor.run {
+                if !finalText.isEmpty {
+                    inputText = finalText
+                }
+                showingVoiceRecording = false
+            }
+        }
+    }
+
+    private func cancelChatVoiceRecording() {
+        viewModel.audioService.cancelRecording()
+        showingVoiceRecording = false
     }
 
     // MARK: - Input Handling

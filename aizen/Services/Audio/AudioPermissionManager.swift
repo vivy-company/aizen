@@ -15,21 +15,21 @@ class AudioPermissionManager: ObservableObject {
 
     // MARK: - Permission Requests
 
-    func requestPermissions() async -> Bool {
+    func requestPermissions(includeSpeech: Bool = true) async -> Bool {
         let micPermission = await requestMicrophonePermission()
-        let speechPermission = await requestSpeechPermission()
+        let speechPermission = includeSpeech ? await requestSpeechPermission() : true
 
         let granted = micPermission && speechPermission
         permissionStatus = granted ? .authorized : .denied
         return granted
     }
 
-    func checkPermissions() async -> Bool {
+    func checkPermissions(includeSpeech: Bool = true) async -> Bool {
         let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        let speechStatus = SFSpeechRecognizer.authorizationStatus()
+        let speechStatus = includeSpeech ? SFSpeechRecognizer.authorizationStatus() : .authorized
 
         let granted = micStatus == .authorized && speechStatus == .authorized
-        let notDetermined = micStatus == .notDetermined || speechStatus == .notDetermined
+        let notDetermined = micStatus == .notDetermined || (includeSpeech && speechStatus == .notDetermined)
         permissionStatus = granted ? .authorized : (notDetermined ? .notDetermined : .denied)
         return granted
     }
