@@ -185,27 +185,19 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_ID != '' && env.APPLE_APP_PASSWORD != '' }}
         run: |
-          NOTARY_JSON=$(xcrun notarytool submit \
+          NOTARY_PLIST="$(mktemp)"
+          xcrun notarytool submit \
             "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" \
             --apple-id "${{ secrets.APPLE_ID }}" \
             --team-id "${{ secrets.APPLE_TEAM_ID }}" \
             --password "${{ secrets.APPLE_APP_PASSWORD }}" \
             --wait \
-            --output-format json)
+            --output-format plist > "$NOTARY_PLIST"
 
-          echo "$NOTARY_JSON"
-          NOTARY_ID=$(printf '%s' "$NOTARY_JSON" | python3 - <<'PY'
-          import json, sys
-          data = json.load(sys.stdin)
-          print(data.get("id", ""))
-          PY
-          )
-          NOTARY_STATUS=$(printf '%s' "$NOTARY_JSON" | python3 - <<'PY'
-          import json, sys
-          data = json.load(sys.stdin)
-          print(data.get("status", ""))
-          PY
-          )
+          cat "$NOTARY_PLIST"
+          NOTARY_ID=$(/usr/libexec/PlistBuddy -c "Print :id" "$NOTARY_PLIST" 2>/dev/null || true)
+          NOTARY_STATUS=$(/usr/libexec/PlistBuddy -c "Print :status" "$NOTARY_PLIST" 2>/dev/null || true)
+          rm -f "$NOTARY_PLIST"
 
           if [ -z "$NOTARY_ID" ]; then
             echo "Error: Notary submission did not return an id"
