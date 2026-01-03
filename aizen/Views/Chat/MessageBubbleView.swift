@@ -190,6 +190,12 @@ struct UserBubble<Background: View>: View {
     @ViewBuilder let backgroundView: () -> Background
 
     @State private var measuredWidth: CGFloat?
+    @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
+    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+
+    private var chatFont: Font {
+        chatFontFamily == "System Font" ? .system(size: chatFontSize) : .custom(chatFontFamily, size: chatFontSize)
+    }
 
     private let maxContentWidth: CGFloat = 420
     private let hPadding: CGFloat = 16
@@ -265,6 +271,7 @@ struct UserBubble<Background: View>: View {
 
     private var bubbleContent: some View {
         Text(content)
+            .font(chatFont)
             .textSelection(.enabled)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
@@ -322,6 +329,7 @@ struct UserBubble<Background: View>: View {
 
     private var measureUnwrappedWidth: some View {
         Text(content)
+            .font(chatFont)
             .fixedSize()
             .background(
                 GeometryReader { geo in

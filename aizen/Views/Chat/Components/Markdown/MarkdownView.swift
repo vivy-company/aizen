@@ -48,10 +48,13 @@ struct MarkdownView: View {
     var basePath: String? = nil  // Base path for resolving relative URLs (e.g., directory of markdown file)
 
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
+    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+    @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
     @StateObject private var viewModel = MarkdownViewModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: blockSpacing) {
             // Group consecutive text blocks for cross-block selection
             let groups = groupBlocks(viewModel.blocks)
 
@@ -242,6 +245,21 @@ private enum BlockGroup {
 struct CombinedTextBlockView: View {
     let blocks: [MarkdownBlock]
 
+    @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
+    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+    @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+
+    private func chatFont(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        if chatFontFamily == "System Font" {
+            return NSFont.systemFont(ofSize: size, weight: weight)
+        } else {
+            if let font = NSFont(name: chatFontFamily, size: size) {
+                return weight == .regular ? font : NSFontManager.shared.convert(font, toHaveTrait: weight == .bold ? .boldFontMask : [])
+            }
+            return NSFont.systemFont(ofSize: size, weight: weight)
+        }
+    }
+
     var body: some View {
         CombinedSelectableTextView(attributedText: buildAttributedText())
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -249,10 +267,11 @@ struct CombinedTextBlockView: View {
 
     private func buildAttributedText() -> NSAttributedString {
         let result = NSMutableAttributedString()
+        let fontSize = CGFloat(chatFontSize)
 
         for (index, block) in blocks.enumerated() {
             if index == 0, case .heading = block.type {
-                result.append(spacerLine(height: 6))
+                result.append(spacerLine(height: blockSpacing * 0.75))
             }
             if index > 0 {
                 // Smart spacing based on previous and current block types
@@ -264,27 +283,27 @@ struct CombinedTextBlockView: View {
             switch block.type {
             case .paragraph(let content):
                 result.append(content.nsAttributedString(
-                    baseFont: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                    baseFont: chatFont(size: fontSize),
                     baseColor: .labelColor
                 ))
 
             case .heading(let content, let level):
                 result.append(content.nsAttributedString(
-                    baseFont: fontForHeading(level: level),
+                    baseFont: fontForHeading(level: level, baseSize: fontSize),
                     baseColor: .labelColor
                 ))
 
             case .blockQuote(let nestedBlocks):
-                result.append(buildQuoteAttributedString(nestedBlocks))
+                result.append(buildQuoteAttributedString(nestedBlocks, fontSize: fontSize))
 
             case .list(let items, _, _):
-                result.append(buildListAttributedString(items))
+                result.append(buildListAttributedString(items, fontSize: fontSize))
 
             case .thematicBreak:
                 let hr = NSAttributedString(
                     string: "───────────────────────────────",
                     attributes: [
-                        .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                        .font: chatFont(size: fontSize),
                         .foregroundColor: NSColor.secondaryLabelColor
                     ]
                 )
@@ -294,7 +313,7 @@ struct CombinedTextBlockView: View {
                 let fn = NSAttributedString(
                     string: "[\(id)]",
                     attributes: [
-                        .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                        .font: chatFont(size: fontSize * 0.85),
                         .foregroundColor: NSColor.controlAccentColor,
                         .baselineOffset: 4
                     ]
@@ -305,7 +324,7 @@ struct CombinedTextBlockView: View {
                 let fnDef = NSAttributedString(
                     string: "[\(id)]: ",
                     attributes: [
-                        .font: NSFont.systemFont(ofSize: NSFont.systemFontSize - 1),
+                        .font: chatFont(size: fontSize - 1),
                         .foregroundColor: NSColor.secondaryLabelColor
                     ]
                 )
@@ -313,7 +332,7 @@ struct CombinedTextBlockView: View {
                 for defBlock in defBlocks {
                     if case .paragraph(let content) = defBlock.type {
                         let contentAttr = content.nsAttributedString(
-                            baseFont: NSFont.systemFont(ofSize: NSFont.systemFontSize - 1),
+                            baseFont: chatFont(size: fontSize - 1),
                             baseColor: .secondaryLabelColor
                         )
                         result.append(contentAttr)
@@ -328,29 +347,28 @@ struct CombinedTextBlockView: View {
         return result
     }
 
-    private func fontForHeading(level: Int) -> NSFont {
-        let baseSize = NSFont.systemFontSize
+    private func fontForHeading(level: Int, baseSize: CGFloat) -> NSFont {
         switch level {
-        case 1: return NSFont.systemFont(ofSize: baseSize * 1.5, weight: .bold)
-        case 2: return NSFont.systemFont(ofSize: baseSize * 1.3, weight: .bold)
-        case 3: return NSFont.systemFont(ofSize: baseSize * 1.15, weight: .semibold)
-        case 4: return NSFont.systemFont(ofSize: baseSize * 1.05, weight: .semibold)
-        default: return NSFont.systemFont(ofSize: baseSize, weight: .medium)
+        case 1: return chatFont(size: baseSize * 1.5, weight: .bold)
+        case 2: return chatFont(size: baseSize * 1.3, weight: .bold)
+        case 3: return chatFont(size: baseSize * 1.15, weight: .semibold)
+        case 4: return chatFont(size: baseSize * 1.05, weight: .semibold)
+        default: return chatFont(size: baseSize, weight: .medium)
         }
     }
 
-    private func buildQuoteAttributedString(_ blocks: [MarkdownBlock]) -> NSAttributedString {
+    private func buildQuoteAttributedString(_ blocks: [MarkdownBlock], fontSize: CGFloat) -> NSAttributedString {
         let result = NSMutableAttributedString(
             string: "│ ",
             attributes: [
-                .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                .font: chatFont(size: fontSize),
                 .foregroundColor: NSColor.secondaryLabelColor
             ]
         )
 
         for block in blocks {
             if case .paragraph(let content) = block.type {
-                let base = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+                let base = chatFont(size: fontSize)
                 let italic = NSFontManager.shared.convert(base, toHaveTrait: .italicFontMask)
                 let contentAttr = content.nsAttributedString(
                     baseFont: italic,
@@ -363,14 +381,14 @@ struct CombinedTextBlockView: View {
         return result
     }
 
-    private func buildListAttributedString(_ items: [MarkdownListItem]) -> NSAttributedString {
+    private func buildListAttributedString(_ items: [MarkdownListItem], fontSize: CGFloat) -> NSAttributedString {
         let result = NSMutableAttributedString()
 
         for (index, item) in items.enumerated() {
             if index > 0 || item.depth > 0 {
                 result.append(NSAttributedString(
                     string: "\n",
-                    attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize)]
+                    attributes: [.font: chatFont(size: fontSize)]
                 ))
             }
 
@@ -387,14 +405,14 @@ struct CombinedTextBlockView: View {
             let bulletAttr = NSAttributedString(
                 string: indent + bullet,
                 attributes: [
-                    .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                    .font: chatFont(size: fontSize),
                     .foregroundColor: NSColor.secondaryLabelColor
                 ]
             )
             result.append(bulletAttr)
 
             var contentAttr = item.content.nsAttributedString(
-                baseFont: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                baseFont: chatFont(size: fontSize),
                 baseColor: .labelColor
             )
             if item.checkbox == .checked {
@@ -411,7 +429,7 @@ struct CombinedTextBlockView: View {
             result.append(contentAttr)
 
             if !item.children.isEmpty {
-                result.append(buildListAttributedString(item.children))
+                result.append(buildListAttributedString(item.children, fontSize: fontSize))
             }
         }
 
@@ -420,12 +438,13 @@ struct CombinedTextBlockView: View {
 
     /// Determine spacing between blocks based on their types
     private func spacingBetween(prev: MarkdownBlockType, current: MarkdownBlockType) -> NSAttributedString {
+        let fontSize = CGFloat(chatFontSize)
         let spacing = NSMutableAttributedString(
             string: "\n",
-            attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize)]
+            attributes: [.font: chatFont(size: fontSize)]
         )
 
-        var extra: CGFloat = 0
+        var extra: CGFloat = blockSpacing * 0.5
         let prevIsHeading = {
             if case .heading = prev { return true }
             return false
@@ -436,23 +455,23 @@ struct CombinedTextBlockView: View {
         }()
 
         if prevIsHeading {
-            extra = max(extra, 3)
+            extra = max(extra, blockSpacing * 0.6)
         }
 
         if currentIsHeading {
-            extra = max(extra, 3)
+            extra = max(extra, blockSpacing * 0.6)
         }
 
         switch prev {
         case .list, .blockQuote, .thematicBreak:
-            extra = max(extra, 3)
+            extra = max(extra, blockSpacing * 0.6)
         default:
             break
         }
 
         switch current {
         case .list, .blockQuote, .thematicBreak:
-            extra = max(extra, 3)
+            extra = max(extra, blockSpacing * 0.6)
         default:
             break
         }
@@ -527,15 +546,22 @@ struct StreamingTextView: View {
     let text: String
     var allowSelection: Bool = true
 
+    @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
+    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+
+    private var chatFont: Font {
+        chatFontFamily == "System Font" ? .system(size: chatFontSize) : .custom(chatFontFamily, size: chatFontSize)
+    }
+
     var body: some View {
         if allowSelection {
             Text(text)
-                .font(.system(size: NSFont.systemFontSize))
+                .font(chatFont)
                 .foregroundStyle(.primary)
                 .textSelection(.enabled)
         } else {
             Text(text)
-                .font(.system(size: NSFont.systemFontSize))
+                .font(chatFont)
                 .foregroundStyle(.primary)
         }
     }
@@ -644,20 +670,41 @@ struct BlockRenderer: View {
     let block: MarkdownBlock
     var isStreaming: Bool = false
 
+    @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
+    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+    @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+
+    private var chatFont: Font {
+        if chatFontFamily == "System Font" {
+            return .system(size: chatFontSize)
+        } else {
+            return .custom(chatFontFamily, size: chatFontSize)
+        }
+    }
+
+    private func nsFont(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        if chatFontFamily == "System Font" {
+            return NSFont.systemFont(ofSize: size, weight: weight)
+        } else if let font = NSFont(name: chatFontFamily, size: size) {
+            return weight == .regular ? font : NSFontManager.shared.convert(font, toHaveTrait: weight == .bold ? .boldFontMask : [])
+        }
+        return NSFont.systemFont(ofSize: size, weight: weight)
+    }
+
     var body: some View {
         switch block.type {
         case .paragraph(let content):
             // Check if paragraph contains images - render as mixed content if so
             if content.containsImages {
                 MixedContentParagraphView(content: content)
-                    .padding(.vertical, 2)
+                    .padding(.vertical, blockSpacing * 0.25)
             } else {
                 SelectableTextView(
                     content: content,
-                    baseFont: .systemFont(ofSize: NSFont.systemFontSize),
+                    baseFont: nsFont(size: CGFloat(chatFontSize)),
                     baseColor: .labelColor
                 )
-                .padding(.vertical, 2)
+                .padding(.vertical, blockSpacing * 0.25)
             }
 
         case .heading(let content, let level):
@@ -667,68 +714,68 @@ struct BlockRenderer: View {
                 baseColor: .labelColor
             )
             .fontWeight(level <= 2 ? .bold : .semibold)
-            .padding(.top, level <= 2 ? 8 : 4)
-            .padding(.bottom, 2)
+            .padding(.top, level <= 2 ? blockSpacing : blockSpacing * 0.5)
+            .padding(.bottom, blockSpacing * 0.25)
 
         case .codeBlock(let code, let language, _):
             if language?.lowercased() == "mermaid" {
                 MermaidDiagramView(code: code, isStreaming: isStreaming)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, blockSpacing * 0.5)
             } else {
                 CodeBlockView(
                     code: code,
                     language: language,
                     isStreaming: isStreaming
                 )
-                .padding(.vertical, 4)
+                .padding(.vertical, blockSpacing * 0.5)
             }
 
         case .mermaidDiagram(let code):
             MermaidDiagramView(code: code, isStreaming: isStreaming)
-                .padding(.vertical, 4)
+                .padding(.vertical, blockSpacing * 0.5)
 
         case .mathBlock(let content):
             MathBlockView(content: content, isBlock: true)
-                .padding(.vertical, 8)
+                .padding(.vertical, blockSpacing)
 
         case .list(let items, _, _):
             ListBlockView(items: items)
-                .padding(.vertical, 2)
+                .padding(.vertical, blockSpacing * 0.25)
 
         case .blockQuote(let blocks):
             BlockQuoteView(blocks: blocks, isStreaming: isStreaming)
-                .padding(.vertical, 4)
+                .padding(.vertical, blockSpacing * 0.5)
 
         case .table(let rows, let alignments):
             TableBlockView(rows: rows, alignments: alignments)
-                .padding(.vertical, 4)
+                .padding(.vertical, blockSpacing * 0.5)
 
         case .image(let url, let alt):
             MarkdownImageView(url: url, alt: alt)
-                .padding(.vertical, 4)
+                .padding(.vertical, blockSpacing * 0.5)
 
         case .thematicBreak:
             Divider()
-                .padding(.vertical, 8)
+                .padding(.vertical, blockSpacing)
 
         case .htmlBlock(let html):
             SelectableTextView(
                 content: MarkdownInlineContent(text: html),
-                baseFont: .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                baseFont: .monospacedSystemFont(ofSize: CGFloat(chatFontSize), weight: .regular),
                 baseColor: .secondaryLabelColor
             )
-            .padding(.vertical, 2)
+            .padding(.vertical, blockSpacing * 0.25)
 
         case .footnoteReference(let id):
             Text("[\(id)]")
-                .font(.caption)
+                .font(chatFontFamily == "System Font" ? .system(size: chatFontSize * 0.85) : .custom(chatFontFamily, size: chatFontSize * 0.85))
                 .foregroundColor(.blue)
                 .baselineOffset(4)
 
         case .footnoteDefinition(let id, let blocks):
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: blockSpacing * 0.25) {
                 Text("[\(id)]:")
-                    .font(.caption)
+                    .font(chatFontFamily == "System Font" ? .system(size: chatFontSize * 0.85) : .custom(chatFontFamily, size: chatFontSize * 0.85))
                     .foregroundColor(.secondary)
                 ForEach(blocks) { nestedBlock in
                     BlockRenderer(block: nestedBlock, isStreaming: false)
@@ -739,13 +786,13 @@ struct BlockRenderer: View {
     }
 
     private func fontForHeading(level: Int) -> NSFont {
-        let baseSize = NSFont.systemFontSize
+        let baseSize = CGFloat(chatFontSize)
         switch level {
-        case 1: return NSFont.systemFont(ofSize: baseSize * 1.5, weight: .bold)
-        case 2: return NSFont.systemFont(ofSize: baseSize * 1.3, weight: .bold)
-        case 3: return NSFont.systemFont(ofSize: baseSize * 1.15, weight: .semibold)
-        case 4: return NSFont.systemFont(ofSize: baseSize * 1.05, weight: .semibold)
-        default: return NSFont.systemFont(ofSize: baseSize, weight: .medium)
+        case 1: return nsFont(size: baseSize * 1.5, weight: .bold)
+        case 2: return nsFont(size: baseSize * 1.3, weight: .bold)
+        case 3: return nsFont(size: baseSize * 1.15, weight: .semibold)
+        case 4: return nsFont(size: baseSize * 1.05, weight: .semibold)
+        default: return nsFont(size: baseSize, weight: .medium)
         }
     }
 }
@@ -757,6 +804,19 @@ struct MixedContentParagraphView: View {
     let content: MarkdownInlineContent
     var basePath: String? = nil
 
+    @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
+    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+    @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+
+    private func nsFont(size: CGFloat) -> NSFont {
+        if chatFontFamily == "System Font" {
+            return NSFont.systemFont(ofSize: size)
+        } else if let font = NSFont(name: chatFontFamily, size: size) {
+            return font
+        }
+        return NSFont.systemFont(ofSize: size)
+    }
+
     var body: some View {
         let segments = splitIntoSegments(content.elements)
 
@@ -765,7 +825,7 @@ struct MixedContentParagraphView: View {
 
         if allImages && segments.count > 1 {
             // Render as horizontal row of badges with wrapping
-            FlowLayout(spacing: 4) {
+            FlowLayout(spacing: blockSpacing * 0.5) {
                 ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
                     if case .image(let url, let alt, let linkURL) = segment {
                         LinkedImageView(url: url, alt: alt, linkURL: linkURL, basePath: basePath)
@@ -773,14 +833,14 @@ struct MixedContentParagraphView: View {
                 }
             }
         } else {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: blockSpacing * 0.5) {
                 ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
                     switch segment {
                     case .text(let elements):
                         if !elements.isEmpty {
                             SelectableTextView(
                                 content: MarkdownInlineContent(elements: elements),
-                                baseFont: .systemFont(ofSize: NSFont.systemFontSize),
+                                baseFont: nsFont(size: CGFloat(chatFontSize)),
                                 baseColor: .labelColor
                             )
                         }
@@ -983,9 +1043,11 @@ struct CombinedSelectableTextView: NSViewRepresentable {
 struct ListBlockView: View {
     let items: [MarkdownListItem]
 
+    @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+        VStack(alignment: .leading, spacing: blockSpacing * 0.25) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { _, item in
                 ListItemView(item: item)
             }
         }
@@ -995,8 +1057,25 @@ struct ListBlockView: View {
 struct ListItemView: View {
     let item: MarkdownListItem
 
+    @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
+    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+    @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+
+    private var chatFont: Font {
+        chatFontFamily == "System Font" ? .system(size: chatFontSize) : .custom(chatFontFamily, size: chatFontSize)
+    }
+
+    private func nsFont(size: CGFloat) -> NSFont {
+        if chatFontFamily == "System Font" {
+            return NSFont.systemFont(ofSize: size)
+        } else if let font = NSFont(name: chatFontFamily, size: size) {
+            return font
+        }
+        return NSFont.systemFont(ofSize: size)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: blockSpacing * 0.25) {
             HStack(alignment: .top, spacing: 6) {
                 // Indentation
                 if item.depth > 0 {
@@ -1008,24 +1087,24 @@ struct ListItemView: View {
                 if let checkbox = item.checkbox {
                     Image(systemName: checkbox == .checked ? "checkmark.square.fill" : "square")
                         .foregroundStyle(checkbox == .checked ? .green : .secondary)
-                        .font(.body)
+                        .font(chatFont)
                         .frame(width: 16)
                 } else if item.listOrdered {
                     Text("\(item.listStartIndex + item.itemIndex).")
                         .foregroundStyle(.secondary)
-                        .font(.body)
+                        .font(chatFont)
                         .frame(minWidth: 16, alignment: .trailing)
                 } else {
                     Text(bulletForDepth(item.depth))
                         .foregroundStyle(.secondary)
-                        .font(.body)
+                        .font(chatFont)
                         .frame(width: 16)
                 }
 
                 // Content
                 SelectableTextView(
                     content: item.content,
-                    baseFont: .systemFont(ofSize: NSFont.systemFontSize),
+                    baseFont: nsFont(size: CGFloat(chatFontSize)),
                     baseColor: item.checkbox == .checked ? .secondaryLabelColor : .labelColor
                 )
                 .strikethrough(item.checkbox == .checked)
@@ -1053,13 +1132,15 @@ struct BlockQuoteView: View {
     let blocks: [MarkdownBlock]
     let isStreaming: Bool
 
+    @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: blockSpacing) {
             Rectangle()
                 .fill(Color.secondary.opacity(0.4))
                 .frame(width: 3)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: blockSpacing * 0.5) {
                 ForEach(blocks) { block in
                     BlockRenderer(block: block, isStreaming: isStreaming)
                 }
@@ -1076,6 +1157,25 @@ struct TableBlockView: View {
     let alignments: [ColumnAlignment]
 
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
+    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+
+    private var chatFont: Font {
+        chatFontFamily == "System Font" ? .system(size: chatFontSize) : .custom(chatFontFamily, size: chatFontSize)
+    }
+
+    private var chatFontBold: Font {
+        chatFontFamily == "System Font" ? .system(size: chatFontSize, weight: .semibold) : .custom(chatFontFamily, size: chatFontSize).weight(.semibold)
+    }
+
+    private func nsFont(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        if chatFontFamily == "System Font" {
+            return NSFont.systemFont(ofSize: size, weight: weight)
+        } else if let font = NSFont(name: chatFontFamily, size: size) {
+            return weight == .regular ? font : NSFontManager.shared.convert(font, toHaveTrait: weight == .bold ? .boldFontMask : [])
+        }
+        return NSFont.systemFont(ofSize: size, weight: weight)
+    }
 
     private var headerBackground: Color {
         colorScheme == .dark
@@ -1099,6 +1199,7 @@ struct TableBlockView: View {
     private var columnWidths: [CGFloat] {
         guard let firstRow = rows.first else { return [] }
         let columnCount = firstRow.cells.count
+        let fontSize = CGFloat(chatFontSize)
 
         var widths: [CGFloat] = Array(repeating: 40, count: columnCount) // minimum width
 
@@ -1107,8 +1208,8 @@ struct TableBlockView: View {
                 // Estimate width based on content length
                 let text = cell.plainText
                 let font = row.isHeader
-                    ? NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
-                    : NSFont.systemFont(ofSize: NSFont.systemFontSize)
+                    ? nsFont(size: fontSize, weight: .semibold)
+                    : nsFont(size: fontSize)
                 let attributes: [NSAttributedString.Key: Any] = [.font: font]
                 let size = (text as NSString).size(withAttributes: attributes)
                 let cellWidth = ceil(size.width) + 24 // padding
@@ -1132,7 +1233,7 @@ struct TableBlockView: View {
 
                         HStack(spacing: 0) {
                             Text(cell.plainText)
-                                .font(row.isHeader ? .system(size: NSFont.systemFontSize, weight: .semibold) : .system(size: NSFont.systemFontSize))
+                                .font(row.isHeader ? chatFontBold : chatFont)
                                 .textSelection(.enabled)
                         }
                         .frame(minWidth: width, maxWidth: isLastColumn ? .infinity : width, alignment: swiftUIAlignment(for: alignment))

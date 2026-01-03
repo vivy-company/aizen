@@ -27,6 +27,7 @@ enum SettingsSelection: Hashable {
     case git
     case terminal
     case editor
+    case chat
     case agent(String) // agent id
 }
 
@@ -62,6 +63,9 @@ struct SettingsView: View {
 
                     Label("Editor", systemImage: "doc.text")
                         .tag(SettingsSelection.editor)
+
+                    Label("Chat", systemImage: "bubble.left.and.bubble.right")
+                        .tag(SettingsSelection.chat)
 
                     // Agents section
                     Section("Agents") {
@@ -168,6 +172,10 @@ struct SettingsView: View {
             EditorSettingsView()
                 .navigationTitle("Editor")
                 .navigationSubtitle("Theme, font, and display options")
+        case .chat:
+            ChatSettingsView()
+                .navigationTitle("Chat")
+                .navigationSubtitle("Font size and markdown spacing")
         case .agent(let agentId):
             if let index = agents.firstIndex(where: { $0.id == agentId }) {
                 AgentDetailView(
