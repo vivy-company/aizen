@@ -133,8 +133,20 @@ jobs:
           CERT_IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" | head -1 | grep -o '"[^"]*"' | tr -d '"')
           echo "Using certificate: $CERT_IDENTITY"
 
+          CLI_PATH="build/dmg/aizen.app/Contents/Resources/cli/aizen-cli"
+          if [ -f "$CLI_PATH" ]; then
+            codesign --force --sign "$CERT_IDENTITY" \
+              --options runtime \
+              --timestamp \
+              "$CLI_PATH"
+          else
+            echo "Error: CLI binary not found at $CLI_PATH"
+            exit 1
+          fi
+
           codesign --force --deep --sign "$CERT_IDENTITY" \
             --options runtime \
+            --timestamp \
             --entitlements aizen/aizen.entitlements \
             build/dmg/aizen.app
 
@@ -163,6 +175,7 @@ jobs:
         run: |
           CERT_IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" | head -1 | grep -o '"[^"]*"' | tr -d '"')
           codesign --force --sign "$CERT_IDENTITY" \
+            --timestamp \
             "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg"
 
       - name: Notarize DMG
@@ -172,12 +185,40 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_ID != '' && env.APPLE_APP_PASSWORD != '' }}
         run: |
-          xcrun notarytool submit \
+          NOTARY_JSON=$(xcrun notarytool submit \
             "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" \
             --apple-id "${{ secrets.APPLE_ID }}" \
             --team-id "${{ secrets.APPLE_TEAM_ID }}" \
             --password "${{ secrets.APPLE_APP_PASSWORD }}" \
-            --wait
+            --wait \
+            --output-format json)
+
+          echo "$NOTARY_JSON"
+          NOTARY_ID=$(printf '%s' "$NOTARY_JSON" | python3 - <<'PY'
+import json, sys
+data = json.load(sys.stdin)
+print(data.get("id", ""))
+PY
+          )
+          NOTARY_STATUS=$(printf '%s' "$NOTARY_JSON" | python3 - <<'PY'
+import json, sys
+data = json.load(sys.stdin)
+print(data.get("status", ""))
+PY
+          )
+
+          if [ -z "$NOTARY_ID" ]; then
+            echo "Error: Notary submission did not return an id"
+            exit 1
+          fi
+
+          echo "NOTARY_REQUEST_ID=$NOTARY_ID" >> "$GITHUB_ENV"
+          echo "Notary status: $NOTARY_STATUS"
+
+          if [ "$NOTARY_STATUS" != "Accepted" ]; then
+            echo "Error: Notary status is not Accepted"
+            exit 1
+          fi
 
       - name: Staple notarization
         env:
@@ -186,7 +227,26 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_ID != '' && env.APPLE_APP_PASSWORD != '' }}
         run: |
-          xcrun stapler staple "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg"
+          DMG_PATH="build/Aizen-${{ github.event.inputs.marketing_version }}.dmg"
+          ATTEMPTS=8
+          SLEEP_SECONDS=15
+
+          for i in $(seq 1 $ATTEMPTS); do
+            echo "Stapling attempt $i/$ATTEMPTS..."
+            if xcrun stapler staple -v "$DMG_PATH"; then
+              echo "Staple succeeded"
+              xcrun stapler validate -v "$DMG_PATH"
+              exit 0
+            fi
+
+            if [ $i -lt $ATTEMPTS ]; then
+              echo "Staple failed; waiting ${SLEEP_SECONDS}s before retry..."
+              sleep "$SLEEP_SECONDS"
+            fi
+          done
+
+          echo "Error: Staple failed after $ATTEMPTS attempts"
+          exit 1
 
       - name: Generate Sparkle signature
         run: |
