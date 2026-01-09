@@ -46,7 +46,7 @@ struct AboutView: View {
                     title: "Join Discord Community",
                     icon: "DiscordLogo",
                     isSystemImage: false,
-                    url: "https://discord.gg/eKW7GNesuS"
+                    url: "https://discord.gg/zemMZtrkSb"
                 )
 
                 LinkButton(

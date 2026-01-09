@@ -70,7 +70,7 @@ struct OnboardingView: View {
                 .controlSize(.large)
 
                 Button {
-                    if let url = URL(string: "https://discord.gg/eKW7GNesuS") {
+                    if let url = URL(string: "https://discord.gg/zemMZtrkSb") {
                         NSWorkspace.shared.open(url)
                     }
                 } label: {
