@@ -62,6 +62,20 @@ func parseArguments(_ args: [String]) throws -> ParsedArguments {
                     throw CLIError.invalidArguments("Missing value for --color")
                 }
                 options["color"] = args[index]
+            case "--worktree":
+                index += 1
+                guard index < args.count else {
+                    throw CLIError.invalidArguments("Missing value for --worktree")
+                }
+                options["worktree"] = args[index]
+            case "-a", "--attach":
+                flags.insert("attach")
+            case "-c", "--command":
+                index += 1
+                guard index < args.count else {
+                    throw CLIError.invalidArguments("Missing value for --command")
+                }
+                options["command"] = args[index]
             default:
                 throw CLIError.invalidArguments("Unknown option: \(arg)")
             }
@@ -183,4 +197,359 @@ func isValidHexColor(_ value: String) -> Bool {
 func normalizePath(_ path: String) -> String {
     let expanded = expandPath(path)
     return expanded.hasSuffix("/") && expanded.count > 1 ? String(expanded.dropLast()) : expanded
+}
+
+// MARK: - Interactive Picker
+
+struct SessionInfo {
+    let workspaceName: String
+    let repositoryName: String
+    let worktreeBranch: String
+    let paneCount: Int
+    let focusedPaneId: String?
+    let sessionId: UUID
+    let worktreeId: UUID
+    let repositoryId: UUID
+    let workspaceId: UUID
+
+    var displayName: String {
+        "\(workspaceName) / \(repositoryName) / \(worktreeBranch)"
+    }
+
+    var detailText: String {
+        paneCount == 1 ? "1 pane" : "\(paneCount) panes"
+    }
+}
+
+class InteractivePicker {
+    private let items: [SessionInfo]
+    private var selectedIndex: Int = 0
+    private let style: OutputStyle
+    private var originalTermios: termios?
+
+    init(items: [SessionInfo], style: OutputStyle) {
+        self.items = items
+        self.style = style
+    }
+
+    func run() throws -> SessionInfo? {
+        guard !items.isEmpty else { return nil }
+        guard isTTY() else {
+            throw CLIError.invalidArguments("Interactive picker requires a terminal")
+        }
+
+        enableRawMode()
+        defer { disableRawMode() }
+
+        hideCursor()
+        defer { showCursor() }
+
+        render()
+
+        while true {
+            guard let key = readKey() else { continue }
+
+            switch key {
+            case .up, .k:
+                if selectedIndex > 0 {
+                    selectedIndex -= 1
+                    render()
+                }
+            case .down, .j:
+                if selectedIndex < items.count - 1 {
+                    selectedIndex += 1
+                    render()
+                }
+            case .enter:
+                clearPicker()
+                return items[selectedIndex]
+            case .escape, .q:
+                clearPicker()
+                return nil
+            default:
+                break
+            }
+        }
+    }
+
+    private func render() {
+        // Move cursor to start and clear
+        print("\u{1B}[H\u{1B}[J", terminator: "")
+
+        print(style.section("Select session to attach:"))
+        print("")
+
+        for (index, item) in items.enumerated() {
+            let prefix = index == selectedIndex ? style.success(">") : " "
+            let name = index == selectedIndex ? style.header(item.displayName) : item.displayName
+            let detail = style.label("(\(item.detailText))")
+            print("\(prefix) \(name) \(detail)")
+        }
+
+        print("")
+        print(style.label("↑/↓ navigate • Enter select • Esc cancel"))
+
+        fflush(stdout)
+    }
+
+    private func clearPicker() {
+        // Clear the picker area
+        let lineCount = items.count + 4  // header + items + footer + blank lines
+        print("\u{1B}[\(lineCount)A\u{1B}[J", terminator: "")
+        fflush(stdout)
+    }
+
+    private func enableRawMode() {
+        var raw = termios()
+        tcgetattr(STDIN_FILENO, &raw)
+        originalTermios = raw
+
+        raw.c_lflag &= ~UInt(ICANON | ECHO)
+        // c_cc indices: 16 = VMIN (min chars to read), 17 = VTIME (timeout in deciseconds)
+        // These are macOS-specific indices for the control characters array
+        raw.c_cc.16 = 1
+        raw.c_cc.17 = 0
+
+        tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw)
+    }
+
+    private func disableRawMode() {
+        if var original = originalTermios {
+            tcsetattr(STDIN_FILENO, TCSAFLUSH, &original)
+        }
+    }
+
+    private func hideCursor() {
+        print("\u{1B}[?25l", terminator: "")
+        fflush(stdout)
+    }
+
+    private func showCursor() {
+        print("\u{1B}[?25h", terminator: "")
+        fflush(stdout)
+    }
+
+    private enum Key {
+        case up, down, enter, escape, k, j, q, other
+    }
+
+    private func readKey() -> Key? {
+        var buffer = [UInt8](repeating: 0, count: 3)
+        let bytesRead = read(STDIN_FILENO, &buffer, 3)
+
+        guard bytesRead > 0 else { return nil }
+
+        if bytesRead == 1 {
+            switch buffer[0] {
+            case 0x0A, 0x0D: return .enter      // Enter
+            case 0x1B: return .escape           // Escape
+            case 0x6A: return .j                // j
+            case 0x6B: return .k                // k
+            case 0x71: return .q                // q
+            default: return .other
+            }
+        }
+
+        if bytesRead == 3 && buffer[0] == 0x1B && buffer[1] == 0x5B {
+            switch buffer[2] {
+            case 0x41: return .up               // Up arrow
+            case 0x42: return .down             // Down arrow
+            default: return .other
+            }
+        }
+
+        return .other
+    }
+}
+
+// MARK: - Tmux Utilities
+
+func tmuxPath() -> String? {
+    let paths = [
+        "/opt/homebrew/bin/tmux",
+        "/usr/local/bin/tmux",
+        "/usr/bin/tmux"
+    ]
+    return paths.first { FileManager.default.isExecutableFile(atPath: $0) }
+}
+
+func isTmuxAvailable() -> Bool {
+    return tmuxPath() != nil
+}
+
+func tmuxSessionExists(paneId: String) -> Bool {
+    guard let tmux = tmuxPath() else { return false }
+
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: tmux)
+    process.arguments = ["has-session", "-t", "aizen-\(paneId)"]
+    process.standardError = FileHandle.nullDevice
+
+    do {
+        try process.run()
+        process.waitUntilExit()
+        return process.terminationStatus == 0
+    } catch {
+        return false
+    }
+}
+
+func tmuxAttach(paneId: String) throws {
+    guard let tmux = tmuxPath() else {
+        throw CLIError.tmuxNotInstalled
+    }
+
+    guard isTTY() else {
+        throw CLIError.invalidArguments("tmux attach requires a terminal")
+    }
+
+    let sessionName = "aizen-\(paneId)"
+
+    // Replace current process with tmux attach
+    let args = [tmux, "attach", "-t", sessionName]
+    let cArgs = args.map { strdup($0) } + [nil]
+
+    execv(tmux, cArgs)
+
+    // If execv returns, it failed
+    throw CLIError.ioError("Failed to attach to tmux session")
+}
+
+func tmuxCreateSession(paneId: String, workingDirectory: String, command: String? = nil) throws {
+    guard let tmux = tmuxPath() else {
+        throw CLIError.tmuxNotInstalled
+    }
+
+    let sessionName = "aizen-\(paneId)"
+    let configPath = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".aizen/tmux.conf").path
+
+    // Ensure config exists
+    ensureTmuxConfig()
+
+    var args = [
+        tmux,
+        "-f", configPath,
+        "new-session",
+        "-d",  // detached
+        "-s", sessionName,
+        "-c", workingDirectory
+    ]
+
+    // If command specified, add it
+    if let command = command {
+        args.append(command)
+    }
+
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: tmux)
+    process.arguments = Array(args.dropFirst())  // Remove tmux path from args
+
+    try process.run()
+    process.waitUntilExit()
+
+    guard process.terminationStatus == 0 else {
+        throw CLIError.ioError("Failed to create tmux session")
+    }
+}
+
+private func ensureTmuxConfig() {
+    let aizenDir = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".aizen")
+    let configFile = aizenDir.appendingPathComponent("tmux.conf")
+
+    // Create ~/.aizen if needed
+    try? FileManager.default.createDirectory(at: aizenDir, withIntermediateDirectories: true)
+
+    // Only create if doesn't exist (don't overwrite user customizations from CLI)
+    guard !FileManager.default.fileExists(atPath: configFile.path) else { return }
+
+    let config = """
+    # Aizen tmux configuration
+    # This file is auto-generated - changes may be overwritten by Aizen app
+
+    # Enable hyperlinks (OSC 8)
+    set -as terminal-features ",*:hyperlinks"
+
+    # Allow OSC sequences to pass through
+    set -g allow-passthrough on
+
+    # Hide status bar
+    set -g status off
+
+    # Increase scrollback buffer
+    set -g history-limit 10000
+
+    # Enable mouse support
+    set -g mouse on
+
+    # Set default terminal with true color support
+    set -g default-terminal "xterm-256color"
+    set -ag terminal-overrides ",xterm-256color:RGB"
+    """
+
+    try? config.write(to: configFile, atomically: true, encoding: .utf8)
+}
+
+// MARK: - Split Layout Creation
+
+func createSinglePaneSplitLayout(paneId: String) -> String {
+    // Create a leaf node JSON matching app's format: {"type":"leaf","paneId":"UUID"}
+    let layout: [String: Any] = ["type": "leaf", "paneId": paneId]
+    guard let data = try? JSONSerialization.data(withJSONObject: layout),
+          let json = String(data: data, encoding: .utf8) else {
+        return "{\"type\":\"leaf\",\"paneId\":\"\(paneId)\"}"
+    }
+    return json
+}
+
+// MARK: - Split Layout Parsing
+
+func parsePaneIds(from splitLayout: String?) -> [String] {
+    guard let json = splitLayout,
+          let data = json.data(using: .utf8) else {
+        return []
+    }
+
+    var paneIds: [String] = []
+    extractPaneIds(from: data, into: &paneIds)
+    return paneIds
+}
+
+private func extractPaneIds(from data: Data, into paneIds: inout [String]) {
+    guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        return
+    }
+
+    // Check if it's a leaf node (app format: {"type":"leaf","paneId":"..."})
+    if let paneId = obj["paneId"] as? String {
+        paneIds.append(paneId)
+        return
+    }
+
+    // Handle nested leaf format (old CLI format: {"leaf":{"paneId":"..."}})
+    if let leaf = obj["leaf"] as? [String: Any],
+       let paneId = leaf["paneId"] as? String {
+        paneIds.append(paneId)
+        return
+    }
+
+    // Check if it's a split node (app format with left/right at top level)
+    if let left = obj["left"], let right = obj["right"] {
+        if let leftData = try? JSONSerialization.data(withJSONObject: left),
+           let rightData = try? JSONSerialization.data(withJSONObject: right) {
+            extractPaneIds(from: leftData, into: &paneIds)
+            extractPaneIds(from: rightData, into: &paneIds)
+        }
+        return
+    }
+
+    // Check if it's a split node (nested format: {"split":{"left":...,"right":...}})
+    if let split = obj["split"] as? [String: Any] {
+        if let leftData = try? JSONSerialization.data(withJSONObject: split["left"] as Any),
+           let rightData = try? JSONSerialization.data(withJSONObject: split["right"] as Any) {
+            extractPaneIds(from: leftData, into: &paneIds)
+            extractPaneIds(from: rightData, into: &paneIds)
+        }
+    }
 }
