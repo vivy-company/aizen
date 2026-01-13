@@ -537,9 +537,40 @@ private extension AizenCLI {
             }
         }
 
-        // Find an active pane to attach to
-        guard let paneId = selectedSession.focusedPaneId,
-              tmuxSessionExists(paneId: paneId) else {
+        // Determine which pane to attach to
+        let paneId: String
+
+        if let paneOption = parsed.options["pane"] {
+            // User specified a pane by index (1-based)
+            guard let paneIndex = Int(paneOption), paneIndex >= 1, paneIndex <= selectedSession.activePaneIds.count else {
+                throw CLIError.invalidArguments("Invalid pane index '\(paneOption)'. Valid range: 1-\(selectedSession.activePaneIds.count)")
+            }
+            paneId = selectedSession.activePaneIds[paneIndex - 1]
+        } else if selectedSession.paneCount > 1 {
+            // Multiple panes - show picker
+            guard isTTY() else {
+                throw CLIError.invalidArguments("Multiple panes available. Use --pane <n> to specify which pane (1-\(selectedSession.paneCount))")
+            }
+
+            let panePicker = PanePicker(
+                paneIds: selectedSession.activePaneIds,
+                focusedPaneId: selectedSession.focusedPaneId,
+                sessionName: selectedSession.displayName,
+                style: style
+            )
+            guard let selected = try panePicker.run() else {
+                throw CLIError.cancelled
+            }
+            paneId = selected
+        } else {
+            // Single pane - use it directly
+            guard let focused = selectedSession.focusedPaneId else {
+                throw CLIError.sessionNotFound(selectedSession.displayName)
+            }
+            paneId = focused
+        }
+
+        guard tmuxSessionExists(paneId: paneId) else {
             throw CLIError.sessionNotFound(selectedSession.displayName)
         }
 
@@ -784,6 +815,7 @@ private extension AizenCLI {
                 worktreeBranch: worktreeBranch,
                 paneCount: activePaneIds.count,
                 focusedPaneId: focusedPaneId,
+                activePaneIds: activePaneIds,
                 sessionId: sessionId,
                 worktreeId: worktreeId,
                 repositoryId: repositoryId,
@@ -1463,13 +1495,16 @@ Usage:
   aizen attach <project>                    Attach to project's terminal
   aizen attach <project> --workspace <ws>   Filter by workspace
   aizen attach <project> --worktree <branch>  Filter by worktree
+  aizen attach <project> --pane <n>         Attach to specific pane (1-based)
 
 Options:
   -w, --workspace <name>    Filter sessions by workspace
   --worktree <branch>       Filter sessions by worktree branch
+  --pane <n>                Attach to pane number n (1-based index)
   --no-color                Disable colored output
 
 Attach to an active tmux terminal session from Aizen.
+If the session has multiple panes, you'll be prompted to choose one.
 Use arrow keys or j/k to navigate, Enter to select, Esc to cancel.
 """
     }

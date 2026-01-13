@@ -207,6 +207,7 @@ struct SessionInfo {
     let worktreeBranch: String
     let paneCount: Int
     let focusedPaneId: String?
+    let activePaneIds: [String]
     let sessionId: UUID
     let worktreeId: UUID
     let repositoryId: UUID
@@ -354,6 +355,165 @@ class InteractivePicker {
             switch buffer[2] {
             case 0x41: return .up               // Up arrow
             case 0x42: return .down             // Down arrow
+            default: return .other
+            }
+        }
+
+        return .other
+    }
+}
+
+struct PaneInfo {
+    let paneId: String
+    let index: Int
+    let isFocused: Bool
+
+    var displayName: String {
+        let focusMarker = isFocused ? " (focused)" : ""
+        return "Pane \(index + 1)\(focusMarker)"
+    }
+
+    var shortId: String {
+        String(paneId.prefix(8))
+    }
+}
+
+class PanePicker {
+    private let panes: [PaneInfo]
+    private var selectedIndex: Int
+    private let style: OutputStyle
+    private let sessionName: String
+    private var originalTermios: termios?
+
+    init(paneIds: [String], focusedPaneId: String?, sessionName: String, style: OutputStyle) {
+        self.panes = paneIds.enumerated().map { index, paneId in
+            PaneInfo(paneId: paneId, index: index, isFocused: paneId == focusedPaneId)
+        }
+        self.sessionName = sessionName
+        self.style = style
+        // Start with focused pane selected
+        self.selectedIndex = panes.firstIndex { $0.isFocused } ?? 0
+    }
+
+    func run() throws -> String? {
+        guard !panes.isEmpty else { return nil }
+        guard isTTY() else {
+            throw CLIError.invalidArguments("Interactive picker requires a terminal")
+        }
+
+        enableRawMode()
+        defer { disableRawMode() }
+
+        hideCursor()
+        defer { showCursor() }
+
+        render()
+
+        while true {
+            guard let key = readKey() else { continue }
+
+            switch key {
+            case .up, .k:
+                if selectedIndex > 0 {
+                    selectedIndex -= 1
+                    render()
+                }
+            case .down, .j:
+                if selectedIndex < panes.count - 1 {
+                    selectedIndex += 1
+                    render()
+                }
+            case .enter:
+                clearPicker()
+                return panes[selectedIndex].paneId
+            case .escape, .q:
+                clearPicker()
+                return nil
+            default:
+                break
+            }
+        }
+    }
+
+    private func render() {
+        print("\u{1B}[H\u{1B}[J", terminator: "")
+
+        print(style.section("Select pane to attach:"))
+        print(style.label(sessionName))
+        print("")
+
+        for (index, pane) in panes.enumerated() {
+            let prefix = index == selectedIndex ? style.success(">") : " "
+            let name = index == selectedIndex ? style.header(pane.displayName) : pane.displayName
+            let detail = style.label("[\(pane.shortId)]")
+            print("\(prefix) \(name) \(detail)")
+        }
+
+        print("")
+        print(style.label("↑/↓ navigate • Enter select • Esc cancel"))
+
+        fflush(stdout)
+    }
+
+    private func clearPicker() {
+        let lineCount = panes.count + 5
+        print("\u{1B}[\(lineCount)A\u{1B}[J", terminator: "")
+        fflush(stdout)
+    }
+
+    private func enableRawMode() {
+        var raw = termios()
+        tcgetattr(STDIN_FILENO, &raw)
+        originalTermios = raw
+
+        raw.c_lflag &= ~UInt(ICANON | ECHO)
+        raw.c_cc.16 = 1
+        raw.c_cc.17 = 0
+
+        tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw)
+    }
+
+    private func disableRawMode() {
+        if var original = originalTermios {
+            tcsetattr(STDIN_FILENO, TCSAFLUSH, &original)
+        }
+    }
+
+    private func hideCursor() {
+        print("\u{1B}[?25l", terminator: "")
+        fflush(stdout)
+    }
+
+    private func showCursor() {
+        print("\u{1B}[?25h", terminator: "")
+        fflush(stdout)
+    }
+
+    private enum Key {
+        case up, down, enter, escape, k, j, q, other
+    }
+
+    private func readKey() -> Key? {
+        var buffer = [UInt8](repeating: 0, count: 3)
+        let bytesRead = read(STDIN_FILENO, &buffer, 3)
+
+        guard bytesRead > 0 else { return nil }
+
+        if bytesRead == 1 {
+            switch buffer[0] {
+            case 0x0A, 0x0D: return .enter
+            case 0x1B: return .escape
+            case 0x6A: return .j
+            case 0x6B: return .k
+            case 0x71: return .q
+            default: return .other
+            }
+        }
+
+        if bytesRead == 3 && buffer[0] == 0x1B && buffer[1] == 0x5B {
+            switch buffer[2] {
+            case 0x41: return .up
+            case 0x42: return .down
             default: return .other
             }
         }
