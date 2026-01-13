@@ -235,6 +235,7 @@ struct FileSearchWindowContent: View {
                             selectFile(result)
                         }
                     },
+                    onEscape: onClose,
                     trailing: {
                         Button(action: onClose) {
                             KeyCap(text: "esc")

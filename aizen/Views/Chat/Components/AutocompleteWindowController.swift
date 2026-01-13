@@ -14,6 +14,7 @@ final class AutocompletePopupModel: ObservableObject {
     @Published var items: [AutocompleteItem] = []
     @Published var selectedIndex: Int = 0
     @Published var trigger: AutocompleteTrigger?
+    @Published var itemsVersion: Int = 0  // Increments when items list changes for scroll reset
 
     var onTap: ((AutocompleteItem) -> Void)?
     var onSelect: (() -> Void)?
@@ -24,10 +25,15 @@ final class AutocompleteWindowController: NSWindowController {
     private weak var parentWindow: NSWindow?
     private let model = AutocompletePopupModel()
     private var lastItemCount: Int = -1
+    private var lastItemIds: Set<String> = []
+    private var appearanceObserver: NSObjectProtocol?
 
     override init(window: NSWindow?) {
         super.init(window: window ?? Self.makeWindow())
         if let window = self.window {
+            // Apply initial appearance from app settings
+            updateWindowAppearance()
+
             let hostingView = NSHostingView(rootView: InlineAutocompletePopupView(model: model))
 
             hostingView.wantsLayer = true
@@ -36,7 +42,38 @@ final class AutocompleteWindowController: NSWindowController {
 
             window.contentView = hostingView
             currentHostingView = hostingView
+
+            // Observe appearance mode changes
+            appearanceObserver = NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.updateWindowAppearance()
+            }
         }
+    }
+
+    deinit {
+        if let observer = appearanceObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    private func updateWindowAppearance() {
+        let appearanceMode = UserDefaults.standard.string(forKey: "appearanceMode") ?? "system"
+        let appearance: NSAppearance?
+
+        switch appearanceMode {
+        case "dark":
+            appearance = NSAppearance(named: .darkAqua)
+        case "light":
+            appearance = NSAppearance(named: .aqua)
+        default:
+            appearance = nil  // System default
+        }
+
+        window?.appearance = appearance
     }
 
     required init?(coder: NSCoder) {
@@ -63,6 +100,8 @@ final class AutocompleteWindowController: NSWindowController {
         panel.animationBehavior = .utilityWindow
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
+        panel.acceptsMouseMovedEvents = true
+        panel.ignoresMouseEvents = false
         return panel
     }
 
@@ -78,8 +117,15 @@ final class AutocompleteWindowController: NSWindowController {
 
     func update(state: AutocompleteState) {
         model.trigger = state.trigger
-        model.items = state.items
         model.selectedIndex = state.selectedIndex
+
+        // Check if items actually changed (not just count, but content)
+        let newItemIds = Set(state.items.map { $0.id })
+        if newItemIds != lastItemIds {
+            lastItemIds = newItemIds
+            model.items = state.items
+            model.itemsVersion += 1  // Signal scroll reset
+        }
 
         if state.items.count != lastItemCount {
             lastItemCount = state.items.count
@@ -182,6 +228,7 @@ final class AutocompleteWindowController: NSWindowController {
         model.selectedIndex = 0
         model.trigger = nil
         lastItemCount = -1
+        lastItemIds = []
     }
 
     var isVisible: Bool {
