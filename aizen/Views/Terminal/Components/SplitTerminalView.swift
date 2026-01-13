@@ -35,6 +35,9 @@ struct SplitTerminalView: View {
     @State private var contextSaveWorkItem: DispatchWorkItem?
     @State private var showCloseConfirmation = false
     @State private var pendingCloseAction: CloseAction = .pane
+    @State private var keyMonitor: Any?
+    @State private var focusedPaneVoiceRecording = false
+    @State private var voiceAction: (paneId: String, action: VoiceAction)?
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
 
     private enum CloseAction {
@@ -75,10 +78,16 @@ struct SplitTerminalView: View {
             }
             // Initial persistence to store default layout/pane (only for selected session)
             .onAppear {
-                guard isSelected else { return }
-                persistLayout()
-                persistFocus()
-                applyTitleForFocusedPane()
+                if isSelected {
+                    persistLayout()
+                    persistFocus()
+                    applyTitleForFocusedPane()
+                }
+                if keyMonitor == nil {
+                    keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                        handleVoiceShortcut(event)
+                    }
+                }
             }
             // Trigger focus when tab becomes selected (views are kept alive via opacity)
             .onChange(of: isSelected) { newValue in
@@ -101,6 +110,10 @@ struct SplitTerminalView: View {
                 layoutSaveWorkItem?.cancel()
                 focusSaveWorkItem?.cancel()
                 contextSaveWorkItem?.cancel()
+                if let monitor = keyMonitor {
+                    NSEvent.removeMonitor(monitor)
+                    keyMonitor = nil
+                }
             }
             .alert(
                 String(localized: "terminal.close.confirmTitle", defaultValue: "Close Terminal?"),
@@ -118,6 +131,10 @@ struct SplitTerminalView: View {
     private func renderNode(_ node: SplitNode) -> AnyView {
         switch node {
         case .leaf(let paneId):
+            let voiceActionBinding = Binding<VoiceAction?>(
+                get: { voiceAction?.paneId == paneId ? voiceAction?.action : nil },
+                set: { _ in voiceAction = nil }
+            )
             return AnyView(
                 TerminalPaneView(
                     worktree: worktree,
@@ -125,12 +142,18 @@ struct SplitTerminalView: View {
                     paneId: paneId,
                     isFocused: focusedPaneId == paneId,
                     sessionManager: sessionManager,
+                    voiceAction: voiceActionBinding,
                     onFocus: {
                         focusedPaneId = paneId
                         applyTitleForFocusedPane()
                     },
                     onProcessExit: { handleProcessExit(for: paneId) },
-                    onTitleChange: { title in handleTitleChange(for: paneId, title: title) }
+                    onTitleChange: { title in handleTitleChange(for: paneId, title: title) },
+                    onVoiceRecordingChanged: { isRecording in
+                        if focusedPaneId == paneId {
+                            focusedPaneVoiceRecording = isRecording
+                        }
+                    }
                 )
                 .id("\(paneId)-\(layoutVersion)")  // Force refresh when layout changes
             )
@@ -385,5 +408,35 @@ struct SplitTerminalView: View {
             session.title = title
             saveContext()
         }
+    }
+
+    // MARK: - Voice Shortcut Handling
+
+    private func handleVoiceShortcut(_ event: NSEvent) -> NSEvent? {
+        guard isSelected else { return event }
+
+        let keyCodeEscape: UInt16 = 53
+        let keyCodeReturn: UInt16 = 36
+
+        // Handle Enter/Escape when voice recording is active
+        if focusedPaneVoiceRecording {
+            if event.keyCode == keyCodeEscape {
+                voiceAction = (focusedPaneId, .cancel)
+                return nil
+            }
+            if event.keyCode == keyCodeReturn {
+                voiceAction = (focusedPaneId, .accept)
+                return nil
+            }
+        }
+
+        // Handle ⌘⇧M to toggle voice recording
+        guard event.modifierFlags.contains(.command),
+              event.modifierFlags.contains(.shift),
+              event.charactersIgnoringModifiers?.lowercased() == "m" else {
+            return event
+        }
+        voiceAction = (focusedPaneId, .toggle)
+        return nil
     }
 }

@@ -8,6 +8,14 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Voice Action
+
+enum VoiceAction {
+    case toggle
+    case cancel
+    case accept
+}
+
 // MARK: - Terminal Pane View
 
 struct TerminalPaneView: View {
@@ -16,9 +24,11 @@ struct TerminalPaneView: View {
     let paneId: String
     let isFocused: Bool
     let sessionManager: TerminalSessionManager
+    @Binding var voiceAction: VoiceAction?
     let onFocus: () -> Void
     let onProcessExit: () -> Void
     let onTitleChange: (String) -> Void
+    let onVoiceRecordingChanged: (Bool) -> Void
 
     @State private var shouldFocus: Bool = false
     @State private var focusVersion: Int = 0  // Increment to force updateNSView
@@ -33,7 +43,6 @@ struct TerminalPaneView: View {
     @State private var showingVoiceRecording = false
     @State private var showingPermissionError = false
     @State private var permissionErrorMessage = ""
-    @State private var keyMonitor: Any?
 
     @AppStorage("terminalNotificationsEnabled") private var notificationsEnabled = true
     @AppStorage("terminalProgressEnabled") private var progressEnabled = true
@@ -136,23 +145,23 @@ struct TerminalPaneView: View {
                     }
                 }
             }
-            if keyMonitor == nil {
-                keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                    handleVoiceShortcut(event)
-                }
-            }
         }
         .onDisappear {
             hideWorkItem?.cancel()
             hideWorkItem = nil
-            if let monitor = keyMonitor {
-                NSEvent.removeMonitor(monitor)
-                keyMonitor = nil
-            }
             if showingVoiceRecording {
                 audioService.cancelRecording()
                 showingVoiceRecording = false
             }
+        }
+        .onChange(of: voiceAction) { action in
+            if let action = action {
+                handleVoiceAction(action)
+                voiceAction = nil
+            }
+        }
+        .onChange(of: showingVoiceRecording) { isRecording in
+            onVoiceRecordingChanged(isRecording)
         }
         .alert("Voice Input Unavailable", isPresented: $showingPermissionError) {
             Button("OK", role: .cancel) { }
@@ -238,30 +247,16 @@ struct TerminalPaneView: View {
         .padding(14)
     }
 
-    private func handleVoiceShortcut(_ event: NSEvent) -> NSEvent? {
-        guard isFocused else { return event }
-        let keyCodeEscape: UInt16 = 53
-        let keyCodeReturn: UInt16 = 36
-
-        if showingVoiceRecording {
-            if event.keyCode == keyCodeEscape {
-                audioService.cancelRecording()
-                showingVoiceRecording = false
-                return nil
-            }
-            if event.keyCode == keyCodeReturn {
-                toggleVoiceRecording()
-                return nil
-            }
+    private func handleVoiceAction(_ action: VoiceAction) {
+        switch action {
+        case .toggle:
+            toggleVoiceRecording()
+        case .cancel:
+            audioService.cancelRecording()
+            showingVoiceRecording = false
+        case .accept:
+            toggleVoiceRecording()
         }
-
-        guard event.modifierFlags.contains(.command),
-              event.modifierFlags.contains(.shift),
-              event.charactersIgnoringModifiers?.lowercased() == "m" else {
-            return event
-        }
-        toggleVoiceRecording()
-        return nil
     }
 
     private func toggleVoiceRecording() {
