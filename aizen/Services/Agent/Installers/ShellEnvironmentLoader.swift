@@ -21,13 +21,14 @@ actor ShellEnvironmentLoader {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
 
-        // Use login shell to load profile
+        // Use login + interactive shell to load all profile files (.zshrc, .bashrc, etc.)
+        // This is critical for nvm/fnm/asdf which are typically initialized in interactive shell configs
         let arguments: [String]
         switch shellName {
         case "fish":
             arguments = ["-l", "-c", "env"]
         case "zsh", "bash", "sh":
-            arguments = ["-l", "-c", "env"]
+            arguments = ["-l", "-i", "-c", "env"]
         default:
             arguments = ["-c", "env"]
         }
