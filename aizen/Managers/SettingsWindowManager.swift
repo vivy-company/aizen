@@ -22,6 +22,7 @@ final class SettingsWindowManager {
         }
 
         let settingsView = SettingsView()
+            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
             .modifier(AppearanceModifier())
         let hostingController = NSHostingController(rootView: settingsView)
 

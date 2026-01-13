@@ -139,107 +139,411 @@ struct AgentUsageDetailContent: View {
     let onRefresh: () -> Void
     let showActivity: Bool
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            headerRow
+    private let gridSpacing: CGFloat = 12
 
+    var body: some View {
+        VStack(alignment: .leading, spacing: gridSpacing) {
             if let reason = report.unavailableReason {
                 Text(reason)
                     .foregroundStyle(.secondary)
+                    .padding(.bottom, 4)
             }
 
-            usageCard(
-                title: "Tokens & cost",
-                subtitle: "Today, last 30 days, and this month",
-                accent: Color(red: 0.12, green: 0.5, blue: 0.9)
-            ) {
-                if report.periods.isEmpty {
-                    Text("No token usage available.")
-                        .foregroundStyle(.secondary)
+            // Top row: Hero stats
+            HStack(spacing: gridSpacing) {
+                heroStatCard(
+                    icon: "bolt.fill",
+                    iconColor: .purple,
+                    value: totalCostString,
+                    label: "Total cost",
+                    sublabel: "This month"
+                )
+                heroStatCard(
+                    icon: "text.word.spacing",
+                    iconColor: .blue,
+                    value: totalTokensString,
+                    label: "Tokens",
+                    sublabel: "This month"
+                )
+                if let primaryQuota = report.quota.first {
+                    heroStatCard(
+                        icon: "gauge.with.dots.needle.50percent",
+                        iconColor: quotaColor(primaryQuota.usedPercent),
+                        value: UsageFormatter.percentString(primaryQuota.usedPercent),
+                        label: primaryQuota.title,
+                        sublabel: primaryQuota.resetDescription
+                    )
                 } else {
-                    tokenDetailChart(periods: report.periods)
+                    heroStatCard(
+                        icon: "gauge.with.dots.needle.50percent",
+                        iconColor: .secondary,
+                        value: "N/A",
+                        label: "Usage",
+                        sublabel: nil
+                    )
                 }
             }
 
-            usageCard(
-                title: "Subscription usage",
-                subtitle: report.quota.isEmpty ? "No subscription data yet" : "Active limits and resets",
-                accent: Color(red: 0.2, green: 0.6, blue: 0.35)
-            ) {
-                if report.quota.isEmpty {
-                    Text("No subscription data available.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(report.quota) { window in
-                        UsageQuotaRow(window: window)
+            // Second row: Activity stats grid + Plan card
+            HStack(alignment: .top, spacing: gridSpacing) {
+                // Activity mini-grid (2x3)
+                if showActivity {
+                    VStack(spacing: gridSpacing) {
+                        HStack(spacing: gridSpacing) {
+                            miniStatCard(
+                                value: "\(activityStats.sessionsStarted)",
+                                label: "Sessions",
+                                icon: "bubble.left.and.bubble.right.fill",
+                                color: .green
+                            )
+                            miniStatCard(
+                                value: "\(activityStats.promptsSent)",
+                                label: "Prompts",
+                                icon: "arrow.up.circle.fill",
+                                color: .blue
+                            )
+                        }
+                        HStack(spacing: gridSpacing) {
+                            miniStatCard(
+                                value: "\(activityStats.agentMessages)",
+                                label: "Responses",
+                                icon: "arrow.down.circle.fill",
+                                color: .indigo
+                            )
+                            miniStatCard(
+                                value: "\(activityStats.toolCalls)",
+                                label: "Tool calls",
+                                icon: "wrench.and.screwdriver.fill",
+                                color: .orange
+                            )
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+
+                // Plan & user card
+                VStack(alignment: .leading, spacing: 8) {
+                    if let user = report.user, hasAccountDetails(user) {
+                        planCard(user: user)
+                    } else {
+                        bentoCard(minHeight: 130) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("Account", systemImage: "person.crop.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("Not signed in")
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
 
-            usageCard(
-                title: "Current user",
-                subtitle: nil,
-                accent: Color(red: 0.95, green: 0.55, blue: 0.2)
-            ) {
-                if let user = report.user, hasAccountDetails(user) {
-                    usageInfoRow("Email", value: user.email ?? "N/A")
-                    usageInfoRow("Organization", value: user.organization ?? "N/A")
-                    usageInfoRow("Plan", value: user.plan ?? "N/A")
+            // Third row: Token breakdown + Quota rings
+            HStack(alignment: .top, spacing: gridSpacing) {
+                // Token periods
+                bentoCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Token usage", systemImage: "chart.bar.fill")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+
+                        if report.periods.isEmpty {
+                            Spacer()
+                            Text("No data")
+                                .foregroundStyle(.tertiary)
+                            Spacer()
+                        } else {
+                            tokenPeriodsList
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: .infinity)
+
+                // Quota rings column - match height of token card
+                if report.quota.count > 1 {
+                    VStack(spacing: gridSpacing) {
+                        ForEach(report.quota.dropFirst()) { window in
+                            quotaRingCard(window: window)
+                                .frame(maxHeight: .infinity)
+                        }
+                    }
+                    .frame(minWidth: 200, maxHeight: .infinity)
                 } else {
-                    Text("No user details available.")
-                        .foregroundStyle(.secondary)
+                    // Last used card
+                    bentoCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Last active", systemImage: "clock.fill")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(lastUsedText)
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    }
+                    .frame(minWidth: 200)
                 }
             }
+            .frame(minHeight: 180)
 
-            if showActivity {
-                usageCard(
-                    title: "Activity",
-                    subtitle: "Local usage signals",
-                    accent: Color(red: 0.62, green: 0.6, blue: 0.2)
-                ) {
-                    AgentActivityRowsView(stats: activityStats)
+            // Footer row: Notes, Errors, Last updated
+            HStack(alignment: .top, spacing: gridSpacing) {
+                if !report.notes.isEmpty || !report.errors.isEmpty {
+                    bentoCard(maxHeight: .infinity) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if !report.notes.isEmpty {
+                                ForEach(report.notes, id: \.self) { note in
+                                    Label(note, systemImage: "info.circle")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            if !report.errors.isEmpty {
+                                ForEach(report.errors, id: \.self) { error in
+                                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                        }
+                    }
                 }
-            }
 
-            if !report.notes.isEmpty {
-                usageCard(
-                    title: "Notes",
-                    subtitle: nil,
-                    accent: Color.secondary
-                ) {
-                    ForEach(report.notes, id: \.self) { note in
-                        Text(note)
+                // Refresh card
+                bentoCard(maxHeight: .infinity) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .foregroundStyle(.secondary)
+                        Text(UsageFormatter.relativeDateString(report.updatedAt))
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        Spacer()
+                        refreshButton
                     }
                 }
+                .frame(minWidth: 200)
             }
-
-            if !report.errors.isEmpty {
-                usageCard(
-                    title: "Errors",
-                    subtitle: nil,
-                    accent: Color.red
-                ) {
-                    ForEach(report.errors, id: \.self) { error in
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-            }
+            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var headerRow: some View {
-        HStack(spacing: 12) {
-            Text("Last updated")
-            Spacer()
-            Text(UsageFormatter.relativeDateString(report.updatedAt))
-                .foregroundStyle(.secondary)
-            refreshButton
+    // MARK: - Computed Properties
+
+    private var totalCostString: String {
+        guard let month = report.periods.first(where: { $0.label.lowercased().contains("month") }) else {
+            if let first = report.periods.first {
+                return UsageFormatter.usdString(first.costUSD)
+            }
+            return "$0"
         }
+        return UsageFormatter.usdString(month.costUSD)
+    }
+
+    private var totalTokensString: String {
+        guard let month = report.periods.first(where: { $0.label.lowercased().contains("month") }) else {
+            if let first = report.periods.first {
+                return UsageFormatter.tokenString(first.totalTokens)
+            }
+            return "0"
+        }
+        return UsageFormatter.tokenString(month.totalTokens)
+    }
+
+    private var lastUsedText: String {
+        guard let lastUsedAt = activityStats.lastUsedAt else { return "Never" }
+        return RelativeDateFormatter.shared.string(from: lastUsedAt)
+    }
+
+    private var tokenPeriodsList: some View {
+        let totals = report.periods.map { Double($0.totalTokens ?? 0) }
+        let maxTotal = max(totals.max() ?? 0, 1)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            ForEach(report.periods, id: \.label) { period in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(period.label)
+                            .font(.caption)
+                        Spacer()
+                        Text(UsageFormatter.usdString(period.costUSD))
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    UsageStackedBar(
+                        input: Double(period.inputTokens ?? 0),
+                        output: Double(period.outputTokens ?? 0),
+                        total: maxTotal
+                    )
+                    HStack(spacing: 12) {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.accentColor.opacity(0.5))
+                                .frame(width: 6, height: 6)
+                            Text("In \(UsageFormatter.tokenString(period.inputTokens))")
+                        }
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.accentColor)
+                                .frame(width: 6, height: 6)
+                            Text("Out \(UsageFormatter.tokenString(period.outputTokens))")
+                        }
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                }
+            }
+        }
+    }
+
+    // MARK: - Card Components
+
+    private func heroStatCard(
+        icon: String,
+        iconColor: Color,
+        value: String,
+        label: String,
+        sublabel: String?
+    ) -> some View {
+        bentoCard {
+            VStack(alignment: .leading, spacing: 6) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(iconColor)
+
+                Spacer()
+
+                Text(value)
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .fontDesign(.rounded)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    if let sublabel {
+                        Text(sublabel)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(minHeight: 120)
+    }
+
+    private func miniStatCard(
+        value: String,
+        label: String,
+        icon: String,
+        color: Color
+    ) -> some View {
+        bentoCard {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.body)
+                    .foregroundStyle(color)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(value)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .fontDesign(.rounded)
+                    Text(label)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+            }
+        }
+        .frame(minWidth: 120)
+    }
+
+    private func planCard(user: UsageUserIdentity) -> some View {
+        bentoCard(minHeight: 130) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Account", systemImage: "person.crop.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                if let plan = user.plan {
+                    Text(plan)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    if let email = user.email {
+                        Text(email)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    if let org = user.organization {
+                        Text(org)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func quotaRingCard(window: UsageQuotaWindow) -> some View {
+        bentoCard(maxHeight: .infinity) {
+            HStack(spacing: 12) {
+                UsageRing(percent: window.usedPercent)
+                    .frame(width: 48, height: 48)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(window.title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    if let reset = window.resetDescription {
+                        Text(reset)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
+                Spacer()
+            }
+        }
+    }
+
+    private func bentoCard<Content: View>(
+        minHeight: CGFloat? = nil,
+        maxHeight: CGFloat? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: maxHeight, alignment: .leading)
+            .background(Color.secondary.opacity(0.06))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     @ViewBuilder
@@ -257,84 +561,13 @@ struct AgentUsageDetailContent: View {
         }
     }
 
-    private func usageCard(
-        title: String,
-        subtitle: String?,
-        accent: Color,
-        @ViewBuilder content: () -> some View
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            content()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [
-                    accent.opacity(0.12),
-                    Color(nsColor: .windowBackgroundColor)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
+    // MARK: - Helpers
 
-    private func usageInfoRow(_ title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text(value)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func tokenDetailChart(periods: [UsagePeriodSummary]) -> some View {
-        let totals = periods.map { Double($0.totalTokens ?? 0) }
-        let maxTotal = max(totals.max() ?? 0, 1)
-
-        return VStack(alignment: .leading, spacing: 10) {
-            ForEach(periods, id: \.label) { period in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(period.label)
-                        Spacer()
-                        Text(UsageFormatter.usdString(period.costUSD))
-                            .foregroundStyle(.secondary)
-                    }
-                    UsageStackedBar(
-                        input: Double(period.inputTokens ?? 0),
-                        output: Double(period.outputTokens ?? 0),
-                        total: maxTotal
-                    )
-                    Text(tokenLine(for: period))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    private func tokenLine(for period: UsagePeriodSummary) -> String {
-        let input = UsageFormatter.tokenString(period.inputTokens)
-        let output = UsageFormatter.tokenString(period.outputTokens)
-        let total = UsageFormatter.tokenString(period.totalTokens)
-        return "Input \(input) | Output \(output) | Total \(total)"
+    private func quotaColor(_ percent: Double?) -> Color {
+        guard let p = percent else { return .secondary }
+        if p >= 90 { return .red }
+        if p >= 70 { return .orange }
+        return .green
     }
 
     private func hasAccountDetails(_ user: UsageUserIdentity) -> Bool {
@@ -556,7 +789,7 @@ struct AgentUsageSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(20)
-        .frame(minWidth: 520, maxWidth: .infinity, alignment: .leading)
+        .frame(minWidth: 680, maxWidth: .infinity, alignment: .leading)
         .onAppear {
             metricsStore.refreshIfNeeded(agentId: agentId)
         }
