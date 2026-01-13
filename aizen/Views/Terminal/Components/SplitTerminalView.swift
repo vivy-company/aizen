@@ -16,6 +16,16 @@ struct SplitTerminalView: View {
     let sessionManager: TerminalSessionManager
     let isSelected: Bool
 
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
+    @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
+    @AppStorage("terminalUsePerAppearanceTheme") private var usePerAppearanceTheme = false
+
+    private var effectiveThemeName: String {
+        guard usePerAppearanceTheme else { return terminalThemeName }
+        return colorScheme == .dark ? terminalThemeName : terminalThemeNameLight
+    }
+
     @State private var layout: SplitNode
     @State private var focusedPaneId: String
     @State private var layoutVersion: Int = 0  // Increment when layout changes to force refresh
@@ -143,7 +153,7 @@ struct SplitTerminalView: View {
                 SplitView(
                     split.direction == .horizontal ? .horizontal : .vertical,
                     ratioBinding,
-                    dividerColor: Color(nsColor: .separatorColor),
+                    dividerColor: Color(nsColor: GhosttyThemeParser.loadDividerColor(named: effectiveThemeName)),
                     left: { renderNode(split.left) },
                     right: { renderNode(split.right) }
                 )

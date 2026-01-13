@@ -37,6 +37,19 @@ nonisolated extension NSColor {
     var hexString: String {
         String(format: "%06x", hexInt)
     }
+
+    var luminance: Double {
+        guard let rgb = self.usingColorSpace(.sRGB) else { return 0 }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return (0.299 * r) + (0.587 * g) + (0.114 * b)
+    }
+
+    func darken(by amount: CGFloat) -> NSColor {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        self.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        return NSColor(hue: h, saturation: s, brightness: b * (1 - amount), alpha: a)
+    }
 }
 
 typealias Attribute = EditorTheme.Attribute
@@ -222,6 +235,26 @@ nonisolated struct GhosttyThemeParser {
             .appendingPathComponent(name)
 
         return parseRaw(contentsOf: themePath)?.palette
+    }
+
+    /// Returns the background color for a theme
+    static func loadBackgroundColor(named name: String) -> NSColor {
+        guard let resourcePath = Bundle.main.resourcePath else {
+            return NSColor(hex: "1E1E2E")
+        }
+        let themePath = ((resourcePath as NSString)
+            .appendingPathComponent("ghostty/themes") as NSString)
+            .appendingPathComponent(name)
+
+        return parseRaw(contentsOf: themePath)?.background ?? NSColor(hex: "1E1E2E")
+    }
+
+    /// Returns a divider color calculated from the background (Ghostty style)
+    static func loadDividerColor(named name: String) -> NSColor {
+        let bg = loadBackgroundColor(named: name)
+        let isLight = bg.luminance > 0.5
+        let darkenAmount: CGFloat = isLight ? 0.08 : 0.4
+        return bg.darken(by: darkenAmount)
     }
 
     /// Returns tmux mode-style string for selection highlighting
