@@ -86,6 +86,10 @@ actor OpenCodePluginInstaller {
     }
     
     func isInstalled(_ packageName: String) async -> Bool {
+        if getVersionFromPackageJson(packageName) != nil {
+            return true
+        }
+        
         if checkCommonBinaryLocations(packageName) {
             return true
         }
@@ -97,7 +101,25 @@ actor OpenCodePluginInstaller {
             arguments: ["which", packageName],
             environment: shellEnv
         )
-        return whichResult?.succeeded ?? false
+        if whichResult?.succeeded == true {
+            return true
+        }
+        
+        let npmResult = try? await ProcessExecutor.shared.executeWithOutput(
+            executable: "/usr/bin/env",
+            arguments: ["npm", "list", "-g", packageName, "--depth=0", "--json"],
+            environment: shellEnv
+        )
+        
+        if let npmResult = npmResult, npmResult.succeeded,
+           let data = npmResult.stdout.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let deps = json["dependencies"] as? [String: Any],
+           deps[packageName] != nil {
+            return true
+        }
+        
+        return false
     }
     
     private func checkCommonBinaryLocations(_ packageName: String) -> Bool {
