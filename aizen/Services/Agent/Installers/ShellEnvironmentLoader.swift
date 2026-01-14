@@ -7,20 +7,17 @@
 
 import Foundation
 
-actor ShellEnvironmentLoader {
-    static let shared = ShellEnvironmentLoader()
-
-    init() {}
+enum ShellEnvironmentLoader {
 
     // MARK: - Environment Loading
 
-    func loadShellEnvironment() async -> [String: String] {
+    static func loadShellEnvironment() async -> [String: String] {
         await Task.detached {
             return ShellEnvironmentLoader.loadShellEnvironmentBlocking()
         }.value
     }
 
-    private nonisolated static func loadShellEnvironmentBlocking() -> [String: String] {
+    private static func loadShellEnvironmentBlocking() -> [String: String] {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let shellName = (shell as NSString).lastPathComponent
 
