@@ -11,11 +11,9 @@ import os.log
 actor NPMAgentInstaller {
     static let shared = NPMAgentInstaller()
 
-    private let shellLoader: ShellEnvironmentLoader
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "NPMInstaller")
 
-    init(shellLoader: ShellEnvironmentLoader = .shared) {
-        self.shellLoader = shellLoader
+    init() {
     }
 
     // MARK: - Installation
@@ -25,7 +23,7 @@ actor NPMAgentInstaller {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = ["npm", "install", "--prefix", targetDir, package]
 
-        let shellEnv = await shellLoader.loadShellEnvironment()
+        let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
         process.environment = shellEnv
 
         let pipe = Pipe()
