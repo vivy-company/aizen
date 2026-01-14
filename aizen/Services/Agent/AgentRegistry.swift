@@ -220,7 +220,7 @@ actor AgentRegistry {
     
     /// Find OpenCode in system PATH (Volta, npm global, etc.)
     private func findSystemOpenCode() async -> String? {
-        let shellEnv = await ShellEnvironmentLoader.shared.loadShellEnvironment()
+        let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
         guard let pathString = shellEnv["PATH"] else { return nil }
         
         let paths = pathString.split(separator: ":").map(String.init)
