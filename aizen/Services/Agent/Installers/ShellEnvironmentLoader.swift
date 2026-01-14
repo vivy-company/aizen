@@ -14,7 +14,13 @@ actor ShellEnvironmentLoader {
 
     // MARK: - Environment Loading
 
-    func loadShellEnvironment() -> [String: String] {
+    func loadShellEnvironment() async -> [String: String] {
+        await Task.detached {
+            return ShellEnvironmentLoader.loadShellEnvironmentBlocking()
+        }.value
+    }
+
+    private nonisolated static func loadShellEnvironmentBlocking() -> [String: String] {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let shellName = (shell as NSString).lastPathComponent
 
@@ -61,7 +67,6 @@ actor ShellEnvironmentLoader {
         } catch {
             try? pipe.fileHandleForReading.close()
             try? errorPipe.fileHandleForReading.close()
-            // Fallback to basic environment
             return ProcessInfo.processInfo.environment
         }
 

@@ -45,6 +45,10 @@ struct ChatControlsBar: View {
                     .transition(.opacity)
             }
 
+            if let agentSession = currentAgentSession {
+                AgentConfigMenu(session: agentSession)
+            }
+
             if hasModes, let agentSession = currentAgentSession {
                 ModeSelectorView(session: agentSession)
             }

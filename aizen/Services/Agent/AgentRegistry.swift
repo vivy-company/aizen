@@ -13,6 +13,16 @@ extension Notification.Name {
     static let agentMetadataDidChange = Notification.Name("agentMetadataDidChange")
 }
 
+enum AgentRegistryError: Error, LocalizedError {
+    case agentNotFound
+    
+    var errorDescription: String? {
+        switch self {
+        case .agentNotFound: return "Agent not found"
+        }
+    }
+}
+
 /// Manages discovery and configuration of available ACP agents
 actor AgentRegistry {
     static let shared = AgentRegistry()
@@ -196,9 +206,35 @@ actor AgentRegistry {
     // MARK: - Agent Path Management
 
     /// Get executable path for a specific agent by name
+    /// For OpenCode, prefers system install (from PATH) over managed install
     nonisolated func getAgentPath(for agentName: String) -> String? {
         let metadata = loadMetadataFromDefaults()
+        
+        if agentName == "opencode" {
+            if let systemPath = findSystemOpenCode() {
+                return systemPath
+            }
+        }
+        
         return metadata[agentName]?.executablePath
+    }
+    
+    /// Find OpenCode in system PATH (Volta, npm global, etc.)
+    private nonisolated func findSystemOpenCode() -> String? {
+        let shellEnv = ShellEnvironment.loadUserShellEnvironment()
+        guard let pathString = shellEnv["PATH"] else { return nil }
+        
+        let paths = pathString.split(separator: ":").map(String.init)
+        let fileManager = FileManager.default
+        
+        for dir in paths {
+            let candidate = (dir as NSString).appendingPathComponent("opencode")
+            if fileManager.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
+        }
+        
+        return nil
     }
 
     /// Get launch arguments for a specific agent

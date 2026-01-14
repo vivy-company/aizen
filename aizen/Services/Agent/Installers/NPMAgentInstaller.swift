@@ -25,7 +25,6 @@ actor NPMAgentInstaller {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = ["npm", "install", "--prefix", targetDir, package]
 
-        // Load shell environment to get PATH with npm
         let shellEnv = await shellLoader.loadShellEnvironment()
         process.environment = shellEnv
 
@@ -47,7 +46,6 @@ actor NPMAgentInstaller {
             throw AgentInstallError.installFailed(message: errorMessage)
         }
 
-        // Save installed version to manifest
         if let version = getInstalledVersion(package: package, targetDir: targetDir) {
             saveVersionManifest(version: version, targetDir: targetDir)
             logger.info("Installed \(package) version \(version)")

@@ -64,6 +64,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     @Published var agentPlan: Plan?
     @Published var availableModes: [ModeInfo] = []
     @Published var availableModels: [ModelInfo] = []
+    @Published var availableConfigOptions: [SessionConfigOption] = []
     @Published var currentModeId: String?
     @Published var currentModelId: String?
 
@@ -300,7 +301,10 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         do {
             logger.info("[\(agentName)] Launching process...")
             try await client.launch(
-                agentPath: agentPath, arguments: launchArgs, workingDirectory: workingDir)
+                agentPath: agentPath,
+                arguments: launchArgs,
+                workingDirectory: workingDir
+            )
             logger.info(
                 "[\(agentName)] Process launched in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms"
             )
@@ -335,7 +339,8 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                         "terminal_output": AnyCodable(true),
                         "terminal-auth": AnyCodable(true)
                     ]
-                )
+                ),
+                timeout: 120.0
             )
             logger.info(
                 "[\(agentName)] Initialize completed in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms"
@@ -464,11 +469,16 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         if let modesInfo = sessionResponse.modes {
             self.availableModes = modesInfo.availableModes
             self.currentModeId = modesInfo.currentModeId
+            logger.info("[\(agentName)] Modes: current=\(modesInfo.currentModeId), available=\(modesInfo.availableModes.map { $0.id })")
         }
 
         if let modelsInfo = sessionResponse.models {
             self.availableModels = modelsInfo.availableModels
             self.currentModelId = modelsInfo.currentModelId
+        }
+
+        if let configOptions = sessionResponse.configOptions {
+            self.availableConfigOptions = configOptions
         }
 
         let metadata = AgentRegistry.shared.getMetadata(for: agentName)
@@ -601,6 +611,44 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             } else {
                 addSystemMessage("Model changed to \(modelId)")
             }
+        }
+    }
+
+    /// Set config option
+    func setConfigOption(configId: String, value: String) async throws {
+        guard let sessionId = sessionId, let acpClient = acpClient else {
+            throw AgentSessionError.sessionNotActive
+        }
+
+        let response = try await acpClient.setConfigOption(
+            sessionId: sessionId,
+            configId: SessionConfigId(configId),
+            value: SessionConfigValueId(value)
+        )
+
+        self.availableConfigOptions = response.configOptions
+
+        if let option = response.configOptions.first(where: { $0.id.value == configId }) {
+            let optionName = option.name
+            var valueName = value
+
+            if case .select(let select) = option.kind {
+                switch select.options {
+                case .ungrouped(let options):
+                    if let selectedOption = options.first(where: { $0.value.value == value }) {
+                        valueName = selectedOption.name
+                    }
+                case .grouped(let groups):
+                    for group in groups {
+                        if let selectedOption = group.options.first(where: { $0.value.value == value }) {
+                            valueName = selectedOption.name
+                            break
+                        }
+                    }
+                }
+            }
+
+            addSystemMessage("Config '\(optionName)' changed to '\(valueName)'")
         }
     }
 
