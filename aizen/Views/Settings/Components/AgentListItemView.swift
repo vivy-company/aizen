@@ -324,7 +324,7 @@ struct AgentListItemView: View {
             try await AgentInstaller.shared.updateAgent(metadata)
 
             // Get the path from registry (installer already set it during update)
-            let updatedPath = AgentRegistry.shared.getAgentPath(for: metadata.id)
+            let updatedPath = await AgentRegistry.shared.getAgentPath(for: metadata.id)
             await MainActor.run {
                 if let path = updatedPath {
                     metadata.executablePath = path
@@ -362,7 +362,7 @@ struct AgentListItemView: View {
         do {
             // Install to managed .aizen/agents directory
             try await AgentInstaller.shared.installAgent(metadata)
-            let path = AgentRegistry.shared.getAgentPath(for: metadata.id)
+            let path = await AgentRegistry.shared.getAgentPath(for: metadata.id)
             await MainActor.run {
                 if let execPath = path {
                     metadata.executablePath = execPath
