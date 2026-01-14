@@ -48,7 +48,6 @@ struct OpenCodePluginInfo {
 actor OpenCodePluginInstaller {
     static let shared = OpenCodePluginInstaller()
     
-    private let shellLoader: ShellEnvironmentLoader
     private let configService: OpenCodeConfigService
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "OpenCodePluginInstaller")
     
@@ -59,8 +58,7 @@ actor OpenCodePluginInstaller {
         ("opencode-antigravity-auth", "Antigravity Auth", "OAuth authentication for Antigravity models", "opencode-antigravity-auth")
     ]
     
-    init(shellLoader: ShellEnvironmentLoader = .shared, configService: OpenCodeConfigService = .shared) {
-        self.shellLoader = shellLoader
+    init(configService: OpenCodeConfigService = .shared) {
         self.configService = configService
     }
     
@@ -76,7 +74,7 @@ actor OpenCodePluginInstaller {
     }
     
     func checkNpmAvailable() async -> Bool {
-        let shellEnv = await shellLoader.loadShellEnvironment()
+        let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
         let result = try? await ProcessExecutor.shared.executeWithOutput(
             executable: "/usr/bin/env",
             arguments: ["npm", "--version"],
@@ -94,7 +92,7 @@ actor OpenCodePluginInstaller {
             return true
         }
         
-        let shellEnv = await shellLoader.loadShellEnvironment()
+        let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
         
         let whichResult = try? await ProcessExecutor.shared.executeWithOutput(
             executable: "/usr/bin/env",
@@ -208,7 +206,7 @@ actor OpenCodePluginInstaller {
             return version
         }
         
-        let shellEnv = await shellLoader.loadShellEnvironment()
+        let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
         
         let voltaListResult = try? await ProcessExecutor.shared.executeWithOutput(
             executable: "/usr/bin/env",
@@ -353,7 +351,7 @@ actor OpenCodePluginInstaller {
     }
     
     func getLatestVersion(_ packageName: String) async -> String? {
-        let shellEnv = await shellLoader.loadShellEnvironment()
+        let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
         let result = try? await ProcessExecutor.shared.executeWithOutput(
             executable: "/usr/bin/env",
             arguments: ["npm", "view", packageName, "version"],
@@ -402,7 +400,7 @@ actor OpenCodePluginInstaller {
             throw OpenCodePluginError.npmNotFound
         }
         
-        let shellEnv = await shellLoader.loadShellEnvironment()
+        let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
         
         let (process, stream) = ProcessExecutor.executeStreaming(
             executable: "/usr/bin/env",
@@ -444,7 +442,7 @@ actor OpenCodePluginInstaller {
     func uninstall(_ packageName: String) async throws {
         try validatePackageName(packageName)
         
-        let shellEnv = await shellLoader.loadShellEnvironment()
+        let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
         
         let result = try await ProcessExecutor.shared.executeWithOutput(
             executable: "/usr/bin/env",
