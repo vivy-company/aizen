@@ -273,7 +273,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         self.agentName = agentName
         self.workingDirectory = workingDir
 
-        let agentPath = await AgentRegistry.shared.getAgentPath(for: agentName)
+        let agentPath = AgentRegistry.shared.getAgentPath(for: agentName)
         let isValid = AgentRegistry.shared.validateAgent(named: agentName)
 
         guard let agentPath = agentPath, isValid else {
