@@ -640,7 +640,7 @@ struct AgentDetailView: View {
 
         do {
             try await AgentInstaller.shared.updateAgent(metadata)
-            let updatedPath = AgentRegistry.shared.getAgentPath(for: metadata.id)
+            let updatedPath = await AgentRegistry.shared.getAgentPath(for: metadata.id)
             await MainActor.run {
                 if let path = updatedPath {
                     metadata.executablePath = path
@@ -675,7 +675,7 @@ struct AgentDetailView: View {
 
         do {
             try await AgentInstaller.shared.installAgent(metadata)
-            let path = AgentRegistry.shared.getAgentPath(for: metadata.id)
+            let path = await AgentRegistry.shared.getAgentPath(for: metadata.id)
             await MainActor.run {
                 if let execPath = path {
                     metadata.executablePath = execPath

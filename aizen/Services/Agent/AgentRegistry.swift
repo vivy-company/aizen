@@ -206,11 +206,11 @@ actor AgentRegistry {
 
     /// Get executable path for a specific agent by name
     /// For OpenCode, prefers system install (from PATH) over managed install
-    nonisolated func getAgentPath(for agentName: String) -> String? {
+    func getAgentPath(for agentName: String) async -> String? {
         let metadata = loadMetadataFromDefaults()
         
         if agentName == "opencode" {
-            if let systemPath = findSystemOpenCode() {
+            if let systemPath = await findSystemOpenCode() {
                 return systemPath
             }
         }
@@ -219,8 +219,8 @@ actor AgentRegistry {
     }
     
     /// Find OpenCode in system PATH (Volta, npm global, etc.)
-    private nonisolated func findSystemOpenCode() -> String? {
-        let shellEnv = ShellEnvironment.loadUserShellEnvironment()
+    private func findSystemOpenCode() async -> String? {
+        let shellEnv = await ShellEnvironmentLoader.shared.loadShellEnvironment()
         guard let pathString = shellEnv["PATH"] else { return nil }
         
         let paths = pathString.split(separator: ":").map(String.init)
