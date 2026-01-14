@@ -106,12 +106,14 @@ extension AgentSession {
 
         // Mark streaming active before sending
         isStreaming = true
+        logger.info("[\(self.agentName)] Sending message: \(content.prefix(100))...")
 
         do {
             // Send to agent - notifications arrive asynchronously via AsyncStream
             // Response comes AFTER all notifications are sent, but our notification
             // listener Task may not have processed them all yet
-            _ = try await client.sendPrompt(sessionId: sessionId, content: contentBlocks)
+            let response = try await client.sendPrompt(sessionId: sessionId, content: contentBlocks)
+            logger.info("[\(self.agentName)] sendPrompt response received, stopReason: \(String(describing: response.stopReason))")
 
             // Delay setting isStreaming = false to allow buffered notifications to be processed
             // The AsyncStream may still have notifications queued that need to update messages
