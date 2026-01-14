@@ -133,6 +133,7 @@ struct SpotlightSearchField<Trailing: View>: View {
     @Binding var text: String
     @FocusState.Binding var isFocused: Bool
     var onSubmit: (() -> Void)?
+    var onEscape: (() -> Void)?
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
@@ -148,6 +149,7 @@ struct SpotlightSearchField<Trailing: View>: View {
             clearButtonWeight: .semibold,
             clearButtonOpacity: 0.9,
             onSubmit: onSubmit,
+            onEscape: onEscape,
             isFocused: $isFocused,
             disableAutocorrection: true,
             trailing: trailing

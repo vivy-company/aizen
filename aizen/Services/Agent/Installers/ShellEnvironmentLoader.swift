@@ -32,7 +32,7 @@ actor ShellEnvironmentLoader {
         case "fish":
             arguments = ["-l", "-c", "env"]
         case "zsh", "bash", "sh":
-            arguments = ["-l", "-c", "env"]
+            arguments = ["-l", "-i", "-c", "env"]
         default:
             arguments = ["-c", "env"]
         }

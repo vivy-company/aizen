@@ -133,12 +133,14 @@ nonisolated enum ShellEnvironment {
         process.executableURL = URL(fileURLWithPath: shell)
 
         let shellName = (shell as NSString).lastPathComponent
+        // Use login + interactive shell to source all profile files (.zshrc, .bashrc, etc.)
+        // Critical for nvm/fnm/asdf/pyenv which are typically initialized in interactive shell configs
         let arguments: [String]
         switch shellName {
         case "fish":
             arguments = ["-l", "-c", "env"]
         case "zsh", "bash":
-            arguments = ["-l", "-c", "env"]
+            arguments = ["-l", "-i", "-c", "env"]
         case "sh":
             arguments = ["-l", "-c", "env"]
         default:

@@ -15,6 +15,7 @@ struct InlineAutocompletePopupView: View {
             items: model.items,
             selectedIndex: model.selectedIndex,
             trigger: model.trigger,
+            itemsVersion: model.itemsVersion,
             onTap: { item in
                 model.onTap?(item)
             },
@@ -29,6 +30,7 @@ struct InlineAutocompleteView: View {
     let items: [AutocompleteItem]
     let selectedIndex: Int
     let trigger: AutocompleteTrigger?
+    let itemsVersion: Int
     let onTap: (AutocompleteItem) -> Void
     let onSelect: () -> Void
 
@@ -49,6 +51,7 @@ struct InlineAutocompleteView: View {
                     AutocompleteListView(
                         items: items,
                         selectedIndex: selectedIndex,
+                        itemsVersion: itemsVersion,
                         onTap: { item in
                             onTap(item)
                         }
@@ -74,12 +77,18 @@ struct InlineAutocompleteView: View {
 private struct AutocompleteListView: View {
     let items: [AutocompleteItem]
     let selectedIndex: Int
+    let itemsVersion: Int
     let onTap: (AutocompleteItem) -> Void
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: true) {
                 LazyVStack(alignment: .leading, spacing: 0) {
+                    // Invisible anchor at top for scroll reset
+                    Color.clear
+                        .frame(height: 0)
+                        .id("autocomplete-top")
+
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         AutocompleteRow(
                             item: item,
@@ -93,16 +102,17 @@ private struct AutocompleteListView: View {
                 }
             }
             .frame(maxHeight: 240)
-            .scrollDisabled(items.count <= 5)
-            .onAppear {
-                // Scroll to selected item when view appears
-                if selectedIndex >= 0 && selectedIndex < items.count {
-                    proxy.scrollTo(items[selectedIndex].id, anchor: .center)
+            .onChange(of: itemsVersion) { _ in
+                // Scroll to top when items list changes (user typed new chars)
+                withAnimation(.easeOut(duration: 0.1)) {
+                    proxy.scrollTo("autocomplete-top", anchor: .top)
                 }
             }
             .onChange(of: selectedIndex) { newValue in
                 guard newValue >= 0 && newValue < items.count else { return }
-                proxy.scrollTo(items[newValue].id, anchor: .center)
+                withAnimation(.easeOut(duration: 0.1)) {
+                    proxy.scrollTo(items[newValue].id, anchor: .center)
+                }
             }
         }
     }
@@ -157,6 +167,7 @@ private struct AutocompleteHeader: View {
 
 private struct AutocompleteRow: View {
     @Environment(\.colorScheme) private var colorScheme
+    @State private var isHovered = false
     let item: AutocompleteItem
     let isSelected: Bool
 
@@ -164,8 +175,21 @@ private struct AutocompleteRow: View {
         colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.06)
     }
 
+    private var hoverFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.03)
+    }
+
     private var selectionStroke: Color {
         colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.06)
+    }
+
+    private var backgroundFill: Color {
+        if isSelected {
+            return selectionFill
+        } else if isHovered {
+            return hoverFill
+        }
+        return Color.clear
     }
 
     var body: some View {
@@ -195,7 +219,7 @@ private struct AutocompleteRow: View {
         .padding(.vertical, 9)
         .background(
             selectionShape
-                .fill(isSelected ? selectionFill : Color.clear)
+                .fill(backgroundFill)
                 .overlay {
                     if isSelected {
                         selectionShape.strokeBorder(selectionStroke, lineWidth: 1)
@@ -219,6 +243,9 @@ private struct AutocompleteRow: View {
             }
         }
         .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 
     @ViewBuilder

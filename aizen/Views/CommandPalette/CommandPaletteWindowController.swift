@@ -227,6 +227,7 @@ struct CommandPaletteContent: View {
                             selectWorktree(worktree)
                         }
                     },
+                    onEscape: onClose,
                     trailing: {
                         Button(action: onClose) {
                             KeyCap(text: "esc")

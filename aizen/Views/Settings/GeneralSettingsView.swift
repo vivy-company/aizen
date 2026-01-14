@@ -209,7 +209,7 @@ struct GeneralSettingsView: View {
     @AppStorage("defaultTerminalBundleId") private var defaultTerminalBundleId: String?
     @AppStorage("defaultEditorBundleId") private var defaultEditorBundleId: String?
     @AppStorage("useCliEditor") private var useCliEditor = false
-    @AppStorage("defaultCloneLocation") private var defaultCloneLocation = ""
+    @AppStorage("defaultCloneLocation") private var defaultCloneLocation = "~/.aizen/repos"
     @AppStorage("defaultWorkspaceId") private var defaultWorkspaceId = ""
 
     // Layout

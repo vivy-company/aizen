@@ -20,6 +20,7 @@ struct SearchField<Trailing: View>: View {
     var clearButtonOpacity: Double = 1.0
     var showsClearButton: Bool = true
     var onSubmit: (() -> Void)? = nil
+    var onEscape: (() -> Void)? = nil
     var onClear: (() -> Void)? = nil
     var isFocused: FocusState<Bool>.Binding? = nil
     var disableAutocorrection: Bool = false
@@ -67,12 +68,14 @@ struct SearchField<Trailing: View>: View {
                 .focused(isFocused)
                 .disableAutocorrection(disableAutocorrection)
                 .onSubmit { onSubmit?() }
+                .onExitCommand { onEscape?() }
         } else {
             TextField(placeholder, text: $text)
                 .textFieldStyle(.plain)
                 .font(textFont)
                 .disableAutocorrection(disableAutocorrection)
                 .onSubmit { onSubmit?() }
+                .onExitCommand { onEscape?() }
         }
     }
 }

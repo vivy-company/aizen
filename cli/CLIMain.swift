@@ -45,6 +45,12 @@ struct AizenCLI {
             try await handleSync(subArgs)
         case "status":
             try await handleStatus(subArgs)
+        case "attach":
+            try handleAttach(subArgs)
+        case "sessions":
+            try handleSessions(subArgs)
+        case "terminal":
+            try await handleTerminal(subArgs)
         default:
             throw CLIError.invalidArguments("Unknown command: \(command)")
         }
@@ -64,7 +70,42 @@ private extension AizenCLI {
         if args.count > 1 {
             throw CLIError.invalidArguments("Too many arguments for open")
         }
+
         let path = normalizePath(args[0])
+
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw CLIError.pathNotFound(path)
+        }
+
+        let store = try CLIStore()
+        let context = store.container.viewContext
+
+        if findRepository(for: path, in: context) != nil {
+            try openApp(path: path)
+            return
+        }
+
+        guard await GitUtils.isGitRepository(at: path) else {
+            throw CLIError.notGitRepository(path)
+        }
+
+        guard isTTY() else {
+            throw CLIError.invalidArguments("Repository not tracked. Run 'aizen add \(path)' first or run in an interactive terminal.")
+        }
+
+        let style = OutputStyle(useColor: shouldUseColor(flags: []))
+        print(style.warning("Repository not tracked in any workspace."))
+
+        let workspace = try selectWorkspace(
+            in: context,
+            preferredName: nil,
+            defaultWorkspaceId: readDefaultSetting(key: "defaultWorkspaceId")
+        )
+
+        let manager = CLIRepositoryManager(context: context)
+        let repository = try await manager.addExistingRepository(path: path, workspace: workspace)
+        print(style.success("Added repository: \(repository.name ?? "")"))
+
         try openApp(path: path)
     }
 
@@ -419,6 +460,370 @@ private extension AizenCLI {
                 print("- \(name) (\(path))")
             }
         }
+    }
+
+    static func handleAttach(_ args: [String]) throws {
+        let parsed = try parseArguments(args)
+        if parsed.flags.contains("help") {
+            print(attachHelpText())
+            return
+        }
+
+        guard isTmuxAvailable() else {
+            throw CLIError.tmuxNotInstalled
+        }
+
+        let store = try CLIStore()
+        let context = store.container.viewContext
+        let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
+
+        let sessions = try fetchActiveSessions(in: context, workspaceFilter: parsed.options["workspace"])
+
+        guard !sessions.isEmpty else {
+            throw CLIError.noActiveSessions
+        }
+
+        let selectedSession: SessionInfo
+
+        if parsed.positionals.isEmpty {
+            // Interactive picker mode
+            guard isTTY() else {
+                throw CLIError.invalidArguments("Interactive mode requires a terminal. Specify a project name.")
+            }
+
+            let picker = InteractivePicker(items: sessions, style: style)
+            guard let selected = try picker.run() else {
+                throw CLIError.cancelled
+            }
+            selectedSession = selected
+        } else {
+            // Direct attach by project name
+            let projectName = parsed.positionals[0].lowercased()
+            let worktreeFilter = parsed.options["worktree"]?.lowercased()
+
+            var matches = sessions.filter { $0.repositoryName.lowercased() == projectName }
+
+            if matches.isEmpty {
+                // Try partial match
+                matches = sessions.filter { $0.repositoryName.lowercased().contains(projectName) }
+            }
+
+            if matches.isEmpty {
+                throw CLIError.sessionNotFound(parsed.positionals[0])
+            }
+
+            if let worktreeFilter = worktreeFilter {
+                matches = matches.filter { $0.worktreeBranch.lowercased() == worktreeFilter }
+                if matches.isEmpty {
+                    throw CLIError.sessionNotFound("\(parsed.positionals[0]) / \(worktreeFilter)")
+                }
+            }
+
+            if matches.count > 1 {
+                // Multiple matches - use interactive picker
+                guard isTTY() else {
+                    let names = matches.map { $0.displayName }.joined(separator: ", ")
+                    throw CLIError.invalidArguments("Multiple sessions match '\(projectName)': \(names). Use --workspace or --worktree to filter.")
+                }
+
+                print(style.warning("Multiple sessions match '\(projectName)':"))
+                let picker = InteractivePicker(items: matches, style: style)
+                guard let selected = try picker.run() else {
+                    throw CLIError.cancelled
+                }
+                selectedSession = selected
+            } else {
+                selectedSession = matches[0]
+            }
+        }
+
+        // Determine which pane to attach to
+        let paneId: String
+
+        if let paneOption = parsed.options["pane"] {
+            // User specified a pane by index (1-based)
+            guard let paneIndex = Int(paneOption), paneIndex >= 1, paneIndex <= selectedSession.activePaneIds.count else {
+                throw CLIError.invalidArguments("Invalid pane index '\(paneOption)'. Valid range: 1-\(selectedSession.activePaneIds.count)")
+            }
+            paneId = selectedSession.activePaneIds[paneIndex - 1]
+        } else if selectedSession.paneCount > 1 {
+            // Multiple panes - show picker
+            guard isTTY() else {
+                throw CLIError.invalidArguments("Multiple panes available. Use --pane <n> to specify which pane (1-\(selectedSession.paneCount))")
+            }
+
+            let panePicker = PanePicker(
+                paneIds: selectedSession.activePaneIds,
+                focusedPaneId: selectedSession.focusedPaneId,
+                sessionName: selectedSession.displayName,
+                style: style
+            )
+            guard let selected = try panePicker.run() else {
+                throw CLIError.cancelled
+            }
+            paneId = selected
+        } else {
+            // Single pane - use it directly
+            guard let focused = selectedSession.focusedPaneId else {
+                throw CLIError.sessionNotFound(selectedSession.displayName)
+            }
+            paneId = focused
+        }
+
+        guard tmuxSessionExists(paneId: paneId) else {
+            throw CLIError.sessionNotFound(selectedSession.displayName)
+        }
+
+        // Verify we have a terminal before attempting attach
+        guard isTTY() else {
+            throw CLIError.invalidArguments("tmux attach requires a terminal")
+        }
+
+        print(style.success("Attaching to: \(selectedSession.displayName)"))
+        try tmuxAttach(paneId: paneId)
+    }
+
+    static func handleSessions(_ args: [String]) throws {
+        let parsed = try parseArguments(args)
+        if parsed.flags.contains("help") {
+            print(sessionsHelpText())
+            return
+        }
+
+        let store = try CLIStore()
+        let context = store.container.viewContext
+        let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
+
+        let sessions = try fetchActiveSessions(in: context, workspaceFilter: parsed.options["workspace"])
+
+        if parsed.flags.contains("json") {
+            let payload = SessionListPayload(
+                sessions: sessions.map { session in
+                    SessionOutput(
+                        workspace: session.workspaceName,
+                        repository: session.repositoryName,
+                        worktree: session.worktreeBranch,
+                        panes: session.paneCount,
+                        focusedPaneId: session.focusedPaneId ?? ""
+                    )
+                }
+            )
+            printJSON(payload)
+            return
+        }
+
+        if sessions.isEmpty {
+            print("No active terminal sessions found")
+            if !isTmuxAvailable() {
+                print(style.warning("Note: tmux is not installed. Install with: brew install tmux"))
+            }
+            return
+        }
+
+        printSectionTitle("Active Sessions (\(sessions.count))", style: style)
+        let headers = ["Workspace", "Repository", "Worktree", "Panes"]
+        var rows: [[String]] = []
+        for session in sessions {
+            rows.append([
+                session.workspaceName,
+                session.repositoryName,
+                session.worktreeBranch,
+                String(session.paneCount)
+            ])
+        }
+        printTable(headers: headers, rows: rows, style: style)
+    }
+
+    static func handleTerminal(_ args: [String]) async throws {
+        let parsed = try parseArguments(args)
+        if parsed.flags.contains("help") {
+            print(terminalHelpText())
+            return
+        }
+
+        guard isTmuxAvailable() else {
+            throw CLIError.tmuxNotInstalled
+        }
+
+        let store = try CLIStore()
+        let context = store.container.viewContext
+        let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
+
+        // Resolve path
+        let targetPath: String
+        if let pathArg = parsed.positionals.first {
+            targetPath = normalizePath(pathArg)
+        } else {
+            targetPath = FileManager.default.currentDirectoryPath
+        }
+
+        guard FileManager.default.fileExists(atPath: targetPath) else {
+            throw CLIError.pathNotFound(targetPath)
+        }
+
+        // Find or create worktree
+        let worktree: Worktree
+        if let existingWorktree = findWorktree(for: targetPath, in: context) {
+            worktree = existingWorktree
+        } else {
+            // Path not tracked - need to add it
+            guard await GitUtils.isGitRepository(at: targetPath) else {
+                throw CLIError.notGitRepository(targetPath)
+            }
+
+            guard isTTY() else {
+                throw CLIError.invalidArguments("Repository not tracked. Run 'aizen add \(targetPath)' first.")
+            }
+
+            print(style.warning("Repository not tracked in any workspace."))
+
+            let workspace = try selectWorkspace(
+                in: context,
+                preferredName: parsed.options["workspace"],
+                defaultWorkspaceId: readDefaultSetting(key: "defaultWorkspaceId")
+            )
+
+            let manager = CLIRepositoryManager(context: context)
+            let repository = try await manager.addExistingRepository(path: targetPath, workspace: workspace)
+            print(style.success("Added repository: \(repository.name ?? "")"))
+
+            // Get the primary worktree
+            guard let primaryWorktree = (repository.worktrees as? Set<Worktree>)?.first(where: { $0.isPrimary })
+                    ?? (repository.worktrees as? Set<Worktree>)?.first else {
+                throw CLIError.ioError("Failed to find worktree for repository")
+            }
+            worktree = primaryWorktree
+        }
+
+        // Create terminal session
+        let paneId = UUID().uuidString
+        let worktreePath = worktree.path ?? targetPath
+        let command = parsed.options["command"]
+        let sessionName = parsed.options["name"]
+
+        // Create tmux session
+        try tmuxCreateSession(paneId: paneId, workingDirectory: worktreePath, command: command)
+
+        // Create Core Data record
+        let terminalSession = TerminalSession(context: context)
+        terminalSession.id = UUID()
+        terminalSession.title = sessionName
+        terminalSession.createdAt = Date()
+        terminalSession.splitLayout = createSinglePaneSplitLayout(paneId: paneId)
+        terminalSession.focusedPaneId = paneId
+        terminalSession.initialCommand = command
+        terminalSession.worktree = worktree
+
+        try context.save()
+
+        let repoName = worktree.repository?.name ?? "repository"
+        let branch = worktree.branch ?? "main"
+
+        if parsed.flags.contains("attach") {
+            print(style.success("Created terminal for \(repoName) / \(branch)"))
+            try tmuxAttach(paneId: paneId)
+        } else {
+            print(style.success("Created terminal: \(repoName) / \(branch)"))
+            print(style.label("Session: aizen-\(paneId)"))
+            print("")
+            print("To attach: \(style.header("aizen attach \(repoName)"))")
+            print("Or open Aizen to see the terminal tab.")
+        }
+    }
+}
+
+private extension AizenCLI {
+    static func findWorktree(for path: String, in context: NSManagedObjectContext) -> Worktree? {
+        let normalized = normalizePath(path)
+
+        // Direct worktree match
+        let worktreeRequest: NSFetchRequest<Worktree> = Worktree.fetchRequest()
+        worktreeRequest.predicate = NSPredicate(format: "path == %@", normalized)
+        worktreeRequest.fetchLimit = 1
+        if let worktree = try? context.fetch(worktreeRequest).first {
+            return worktree
+        }
+
+        // Check if path is inside a worktree
+        let allWorktreesRequest: NSFetchRequest<Worktree> = Worktree.fetchRequest()
+        guard let allWorktrees = try? context.fetch(allWorktreesRequest) else {
+            return nil
+        }
+
+        var bestMatch: Worktree?
+        var bestLength = 0
+        for wt in allWorktrees {
+            guard let wtPath = wt.path else { continue }
+            if normalized == wtPath || normalized.hasPrefix(wtPath + "/") {
+                if wtPath.count > bestLength {
+                    bestLength = wtPath.count
+                    bestMatch = wt
+                }
+            }
+        }
+
+        return bestMatch
+    }
+}
+
+private extension AizenCLI {
+    static func fetchActiveSessions(in context: NSManagedObjectContext, workspaceFilter: String?) throws -> [SessionInfo] {
+        let request: NSFetchRequest<TerminalSession> = TerminalSession.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \TerminalSession.createdAt, ascending: false)]
+
+        let allSessions = try context.fetch(request)
+        var results: [SessionInfo] = []
+
+        for session in allSessions {
+            guard let sessionId = session.id,
+                  let worktree = session.worktree,
+                  let worktreeId = worktree.id,
+                  let repository = worktree.repository,
+                  let repositoryId = repository.id,
+                  let workspace = repository.workspace,
+                  let workspaceId = workspace.id else {
+                continue
+            }
+
+            let workspaceName = workspace.name ?? "Unknown"
+            let repositoryName = repository.name ?? "Unknown"
+            let worktreeBranch = worktree.branch ?? "unknown"
+
+            // Apply workspace filter
+            if let filter = workspaceFilter?.lowercased(),
+               workspaceName.lowercased() != filter {
+                continue
+            }
+
+            let paneIds = parsePaneIds(from: session.splitLayout)
+
+            // Check if any tmux session is actually running
+            let activePaneIds = paneIds.filter { tmuxSessionExists(paneId: $0) }
+            guard !activePaneIds.isEmpty else { continue }
+
+            // Prefer focused pane if it's active, otherwise use first active
+            let focusedPaneId: String?
+            if let focused = session.focusedPaneId, activePaneIds.contains(focused) {
+                focusedPaneId = focused
+            } else {
+                focusedPaneId = activePaneIds.first
+            }
+
+            results.append(SessionInfo(
+                workspaceName: workspaceName,
+                repositoryName: repositoryName,
+                worktreeBranch: worktreeBranch,
+                paneCount: activePaneIds.count,
+                focusedPaneId: focusedPaneId,
+                activePaneIds: activePaneIds,
+                sessionId: sessionId,
+                worktreeId: worktreeId,
+                repositoryId: repositoryId,
+                workspaceId: workspaceId
+            ))
+        }
+
+        return results
     }
 }
 
@@ -791,6 +1196,18 @@ private extension AizenCLI {
         let filters: WorkspaceFilters
     }
 
+    struct SessionOutput: Encodable {
+        let workspace: String
+        let repository: String
+        let worktree: String
+        let panes: Int
+        let focusedPaneId: String
+    }
+
+    struct SessionListPayload: Encodable {
+        let sessions: [SessionOutput]
+    }
+
     static func printRepositoryTable(_ repositories: [Repository], style: OutputStyle) {
         let headers = ["Repository", "Path", "Workspace", "Worktrees", "Updated"]
         var rows: [[String]] = []
@@ -933,16 +1350,17 @@ private extension AizenCLI {
 Aizen CLI
 
 Usage:
-  aizen
-  aizen open [path]
-  aizen add [path|url] [--workspace <name>] [--destination <path>]
-  aizen remove <path>
-  aizen list [workspace]
-  aizen ls [workspace]
-  aizen workspace <command>
-  aizen ws <command>
-  aizen sync [path]
-  aizen status
+  aizen                           Open Aizen
+  aizen open [path]               Open path in Aizen (adds to workspace if not tracked)
+  aizen add [path|url]            Add repository to workspace
+  aizen remove <path>             Remove repository from tracking
+  aizen list [workspace]          List repositories
+  aizen workspace <command>       Manage workspaces
+  aizen sync [path]               Rescan worktrees
+  aizen status                    Show overview
+  aizen terminal [path]           Create persistent terminal session
+  aizen attach [project]          Attach to tmux terminal session
+  aizen sessions                  List active terminal sessions
 
 Run 'aizen <command> --help' for more details.
 """
@@ -1051,8 +1469,12 @@ Options:
         return """
 Usage:
   aizen open [path]
+  aizen open .
 
-Opens the Aizen GUI. If a path is provided, focuses the tracked repository.
+Opens Aizen and navigates to the repository at the given path.
+
+If the path is not tracked in any workspace, you will be prompted to select
+a workspace to add it to. Use '.' to open the current directory.
 """
     }
 
@@ -1063,6 +1485,61 @@ Usage:
   aizen workspace new <name> [--color <hex>]
   aizen workspace delete <name> [--force]
   aizen workspace rename <old-name> <new-name>
+"""
+    }
+
+    static func attachHelpText() -> String {
+        return """
+Usage:
+  aizen attach                              Interactive session picker
+  aizen attach <project>                    Attach to project's terminal
+  aizen attach <project> --workspace <ws>   Filter by workspace
+  aizen attach <project> --worktree <branch>  Filter by worktree
+  aizen attach <project> --pane <n>         Attach to specific pane (1-based)
+
+Options:
+  -w, --workspace <name>    Filter sessions by workspace
+  --worktree <branch>       Filter sessions by worktree branch
+  --pane <n>                Attach to pane number n (1-based index)
+  --no-color                Disable colored output
+
+Attach to an active tmux terminal session from Aizen.
+If the session has multiple panes, you'll be prompted to choose one.
+Use arrow keys or j/k to navigate, Enter to select, Esc to cancel.
+"""
+    }
+
+    static func sessionsHelpText() -> String {
+        return """
+Usage:
+  aizen sessions [--workspace <name>] [--json]
+
+Options:
+  -w, --workspace <name>    Filter sessions by workspace
+  --json                    Output JSON
+  --no-color                Disable colored output
+
+List all active terminal sessions with their tmux panes.
+"""
+    }
+
+    static func terminalHelpText() -> String {
+        return """
+Usage:
+  aizen terminal [path]                     Create detached terminal session
+  aizen terminal . --attach                 Create and attach
+  aizen terminal . -c "npm run dev"         Run command in session
+  aizen terminal . --name "Dev Server"      Custom tab name
+
+Options:
+  -a, --attach              Attach to session after creating
+  -c, --command <cmd>       Run command in the terminal
+  --name <name>             Custom name for the terminal tab
+  -w, --workspace <name>    Workspace for untracked repos
+  --no-color                Disable colored output
+
+Create a new terminal session that persists via tmux.
+The session will appear in Aizen when you open the app.
 """
     }
 }

@@ -349,6 +349,7 @@ struct ChatSessionView: View {
 
         let keyCodeEscape: UInt16 = 53
         let keyCodeReturn: UInt16 = 36
+        let keyCodeC: UInt16 = 8
 
         if showingVoiceRecording {
             if event.keyCode == keyCodeEscape {
@@ -357,6 +358,26 @@ struct ChatSessionView: View {
             }
             if event.keyCode == keyCodeReturn {
                 acceptChatVoiceRecording()
+                return nil
+            }
+        }
+
+        // Ctrl+C clears input text (terminal-like behavior)
+        if event.modifierFlags.contains(.control),
+           event.keyCode == keyCodeC {
+            if !inputText.isEmpty {
+                inputText = ""
+                return nil
+            }
+        }
+
+        // Escape interrupts agent when processing, otherwise clears input
+        if event.keyCode == keyCodeEscape && !showingVoiceRecording {
+            if viewModel.isProcessing {
+                viewModel.cancelCurrentPrompt()
+                return nil
+            } else if !inputText.isEmpty {
+                inputText = ""
                 return nil
             }
         }

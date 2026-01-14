@@ -519,8 +519,10 @@ struct SpecialBlockRenderer: View {
                 .padding(.vertical, 8)
 
         case .table(let rows, let alignments):
-            TableBlockView(rows: rows, alignments: alignments)
-                .padding(.vertical, 4)
+            ScrollView(.horizontal, showsIndicators: false) {
+                TableBlockView(rows: rows, alignments: alignments)
+            }
+            .padding(.vertical, 4)
 
         case .image(let url, let alt):
             MarkdownImageView(url: url, alt: alt, basePath: basePath)
@@ -747,8 +749,10 @@ struct BlockRenderer: View {
                 .padding(.vertical, blockSpacing * 0.5)
 
         case .table(let rows, let alignments):
-            TableBlockView(rows: rows, alignments: alignments)
-                .padding(.vertical, blockSpacing * 0.5)
+            ScrollView(.horizontal, showsIndicators: false) {
+                TableBlockView(rows: rows, alignments: alignments)
+            }
+            .padding(.vertical, blockSpacing * 0.5)
 
         case .image(let url, let alt):
             MarkdownImageView(url: url, alt: alt)
@@ -989,7 +993,8 @@ struct SelectableTextView: NSViewRepresentable {
             return nil
         }
 
-        let width = proposal.width ?? 500
+        // Use proposed width, fallback to reasonable default for text readability
+        let width = proposal.width ?? 800
         container.containerSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
         layoutManager.ensureLayout(for: container)
 
@@ -1029,7 +1034,8 @@ struct CombinedSelectableTextView: NSViewRepresentable {
             return nil
         }
 
-        let width = proposal.width ?? 500
+        // Use proposed width, fallback to reasonable default for text readability
+        let width = proposal.width ?? 800
         container.containerSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
         layoutManager.ensureLayout(for: container)
 

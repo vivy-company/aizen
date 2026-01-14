@@ -7,6 +7,7 @@ enum ExitCode: Int32 {
     case repositoryNotFound = 3
     case notGitRepository = 4
     case workspaceNotFound = 5
+    case pathNotFound = 6
 }
 
 enum CLIError: Error, LocalizedError {
@@ -14,11 +15,16 @@ enum CLIError: Error, LocalizedError {
     case repositoryNotFound(String)
     case notGitRepository(String)
     case workspaceNotFound(String)
+    case pathNotFound(String)
     case appNotFound
     case modelNotFound
     case storeLoadFailed(String)
     case cloneFailed(String)
     case ioError(String)
+    case tmuxNotInstalled
+    case noActiveSessions
+    case sessionNotFound(String)
+    case cancelled
 
     var errorDescription: String? {
         switch self {
@@ -30,6 +36,8 @@ enum CLIError: Error, LocalizedError {
             return "Not a git repository: \(path)"
         case .workspaceNotFound(let name):
             return "Workspace not found: \(name)"
+        case .pathNotFound(let path):
+            return "Path does not exist: \(path)"
         case .appNotFound:
             return "Aizen app not found. Please install and launch Aizen first."
         case .modelNotFound:
@@ -40,6 +48,14 @@ enum CLIError: Error, LocalizedError {
             return "Clone failed: \(message)"
         case .ioError(let message):
             return message
+        case .tmuxNotInstalled:
+            return "tmux is not installed. Install with: brew install tmux"
+        case .noActiveSessions:
+            return "No active terminal sessions found"
+        case .sessionNotFound(let name):
+            return "No terminal session found for: \(name)"
+        case .cancelled:
+            return "Cancelled"
         }
     }
 
@@ -53,6 +69,8 @@ enum CLIError: Error, LocalizedError {
             return .notGitRepository
         case .workspaceNotFound:
             return .workspaceNotFound
+        case .pathNotFound:
+            return .pathNotFound
         default:
             return .generalError
         }
