@@ -7,18 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		89C3A37FB37B4F8A8E0CE8B4 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F05B3C5650AC493F9C8D24E4 /* AppIntents.framework */; };
-		98D8F68E63ED4B66AB2B8651 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F05B3C5650AC493F9C8D24E4 /* AppIntents.framework */; };
-		CCF00000000000000000000C /* aizen-cli in Copy Files */ = {isa = PBXBuildFile; fileRef = CCF000000000000000000001 /* aizen-cli */; };
-		CCF00000000000000000000D /* aizen-cli in Copy Files */ = {isa = PBXBuildFile; fileRef = CCF000000000000000000001 /* aizen-cli */; };
-		CC1234572EA241B30007DBB1 /* libghostty.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* libghostty.a */; };
-		CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC128B1A2EAF8DD600EA9A50 /* Sparkle */; };
-		D40AC0EE6127B8397D78C242 /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = 2CE06D116E3316BF792222D8 /* MLXFFT */; };
-		F023734E9DB882ACB5152A8C /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = F9A93A2E8948A4831C8E4835 /* MLX */; };
 		143D01456282D2C9CC8261F8 /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = 8A569477FDE9E6427210C021 /* MLXNN */; };
 		21DCDAD9BE07D782912A77AD /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = F9A93A2E8948A4831C8E4835 /* MLX */; };
 		5C2187920444BE7967808AED /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = 8A569477FDE9E6427210C021 /* MLXNN */; };
 		72C10A3C810BBB650192A3DC /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = 2CE06D116E3316BF792222D8 /* MLXFFT */; };
+		89C3A37FB37B4F8A8E0CE8B4 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F05B3C5650AC493F9C8D24E4 /* AppIntents.framework */; };
+		98D8F68E63ED4B66AB2B8651 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F05B3C5650AC493F9C8D24E4 /* AppIntents.framework */; };
+		CC1234572EA241B30007DBB1 /* libghostty.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* libghostty.a */; };
+		CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC128B1A2EAF8DD600EA9A50 /* Sparkle */; };
 		CC2917C82EFBDAE300440062 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917C32EFBDAE300440062 /* CodeEditSourceEditor */; };
 		CC2917C92EFBDAE300440062 /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917C12EFBDAE300440062 /* CodeEditTextView */; };
 		CC2917CA2EFBDAE300440062 /* CodeEditSymbols in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917C02EFBDAE300440062 /* CodeEditSymbols */; };
@@ -45,6 +41,10 @@
 		CCB235142EEA7CA300041489 /* CodeEditSymbols in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A062ECB1E8D00955D13 /* CodeEditSymbols */; };
 		CCB235152EEA7CA300041489 /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A082ECB1E9D00955D13 /* CodeEditTextView */; };
 		CCB235162EEA7CA300041489 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A0C2ECB1F2800955D13 /* CodeEditSourceEditor */; };
+		CCF00000000000000000000C /* aizen-cli in Copy CLI */ = {isa = PBXBuildFile; fileRef = CCF000000000000000000001 /* aizen-cli */; };
+		CCF00000000000000000000D /* aizen-cli in Copy CLI */ = {isa = PBXBuildFile; fileRef = CCF000000000000000000001 /* aizen-cli */; };
+		D40AC0EE6127B8397D78C242 /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = 2CE06D116E3316BF792222D8 /* MLXFFT */; };
+		F023734E9DB882ACB5152A8C /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = F9A93A2E8948A4831C8E4835 /* MLX */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,10 +82,10 @@
 		CCF00000000000000000000A /* Copy CLI */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "cli";
+			dstPath = cli;
 			dstSubfolderSpec = 7;
 			files = (
-				CCF00000000000000000000C /* aizen-cli in Copy Files */,
+				CCF00000000000000000000C /* aizen-cli in Copy CLI */,
 			);
 			name = "Copy CLI";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -93,10 +93,10 @@
 		CCF00000000000000000000B /* Copy CLI */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "cli";
+			dstPath = cli;
 			dstSubfolderSpec = 7;
 			files = (
-				CCF00000000000000000000D /* aizen-cli in Copy Files */,
+				CCF00000000000000000000D /* aizen-cli in Copy CLI */,
 			);
 			name = "Copy CLI";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -105,13 +105,13 @@
 
 /* Begin PBXFileReference section */
 		CC1234562EA241B30007DBB1 /* libghostty.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libghostty.a; path = Vendor/libghostty/lib/libghostty.a; sourceTree = "<group>"; };
-		F05B3C5650AC493F9C8D24E4 /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
 		CC2917DB2EFBDAE300440062 /* aizen nightly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "aizen nightly.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC2917DD2EFBDAE400440062 /* aizen nightly-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "aizen nightly-Info.plist"; path = "/Users/uyakauleu/development/aizen/aizen nightly-Info.plist"; sourceTree = "<absolute>"; };
 		CCB04B422EA241B30007DBB1 /* aizen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = aizen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCB04B542EA241B50007DBB1 /* aizenTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = aizenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCB04B5E2EA241B50007DBB1 /* aizenUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = aizenUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCF000000000000000000001 /* aizen-cli */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "aizen-cli"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F05B3C5650AC493F9C8D24E4 /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -184,13 +184,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		CCF000000000000000000004 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		CCB04B3F2EA241B30007DBB1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -224,6 +217,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CCB04B5B2EA241B50007DBB1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCF000000000000000000004 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -352,28 +352,6 @@
 			productReference = CCB04B422EA241B30007DBB1 /* aizen.app */;
 			productType = "com.apple.product-type.application";
 		};
-		CCF000000000000000000002 /* aizen-cli */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = CCF000000000000000000007 /* Build configuration list for PBXNativeTarget "aizen-cli" */;
-			buildPhases = (
-				CCF000000000000000000003 /* Sources */,
-				CCF000000000000000000004 /* Frameworks */,
-				CCF000000000000000000005 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				CCF000000000000000000006 /* cli */,
-			);
-			name = "aizen-cli";
-			packageProductDependencies = (
-			);
-			productName = "aizen-cli";
-			productReference = CCF000000000000000000001 /* aizen-cli */;
-			productType = "com.apple.product-type.tool";
-		};
 		CCB04B532EA241B50007DBB1 /* aizenTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = CCB04B6B2EA241B50007DBB1 /* Build configuration list for PBXNativeTarget "aizenTests" */;
@@ -419,6 +397,28 @@
 			productName = aizenUITests;
 			productReference = CCB04B5E2EA241B50007DBB1 /* aizenUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		CCF000000000000000000002 /* aizen-cli */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CCF000000000000000000007 /* Build configuration list for PBXNativeTarget "aizen-cli" */;
+			buildPhases = (
+				CCF000000000000000000003 /* Sources */,
+				CCF000000000000000000004 /* Frameworks */,
+				CCF000000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CCF000000000000000000006 /* cli */,
+			);
+			name = "aizen-cli";
+			packageProductDependencies = (
+			);
+			productName = "aizen-cli";
+			productReference = CCF000000000000000000001 /* aizen-cli */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -580,13 +580,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		CCF000000000000000000003 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		CCB04B502EA241B50007DBB1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -595,6 +588,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CCB04B5A2EA241B50007DBB1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCF000000000000000000003 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1158,12 +1158,8 @@
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
 				DEAD_CODE_STRIPPING = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/include",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/lib",
-				);
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/lib";
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				OTHER_LDFLAGS = (
 					"-lc++",
@@ -1195,12 +1191,8 @@
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
 				DEAD_CODE_STRIPPING = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/include",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/lib",
-				);
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/lib";
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				OTHER_LDFLAGS = (
 					"-lc++",
@@ -1301,6 +1293,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		79EC426B0DCDB46C628589C2 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -1365,17 +1365,19 @@
 				minimumVersion = 0.8.0;
 			};
 		};
-		79EC426B0DCDB46C628589C2 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2CE06D116E3316BF792222D8 /* MLXFFT */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 79EC426B0DCDB46C628589C2 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFFT;
+		};
+		8A569477FDE9E6427210C021 /* MLXNN */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 79EC426B0DCDB46C628589C2 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXNN;
+		};
 		CC128B1A2EAF8DD600EA9A50 /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */;
@@ -1390,21 +1392,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CC2917B82EFBDAE300440062 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
-		};
-		F9A93A2E8948A4831C8E4835 /* MLX */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 79EC426B0DCDB46C628589C2 /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLX;
-		};
-		8A569477FDE9E6427210C021 /* MLXNN */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 79EC426B0DCDB46C628589C2 /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLXNN;
-		};
-		2CE06D116E3316BF792222D8 /* MLXFFT */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 79EC426B0DCDB46C628589C2 /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLXFFT;
 		};
 		CC2917B92EFBDAE300440062 /* SwiftTreeSitter */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1502,6 +1489,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */;
 			productName = SwiftTreeSitter;
+		};
+		F9A93A2E8948A4831C8E4835 /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 79EC426B0DCDB46C628589C2 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
