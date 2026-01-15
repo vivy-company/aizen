@@ -635,6 +635,10 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         // Clear error but keep needsAgentSetup true until start succeeds
         setupError = nil
 
+        // Reset session state for retry - start() requires !isActive && sessionState != .initializing
+        isActive = false
+        sessionState = .idle
+
         // Attempt to start session again
         try await start(agentName: agentName, workingDir: workingDirectory)
 
