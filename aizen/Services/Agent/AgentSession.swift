@@ -7,6 +7,7 @@
 
 import Combine
 import Foundation
+import CoreData
 import UniformTypeIdentifiers
 import os.log
 
@@ -87,6 +88,9 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     var versionCheckTask: Task<Void, Never>?
     let logger = Logger.forCategory("AgentSession")
     private var finalizeMessageTask: Task<Void, Never>?
+    
+    // Session persistence
+    var chatSessionId: UUID?  // Core Data ChatSession ID for persistence
     private var lastAgentChunkAt: Date?
     private static let finalizeIdleDelay: TimeInterval = 0.2
     private var isModeChanging = false
@@ -253,121 +257,31 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     // MARK: - Session Management
 
     /// Start a new agent session
-    func start(agentName: String, workingDir: String) async throws {
-        // Atomically check and set active state to prevent race conditions
+    func start(agentName: String, workingDir: String, chatSessionId: UUID? = nil) async throws {
         guard !isActive && sessionState != .initializing else {
             throw AgentSessionError.sessionAlreadyActive
         }
 
-        // Mark as initializing immediately for UI feedback
         sessionState = .initializing
         isActive = true
+        self.chatSessionId = chatSessionId
 
         let startTime = CFAbsoluteTimeGetCurrent()
         logger.info("[\(agentName)] Session start begin")
 
-        // Store for potential rollback on error
         let previousAgentName = self.agentName
         let previousWorkingDir = self.workingDirectory
 
         self.agentName = agentName
         self.workingDirectory = workingDir
 
-        let agentPath = AgentRegistry.shared.getAgentPath(for: agentName)
-        let isValid = AgentRegistry.shared.validateAgent(named: agentName)
-
-        guard let agentPath = agentPath, isValid else {
-            // Agent not configured or invalid - trigger setup dialog
-            // Keep isActive true so UI shows the setup dialog
-            needsAgentSetup = true
-            missingAgentName = agentName
-            setupError = nil
-            sessionState = .failed("Agent not configured")
-            return
-        }
-
-        // Initialize ACP client
-        let client = ACPClient()
-        self.acpClient = client
-
-        // Set self as delegate
-        await client.setDelegate(self)
-
-        // Get launch arguments for this agent
-        let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
-
-        // Launch the agent process with correct working directory
-        do {
-            logger.info("[\(agentName)] Launching process...")
-            try await client.launch(
-                agentPath: agentPath,
-                arguments: launchArgs,
-                workingDirectory: workingDir
-            )
-            logger.info(
-                "[\(agentName)] Process launched in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms"
-            )
-        } catch {
-            // Rollback on launch failure
-            isActive = false
-            sessionState = .failed(error.localizedDescription)
-            self.agentName = previousAgentName
-            self.workingDirectory = previousWorkingDir
-            self.acpClient = nil
-            logger.error("[\(agentName)] Launch failed: \(error.localizedDescription)")
-            throw error
-        }
-
-        // Start notification listener BEFORE any protocol calls
-        // This ensures we don't miss any notifications during initialization
-        startNotificationListener(client: client)
-
-        // Initialize protocol with timeout
-        logger.info("[\(agentName)] Sending initialize request...")
-        let initResponse: InitializeResponse
-        do {
-            initResponse = try await client.initialize(
-                protocolVersion: 1,
-                capabilities: ClientCapabilities(
-                    fs: FileSystemCapabilities(
-                        readTextFile: true,
-                        writeTextFile: true
-                    ),
-                    terminal: true,
-                    meta: [
-                        "terminal_output": AnyCodable(true),
-                        "terminal-auth": AnyCodable(true)
-                    ]
-                ),
-                timeout: 120.0
-            )
-            logger.info(
-                "[\(agentName)] Initialize completed in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms"
-            )
-        } catch {
-            isActive = false
-            sessionState = .failed("Initialize failed: \(error.localizedDescription)")
-            self.acpClient = nil
-            logger.error("[\(agentName)] Initialize failed: \(error.localizedDescription)")
-            throw error
-        }
-
-        self.agentCapabilities = initResponse.agentCapabilities
-
-        // Check agent version in background (non-blocking)
-        versionCheckTask = Task { [weak self] in
-            guard let self = self else { return }
-            let versionInfo = await AgentVersionChecker.shared.checkVersion(for: agentName)
-            await MainActor.run {
-                self.versionInfo = versionInfo
-                if versionInfo.isOutdated {
-                    self.needsUpdate = true
-                    self.addSystemMessage(
-                        "⚠️ Update available: \(agentName) v\(versionInfo.current ?? "?") → v\(versionInfo.latest ?? "?")"
-                    )
-                }
-            }
-        }
+        let (client, initResponse) = try await initializeClient(
+            agentName: agentName,
+            workingDir: workingDir,
+            startTime: startTime,
+            previousAgentName: previousAgentName,
+            previousWorkingDir: previousWorkingDir
+        )
 
         if let authMethods = initResponse.authMethods, !authMethods.isEmpty {
             self.authMethods = authMethods
@@ -484,6 +398,201 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         let displayName = metadata?.name ?? agentName
         AgentUsageStore.shared.recordSessionStart(agentId: agentName)
         addSystemMessage("Session started with \(displayName) in \(workingDir)")
+        
+        if let chatSessionId = chatSessionId {
+            do {
+                try await persistSessionId(chatSessionId: chatSessionId)
+            } catch {
+                logger.error("Failed to persist session ID: \(error.localizedDescription)")
+                addSystemMessage("⚠️ Session created but not saved. It may not be available after restart.")
+            }
+        }
+    }
+    
+    /// Resume an existing agent session from persisted ACP session ID
+    func resume(acpSessionId: String, agentName: String, workingDir: String, chatSessionId: UUID) async throws {
+        guard !isActive && sessionState != .initializing else {
+            throw AgentSessionError.sessionAlreadyActive
+        }
+        
+        sessionState = .initializing
+        isActive = true
+        self.chatSessionId = chatSessionId
+        
+        guard !acpSessionId.isEmpty,
+              acpSessionId.count < 256,
+              acpSessionId.allSatisfy({ $0.isASCII && !$0.isNewline }) else {
+            sessionState = .failed("Invalid ACP session ID format")
+            isActive = false
+            throw AgentSessionError.custom("Invalid ACP session ID format")
+        }
+        
+        guard FileManager.default.fileExists(atPath: workingDir) else {
+            sessionState = .failed("Working directory no longer exists: \(workingDir)")
+            isActive = false
+            throw AgentSessionError.custom("Working directory no longer exists: \(workingDir)")
+        }
+        
+        guard FileManager.default.isReadableFile(atPath: workingDir) else {
+            sessionState = .failed("Working directory not accessible: \(workingDir)")
+            isActive = false
+            throw AgentSessionError.custom("Working directory not accessible: \(workingDir)")
+        }
+        
+        let startTime = CFAbsoluteTimeGetCurrent()
+        logger.info("[\(agentName)] Session resume begin for ACP session \(acpSessionId)")
+        
+        let previousAgentName = self.agentName
+        let previousWorkingDir = self.workingDirectory
+        
+        self.agentName = agentName
+        self.workingDirectory = workingDir
+        
+        let (client, _) = try await initializeClient(
+            agentName: agentName,
+            workingDir: workingDir,
+            startTime: startTime,
+            previousAgentName: previousAgentName,
+            previousWorkingDir: previousWorkingDir
+        )
+        
+        logger.info("[\(agentName)] Loading session \(acpSessionId)...")
+        let sessionResponse: LoadSessionResponse
+        do {
+            let mcpServers = await resolveMCPServers()
+            sessionResponse = try await client.loadSession(
+                sessionId: SessionId(acpSessionId),
+                cwd: workingDir,
+                mcpServers: mcpServers
+            )
+            logger.info(
+                "[\(agentName)] Session loaded in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms"
+            )
+        } catch {
+            isActive = false
+            sessionState = .failed("loadSession failed: \(error.localizedDescription)")
+            self.acpClient = nil
+            logger.error("[\(agentName)] loadSession failed: \(error.localizedDescription)")
+            throw error
+        }
+        
+        self.sessionId = sessionResponse.sessionId
+        self.sessionState = .ready
+        
+        let metadata = AgentRegistry.shared.getMetadata(for: agentName)
+        let displayName = metadata?.name ?? agentName
+        AgentUsageStore.shared.recordSessionStart(agentId: agentName)
+        addSystemMessage("Session resumed with \(displayName) in \(workingDir)")
+    }
+    
+    private func initializeClient(
+        agentName: String,
+        workingDir: String,
+        startTime: CFAbsoluteTime,
+        previousAgentName: String,
+        previousWorkingDir: String
+    ) async throws -> (client: ACPClient, initResponse: InitializeResponse) {
+        let agentPath = AgentRegistry.shared.getAgentPath(for: agentName)
+        let isValid = AgentRegistry.shared.validateAgent(named: agentName)
+        
+        guard let agentPath = agentPath, isValid else {
+            needsAgentSetup = true
+            missingAgentName = agentName
+            setupError = nil
+            sessionState = .failed("Agent not configured")
+            throw AgentSessionError.custom("Agent not configured")
+        }
+        
+        let client = ACPClient()
+        self.acpClient = client
+        await client.setDelegate(self)
+        
+        let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
+        
+        do {
+            logger.info("[\(agentName)] Launching process...")
+            try await client.launch(
+                agentPath: agentPath,
+                arguments: launchArgs,
+                workingDirectory: workingDir
+            )
+            logger.info(
+                "[\(agentName)] Process launched in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms"
+            )
+        } catch {
+            isActive = false
+            sessionState = .failed(error.localizedDescription)
+            self.agentName = previousAgentName
+            self.workingDirectory = previousWorkingDir
+            self.acpClient = nil
+            logger.error("[\(agentName)] Launch failed: \(error.localizedDescription)")
+            throw error
+        }
+        
+        startNotificationListener(client: client)
+        
+        logger.info("[\(agentName)] Sending initialize request...")
+        let initResponse: InitializeResponse
+        do {
+            initResponse = try await client.initialize(
+                protocolVersion: 1,
+                capabilities: ClientCapabilities(
+                    fs: FileSystemCapabilities(
+                        readTextFile: true,
+                        writeTextFile: true
+                    ),
+                    terminal: true,
+                    meta: [
+                        "terminal_output": AnyCodable(true),
+                        "terminal-auth": AnyCodable(true)
+                    ]
+                ),
+                timeout: 120.0
+            )
+            logger.info(
+                "[\(agentName)] Initialize completed in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms"
+            )
+        } catch {
+            isActive = false
+            sessionState = .failed("Initialize failed: \(error.localizedDescription)")
+            self.acpClient = nil
+            logger.error("[\(agentName)] Initialize failed: \(error.localizedDescription)")
+            throw error
+        }
+        
+        self.agentCapabilities = initResponse.agentCapabilities
+        
+        versionCheckTask = Task { [weak self] in
+            guard let self = self else { return }
+            let versionInfo = await AgentVersionChecker.shared.checkVersion(for: agentName)
+            await MainActor.run {
+                self.versionInfo = versionInfo
+                if versionInfo.isOutdated {
+                    self.needsUpdate = true
+                    self.addSystemMessage(
+                        "⚠️ Update available: \(agentName) v\(versionInfo.current ?? "?") → v\(versionInfo.latest ?? "?")"
+                    )
+                }
+            }
+        }
+        
+        return (client, initResponse)
+    }
+    
+    private func persistSessionId(chatSessionId: UUID) async throws {
+        guard let sessionId = sessionId else {
+            logger.warning("Attempted to persist session ID but no ACP session ID available")
+            return
+        }
+        
+        let context = PersistenceController.shared.container.viewContext
+        
+        try await SessionPersistenceService.shared.saveSessionId(
+            sessionId.value,
+            for: chatSessionId,
+            in: context
+        )
+        logger.info("Persisted ACP session ID for ChatSession \(chatSessionId.uuidString)")
     }
 
     func resolveMCPServers() async -> [MCPServerConfig] {

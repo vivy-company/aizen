@@ -39,6 +39,8 @@ class ChatSessionManager: ObservableObject {
         touch(chatSessionId)
         evictIfNeeded()
 
+        session.chatSessionId = chatSessionId
+        
         // Set permission handler context for notifications
         session.permissionHandler.chatSessionId = chatSessionId
         session.permissionHandler.worktreeName = worktreeName

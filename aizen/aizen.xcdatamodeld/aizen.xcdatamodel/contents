@@ -48,7 +48,10 @@
         <attribute name="title" optional="YES" attributeType="String"/>
         <attribute name="agentName" attributeType="String"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="lastMessageAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lastMessageAt" optional="YES" attributeType="Date" usesScalarValueType="NO" indexed="YES"/>
+        <attribute name="acpSessionId" optional="YES" attributeType="String" indexed="YES"/>
+        <attribute name="archived" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES" indexed="YES"/>
+        <attribute name="messageCount" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <relationship name="worktree" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Worktree" inverseName="chatSessions" inverseEntity="Worktree"/>
         <relationship name="messages" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ChatMessage" inverseName="session" inverseEntity="ChatMessage"/>
     </entity>
@@ -67,6 +70,11 @@
         <relationship name="session" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ChatSession" inverseName="messages" inverseEntity="ChatSession"/>
         <relationship name="conversation" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ChatConversation" inverseName="messages" inverseEntity="ChatConversation"/>
         <relationship name="toolCalls" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ToolCallRecord" inverseName="message" inverseEntity="ToolCallRecord"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
     </entity>
     <entity name="ToolCallRecord" representedClassName="ToolCallRecord" syncable="YES" codeGenerationType="class">
         <attribute name="id" attributeType="String"/>
@@ -75,7 +83,7 @@
         <attribute name="status" attributeType="String"/>
         <attribute name="contentJSON" attributeType="String"/>
         <attribute name="timestamp" attributeType="Date" usesScalarValueType="NO"/>
-        <relationship name="message" maxCount="1" deletionRule="Nullify" destinationEntity="ChatMessage" inverseName="toolCalls" inverseEntity="ChatMessage"/>
+        <relationship name="message" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="ChatMessage" inverseName="toolCalls" inverseEntity="ChatMessage"/>
     </entity>
     <entity name="FileBrowserSession" representedClassName="FileBrowserSession" syncable="YES" codeGenerationType="class">
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>

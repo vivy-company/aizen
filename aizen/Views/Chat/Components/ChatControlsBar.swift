@@ -19,6 +19,7 @@ struct ChatControlsBar: View {
     let showsUsage: Bool
 
     @State private var showingAuthClearedMessage = false
+    @Environment(\.managedObjectContext) private var viewContext
 
     var body: some View {
         HStack(spacing: 8) {
@@ -65,6 +66,10 @@ struct ChatControlsBar: View {
             Menu {
                 Button("New Session") {
                     onNewSession()
+                }
+
+                Button("Session History...") {
+                    SessionsWindowManager.shared.show(context: viewContext)
                 }
 
                 Divider()
