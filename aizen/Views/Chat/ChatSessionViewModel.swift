@@ -47,17 +47,9 @@ class ChatSessionViewModel: ObservableObject {
     // Historical messages loaded from Core Data (separate from live session)
     var historicalMessages: [MessageItem] = []
 
-    /// Messages - combines historical + live session messages
     var messages: [MessageItem] {
-        // If we have a live session, use its messages
-        // Historical messages are only shown before session starts
-        let source: [MessageItem]
-        if let session = currentAgentSession, session.isActive {
-            source = session.messages
-        } else {
-            source = historicalMessages
-        }
-
+        let source = currentAgentSession?.messages ?? historicalMessages
+        
         return source.filter { message in
             guard message.role == .agent else { return true }
             return !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -97,12 +89,13 @@ class ChatSessionViewModel: ObservableObject {
     }
     private var cancellables = Set<AnyCancellable>()
     private var notificationCancellables = Set<AnyCancellable>()
-    private var wasStreaming: Bool = false  // Track streaming state transitions
+    private var wasStreaming: Bool = false
+    private var observedSessionId: UUID?
     let logger = Logger.forCategory("ChatSession")
     var autoScrollTask: Task<Void, Never>?
     var suppressNextAutoScroll: Bool = false
     private var gitPauseApplied: Bool = false
-    private var isSettingUpSession: Bool = false
+    private var settingUpSessionId: UUID? = nil
 
     // MARK: - Computed Properties
 
@@ -179,36 +172,106 @@ class ChatSessionViewModel: ObservableObject {
         }
         cancellables.removeAll()
         notificationCancellables.removeAll()
+        observedSessionId = nil
+    }
+    
+    private func loadHistoricalMessages() {
+        guard let sessionId = session.id else {
+            logger.warning("Cannot load historical messages: session has no ID")
+            return
+        }
+        
+        guard historicalMessages.isEmpty else { return }
+        
+        let fetchRequest: NSFetchRequest<ChatMessage> = ChatMessage.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "session.id == %@", sessionId as CVarArg)
+        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
+        fetchRequest.fetchLimit = 200
+        
+        do {
+            let messages = try viewContext.fetch(fetchRequest)
+            logger.info("Loaded \(messages.count) historical messages for session \(sessionId.uuidString)")
+            
+            self.historicalMessages = messages.reversed().compactMap { chatMessage in
+                guard let id = chatMessage.id,
+                      let role = chatMessage.role,
+                      let contentJSON = chatMessage.contentJSON else {
+                    logger.warning("Skipping message: missing required fields")
+                    return nil
+                }
+                
+                let messageRole: MessageRole
+                switch role {
+                case "user":
+                    messageRole = .user
+                case "agent", "assistant":
+                    messageRole = .agent
+                default:
+                    logger.warning("Skipping message with unknown role: \(role)")
+                    return nil
+                }
+                
+                let contentBlocks = parseContentBlocks(from: contentJSON)
+                let content = contentBlocks.map { block in
+                    switch block {
+                    case .text(let text):
+                        return text.text
+                    default:
+                        return ""
+                    }
+                }.joined()
+                
+                return MessageItem(
+                    id: id.uuidString,
+                    role: messageRole,
+                    content: content,
+                    timestamp: chatMessage.timestamp ?? Date(),
+                    contentBlocks: contentBlocks,
+                    isComplete: true
+                )
+            }
+            
+            logger.info("Parsed \(self.historicalMessages.count) valid historical messages")
+        } catch {
+            logger.error("Failed to fetch historical messages: \(error.localizedDescription)")
+        }
+    }
+    
+    private func parseContentBlocks(from json: String) -> [ContentBlock] {
+        guard let data = json.data(using: .utf8),
+              let blocks = try? JSONDecoder().decode([ContentBlock].self, from: data) else {
+            return [.text(TextContent(text: json))]
+        }
+        return blocks
     }
 
     func setupAgentSession() {
         guard let sessionId = session.id else { return }
-        guard !isSettingUpSession else { return }
-        isSettingUpSession = true
+        guard settingUpSessionId != sessionId else { return }
+        settingUpSessionId = sessionId
 
-        // Check for pending attachments (e.g., from review comments)
         loadPendingAttachmentsIfNeeded()
+        loadHistoricalMessages()
 
-        // Configure autocomplete handler
         let worktreePath = worktree.path ?? ""
         autocompleteHandler.worktreePath = worktreePath
 
         if let existingSession = sessionManager.getAgentSession(for: sessionId) {
+            if existingSession.messages.isEmpty && !historicalMessages.isEmpty {
+                existingSession.messages = historicalMessages
+            }
+            
             currentAgentSession = existingSession
             autocompleteHandler.agentSession = existingSession
             updateDerivedState(from: existingSession)
 
-            // Initialize sync state from existing session BEFORE setting up observers
-            // This prevents all existing messages/tool calls from appearing as "new"
             previousMessageIds = Set(messages.map { $0.id })
             previousToolCallIds = Set(existingSession.toolCalls.map { $0.id })
 
-            // Rebuild timeline with proper grouping for existing data
             rebuildTimelineWithGrouping(isStreaming: existingSession.isStreaming)
 
             setupSessionObservers(session: existingSession)
 
-            // Index worktree files for autocomplete
             if !worktreePath.isEmpty {
                 Task {
                     await autocompleteHandler.indexWorktree()
@@ -218,24 +281,39 @@ class ChatSessionViewModel: ObservableObject {
             if !existingSession.isActive {
                 guard !worktreePath.isEmpty else {
                     logger.error("Chat session missing worktree path; cannot start agent session.")
-                    isSettingUpSession = false
+                    settingUpSessionId = nil
                     return
                 }
                 Task { [self] in
+                    defer { self.settingUpSessionId = nil }
                     do {
-                        try await existingSession.start(agentName: self.selectedAgent, workingDir: worktreePath)
+                        if let acpSessionId = await SessionPersistenceService.shared.getSessionId(
+                            for: sessionId,
+                            in: self.viewContext
+                        ) {
+                            self.logger.info("Resuming existing ACP session: \(acpSessionId)")
+                            try await existingSession.resume(
+                                acpSessionId: acpSessionId,
+                                agentName: self.selectedAgent,
+                                workingDir: worktreePath,
+                                chatSessionId: sessionId
+                            )
+                        } else {
+                            try await existingSession.start(
+                                agentName: self.selectedAgent,
+                                workingDir: worktreePath,
+                                chatSessionId: sessionId
+                            )
+                        }
                         await sendPendingMessageIfNeeded()
                     } catch {
                         self.logger.error("Failed to start session for \(self.selectedAgent): \(error.localizedDescription)")
-                        // Session will show auth dialog or setup dialog automatically via needsAuthentication/needsAgentSetup
                     }
-                    self.isSettingUpSession = false
                 }
             } else {
-                // Session already active, check for pending message
                 Task {
+                    defer { self.settingUpSessionId = nil }
                     await sendPendingMessageIfNeeded()
-                    self.isSettingUpSession = false
                 }
             }
             return
@@ -243,12 +321,15 @@ class ChatSessionViewModel: ObservableObject {
 
         guard !worktreePath.isEmpty else {
             logger.error("Chat session missing worktree path; cannot start agent session.")
-            isSettingUpSession = false
+            settingUpSessionId = nil
             return
         }
 
-        // Create a dedicated AgentSession for this chat session to avoid cross-tab interference
         let newSession = AgentSession(agentName: self.selectedAgent, workingDirectory: worktreePath)
+        if !historicalMessages.isEmpty {
+            newSession.messages = historicalMessages
+        }
+        
         let worktreeName = worktree.branch ?? "Chat"
         sessionManager.setAgentSession(newSession, for: sessionId, worktreeName: worktreeName)
         currentAgentSession = newSession
@@ -256,7 +337,6 @@ class ChatSessionViewModel: ObservableObject {
         updateDerivedState(from: newSession)
 
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            // Reset previous IDs and rebuild timeline from new session
             previousMessageIds = Set(messages.map { $0.id })
             previousToolCallIds = Set(newSession.toolCalls.map { $0.id })
             rebuildTimeline()
@@ -265,23 +345,36 @@ class ChatSessionViewModel: ObservableObject {
         setupSessionObservers(session: newSession)
 
         Task {
-            // Index worktree files for autocomplete
+            defer { self.settingUpSessionId = nil }
             await autocompleteHandler.indexWorktree()
 
             if !newSession.isActive {
                 do {
-                    try await newSession.start(agentName: self.selectedAgent, workingDir: worktreePath)
-                    // Check for pending message after session starts
+                    if let acpSessionId = await SessionPersistenceService.shared.getSessionId(
+                        for: sessionId,
+                        in: self.viewContext
+                    ) {
+                        self.logger.info("Resuming existing ACP session: \(acpSessionId)")
+                        try await newSession.resume(
+                            acpSessionId: acpSessionId,
+                            agentName: self.selectedAgent,
+                            workingDir: worktreePath,
+                            chatSessionId: sessionId
+                        )
+                    } else {
+                        try await newSession.start(
+                            agentName: self.selectedAgent,
+                            workingDir: worktreePath,
+                            chatSessionId: sessionId
+                        )
+                    }
                     await sendPendingMessageIfNeeded()
                 } catch {
                     self.logger.error("Failed to start new session for \(self.selectedAgent): \(error.localizedDescription)")
-                    // Session will show auth dialog or setup dialog automatically via needsAuthentication/needsAgentSetup
                 }
             } else {
-                // Session already active, check for pending message
                 await sendPendingMessageIfNeeded()
             }
-            self.isSettingUpSession = false
         }
     }
 
@@ -399,26 +492,59 @@ class ChatSessionViewModel: ObservableObject {
 
     func restartSession() {
         guard let agentSession = currentAgentSession else { return }
-
+        
+        let context = viewContext
+        let newChatSession = ChatSession(context: context)
+        newChatSession.id = UUID()
+        newChatSession.agentName = selectedAgent
+        newChatSession.createdAt = Date()
+        newChatSession.worktree = worktree
+        
         Task {
-            // Close the current session
-            await agentSession.close()
-
-            // Clear messages and tool calls
-            agentSession.messages.removeAll()
-            agentSession.clearToolCalls()
-
-            // Clear timeline
-            previousMessageIds = []
-            previousToolCallIds = []
-            timelineItems = []
-
-            // Restart the session
-            let worktreePath = worktree.path ?? ""
+            let displayName = await AgentRegistry.shared.getMetadata(for: selectedAgent)?.name ?? selectedAgent.capitalized
+            newChatSession.title = displayName
+            
             do {
-                try await agentSession.start(agentName: selectedAgent, workingDir: worktreePath)
+                try context.save()
+                logger.info("Created new chat session: \(newChatSession.id?.uuidString ?? "unknown")")
+                
+                await agentSession.close()
+                
+                if let oldSessionId = session.id {
+                    sessionManager.removeAgentSession(for: oldSessionId)
+                }
+                
+                NotificationCenter.default.post(
+                    name: .switchToChatSession,
+                    object: nil,
+                    userInfo: ["chatSessionId": newChatSession.id!]
+                )
+                
+                let worktreePath = worktree.path ?? ""
+                let freshAgentSession = AgentSession(agentName: selectedAgent, workingDirectory: worktreePath)
+                sessionManager.setAgentSession(freshAgentSession, for: newChatSession.id!, worktreeName: worktree.branch)
+                currentAgentSession = freshAgentSession
+                autocompleteHandler.agentSession = freshAgentSession
+                
+                previousMessageIds = []
+                previousToolCallIds = []
+                timelineItems = []
+                
+                setupSessionObservers(session: freshAgentSession)
+                
+                try await freshAgentSession.start(
+                    agentName: selectedAgent,
+                    workingDir: worktreePath,
+                    chatSessionId: self.session.id
+                )
             } catch {
-                logger.error("Failed to restart session: \(error.localizedDescription)")
+                context.delete(newChatSession)
+                do {
+                    try context.save()
+                } catch {
+                    logger.error("Failed to rollback new session creation: \(error.localizedDescription)")
+                }
+                logger.error("Failed to create/start new session: \(error.localizedDescription)")
             }
         }
     }
@@ -465,7 +591,23 @@ class ChatSessionViewModel: ObservableObject {
     }
 
     private func setupSessionObservers(session: AgentSession) {
+        // Only skip if we're ALREADY observing THIS EXACT session object for THIS ViewModel's ChatSession
+        if currentAgentSession === session && 
+           observedSessionId == self.session.id &&
+           !cancellables.isEmpty {
+            // Already observing - just sync latest state without rebuilding observers
+            isProcessing = session.isStreaming
+            updateDerivedState(from: session)
+            return
+        }
+        
+        // Clear old observers and set up fresh ones
         cancellables.removeAll()
+        observedSessionId = self.session.id
+        
+        // Sync initial state
+        isProcessing = session.isStreaming
+        updateDerivedState(from: session)
 
         session.$messages
             // Stream message updates as they arrive for smoother chunk rendering.

@@ -170,12 +170,15 @@ class UnifiedAutocompleteHandler: ObservableObject {
             newItems = results.prefix(10).map { .file($0) }
 
         case .command(let query):
-            let commands = agentSession?.availableCommands ?? []
+            let clientSideCommands = ClientCommandHandler.shared.availableCommands
+            let agentCommands = agentSession?.availableCommands ?? []
+            let allCommands = clientSideCommands + agentCommands
+            
             let filtered: [AvailableCommand]
             if query.isEmpty {
-                filtered = Array(commands.prefix(10))
+                filtered = Array(allCommands.prefix(10))
             } else {
-                filtered = commands.filter {
+                filtered = allCommands.filter {
                     $0.name.lowercased().hasPrefix(query.lowercased()) ||
                     $0.description.lowercased().contains(query.lowercased())
                 }

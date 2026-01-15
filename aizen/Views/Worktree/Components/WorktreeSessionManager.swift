@@ -21,7 +21,14 @@ struct WorktreeSessionManager {
         let sessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
         return sessions
             .filter { !$0.isDeleted }
-            .sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
+            .sorted {
+                let lhsDate = $0.createdAt ?? Date()
+                let rhsDate = $1.createdAt ?? Date()
+                if lhsDate == rhsDate {
+                    return ($0.id?.uuidString ?? "") < ($1.id?.uuidString ?? "")
+                }
+                return lhsDate < rhsDate
+            }
     }
 
     var terminalSessions: [TerminalSession] {
@@ -50,13 +57,13 @@ struct WorktreeSessionManager {
                 }
             }
         }
-
-        context.delete(session)
-
+        
+        session.worktree = nil
+        
         do {
             try context.save()
         } catch {
-            logger.error("Failed to delete chat session: \(error.localizedDescription)")
+            logger.error("Failed to close chat session: \(error.localizedDescription)")
         }
     }
 
@@ -126,9 +133,7 @@ struct WorktreeSessionManager {
 
         do {
             try context.save()
-            DispatchQueue.main.async {
-                viewModel.selectedChatSessionId = session.id
-            }
+            viewModel.selectedChatSessionId = session.id
         } catch {
             logger.error("Failed to create chat session: \(error.localizedDescription)")
         }

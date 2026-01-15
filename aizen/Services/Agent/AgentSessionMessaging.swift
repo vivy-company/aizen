@@ -7,7 +7,8 @@
 
 import Foundation
 import UniformTypeIdentifiers
-import os
+import CoreData
+import os.log
 
 // MARK: - AgentSession + Messaging
 
@@ -308,15 +309,48 @@ extension AgentSession {
     // MARK: - Message Management
 
     func addUserMessage(_ content: String, contentBlocks: [ContentBlock] = []) {
+        let messageId = UUID()
         messages.append(
             MessageItem(
-                id: UUID().uuidString,
+                id: messageId.uuidString,
                 role: .user,
                 content: content,
                 timestamp: Date(),
                 contentBlocks: contentBlocks
             ))
         trimMessagesIfNeeded()
+        
+        if let chatSessionId = chatSessionId {
+            Task {
+                let bgContext = PersistenceController.shared.container.newBackgroundContext()
+                do {
+                    try await bgContext.perform {
+                        let fetchRequest: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
+                        fetchRequest.predicate = NSPredicate(format: "id == %@", chatSessionId as CVarArg)
+                        fetchRequest.fetchLimit = 1
+                        
+                        guard let session = try bgContext.fetch(fetchRequest).first else {
+                            throw SessionPersistenceError.chatSessionNotFound(chatSessionId)
+                        }
+                        
+                        session.messageCount += 1
+                        session.lastMessageAt = Date()
+                        
+                        try bgContext.save()
+                    }
+                    
+                    try await self.persistMessage(
+                        id: messageId,
+                        role: "user",
+                        content: content,
+                        contentBlocks: contentBlocks,
+                        chatSessionId: chatSessionId
+                    )
+                } catch {
+                    self.logger.error("Failed to persist user message: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     func markLastMessageComplete() {
@@ -339,6 +373,23 @@ extension AgentSession {
             var updatedMessages = messages
             updatedMessages[lastIndex] = updatedMessage
             messages = updatedMessages
+            
+            if let chatSessionId = chatSessionId,
+               let messageId = UUID(uuidString: completedMessage.id) {
+                Task {
+                    do {
+                        try await self.persistMessage(
+                            id: messageId,
+                            role: "agent",
+                            content: completedMessage.content,
+                            contentBlocks: completedMessage.contentBlocks,
+                            chatSessionId: chatSessionId
+                        )
+                    } catch {
+                        self.logger.error("Failed to persist completed agent message: \(error.localizedDescription)")
+                    }
+                }
+            }
         }
     }
 
@@ -350,8 +401,9 @@ extension AgentSession {
         startTime: Date? = nil,
         requestId: String? = nil
     ) {
+        let messageId = UUID()
         let newMessage = MessageItem(
-            id: UUID().uuidString,
+            id: messageId.uuidString,
             role: .agent,
             content: content,
             timestamp: Date(),
@@ -381,5 +433,44 @@ extension AgentSession {
         let excess = messages.count - Self.maxMessageCount
         guard excess > 0 else { return }
         messages.removeFirst(excess)
+    }
+    
+    private func persistMessage(
+        id: UUID,
+        role: String,
+        content: String,
+        contentBlocks: [ContentBlock],
+        chatSessionId: UUID
+    ) async throws {
+        let context = PersistenceController.shared.container.newBackgroundContext()
+        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        
+        try await context.perform {
+            let fetchRequest: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", chatSessionId as CVarArg)
+            fetchRequest.fetchLimit = 1
+            
+            guard let chatSession = try context.fetch(fetchRequest).first else {
+                throw NSError(domain: "AgentSession", code: 1, userInfo: [NSLocalizedDescriptionKey: "ChatSession not found"])
+            }
+            
+            let chatMessage = ChatMessage(context: context)
+            chatMessage.id = id
+            chatMessage.role = role
+            chatMessage.timestamp = Date()
+            chatMessage.agentName = self.agentName
+            
+            let encoder = JSONEncoder()
+            if let contentJSON = try? encoder.encode(contentBlocks),
+               let jsonString = String(data: contentJSON, encoding: .utf8) {
+                chatMessage.contentJSON = jsonString
+            } else {
+                chatMessage.contentJSON = content
+            }
+            
+            chatMessage.session = chatSession
+            
+            try context.save()
+        }
     }
 }

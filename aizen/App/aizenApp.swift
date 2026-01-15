@@ -117,6 +117,11 @@ struct aizenApp: App {
                 .task {
                     await cleanupOrphanedTmuxSessions()
                 }
+                .task {
+                    await SessionPersistenceService.shared.backfillSessionMetadata(
+                        in: persistenceController.container.viewContext
+                    )
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified)
@@ -154,6 +159,11 @@ struct aizenApp: App {
                     ActiveWorktreesWindowManager.shared.show(context: persistenceController.container.viewContext)
                 }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
+
+                Button("Chat Sessions...") {
+                    SessionsWindowManager.shared.show(context: persistenceController.container.viewContext)
+                }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
 
                 Divider()
 

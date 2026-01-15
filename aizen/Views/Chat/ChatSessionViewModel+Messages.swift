@@ -52,7 +52,11 @@ extension ChatSessionViewModel {
 
                 // Start session if not active
                 if !agentSession.isActive {
-                    try await agentSession.start(agentName: self.selectedAgent, workingDir: worktreePath)
+                    try await agentSession.start(
+                        agentName: self.selectedAgent,
+                        workingDir: worktreePath,
+                        chatSessionId: self.session.id
+                    )
                 }
 
                 // Wait for session to be ready (not just active) - handles initialization delay

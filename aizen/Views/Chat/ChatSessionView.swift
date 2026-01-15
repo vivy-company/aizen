@@ -463,7 +463,13 @@ struct ChatSessionView: View {
     // MARK: - Input Handling
 
     private func sendMessage() {
-        let text = inputText
+        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if ClientCommandHandler.shared.handle(text, context: viewContext) {
+            inputText = ""
+            return
+        }
+        
         inputText = ""
         viewModel.sendMessage(text)
     }
