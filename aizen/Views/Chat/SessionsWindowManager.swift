@@ -16,13 +16,13 @@ final class SessionsWindowManager {
 
     private init() {}
 
-    func show(context: NSManagedObjectContext) {
+    func show(context: NSManagedObjectContext, worktreeId: UUID? = nil) {
         if let existing = window, existing.isVisible {
             existing.makeKeyAndOrderFront(nil)
             return
         }
 
-        let contentView = SessionsListView()
+        let contentView = SessionsListView(worktreeId: worktreeId)
             .environment(\.managedObjectContext, context)
             .modifier(AppearanceModifier())
 

@@ -30,7 +30,7 @@
         <attribute name="note" optional="YES" attributeType="String"/>
         <relationship name="repository" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Repository" inverseName="worktrees" inverseEntity="Repository"/>
         <relationship name="terminalSessions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="TerminalSession" inverseName="worktree" inverseEntity="TerminalSession"/>
-        <relationship name="chatSessions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ChatSession" inverseName="worktree" inverseEntity="ChatSession"/>
+        <relationship name="chatSessions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="ChatSession" inverseName="worktree" inverseEntity="ChatSession"/>
         <relationship name="fileBrowserSession" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="FileBrowserSession" inverseName="worktree" inverseEntity="FileBrowserSession"/>
         <relationship name="browserSessions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="BrowserSession" inverseName="worktree" inverseEntity="BrowserSession"/>
     </entity>

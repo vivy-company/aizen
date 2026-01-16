@@ -591,23 +591,48 @@ class ChatSessionViewModel: ObservableObject {
     }
 
     private func setupSessionObservers(session: AgentSession) {
+        #if DEBUG
+        logger.info("setupSessionObservers called")
+        logger.info("  - session id: \(session.chatSessionId?.uuidString ?? "nil")")
+        logger.info("  - currentAgentSession id: \(self.currentAgentSession?.chatSessionId?.uuidString ?? "nil")")
+        logger.info("  - observedSessionId: \(self.observedSessionId?.uuidString ?? "nil")")
+        logger.info("  - self.session.id: \(self.session.id?.uuidString ?? "nil")")
+        logger.info("  - currentAgentSession === session: \(self.currentAgentSession === session)")
+        logger.info("  - observedSessionId == self.session.id: \(self.observedSessionId == self.session.id)")
+        logger.info("  - cancellables.isEmpty: \(self.cancellables.isEmpty)")
+        logger.info("  - session.sessionState: \(String(describing: session.sessionState))")
+        logger.info("  - session.isActive: \(session.isActive)")
+        #endif
+        
         // Only skip if we're ALREADY observing THIS EXACT session object for THIS ViewModel's ChatSession
         if currentAgentSession === session && 
            observedSessionId == self.session.id &&
            !cancellables.isEmpty {
             // Already observing - just sync latest state without rebuilding observers
+            #if DEBUG
+            logger.info("  -> SKIPPING observer rebuild, syncing state")
+            #endif
             isProcessing = session.isStreaming
             updateDerivedState(from: session)
+            #if DEBUG
+            logger.info("  -> After sync: sessionState=\(String(describing: self.sessionState)), isSessionReady=\(self.isSessionReady)")
+            #endif
             return
         }
         
         // Clear old observers and set up fresh ones
+        #if DEBUG
+        logger.info("  -> REBUILDING observers")
+        #endif
         cancellables.removeAll()
         observedSessionId = self.session.id
         
         // Sync initial state
         isProcessing = session.isStreaming
         updateDerivedState(from: session)
+        #if DEBUG
+        logger.info("  -> After rebuild: sessionState=\(String(describing: self.sessionState)), isSessionReady=\(self.isSessionReady)")
+        #endif
 
         session.$messages
             // Stream message updates as they arrive for smoother chunk rendering.

@@ -150,7 +150,8 @@ struct ChatSessionView: View {
                         plan: viewModel.currentAgentPlan,
                         onShowUsage: { showingUsageSheet = true },
                         onNewSession: viewModel.restartSession,
-                        showsUsage: supportsUsageMetrics
+                        showsUsage: supportsUsageMetrics,
+                        worktreeId: worktree.id
                     )
                     .padding(.horizontal, 20)
 
