@@ -52,6 +52,7 @@ struct TerminalTabView: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .opacity(isSelected ? 1 : 0)
+                    .animation(nil, value: isSelected)
                     .allowsHitTesting(isSelected)
                     .zIndex(isSelected ? 1 : 0)
                 }
