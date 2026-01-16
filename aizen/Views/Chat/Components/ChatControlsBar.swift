@@ -17,6 +17,7 @@ struct ChatControlsBar: View {
     let onShowUsage: () -> Void
     let onNewSession: () -> Void
     let showsUsage: Bool
+    let worktreeId: UUID?
 
     @State private var showingAuthClearedMessage = false
     @Environment(\.managedObjectContext) private var viewContext
@@ -69,7 +70,7 @@ struct ChatControlsBar: View {
                 }
 
                 Button("Session History...") {
-                    SessionsWindowManager.shared.show(context: viewContext)
+                    SessionsWindowManager.shared.show(context: viewContext, worktreeId: worktreeId)
                 }
 
                 Divider()
