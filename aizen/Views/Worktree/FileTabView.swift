@@ -11,6 +11,7 @@ import CoreData
 struct FileTabView: View {
     let worktree: Worktree
     @Binding var fileToOpenFromSearch: String?
+    var showPathHeader: Bool = true
     @Environment(\.managedObjectContext) private var viewContext
 
     var body: some View {
@@ -18,7 +19,8 @@ struct FileTabView: View {
             FileBrowserSessionView(
                 worktree: worktree,
                 context: viewContext,
-                fileToOpenFromSearch: $fileToOpenFromSearch
+                fileToOpenFromSearch: $fileToOpenFromSearch,
+                showPathHeader: showPathHeader
             )
         } else {
             VStack {

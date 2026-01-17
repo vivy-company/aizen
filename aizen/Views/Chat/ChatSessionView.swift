@@ -13,6 +13,7 @@ struct ChatSessionView: View {
     @ObservedObject var session: ChatSession
     let sessionManager: ChatSessionManager
     let isSelected: Bool
+    let isCompanionResizing: Bool
 
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -28,6 +29,8 @@ struct ChatSessionView: View {
     @State private var fileToOpenInEditor: String?
     @State private var autocompleteWindow: AutocompleteWindowController?
     @State private var keyMonitor: Any?
+    @State private var isWindowResizing = false
+    @State private var wasNearBottomBeforeResize = true
 
     // Input state (local to avoid re-rendering entire view on keystroke)
     @State private var inputText = ""
@@ -47,12 +50,14 @@ struct ChatSessionView: View {
         session: ChatSession,
         sessionManager: ChatSessionManager,
         viewContext: NSManagedObjectContext,
-        isSelected: Bool
+        isSelected: Bool,
+        isCompanionResizing: Bool = false
     ) {
         self.worktree = worktree
         self.session = session
         self.sessionManager = sessionManager
         self.isSelected = isSelected
+        self.isCompanionResizing = isCompanionResizing
         self._viewContext = Environment(\.managedObjectContext)
 
         let vm = ChatSessionViewModel(
@@ -65,6 +70,7 @@ struct ChatSessionView: View {
     }
 
     var body: some View {
+        let isLayoutResizing = isWindowResizing || isCompanionResizing
         ZStack {
             Color(nsColor: .windowBackgroundColor)
                 .ignoresSafeArea()
@@ -80,6 +86,7 @@ struct ChatSessionView: View {
                         currentIterationId: viewModel.currentAgentSession?.currentIterationId,
                         scrollRequest: viewModel.scrollRequest,
                         shouldAutoScroll: viewModel.isNearBottom,
+                        isResizing: isLayoutResizing,
                         onAppear: viewModel.loadMessages,
                         renderInlineMarkdown: viewModel.renderInlineMarkdown,
                         onToolTap: { toolCall in
@@ -90,7 +97,9 @@ struct ChatSessionView: View {
                         },
                         agentSession: viewModel.currentAgentSession,
                         onScrollPositionChange: { isNearBottom in
-                            viewModel.isNearBottom = isNearBottom
+                            if !isLayoutResizing {
+                                viewModel.isNearBottom = isNearBottom
+                            }
                         },
                         childToolCallsProvider: { parentId in
                             viewModel.childToolCalls(for: parentId)
@@ -177,7 +186,19 @@ struct ChatSessionView: View {
             .frame(maxWidth: 1100)
             .frame(maxWidth: .infinity)
         }
+        .background(WindowResizeObserver(isResizing: $isWindowResizing))
         .focusedSceneValue(\.chatActions, ChatActions(cycleModeForward: viewModel.cycleModeForward))
+        .onChange(of: isLayoutResizing) { _, resizing in
+            if resizing {
+                wasNearBottomBeforeResize = viewModel.isNearBottom
+                viewModel.cancelPendingAutoScroll()
+                viewModel.suppressNextAutoScroll = true
+                viewModel.scrollRequest = nil
+                viewModel.isNearBottom = false
+            } else {
+                viewModel.isNearBottom = wasNearBottomBeforeResize
+            }
+        }
         .onAppear {
             // Load draft input text if available
             if let draft = viewModel.loadDraftInputText() {
