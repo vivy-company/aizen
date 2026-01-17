@@ -467,6 +467,13 @@ actor ACPClient {
                 await handleResponse(response)
 
             case .notification(let notification):
+                if let params = notification.params?.value as? [String: Any],
+                   let update = params["update"] as? [String: Any],
+                   let type = update["type"] as? String {
+                    logger.info("Received notification: \(notification.method) update.type=\(type)")
+                } else {
+                    logger.info("Received notification: \(notification.method)")
+                }
                 notificationContinuation.yield(notification)
 
             case .request(let request):

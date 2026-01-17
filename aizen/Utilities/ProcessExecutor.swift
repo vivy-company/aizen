@@ -173,7 +173,7 @@ actor ProcessExecutor {
     }
 
     /// Execute a process and stream output via AsyncStream
-    func executeStreaming(
+    static func executeStreaming(
         executable: String,
         arguments: [String] = [],
         environment: [String: String]? = nil,
@@ -226,15 +226,24 @@ actor ProcessExecutor {
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
                 stderrPipe.fileHandleForReading.readabilityHandler = nil
 
-                // Read any remaining data
-                let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                let remainingStderr = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-                if !remainingStdout.isEmpty, let text = String(data: remainingStdout, encoding: .utf8) {
-                    continuation.yield(.stdout(text))
+                // Read any remaining data (handles may already be closed by readabilityHandler)
+                // Use ObjC exception-safe approach: catch NSException from readDataToEndOfFile
+                do {
+                    let remainingStdout = try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()
+                    if !remainingStdout.isEmpty, let text = String(data: remainingStdout, encoding: .utf8) {
+                        continuation.yield(.stdout(text))
+                    }
+                } catch {
+                    // Handle already closed, ignore
                 }
-                if !remainingStderr.isEmpty, let text = String(data: remainingStderr, encoding: .utf8) {
-                    continuation.yield(.stderr(text))
+                
+                do {
+                    let remainingStderr = try stderrPipe.fileHandleForReading.readToEnd() ?? Data()
+                    if !remainingStderr.isEmpty, let text = String(data: remainingStderr, encoding: .utf8) {
+                        continuation.yield(.stderr(text))
+                    }
+                } catch {
+                    // Handle already closed, ignore
                 }
 
                 continuation.yield(.terminated(proc.terminationStatus))

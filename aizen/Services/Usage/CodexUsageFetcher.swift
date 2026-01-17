@@ -21,7 +21,7 @@ enum CodexUsageFetcher {
         var creditsRemaining: Double?
 
         do {
-            let shellEnv = await ShellEnvironmentLoader.shared.loadShellEnvironment()
+            let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
             let rpc = try CodexRPCClient(environment: shellEnv)
             defer { rpc.shutdown() }
             try await rpc.initialize(clientName: "aizen", clientVersion: "1.0")

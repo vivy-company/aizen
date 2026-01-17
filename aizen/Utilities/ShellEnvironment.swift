@@ -12,9 +12,13 @@ nonisolated enum ShellEnvironment {
     /// Cached environment loaded once at first access
     private static var cachedEnvironment: [String: String]?
     private static let cacheLock = NSLock()
+    private static let cacheCondition = NSCondition()
+    private static var isLoading = false
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ShellEnvironment")
 
     /// Get user's shell environment (cached after first load)
+    /// Warning: On main thread, returns immediately with potentially incomplete environment.
+    /// Use `loadUserShellEnvironmentAsync()` for guaranteed complete environment.
     nonisolated static func loadUserShellEnvironment() -> [String: String] {
         cacheLock.lock()
         defer { cacheLock.unlock() }
@@ -34,6 +38,75 @@ nonisolated enum ShellEnvironment {
 
         let env = loadEnvironmentFromShell()
         cachedEnvironment = env
+        
+        // Signal any waiters that cache is ready
+        cacheCondition.lock()
+        cacheCondition.broadcast()
+        cacheCondition.unlock()
+        
+        return env
+    }
+    
+    /// Async version that guarantees the full user shell environment is loaded.
+    /// Safe to call from any context (main thread, actors, etc.)
+    nonisolated static func loadUserShellEnvironmentAsync() async -> [String: String] {
+        // Fast path: already cached
+        cacheLock.lock()
+        if let cached = cachedEnvironment {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+        
+        // Load on background thread and await result
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let env = loadUserShellEnvironmentBlocking()
+                continuation.resume(returning: env)
+            }
+        }
+    }
+    
+    /// Blocking version that waits for environment to be loaded.
+    /// Do NOT call from main thread - use loadUserShellEnvironmentAsync() instead.
+    nonisolated static func loadUserShellEnvironmentBlocking() -> [String: String] {
+        cacheLock.lock()
+        
+        if let cached = cachedEnvironment {
+            cacheLock.unlock()
+            return cached
+        }
+        
+        // Check if another thread is already loading
+        if isLoading {
+            cacheLock.unlock()
+            
+            // Wait for the loading thread to finish
+            cacheCondition.lock()
+            while cachedEnvironment == nil {
+                cacheCondition.wait()
+            }
+            let env = cachedEnvironment!
+            cacheCondition.unlock()
+            return env
+        }
+        
+        // We'll do the loading
+        isLoading = true
+        cacheLock.unlock()
+        
+        let env = loadEnvironmentFromShell()
+        
+        cacheLock.lock()
+        cachedEnvironment = env
+        isLoading = false
+        cacheLock.unlock()
+        
+        // Signal any waiters
+        cacheCondition.lock()
+        cacheCondition.broadcast()
+        cacheCondition.unlock()
+        
         return env
     }
 

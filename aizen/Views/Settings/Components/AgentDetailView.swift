@@ -292,6 +292,28 @@ struct AgentDetailView: View {
                     }
                 }
 
+                // MARK: - Plugins (OpenCode only)
+
+                if metadata.id == "opencode" {
+                    Section {
+                        NavigationLink(destination: OpenCodePluginsView()) {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Plugins")
+                                    Text("Oh My OpenCode, auth plugins, and more")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "puzzlepiece.extension")
+                                    .foregroundStyle(.blue)
+                            }
+                        }
+                    } header: {
+                        Text("Plugins")
+                    }
+                }
+
                 // MARK: - Custom Commands
 
                 if configSpec.commandsDirectory != nil {

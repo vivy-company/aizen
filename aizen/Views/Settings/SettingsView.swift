@@ -115,7 +115,9 @@ struct SettingsView: View {
                     .padding(.vertical, 10)
             }
         } detail: {
-            detailView
+            NavigationStack {
+                detailView
+            }
         }
         .toolbar {
             // Forces creation of an NSToolbar so the window's unified toolbar style applies.

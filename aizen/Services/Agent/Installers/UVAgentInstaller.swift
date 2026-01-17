@@ -11,11 +11,9 @@ import os.log
 actor UVAgentInstaller {
     static let shared = UVAgentInstaller()
 
-    private let shellLoader: ShellEnvironmentLoader
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "UVInstaller")
 
-    init(shellLoader: ShellEnvironmentLoader = .shared) {
-        self.shellLoader = shellLoader
+    init() {
     }
 
     // MARK: - Installation
@@ -24,7 +22,7 @@ actor UVAgentInstaller {
         // Ensure uv is installed
         try await ensureUVInstalled()
 
-        var shellEnv = await shellLoader.loadShellEnvironment()
+        var shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
 
         // Use UV_TOOL_DIR and UV_TOOL_BIN_DIR to install to our managed directory
         // This keeps everything self-contained in ~/.aizen/agents/{agent}/
@@ -111,7 +109,7 @@ actor UVAgentInstaller {
     // MARK: - UV Installation
 
     private func ensureUVInstalled() async throws {
-        let shellEnv = await shellLoader.loadShellEnvironment()
+        let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
 
         // Check if uv is already installed
         let checkProcess = Process()

@@ -26,8 +26,11 @@ extension AgentSession {
     /// Handle incoming session update notifications
     func handleNotification(_ notification: JSONRPCNotification) {
         guard notification.method == "session/update" else {
+            logger.debug("[\(self.agentName)] Ignoring notification method: \(notification.method)")
             return
         }
+
+        logger.debug("[\(self.agentName)] Received session/update notification")
 
         let params = notification.params?.value as? [String: Any] ?? [:]
 
@@ -127,6 +130,7 @@ extension AgentSession {
                 clearThoughtBuffer()
                 currentThought = nil
                 let (text, blockContent) = textAndContent(from: block)
+                logger.debug("[\(self.agentName)] agentMessageChunk: text=\(text.prefix(50))..., blocks=\(blockContent.count)")
                 if text.isEmpty && blockContent.isEmpty { break }
                 recordAgentChunk()
 
