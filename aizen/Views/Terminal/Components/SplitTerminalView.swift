@@ -216,7 +216,11 @@ struct SplitTerminalView: View {
             sessionManager.removeTerminal(for: sessionId, paneId: paneId)
         }
 
-        let paneCount = layout.allPaneIds().count
+        let paneIds = layout.allPaneIds()
+        let paneCount = paneIds.count
+
+        // Ignore exit callbacks for panes that are already closed
+        guard paneIds.contains(paneId) else { return }
 
         if paneCount == 1 {
             // Only one pane - delete the entire terminal session
@@ -235,13 +239,11 @@ struct SplitTerminalView: View {
         } else {
             // Multiple panes - just close this one
             if let newLayout = layout.removingPane(paneId) {
-                layout = newLayout
-                // If we closed the focused pane, focus another one
-                if focusedPaneId == paneId {
-                    if let firstPane = layout.allPaneIds().first {
-                        focusedPaneId = firstPane
-                    }
+                if focusedPaneId == paneId, let nextPane = newLayout.allPaneIds().first {
+                    focusedPaneId = nextPane
                 }
+                layout = newLayout
+                layoutVersion += 1
             }
         }
     }
@@ -282,23 +284,29 @@ struct SplitTerminalView: View {
     private func executeClosePaneOnly() {
         let paneIdToClose = focusedPaneId
 
-        // Remove terminal from manager
-        if let sessionId = session.id {
-            sessionManager.removeTerminal(for: sessionId, paneId: paneIdToClose)
+        guard let newLayout = layout.removingPane(paneIdToClose) else {
+            closeTab()
+            return
         }
 
-        // Kill tmux session if persistence is enabled
-        if sessionPersistence {
-            Task {
-                await TmuxSessionManager.shared.killSession(paneId: paneIdToClose)
+        // Shift focus to a surviving pane before removing the view
+        if let nextPane = newLayout.allPaneIds().first {
+            focusedPaneId = nextPane
+        }
+
+        layout = newLayout.equalized()
+        layoutVersion += 1
+
+        // Remove terminal after the layout update so AppKit can resign responders safely
+        DispatchQueue.main.async {
+            if let sessionId = session.id {
+                sessionManager.removeTerminal(for: sessionId, paneId: paneIdToClose)
             }
-        }
 
-        if let newLayout = layout.removingPane(paneIdToClose) {
-            layout = newLayout.equalized()
-            // Focus first available pane
-            if let firstPane = layout.allPaneIds().first {
-                focusedPaneId = firstPane
+            if sessionPersistence {
+                Task {
+                    await TmuxSessionManager.shared.killSession(paneId: paneIdToClose)
+                }
             }
         }
     }
