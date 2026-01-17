@@ -340,47 +340,67 @@ class PullRequestsViewModel: ObservableObject {
 
         isPerformingAction = true
         actionError = nil
+        var primaryError: Error?
+
+        if let provider = hostingInfo?.provider, provider == .github || provider == .gitlab {
+            do {
+                try await hostingService.checkoutPullRequest(repoPath: repoPath, number: pr.number)
+                isPerformingAction = false
+                return
+            } catch {
+                primaryError = error
+                logger.error("PR checkout via CLI failed: \(error.localizedDescription)")
+            }
+        }
 
         do {
-            let result = try await ProcessExecutor.shared.executeWithOutput(
-                executable: "/usr/bin/git",
-                arguments: ["checkout", pr.sourceBranch],
-                workingDirectory: repoPath
-            )
-
-            if result.exitCode != 0 {
-                // Try fetching first then checkout
-                _ = try await ProcessExecutor.shared.executeWithOutput(
-                    executable: "/usr/bin/git",
-                    arguments: ["fetch", "origin", pr.sourceBranch],
-                    workingDirectory: repoPath
-                )
-
-                let retryResult = try await ProcessExecutor.shared.executeWithOutput(
-                    executable: "/usr/bin/git",
-                    arguments: ["checkout", pr.sourceBranch],
-                    workingDirectory: repoPath
-                )
-
-                if retryResult.exitCode != 0 {
-                    // Create tracking branch
-                    let trackResult = try await ProcessExecutor.shared.executeWithOutput(
-                        executable: "/usr/bin/git",
-                        arguments: ["checkout", "-b", pr.sourceBranch, "origin/\(pr.sourceBranch)"],
-                        workingDirectory: repoPath
-                    )
-
-                    if trackResult.exitCode != 0 {
-                        throw GitHostingError.commandFailed(message: trackResult.stderr)
-                    }
-                }
-            }
+            try await checkoutBranchWithGit(pr.sourceBranch)
         } catch {
             logger.error("Failed to checkout branch: \(error.localizedDescription)")
-            actionError = error.localizedDescription
+            if let primaryError {
+                actionError = "\(primaryError.localizedDescription)\n\(error.localizedDescription)"
+            } else {
+                actionError = error.localizedDescription
+            }
         }
 
         isPerformingAction = false
+    }
+
+    private func checkoutBranchWithGit(_ branch: String) async throws {
+        let result = try await ProcessExecutor.shared.executeWithOutput(
+            executable: "/usr/bin/git",
+            arguments: ["checkout", branch],
+            workingDirectory: repoPath
+        )
+
+        if result.exitCode != 0 {
+            // Try fetching first then checkout
+            _ = try await ProcessExecutor.shared.executeWithOutput(
+                executable: "/usr/bin/git",
+                arguments: ["fetch", "origin", branch],
+                workingDirectory: repoPath
+            )
+
+            let retryResult = try await ProcessExecutor.shared.executeWithOutput(
+                executable: "/usr/bin/git",
+                arguments: ["checkout", branch],
+                workingDirectory: repoPath
+            )
+
+            if retryResult.exitCode != 0 {
+                // Create tracking branch
+                let trackResult = try await ProcessExecutor.shared.executeWithOutput(
+                    executable: "/usr/bin/git",
+                    arguments: ["checkout", "-b", branch, "origin/\(branch)"],
+                    workingDirectory: repoPath
+                )
+
+                if trackResult.exitCode != 0 {
+                    throw GitHostingError.commandFailed(message: trackResult.stderr)
+                }
+            }
+        }
     }
 
     func openInBrowser() {
