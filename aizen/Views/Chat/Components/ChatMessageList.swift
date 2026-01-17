@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import QuartzCore
 import SwiftUI
 
 // MARK: - Scroll Observation
@@ -59,6 +60,9 @@ private struct ScrollViewObserver: NSViewRepresentable {
         private weak var documentView: NSView?
         private var boundsObserver: NSObjectProtocol?
         private var frameObserver: NSObjectProtocol?
+        private var lastNotifyTime: CFTimeInterval = 0
+        private var pendingNotify: DispatchWorkItem?
+        private let minNotifyInterval: CFTimeInterval = 1.0 / 30.0
 
         init(onScroll: @escaping (CGFloat, CGFloat, CGFloat) -> Void) {
             self.onScroll = onScroll
@@ -169,6 +173,25 @@ private struct ScrollViewObserver: NSViewRepresentable {
 
         private func notifyScrollPosition() {
             guard let scrollView = scrollView else { return }
+            let now = CACurrentMediaTime()
+            let elapsed = now - lastNotifyTime
+            if elapsed < minNotifyInterval {
+                if pendingNotify == nil {
+                    let delay = minNotifyInterval - elapsed
+                    let workItem = DispatchWorkItem { [weak self] in
+                        self?.pendingNotify = nil
+                        self?.notifyScrollPosition()
+                    }
+                    pendingNotify = workItem
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+                }
+                return
+            }
+            lastNotifyTime = now
+            if let pendingNotify = pendingNotify {
+                pendingNotify.cancel()
+                self.pendingNotify = nil
+            }
             let contentHeight = scrollView.documentView?.bounds.height ?? 0
             let viewportHeight = scrollView.contentView.bounds.height
             let rawOffset = scrollView.contentView.bounds.origin.y
@@ -189,9 +212,13 @@ private struct ScrollViewObserver: NSViewRepresentable {
             if let frameObserver = frameObserver {
                 NotificationCenter.default.removeObserver(frameObserver)
             }
+            if let pendingNotify = pendingNotify {
+                pendingNotify.cancel()
+            }
             boundsObserver = nil
             frameObserver = nil
             documentView = nil
+            pendingNotify = nil
         }
     }
 }
@@ -205,6 +232,7 @@ struct ChatMessageList: View {
     let currentIterationId: String?
     let scrollRequest: ChatSessionViewModel.ScrollRequest?
     let shouldAutoScroll: Bool
+    let isResizing: Bool
     let onAppear: () -> Void
     let renderInlineMarkdown: (String) -> AttributedString
     var onToolTap: (ToolCall) -> Void = { _ in }
@@ -239,7 +267,7 @@ struct ChatMessageList: View {
                     .transition(.opacity)
             }
         }
-        .animation(allowAnimations ? .easeInOut(duration: 0.25) : nil, value: showLoadingView)
+        .animation((allowAnimations && !isResizing) ? .easeInOut(duration: 0.25) : nil, value: showLoadingView)
         .onChange(of: shouldShowLoading) { newValue in
             if newValue {
                 // Start showing loading
@@ -356,12 +384,12 @@ struct ChatMessageList: View {
                 .transaction { transaction in
                     // Disable animations during initial load or when processing
                     // to prevent empty screen issues during rapid updates
-                    if !allowAnimations || isProcessing {
+                    if !allowAnimations || isProcessing || isResizing {
                         transaction.disablesAnimations = true
                     }
                 }
                 .background {
-                    if enableScrollObserver {
+                    if enableScrollObserver && !isResizing {
                         ScrollViewObserver(
                             onScroll: { offset, contentHeight, viewportHeight in
                                 updateScrollState(
@@ -375,10 +403,11 @@ struct ChatMessageList: View {
                 }
             }
             .onChange(of: scrollRequest) { request in
+                guard !isResizing else { return }
                 guard let request = request else { return }
                 guard case .item(let targetId, let anchor) = request.target else { return }
                 DispatchQueue.main.async {
-                    if request.animated {
+                    if request.animated && !isResizing {
                         withAnimation(.easeOut(duration: 0.25)) {
                             proxy.scrollTo(targetId, anchor: anchor)
                         }

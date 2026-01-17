@@ -5,6 +5,7 @@
 //  View for displaying and editing file content
 //
 
+import AppKit
 import SwiftUI
 
 struct FileContentView: View {
@@ -15,6 +16,7 @@ struct FileContentView: View {
     let onRevert: () -> Void
 
     @State private var showPreview = true
+    @State private var breadcrumbWidth: CGFloat = 0
 
     private var isMarkdown: Bool {
         let ext = (file.path as NSString).pathExtension.lowercased()
@@ -26,9 +28,13 @@ struct FileContentView: View {
             // Breadcrumb bar
             HStack(spacing: 6) {
                 // Breadcrumb path
+                let displayPath = relativePath(for: file.path, basePath: repoPath)
+                let pathComponents = displayPath.isEmpty
+                    ? [URL(fileURLWithPath: file.path).lastPathComponent]
+                    : displayPath.split(separator: "/").map(String.init)
+                let components = collapsedComponents(pathComponents, availableWidth: breadcrumbWidth)
                 HStack(spacing: 4) {
-                    let pathComponents = file.path.split(separator: "/").map(String.init)
-                    ForEach(Array(pathComponents.enumerated()), id: \.offset) { index, component in
+                    ForEach(Array(components.enumerated()), id: \.offset) { index, component in
                         if index > 0 {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 8))
@@ -36,10 +42,22 @@ struct FileContentView: View {
                         }
                         Text(component)
                             .font(.system(size: 11))
-                            .foregroundColor(index == pathComponents.count - 1 ? .primary : .secondary)
+                            .foregroundColor(index == components.count - 1 ? .primary : .secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                 }
                 .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear
+                            .onAppear { breadcrumbWidth = geometry.size.width }
+                            .onChange(of: geometry.size.width) { newValue in
+                                breadcrumbWidth = newValue
+                            }
+                    }
+                )
 
                 CopyButton(text: file.path, iconSize: 10)
 
@@ -108,5 +126,64 @@ struct FileContentView: View {
     private func detectLanguage(from path: String) -> String? {
         let ext = (path as NSString).pathExtension.lowercased()
         return ext.isEmpty ? nil : ext
+    }
+
+    private func relativePath(for absolutePath: String, basePath: String?) -> String {
+        guard let basePath, !basePath.isEmpty else { return absolutePath }
+        let normalizedBase = basePath.hasSuffix("/") ? String(basePath.dropLast()) : basePath
+        let normalizedAbsolute = absolutePath.hasSuffix("/") ? String(absolutePath.dropLast()) : absolutePath
+        if normalizedAbsolute == normalizedBase {
+            return URL(fileURLWithPath: absolutePath).lastPathComponent
+        }
+        if normalizedAbsolute.hasPrefix(normalizedBase + "/") {
+            return String(normalizedAbsolute.dropFirst(normalizedBase.count + 1))
+        }
+        return absolutePath
+    }
+
+    private func collapsedComponents(_ components: [String], availableWidth: CGFloat) -> [String] {
+        guard components.count > 2, availableWidth > 0 else { return components }
+        if totalWidth(for: components) <= availableWidth {
+            return components
+        }
+
+        let first = components[0]
+        let last = components[components.count - 1]
+        var result: [String] = [first, "...", last]
+        if totalWidth(for: result) > availableWidth {
+            result = ["...", last]
+            if totalWidth(for: result) > availableWidth {
+                return [last]
+            }
+            return result
+        }
+
+        for index in stride(from: components.count - 2, through: 1, by: -1) {
+            let candidate = [first, "..."] + components[index...]
+            if totalWidth(for: candidate) <= availableWidth {
+                result = candidate
+            } else {
+                break
+            }
+        }
+
+        return result
+    }
+
+    private func totalWidth(for components: [String]) -> CGFloat {
+        let componentWidth = components.reduce(0) { $0 + textWidth($1) }
+        let chevronCount = max(components.count - 1, 0)
+        let elementCount = max(components.count * 2 - 1, 0)
+        let spacingCount = max(elementCount - 1, 0)
+        return componentWidth
+            + (CGFloat(chevronCount) * 8)
+            + (CGFloat(spacingCount) * 4)
+    }
+
+    private func textWidth(_ text: String) -> CGFloat {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11)
+        ]
+        return (text as NSString).size(withAttributes: attributes).width
     }
 }

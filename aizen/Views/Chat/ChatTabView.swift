@@ -11,7 +11,10 @@ import os.log
 
 struct ChatTabView: View {
     let worktree: Worktree
+    let repositoryManager: RepositoryManager
     @Binding var selectedSessionId: UUID?
+    @Binding var selectedTerminalSessionId: UUID?
+    @Binding var selectedBrowserSessionId: UUID?
 
     @Environment(\.managedObjectContext) private var viewContext
     private let sessionManager = ChatSessionManager.shared
@@ -20,11 +23,58 @@ struct ChatTabView: View {
     @State private var cachedSessionIds: [UUID] = []
     private let maxCachedSessions = 10
 
+    // Companion panel state (persisted) - Left
+    @AppStorage("companionLeftPanelType") private var leftPanelType: String = ""
+    @AppStorage("companionLeftPanelWidth") private var leftPanelWidthStored: Double = 400
+    @State private var leftPanelWidth: Double = 400
+
+    // Companion panel state (persisted) - Right
+    @AppStorage("companionRightPanelType") private var rightPanelType: String = ""
+    @AppStorage("companionRightPanelWidth") private var rightPanelWidthStored: Double = 400
+    @State private var rightPanelWidth: Double = 400
+
+    @State private var didLoadWidths = false
+    @State private var isResizingCompanion = false
+
+    private let minPanelWidth: CGFloat = 250
+    private let minCenterWidth: CGFloat = 360
+    private let dividerWidth: CGFloat = 1
+    private let maxPanelWidthRatio: CGFloat = 0.75
+    private let companionCoordinateSpace = "companionSplit"
+
+    private var leftPanel: CompanionPanel? {
+        get { CompanionPanel(rawValue: leftPanelType) }
+        nonmutating set { leftPanelType = newValue?.rawValue ?? "" }
+    }
+
+    private var rightPanel: CompanionPanel? {
+        get { CompanionPanel(rawValue: rightPanelType) }
+        nonmutating set { rightPanelType = newValue?.rawValue ?? "" }
+    }
+
+    // Panels available for each side (excluding what's on the other side)
+    private var availableForLeft: [CompanionPanel] {
+        CompanionPanel.allCases.filter { $0.rawValue != rightPanelType }
+    }
+
+    private var availableForRight: [CompanionPanel] {
+        CompanionPanel.allCases.filter { $0.rawValue != leftPanelType }
+    }
+
     @FetchRequest private var sessions: FetchedResults<ChatSession>
 
-    init(worktree: Worktree, selectedSessionId: Binding<UUID?>) {
+    init(
+        worktree: Worktree,
+        repositoryManager: RepositoryManager,
+        selectedSessionId: Binding<UUID?>,
+        selectedTerminalSessionId: Binding<UUID?>,
+        selectedBrowserSessionId: Binding<UUID?>
+    ) {
         self.worktree = worktree
+        self.repositoryManager = repositoryManager
         self._selectedSessionId = selectedSessionId
+        self._selectedTerminalSessionId = selectedTerminalSessionId
+        self._selectedBrowserSessionId = selectedBrowserSessionId
 
         // Handle deleted worktree gracefully - use impossible predicate to return empty results
         let predicate: NSPredicate
@@ -45,30 +95,155 @@ struct ChatTabView: View {
         if sessions.isEmpty {
             chatEmptyState
         } else {
-            ZStack {
-                ForEach(cachedSessions) { session in
-                    let isSelected = selectedSessionId == session.id
-                    ChatSessionView(
+            chatContentWithCompanion
+                .onAppear {
+                    syncSelectionAndCache()
+                }
+                .onChange(of: selectedSessionId) { _ in
+                    updateCacheForSelection()
+                }
+                .onChange(of: sessions.count) { _ in
+                    syncSelectionAndCache()
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var chatContentWithCompanion: some View {
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                // LEFT PANEL
+                if let panel = leftPanel {
+                    CompanionPanelView(
+                        panel: panel,
                         worktree: worktree,
-                        session: session,
-                        sessionManager: sessionManager,
-                        viewContext: viewContext,
-                        isSelected: isSelected
+                        repositoryManager: repositoryManager,
+                        side: .left,
+                        onClose: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                leftPanelType = ""
+                            }
+                        },
+                        isResizing: isResizingCompanion,
+                        terminalSessionId: $selectedTerminalSessionId,
+                        browserSessionId: $selectedBrowserSessionId
                     )
+                    .frame(width: CGFloat(leftPanelWidth))
+                    .animation(nil, value: leftPanelWidth)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+
+                    CompanionDivider(
+                        panelWidth: $leftPanelWidth,
+                        minWidth: minPanelWidth,
+                        maxWidth: maxLeftWidth(containerWidth: geometry.size.width, rightWidth: CGFloat(rightPanelWidth)),
+                        containerWidth: geometry.size.width,
+                        coordinateSpace: companionCoordinateSpace,
+                        side: .left,
+                        isDragging: $isResizingCompanion,
+                        onDragEnd: { leftPanelWidthStored = leftPanelWidth }
+                    )
+                }
+
+                // CHAT (center)
+                chatSessionsStack
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .opacity(isSelected ? 1 : 0)
-                    .allowsHitTesting(isSelected)
-                    .zIndex(isSelected ? 1 : 0)
+                    .overlay(alignment: .leading) {
+                        if leftPanel == nil {
+                            CompanionRailView(
+                                side: .left,
+                                availablePanels: availableForLeft,
+                                onSelect: { leftPanelType = $0.rawValue }
+                            )
+                        }
+                    }
+                    .overlay(alignment: .trailing) {
+                        if rightPanel == nil {
+                            CompanionRailView(
+                                side: .right,
+                                availablePanels: availableForRight,
+                                onSelect: { rightPanelType = $0.rawValue }
+                            )
+                        }
+                    }
+
+                // RIGHT PANEL
+                if let panel = rightPanel {
+                    CompanionDivider(
+                        panelWidth: $rightPanelWidth,
+                        minWidth: minPanelWidth,
+                        maxWidth: maxRightWidth(containerWidth: geometry.size.width, leftWidth: CGFloat(leftPanelWidth)),
+                        containerWidth: geometry.size.width,
+                        coordinateSpace: companionCoordinateSpace,
+                        side: .right,
+                        isDragging: $isResizingCompanion,
+                        onDragEnd: { rightPanelWidthStored = rightPanelWidth }
+                    )
+
+                    CompanionPanelView(
+                        panel: panel,
+                        worktree: worktree,
+                        repositoryManager: repositoryManager,
+                        side: .right,
+                        onClose: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                rightPanelType = ""
+                            }
+                        },
+                        isResizing: isResizingCompanion,
+                        terminalSessionId: $selectedTerminalSessionId,
+                        browserSessionId: $selectedBrowserSessionId
+                    )
+                    .frame(width: CGFloat(rightPanelWidth))
+                    .animation(nil, value: rightPanelWidth)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
+            .animation(.easeInOut(duration: 0.2), value: leftPanelType)
+            .animation(.easeInOut(duration: 0.2), value: rightPanelType)
+            .animation(nil, value: leftPanelWidth)
+            .animation(nil, value: rightPanelWidth)
+            .transaction { transaction in
+                if isResizingCompanion {
+                    transaction.disablesAnimations = true
+                }
+            }
+            .coordinateSpace(name: companionCoordinateSpace)
             .onAppear {
-                syncSelectionAndCache()
+                if !didLoadWidths {
+                    leftPanelWidth = leftPanelWidthStored
+                    rightPanelWidth = rightPanelWidthStored
+                    clampPanelWidths(containerWidth: geometry.size.width)
+                    didLoadWidths = true
+                }
             }
-            .onChange(of: selectedSessionId) { _ in
-                updateCacheForSelection()
+            .onChange(of: geometry.size.width) { newWidth in
+                clampPanelWidths(containerWidth: newWidth)
             }
-            .onChange(of: sessions.count) { _ in
-                syncSelectionAndCache()
+            .onChange(of: leftPanelType) { _ in
+                clampPanelWidths(containerWidth: geometry.size.width)
+            }
+            .onChange(of: rightPanelType) { _ in
+                clampPanelWidths(containerWidth: geometry.size.width)
+            }
+        }
+    }
+
+    private var chatSessionsStack: some View {
+        ZStack {
+            ForEach(cachedSessions) { session in
+                let isSelected = selectedSessionId == session.id
+                ChatSessionView(
+                    worktree: worktree,
+                    session: session,
+                    sessionManager: sessionManager,
+                    viewContext: viewContext,
+                    isSelected: isSelected,
+                    isCompanionResizing: isResizingCompanion
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(isSelected ? 1 : 0)
+                .allowsHitTesting(isSelected)
+                .zIndex(isSelected ? 1 : 0)
             }
         }
     }
@@ -113,6 +288,48 @@ struct ChatTabView: View {
     private func pruneCache() {
         let validIds = Set(sessions.compactMap { $0.id })
         cachedSessionIds.removeAll { !validIds.contains($0) }
+    }
+
+    private func maxLeftWidth(containerWidth: CGFloat, rightWidth: CGFloat) -> CGFloat {
+        let rightTotal = rightPanel == nil ? 0 : rightWidth + dividerWidth
+        let available = containerWidth - minCenterWidth - rightTotal - dividerWidth
+        let ratioMax = containerWidth * maxPanelWidthRatio
+        return max(minPanelWidth, min(available, ratioMax))
+    }
+
+    private func maxRightWidth(containerWidth: CGFloat, leftWidth: CGFloat) -> CGFloat {
+        let leftTotal = leftPanel == nil ? 0 : leftWidth + dividerWidth
+        let available = containerWidth - minCenterWidth - leftTotal - dividerWidth
+        let ratioMax = containerWidth * maxPanelWidthRatio
+        return max(minPanelWidth, min(available, ratioMax))
+    }
+
+    private func clampPanelWidths(containerWidth: CGFloat) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            if leftPanel != nil {
+                let maxWidth = maxLeftWidth(containerWidth: containerWidth, rightWidth: CGFloat(rightPanelWidth))
+                let clamped = min(max(CGFloat(leftPanelWidth), minPanelWidth), maxWidth)
+                if clamped != CGFloat(leftPanelWidth) {
+                    leftPanelWidth = Double(clamped)
+                }
+            }
+            if rightPanel != nil {
+                let maxWidth = maxRightWidth(containerWidth: containerWidth, leftWidth: CGFloat(leftPanelWidth))
+                let clamped = min(max(CGFloat(rightPanelWidth), minPanelWidth), maxWidth)
+                if clamped != CGFloat(rightPanelWidth) {
+                    rightPanelWidth = Double(clamped)
+                }
+            }
+            if leftPanel != nil {
+                let maxWidth = maxLeftWidth(containerWidth: containerWidth, rightWidth: CGFloat(rightPanelWidth))
+                let clamped = min(max(CGFloat(leftPanelWidth), minPanelWidth), maxWidth)
+                if clamped != CGFloat(leftPanelWidth) {
+                    leftPanelWidth = Double(clamped)
+                }
+            }
+        }
     }
 
     private var chatEmptyState: some View {

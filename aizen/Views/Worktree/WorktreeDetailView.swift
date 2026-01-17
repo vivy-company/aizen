@@ -111,7 +111,10 @@ struct WorktreeDetailView: View {
             if selectedTab == "chat" {
                 ChatTabView(
                     worktree: worktree,
-                    selectedSessionId: $viewModel.selectedChatSessionId
+                    repositoryManager: repositoryManager,
+                    selectedSessionId: $viewModel.selectedChatSessionId,
+                    selectedTerminalSessionId: $viewModel.selectedTerminalSessionId,
+                    selectedBrowserSessionId: $viewModel.selectedBrowserSessionId
                 )
             } else if selectedTab == "terminal" {
                 TerminalTabView(
