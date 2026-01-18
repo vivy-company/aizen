@@ -71,12 +71,15 @@ actor AgentInstaller {
 
     func getAgentExecutablePath(_ agentName: String) -> String {
         let agentDir = (baseInstallPath as NSString).appendingPathComponent(agentName)
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
 
         switch agentName {
         case "claude":
             return (agentDir as NSString).appendingPathComponent("node_modules/.bin/claude-code-acp")
         case "codex":
             return (agentDir as NSString).appendingPathComponent("node_modules/.bin/codex-acp")
+        case "droid":
+            return (homeDir as NSString).appendingPathComponent(".local/bin/droid")
         case "gemini":
             return (agentDir as NSString).appendingPathComponent("node_modules/.bin/gemini")
         case "kimi":
@@ -132,6 +135,8 @@ actor AgentInstaller {
                 agentId: metadata.id,
                 targetDir: agentDir
             )
+        case .script(let urlString):
+            try await ScriptAgentInstaller.shared.install(from: urlString)
         }
 
         // Register the installed path
@@ -200,4 +205,5 @@ actor AgentInstaller {
         return "unknown"
         #endif
     }
+
 }

@@ -13,6 +13,7 @@ enum AgentInstallMethod: Codable, Equatable {
     case uv(package: String)
     case binary(url: String)
     case githubRelease(repo: String, assetPattern: String)
+    case script(url: String)
 
     enum CodingKeys: String, CodingKey {
         case type, package, url, repo, assetPattern
@@ -36,6 +37,9 @@ enum AgentInstallMethod: Codable, Equatable {
             let repo = try container.decode(String.self, forKey: .repo)
             let assetPattern = try container.decode(String.self, forKey: .assetPattern)
             self = .githubRelease(repo: repo, assetPattern: assetPattern)
+        case "script":
+            let url = try container.decode(String.self, forKey: .url)
+            self = .script(url: url)
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown install method")
         }
@@ -58,6 +62,9 @@ enum AgentInstallMethod: Codable, Equatable {
             try container.encode("githubRelease", forKey: .type)
             try container.encode(repo, forKey: .repo)
             try container.encode(assetPattern, forKey: .assetPattern)
+        case .script(let url):
+            try container.encode("script", forKey: .type)
+            try container.encode(url, forKey: .url)
         }
     }
 }

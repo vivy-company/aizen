@@ -57,6 +57,9 @@ actor AgentVersionChecker {
         case .binary:
             // Binary installs don't have version tracking
             info = AgentVersionInfo(current: nil, latest: nil, isOutdated: false, updateAvailable: false)
+        case .script:
+            // Script installs don't have version tracking
+            info = AgentVersionInfo(current: nil, latest: nil, isOutdated: false, updateAvailable: false)
         }
 
         // Cache the result

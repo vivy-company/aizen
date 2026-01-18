@@ -77,6 +77,8 @@ actor AgentUpdater {
             methodName = repo
         case .binary(let url):
             methodName = url
+        case .script(let url):
+            methodName = url
         }
 
         await MainActor.run { onProgress("Updating \(methodName)...") }

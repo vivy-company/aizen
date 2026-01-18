@@ -19,11 +19,14 @@ extension AgentRegistry {
     /// Returns the path where the agent should be installed, regardless of whether it exists
     static func managedPath(for agentId: String) -> String {
         let basePath = managedAgentsBasePath
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
         switch agentId {
         case "claude":
             return "\(basePath)/claude/node_modules/.bin/claude-code-acp"
         case "codex":
             return "\(basePath)/codex/node_modules/.bin/codex-acp"
+        case "droid":
+            return "\(home)/.local/bin/droid"
         case "gemini":
             return "\(basePath)/gemini/node_modules/.bin/gemini"
         case "kimi":
@@ -85,6 +88,20 @@ extension AgentRegistry {
                 executablePath: Self.managedPath(for: "codex"),
                 launchArgs: [],
                 installMethod: .npm(package: "@zed-industries/codex-acp")
+            )
+        }
+
+        updateBuiltInAgent("droid", in: &metadata) {
+            AgentMetadata(
+                id: "droid",
+                name: "Droid",
+                description: "Factory Droid agent for ACP-based coding sessions",
+                iconType: .builtin("droid"),
+                isBuiltIn: true,
+                isEnabled: true,
+                executablePath: Self.managedPath(for: "droid"),
+                launchArgs: ["exec", "--output-format", "acp"],
+                installMethod: .script(url: "https://app.factory.ai/cli")
             )
         }
 
