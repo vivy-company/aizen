@@ -87,12 +87,12 @@ class RepositoryManager: ObservableObject {
     /// Update a repository with a new path (relocate)
     func relocateRepository(_ repository: Repository, to newPath: String) async throws {
         // Validate it's a git repository
-        guard await GitUtils.isGitRepository(at: newPath) else {
+        guard GitUtils.isGitRepository(at: newPath) else {
             throw Libgit2Error.notARepository(newPath)
         }
 
         // Get main repository path (in case this is a worktree)
-        let mainRepoPath = await GitUtils.getMainRepositoryPath(at: newPath)
+        let mainRepoPath = GitUtils.getMainRepositoryPath(at: newPath)
 
         repository.path = mainRepoPath
         repository.lastUpdated = Date()
@@ -110,13 +110,13 @@ class RepositoryManager: ObservableObject {
     // MARK: - Repository Operations
 
     func addExistingRepository(path: String, workspace: Workspace) async throws -> Repository {
-        // Validate it's a git repository using libgit2 (async to avoid blocking main thread)
-        guard await GitUtils.isGitRepository(at: path) else {
+        // Validate it's a git repository using libgit2
+        guard GitUtils.isGitRepository(at: path) else {
             throw Libgit2Error.notARepository(path)
         }
 
-        // Get main repository path (in case this is a worktree) - async for file I/O
-        let mainRepoPath = await GitUtils.getMainRepositoryPath(at: path)
+        // Get main repository path (in case this is a worktree)
+        let mainRepoPath = GitUtils.getMainRepositoryPath(at: path)
 
         // Check if repository already exists
         let fetchRequest: NSFetchRequest<Repository> = Repository.fetchRequest()

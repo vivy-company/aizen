@@ -92,12 +92,12 @@ final class DeepLinkHandler {
         for path: String,
         in context: NSManagedObjectContext
     ) async -> (workspaceId: UUID, repoId: UUID, worktreeId: UUID)? {
-        let discovered = await GitUtils.discoverRepository(from: path)
+        let discovered = GitUtils.discoverRepository(from: path)
         var repositoryPath = discovered ?? path
         if repositoryPath.hasSuffix("/.git") {
             repositoryPath = URL(fileURLWithPath: repositoryPath).deletingLastPathComponent().path
         }
-        let mainRepoPath = await GitUtils.getMainRepositoryPath(at: repositoryPath)
+        let mainRepoPath = GitUtils.getMainRepositoryPath(at: repositoryPath)
 
         let repoRequest: NSFetchRequest<Repository> = Repository.fetchRequest()
         repoRequest.predicate = NSPredicate(format: "path == %@", mainRepoPath)

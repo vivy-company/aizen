@@ -22,11 +22,9 @@ actor GitDiffProvider {
         let repoURL = URL(fileURLWithPath: repoPath)
         let relativePath = fileURL.path.replacingOccurrences(of: repoURL.path + "/", with: "")
 
-        // Run libgit2 on background thread to avoid blocking UI
-        let delta = try await Task.detached {
-            let repo = try Libgit2Repository(path: repoPath)
-            return try repo.diffFile(relativePath)
-        }.value
+        // Actor methods run on background executor, no need for Task.detached
+        let repo = try Libgit2Repository(path: repoPath)
+        let delta = try repo.diffFile(relativePath)
 
         guard let delta = delta else {
             return [:]
@@ -90,27 +88,25 @@ actor GitDiffProvider {
         let repoURL = URL(fileURLWithPath: repoPath)
         let relativePath = fileURL.path.replacingOccurrences(of: repoURL.path + "/", with: "")
 
-        // Run libgit2 on background thread to avoid blocking UI
-        return await Task.detached {
-            do {
-                let repo = try Libgit2Repository(path: repoPath)
-                let status = try repo.status()
+        // Actor methods run on background executor, no need for Task.detached
+        do {
+            let repo = try Libgit2Repository(path: repoPath)
+            let status = try repo.status()
 
-                // File is tracked if it's in any category except untracked
-                let allPaths = status.staged.map { $0.path } +
-                              status.modified.map { $0.path } +
-                              status.conflicted.map { $0.path }
+            // File is tracked if it's in any category except untracked
+            let allPaths = status.staged.map { $0.path } +
+                          status.modified.map { $0.path } +
+                          status.conflicted.map { $0.path }
 
-                // Also check if file exists in HEAD
-                if allPaths.contains(relativePath) {
-                    return true
-                }
-
-                // Check if file is in the index or HEAD (not untracked)
-                return !status.untracked.contains { $0.path == relativePath }
-            } catch {
-                return false
+            // Also check if file exists in HEAD
+            if allPaths.contains(relativePath) {
+                return true
             }
-        }.value
+
+            // Check if file is in the index or HEAD (not untracked)
+            return !status.untracked.contains { $0.path == relativePath }
+        } catch {
+            return false
+        }
     }
 }

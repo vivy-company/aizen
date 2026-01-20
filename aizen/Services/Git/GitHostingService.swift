@@ -230,16 +230,14 @@ actor GitHostingService {
     }
 
     private func computeHostingInfo(repoPath: String) async -> GitHostingInfo? {
-        // Run libgit2 operations on background thread
+        // Actor methods run on background executor, no need for Task.detached
         let remoteURL: String?
         do {
-            remoteURL = try await Task.detached {
-                let repo = try Libgit2Repository(path: repoPath)
-                guard let remote = try repo.defaultRemote() else {
-                    return nil
-                }
-                return remote.url
-            }.value
+            let repo = try Libgit2Repository(path: repoPath)
+            guard let remote = try repo.defaultRemote() else {
+                return nil
+            }
+            remoteURL = remote.url
         } catch {
             logger.error("Failed to get hosting info: \(error.localizedDescription)")
             return nil
