@@ -40,7 +40,7 @@ class WorkflowService: ObservableObject {
     private var githubProvider: GitHubWorkflowProvider?
     private var gitlabProvider: GitLabWorkflowProvider?
 
-    private var refreshTimer: Timer?
+    private var refreshTask: Task<Void, Never>?
     private var logPollingTask: Task<Void, Never>?
 
     private let runsLimit = 20
@@ -470,16 +470,18 @@ class WorkflowService: ObservableObject {
     private func startAutoRefresh() {
         stopAutoRefresh()
 
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
+        refreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard !Task.isCancelled else { break }
                 await self?.refresh()
             }
         }
     }
 
     func stopAutoRefresh() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+        refreshTask?.cancel()
+        refreshTask = nil
     }
 
     func setAutoRefreshEnabled(_ enabled: Bool) {
@@ -592,7 +594,7 @@ class WorkflowService: ObservableObject {
     }
 
     deinit {
-        refreshTimer?.invalidate()
+        refreshTask?.cancel()
         logPollingTask?.cancel()
     }
 }

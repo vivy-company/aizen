@@ -234,9 +234,13 @@ actor TmuxSessionManager {
     /// Kill all aizen-prefixed tmux sessions
     func killAllAizenSessions() async {
         let sessions = await listAizenSessions()
-        for session in sessions {
-            let paneId = String(session.dropFirst(sessionPrefix.count))
-            await killSession(paneId: paneId)
+        await withTaskGroup(of: Void.self) { group in
+            for session in sessions {
+                let paneId = String(session.dropFirst(sessionPrefix.count))
+                group.addTask {
+                    await self.killSession(paneId: paneId)
+                }
+            }
         }
         Self.logger.info("Killed all aizen tmux sessions")
     }
@@ -244,12 +248,18 @@ actor TmuxSessionManager {
     /// Clean up orphaned sessions (sessions without matching Core Data panes)
     func cleanupOrphanedSessions(validPaneIds: Set<String>) async {
         let sessions = await listAizenSessions()
-
-        for session in sessions {
+        let orphanedSessions = sessions.filter { session in
             let paneId = String(session.dropFirst(sessionPrefix.count))
-            if !validPaneIds.contains(paneId) {
-                await killSession(paneId: paneId)
-                Self.logger.info("Cleaned up orphaned tmux session: \(session)")
+            return !validPaneIds.contains(paneId)
+        }
+
+        await withTaskGroup(of: Void.self) { group in
+            for session in orphanedSessions {
+                let paneId = String(session.dropFirst(sessionPrefix.count))
+                group.addTask {
+                    await self.killSession(paneId: paneId)
+                    Self.logger.info("Cleaned up orphaned tmux session: \(session)")
+                }
             }
         }
     }

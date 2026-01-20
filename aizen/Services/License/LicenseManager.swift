@@ -65,7 +65,7 @@ final class LicenseManager: ObservableObject {
     private let client = LicenseClient()
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "License")
 
-    private var validationTimer: Timer?
+    private var validationTask: Task<Void, Never>?
     private let validationInterval: TimeInterval = 24 * 60 * 60
     private let offlineGraceDays = 7
 
@@ -348,9 +348,13 @@ final class LicenseManager: ObservableObject {
     }
 
     private func scheduleValidationTimer() {
-        validationTimer?.invalidate()
-        validationTimer = Timer.scheduledTimer(withTimeInterval: validationInterval, repeats: true) { [weak self] _ in
-            Task { await self?.validateNow() }
+        validationTask?.cancel()
+        validationTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(self?.validationInterval ?? 86400))
+                guard !Task.isCancelled else { break }
+                await self?.validateNow()
+            }
         }
     }
 

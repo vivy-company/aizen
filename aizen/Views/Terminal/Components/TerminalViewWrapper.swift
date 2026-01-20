@@ -15,7 +15,7 @@ import os.log
 class TerminalViewCoordinator {
     let session: TerminalSession
     let onProcessExit: () -> Void
-    private var exitCheckTimer: Timer?
+    private var exitCheckTask: Task<Void, Never>?
 
     init(session: TerminalSession, onProcessExit: @escaping () -> Void) {
         self.session = session
@@ -25,23 +25,22 @@ class TerminalViewCoordinator {
     func startMonitoring(terminal: GhosttyTerminalView) {
         stopMonitoring()
         // Poll for process exit every 500ms
-        exitCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self, weak terminal] _ in
-            Task { @MainActor [weak self, weak terminal] in
-                guard let self = self, let terminal = terminal else { return }
+        exitCheckTask = Task { @MainActor [weak self, weak terminal] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled, let self = self, let terminal = terminal else { break }
 
                 if terminal.processExited {
-                    self.exitCheckTimer?.invalidate()
-                    self.exitCheckTimer = nil
                     self.onProcessExit()
+                    break
                 }
             }
         }
-        exitCheckTimer?.tolerance = 0.1
     }
 
     func stopMonitoring() {
-        exitCheckTimer?.invalidate()
-        exitCheckTimer = nil
+        exitCheckTask?.cancel()
+        exitCheckTask = nil
     }
 
     deinit {

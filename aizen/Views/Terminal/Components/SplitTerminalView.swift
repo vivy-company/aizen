@@ -30,9 +30,9 @@ struct SplitTerminalView: View {
     @State private var focusedPaneId: String
     @State private var layoutVersion: Int = 0  // Increment when layout changes to force refresh
     @State private var paneTitles: [String: String] = [:]
-    @State private var layoutSaveWorkItem: DispatchWorkItem?
-    @State private var focusSaveWorkItem: DispatchWorkItem?
-    @State private var contextSaveWorkItem: DispatchWorkItem?
+    @State private var layoutSaveTask: Task<Void, Never>?
+    @State private var focusSaveTask: Task<Void, Never>?
+    @State private var contextSaveTask: Task<Void, Never>?
     @State private var showCloseConfirmation = false
     @State private var pendingCloseAction: CloseAction = .pane
     @State private var keyMonitor: Any?
@@ -107,9 +107,9 @@ struct SplitTerminalView: View {
                 closePane: closePane
             ) : nil)
             .onDisappear {
-                layoutSaveWorkItem?.cancel()
-                focusSaveWorkItem?.cancel()
-                contextSaveWorkItem?.cancel()
+                layoutSaveTask?.cancel()
+                focusSaveTask?.cancel()
+                contextSaveTask?.cancel()
                 if let monitor = keyMonitor {
                     NSEvent.removeMonitor(monitor)
                     keyMonitor = nil
@@ -225,7 +225,8 @@ struct SplitTerminalView: View {
         if paneCount == 1 {
             // Only one pane - delete the entire terminal session
             // Use a small delay to allow SwiftUI to process the deletion gracefully
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak session] in
+            Task { @MainActor [weak session] in
+                try? await Task.sleep(for: .milliseconds(100))
                 guard let session = session,
                       !session.isDeleted,
                       let context = session.managedObjectContext else { return }
@@ -349,9 +350,11 @@ struct SplitTerminalView: View {
     }
 
     private func scheduleDebouncedSave() {
-        contextSaveWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak session] in
-            guard let session = session,
+        contextSaveTask?.cancel()
+        contextSaveTask = Task { @MainActor [weak session] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled,
+                  let session = session,
                   !session.isDeleted,
                   let context = session.managedObjectContext else { return }
             do {
@@ -360,28 +363,28 @@ struct SplitTerminalView: View {
                 Logger.terminal.error("Failed to save split layout: \(error.localizedDescription)")
             }
         }
-        contextSaveWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
     }
 
     // MARK: - Persistence Helpers
 
     private func scheduleLayoutSave() {
-        layoutSaveWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [layout] in
-            persistLayout(layout)
+        layoutSaveTask?.cancel()
+        let currentLayout = layout
+        layoutSaveTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            persistLayout(currentLayout)
         }
-        layoutSaveWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
     }
 
     private func scheduleFocusSave() {
-        focusSaveWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [focusedPaneId] in
-            persistFocus(focusedPaneId)
+        focusSaveTask?.cancel()
+        let currentFocusedPaneId = focusedPaneId
+        focusSaveTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled else { return }
+            persistFocus(currentFocusedPaneId)
         }
-        focusSaveWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: workItem)
     }
 
     private func persistLayout(_ layoutToSave: SplitNode? = nil) {
