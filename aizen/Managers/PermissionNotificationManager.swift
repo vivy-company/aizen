@@ -79,12 +79,9 @@ final class PermissionNotificationManager: NSObject, UNUserNotificationCenterDel
         // Only notify if app is not active
         guard !NSApp.isActive else { return }
 
-        requestPermissionIfNeeded { [weak self] granted in
-            guard granted else { return }
-
-            Task { @MainActor in
-                self?.postNotification(info: info)
-            }
+        Task {
+            guard await requestPermissionIfNeeded() else { return }
+            postNotification(info: info)
         }
     }
 
@@ -111,9 +108,11 @@ final class PermissionNotificationManager: NSObject, UNUserNotificationCenterDel
             trigger: nil
         )
 
-        center.add(request) { [weak self] error in
-            if let error {
-                self?.logger.error("Failed to deliver permission notification: \(error.localizedDescription)")
+        Task {
+            do {
+                try await center.add(request)
+            } catch {
+                logger.error("Failed to deliver permission notification: \(error.localizedDescription)")
             }
         }
     }
@@ -211,16 +210,16 @@ final class PermissionNotificationManager: NSObject, UNUserNotificationCenterDel
         )
     }
 
-    private func requestPermissionIfNeeded(completion: @escaping (Bool) -> Void) {
+    private func requestPermissionIfNeeded() async -> Bool {
         if permissionRequested {
-            center.getNotificationSettings { settings in
-                completion(settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional)
-            }
-            return
+            let settings = await center.notificationSettings()
+            return settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
         }
         permissionRequested = true
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-            completion(granted)
+        do {
+            return try await center.requestAuthorization(options: [.alert, .sound, .badge])
+        } catch {
+            return false
         }
     }
 }

@@ -96,7 +96,9 @@ class ChatSessionViewModel: ObservableObject {
         }
     }
     private var cancellables = Set<AnyCancellable>()
-    private var notificationCancellables = Set<AnyCancellable>()
+    private var notificationTasks: [Task<Void, Never>] = []
+    private var sessionObserverTasks: [Task<Void, Never>] = []
+    private var toolCallThrottleTask: Task<Void, Never>?
     private var wasStreaming: Bool = false  // Track streaming state transitions
     let logger = Logger.forCategory("ChatSession")
     var autoScrollTask: Task<Void, Never>?
@@ -178,7 +180,11 @@ class ChatSessionViewModel: ObservableObject {
             }
         }
         cancellables.removeAll()
-        notificationCancellables.removeAll()
+        notificationTasks.forEach { $0.cancel() }
+        notificationTasks.removeAll()
+        sessionObserverTasks.forEach { $0.cancel() }
+        sessionObserverTasks.removeAll()
+        toolCallThrottleTask?.cancel()
     }
 
     func setupAgentSession() {
@@ -449,32 +455,39 @@ class ChatSessionViewModel: ObservableObject {
     // MARK: - Private Helpers
 
     private func setupNotificationObservers() {
-        NotificationCenter.default.publisher(for: .cycleModeShortcut)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
+        notificationTasks.append(Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: .cycleModeShortcut) {
+                guard !Task.isCancelled else { break }
                 self?.cycleModeForward()
             }
-            .store(in: &notificationCancellables)
+        })
 
-        NotificationCenter.default.publisher(for: .interruptAgentShortcut)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
+        notificationTasks.append(Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: .interruptAgentShortcut) {
+                guard !Task.isCancelled else { break }
                 self?.cancelCurrentPrompt()
             }
-            .store(in: &notificationCancellables)
+        })
     }
 
     private func setupSessionObservers(session: AgentSession) {
+        // Cancel existing observers
         cancellables.removeAll()
+        sessionObserverTasks.forEach { $0.cancel() }
+        sessionObserverTasks.removeAll()
+        toolCallThrottleTask?.cancel()
 
-        session.$messages
-            // Stream message updates as they arrive for smoother chunk rendering.
-            .removeDuplicates()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] newMessages in
-                guard let self = self else { return }
-                // AgentSession is @MainActor so we're already on main thread
-                // Direct call avoids coalescing of rapid streaming updates
+        // Track previous messages for duplicate detection
+        var previousMessages: [MessageItem] = []
+
+        // Observe messages - stream updates as they arrive for smoother chunk rendering
+        sessionObserverTasks.append(Task { [weak self] in
+            for await newMessages in session.$messages.values {
+                guard !Task.isCancelled, let self = self else { break }
+                // Skip duplicate emissions
+                guard newMessages != previousMessages else { continue }
+                previousMessages = newMessages
+
                 self.syncMessages(newMessages)
 
                 // Only auto-scroll if user is near bottom
@@ -484,116 +497,110 @@ class ChatSessionViewModel: ObservableObject {
                     self.scrollToBottomDeferred()
                 }
             }
-            .store(in: &cancellables)
+        })
 
-        // Observe toolCallsById changes (dictionary-based storage)
-        session.$toolCallsById
-            .receive(on: DispatchQueue.main)
-            .throttle(for: .milliseconds(60), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] _ in
-                guard let self = self, let session = self.currentAgentSession else { return }
-                let newToolCalls = session.toolCalls
-                self.syncToolCalls(newToolCalls)
-                // Only auto-scroll if user is near bottom
-                if self.isNearBottom {
-                    self.scrollToBottomDeferred()
+        // Observe toolCallsById changes with throttling (60ms)
+        sessionObserverTasks.append(Task { [weak self] in
+            for await _ in session.$toolCallsById.values {
+                guard !Task.isCancelled, let self = self else { break }
+                // Throttle by cancelling pending and scheduling new
+                self.toolCallThrottleTask?.cancel()
+                self.toolCallThrottleTask = Task {
+                    try? await Task.sleep(for: .milliseconds(60))
+                    guard !Task.isCancelled, let session = self.currentAgentSession else { return }
+                    let newToolCalls = session.toolCalls
+                    self.syncToolCalls(newToolCalls)
+                    if self.isNearBottom {
+                        self.scrollToBottomDeferred()
+                    }
                 }
             }
-            .store(in: &cancellables)
+        })
 
-        session.$isActive
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isActive in
-                guard let self = self else { return }
+        // Observe isActive
+        sessionObserverTasks.append(Task { [weak self] in
+            for await isActive in session.$isActive.values {
+                guard !Task.isCancelled, let self = self else { break }
                 if !isActive {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         self.isProcessing = false
                     }
                 }
             }
-            .store(in: &cancellables)
+        })
 
-        // Direct observers for nested/derived state (fixes Issue 2)
-        session.$needsAuthentication
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] needsAuth in
+        // Direct observers for nested/derived state
+        sessionObserverTasks.append(Task { [weak self] in
+            for await needsAuth in session.$needsAuthentication.values {
+                guard !Task.isCancelled else { break }
                 self?.needsAuth = needsAuth
             }
-            .store(in: &cancellables)
+        })
 
-        session.$needsAgentSetup
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] needsSetup in
+        sessionObserverTasks.append(Task { [weak self] in
+            for await needsSetup in session.$needsAgentSetup.values {
+                guard !Task.isCancelled else { break }
                 self?.needsSetup = needsSetup
             }
-            .store(in: &cancellables)
+        })
 
-        session.$needsUpdate
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] needsUpdate in
+        sessionObserverTasks.append(Task { [weak self] in
+            for await needsUpdate in session.$needsUpdate.values {
+                guard !Task.isCancelled else { break }
                 self?.needsUpdate = needsUpdate
             }
-            .store(in: &cancellables)
+        })
 
-        session.$versionInfo
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] versionInfo in
+        sessionObserverTasks.append(Task { [weak self] in
+            for await versionInfo in session.$versionInfo.values {
+                guard !Task.isCancelled else { break }
                 self?.versionInfo = versionInfo
             }
-            .store(in: &cancellables)
+        })
 
-        session.$agentPlan
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] plan in
-                guard let self = self else {
-                    Logger.forCategory("ChatSession").error("Plan update received but self is nil!")
-                    return
-                }
+        sessionObserverTasks.append(Task { [weak self] in
+            for await plan in session.$agentPlan.values {
+                guard !Task.isCancelled, let self = self else { break }
                 self.logger.info("Plan update received: \(plan?.entries.count ?? 0) entries, wasNil=\(self.currentAgentPlan == nil), isNil=\(plan == nil)")
                 self.currentAgentPlan = plan
             }
-            .store(in: &cancellables)
+        })
 
-        session.$availableModes
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] modes in
+        sessionObserverTasks.append(Task { [weak self] in
+            for await modes in session.$availableModes.values {
+                guard !Task.isCancelled else { break }
                 self?.hasModes = !modes.isEmpty
             }
-            .store(in: &cancellables)
+        })
 
-        session.$currentModeId
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] modeId in
+        sessionObserverTasks.append(Task { [weak self] in
+            for await modeId in session.$currentModeId.values {
+                guard !Task.isCancelled else { break }
                 self?.currentModeId = modeId
             }
-            .store(in: &cancellables)
+        })
 
         // Observe sessionState for lifecycle tracking
-        session.$sessionState
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] state in
+        sessionObserverTasks.append(Task { [weak self] in
+            for await state in session.$sessionState.values {
+                guard !Task.isCancelled else { break }
                 self?.sessionState = state
             }
-            .store(in: &cancellables)
+        })
 
         // Observe isStreaming to update isProcessing - this is the source of truth
-        session.$isStreaming
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isStreaming in
-                guard let self = self else { return }
+        sessionObserverTasks.append(Task { [weak self] in
+            for await isStreaming in session.$isStreaming.values {
+                guard !Task.isCancelled, let self = self else { break }
                 self.isProcessing = isStreaming
 
                 if let path = self.worktree.path, !path.isEmpty {
                     if isStreaming && !self.gitPauseApplied {
                         self.gitPauseApplied = true
-                        Task {
-                            await GitIndexWatchCenter.shared.pause(worktreePath: path)
-                        }
+                        await GitIndexWatchCenter.shared.pause(worktreePath: path)
                     } else if !isStreaming && self.gitPauseApplied {
                         self.gitPauseApplied = false
-                        Task {
-                            await GitIndexWatchCenter.shared.resume(worktreePath: path)
-                        }
+                        await GitIndexWatchCenter.shared.resume(worktreePath: path)
                     }
                 }
 
@@ -602,35 +609,32 @@ class ChatSessionViewModel: ObservableObject {
                 self.wasStreaming = isStreaming
 
                 if streamingEnded {
-                    Task { @MainActor in
-                        // Delay to ensure all tool calls are synced
-                        try? await Task.sleep(for: .milliseconds(150))
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            self.rebuildTimelineWithGrouping(isStreaming: false)
-                        }
-                        self.previousMessageIds = Set(self.messages.map { $0.id })
-                        self.previousToolCallIds = Set(session.toolCalls.map { $0.id })
+                    // Delay to ensure all tool calls are synced
+                    try? await Task.sleep(for: .milliseconds(150))
+                    guard !Task.isCancelled else { break }
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        self.rebuildTimelineWithGrouping(isStreaming: false)
                     }
+                    self.previousMessageIds = Set(self.messages.map { $0.id })
+                    self.previousToolCallIds = Set(session.toolCalls.map { $0.id })
                 }
             }
-            .store(in: &cancellables)
+        })
 
-        // Permission handler observers (enhanced for nested changes)
-        session.permissionHandler.$showingPermissionAlert
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] showing in
-                guard let self = self else { return }
-                self.showingPermissionAlert = showing
+        // Permission handler observers
+        sessionObserverTasks.append(Task { [weak self] in
+            for await showing in session.permissionHandler.$showingPermissionAlert.values {
+                guard !Task.isCancelled else { break }
+                self?.showingPermissionAlert = showing
             }
-            .store(in: &cancellables)
+        })
 
-        session.permissionHandler.$permissionRequest
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] request in
-                guard let self = self else { return }
-                self.currentPermissionRequest = request
+        sessionObserverTasks.append(Task { [weak self] in
+            for await request in session.permissionHandler.$permissionRequest.values {
+                guard !Task.isCancelled else { break }
+                self?.currentPermissionRequest = request
             }
-            .store(in: &cancellables)
+        })
     }
 
     private func extractLastBold(_ inlineElements: some Sequence<Markup>) -> AttributedString? {
