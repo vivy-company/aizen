@@ -9,6 +9,8 @@
 import Foundation
 import Darwin
 
+// SAFETY: Thread-safe via NSLock protecting all mutable state.
+// File system callbacks and polling run on background threads with proper synchronization.
 nonisolated final class GitIndexWatcher: @unchecked Sendable {
     private let worktreePath: String
     private let gitIndexPath: String

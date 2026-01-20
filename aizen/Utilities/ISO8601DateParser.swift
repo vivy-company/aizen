@@ -7,6 +7,8 @@
 
 import Foundation
 
+// SAFETY: Thread-safe via NSLock protecting all formatter access.
+// ISO8601DateFormatter is not Sendable but access is serialized.
 nonisolated final class ISO8601DateParser: @unchecked Sendable {
     static let shared = ISO8601DateParser()
 

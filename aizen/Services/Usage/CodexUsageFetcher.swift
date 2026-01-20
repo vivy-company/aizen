@@ -212,6 +212,8 @@ private enum RPCWireError: Error, CustomStringConvertible, LocalizedError {
     }
 }
 
+// SAFETY: Process and pipes are only accessed during setup before async operations begin.
+// stderrLines is protected by stderrLock. nextID is only accessed sequentially.
 private final class CodexRPCClient: @unchecked Sendable {
     private let process = Process()
     private let stdinPipe = Pipe()
@@ -224,6 +226,7 @@ private final class CodexRPCClient: @unchecked Sendable {
     private var stderrLines: [String] = []
     private let stderrLimit = 6
 
+    // SAFETY: Thread-safe via NSLock protecting buffer mutations.
     private final class LineBuffer: @unchecked Sendable {
         private let lock = NSLock()
         private var buffer = Data()

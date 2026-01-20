@@ -374,9 +374,7 @@ class WorkflowService: ObservableObject {
             if let jobId = jobId,
                let job = jobs.first(where: { $0.id == jobId }),
                !job.steps.isEmpty {
-                let structured = try await Task.detached {
-                    try await providerImpl?.getStructuredLogs(repoPath: path, runId: runId, jobId: jobId, steps: job.steps)
-                }.value
+                let structured = try await providerImpl?.getStructuredLogs(repoPath: path, runId: runId, jobId: jobId, steps: job.steps)
 
                 if let structured = structured {
                     structuredLogs = structured
@@ -387,9 +385,7 @@ class WorkflowService: ObservableObject {
             }
 
             // Fall back to plain text logs
-            let logs = try await Task.detached {
-                try await providerImpl?.getRunLogs(repoPath: path, runId: runId, jobId: jobId) ?? ""
-            }.value
+            let logs = try await providerImpl?.getRunLogs(repoPath: path, runId: runId, jobId: jobId) ?? ""
             logger.debug("Loaded plain text logs, length: \(logs.count)")
             runLogs = logs.isEmpty ? "No logs available for this job." : logs
         } catch {
@@ -444,9 +440,7 @@ class WorkflowService: ObservableObject {
         // Fetch logs
         do {
             if let job = jobs.first(where: { $0.id == jobId }), !job.steps.isEmpty {
-                let structured = try await Task.detached {
-                    try await providerImpl?.getStructuredLogs(repoPath: path, runId: runId, jobId: jobId, steps: job.steps)
-                }.value
+                let structured = try await providerImpl?.getStructuredLogs(repoPath: path, runId: runId, jobId: jobId, steps: job.steps)
 
                 if let structured = structured {
                     if structured.rawContent != currentContent {
@@ -459,9 +453,7 @@ class WorkflowService: ObservableObject {
             }
 
             // Fallback to plain text logs
-            let logs = try await Task.detached {
-                try await providerImpl?.getRunLogs(repoPath: path, runId: runId, jobId: jobId) ?? ""
-            }.value
+            let logs = try await providerImpl?.getRunLogs(repoPath: path, runId: runId, jobId: jobId) ?? ""
 
             if logs != currentContent {
                 runLogs = logs
@@ -514,14 +506,10 @@ class WorkflowService: ObservableObject {
                 // Refresh run status first
                 if let provider = provider {
                     do {
-                        let updatedRun = try await Task.detached {
-                            try await provider.getRun(repoPath: path, runId: runId)
-                        }.value
+                        let updatedRun = try await provider.getRun(repoPath: path, runId: runId)
 
                         // Refresh jobs
-                        let jobs = try await Task.detached {
-                            try await provider.getRunJobs(repoPath: path, runId: runId)
-                        }.value
+                        let jobs = try await provider.getRunJobs(repoPath: path, runId: runId)
 
                         await MainActor.run { [weak self] in
                             self?.selectedRun = updatedRun

@@ -24,9 +24,8 @@ actor GitIndexWatchCenter {
         let key = worktreePath
         let id = UUID()
 
-        if var entry = entries[key] {
-            entry.subscribers[id] = onChange
-            entries[key] = entry
+        if entries[key] != nil {
+            entries[key]!.subscribers[id] = onChange
             return id
         }
 
@@ -51,23 +50,20 @@ actor GitIndexWatchCenter {
 
     func removeSubscriber(worktreePath: String, id: UUID) {
         let key = worktreePath
-        guard var entry = entries[key] else { return }
+        guard entries[key] != nil else { return }
 
-        entry.subscribers.removeValue(forKey: id)
-        if entry.subscribers.isEmpty {
-            entry.watcher.stopWatching()
+        entries[key]!.subscribers.removeValue(forKey: id)
+        if entries[key]!.subscribers.isEmpty {
+            entries[key]!.watcher.stopWatching()
             entries.removeValue(forKey: key)
-        } else {
-            entries[key] = entry
         }
     }
 
     func pause(worktreePath: String) {
         let key = worktreePath
         pauseCounts[key, default: 0] += 1
-        if var entry = entries[key] {
-            entry.pauseCount += 1
-            entries[key] = entry
+        if entries[key] != nil {
+            entries[key]!.pauseCount += 1
         }
     }
 
@@ -81,14 +77,13 @@ actor GitIndexWatchCenter {
             pauseCounts[key] = newCount
         }
 
-        guard var entry = entries[key] else { return }
-        entry.pauseCount = max(0, entry.pauseCount - 1)
-        let shouldNotify = entry.pauseCount == 0 && entry.hasPendingNotification
-        entry.hasPendingNotification = false
-        entries[key] = entry
-
+        guard entries[key] != nil else { return }
+        entries[key]!.pauseCount = max(0, entries[key]!.pauseCount - 1)
+        let shouldNotify = entries[key]!.pauseCount == 0 && entries[key]!.hasPendingNotification
         if shouldNotify {
-            for callback in entry.subscribers.values {
+            entries[key]!.hasPendingNotification = false
+            let callbacks = entries[key]!.subscribers.values
+            for callback in callbacks {
                 Task { @MainActor in
                     callback()
                 }
@@ -97,13 +92,13 @@ actor GitIndexWatchCenter {
     }
 
     private func notifySubscribers(worktreePath: String) {
-        guard var entry = entries[worktreePath] else { return }
-        if entry.pauseCount > 0 {
-            entry.hasPendingNotification = true
-            entries[worktreePath] = entry
+        guard entries[worktreePath] != nil else { return }
+        if entries[worktreePath]!.pauseCount > 0 {
+            entries[worktreePath]!.hasPendingNotification = true
             return
         }
-        for callback in entry.subscribers.values {
+        let callbacks = entries[worktreePath]!.subscribers.values
+        for callback in callbacks {
             Task { @MainActor in
                 callback()
             }

@@ -299,6 +299,7 @@ actor XcodeBuildService {
     }
 }
 
+// SAFETY: Thread-safe via NSLock protecting all mutable string buffers.
 nonisolated private final class LogBuffer: @unchecked Sendable {
     private let lock = NSLock()
     private var stdout = ""

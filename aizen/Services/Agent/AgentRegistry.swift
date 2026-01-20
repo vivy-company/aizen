@@ -17,7 +17,8 @@ extension Notification.Name {
 actor AgentRegistry {
     static let shared = AgentRegistry()
 
-    nonisolated(unsafe) private let defaults: UserDefaults
+    // SAFETY: UserDefaults is thread-safe for read/write operations
+    private nonisolated let defaults: UserDefaults
     private let authPreferencesKey = "acpAgentAuthPreferences"
     private let metadataStoreKey = "agentMetadataStore"
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "AgentRegistry")

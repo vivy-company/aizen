@@ -6,6 +6,9 @@ extension Ghostty {
     /// Wraps a `ghostty_surface_t`
     final class Surface: Sendable {
         private let surface: ghostty_surface_t
+
+        // SAFETY: Handle wraps a C pointer that is only accessed from @MainActor methods.
+        // The deinit captures this handle to ensure proper cleanup on the main actor.
         private struct Handle: @unchecked Sendable {
             let value: ghostty_surface_t
         }

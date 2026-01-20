@@ -7,6 +7,8 @@
 
 import Foundation
 
+// SAFETY: Thread-safe via NSLock protecting all formatter access.
+// RelativeDateTimeFormatter is not Sendable but access is serialized.
 nonisolated final class RelativeDateFormatter: @unchecked Sendable {
     static let shared = RelativeDateFormatter()
 

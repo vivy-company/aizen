@@ -10,6 +10,8 @@ import MetricKit
 import os.log
 
 /// Handles crash reporting and diagnostic collection using MetricKit
+// SAFETY: @MainActor provides isolation. MXMetricManagerSubscriber callbacks
+// are nonisolated but dispatch to @MainActor for state access.
 @MainActor
 final class CrashReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sendable {
     static let shared = CrashReporter()

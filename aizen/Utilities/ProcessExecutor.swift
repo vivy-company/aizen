@@ -277,6 +277,7 @@ nonisolated enum StreamOutput: Sendable {
     case error(String)
 }
 
+// SAFETY: Thread-safe via NSLock. Ensures continuation is only resumed once.
 nonisolated private final class ResumeGuard: @unchecked Sendable {
     private let lock = NSLock()
     private var hasResumed = false
@@ -291,6 +292,7 @@ nonisolated private final class ResumeGuard: @unchecked Sendable {
 }
 
 /// Thread-safe data collector for process output
+// SAFETY: Thread-safe via NSLock protecting all Data buffer mutations.
 nonisolated private final class DataCollector: @unchecked Sendable {
     private var stdoutData = Data()
     private var stderrData = Data()

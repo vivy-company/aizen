@@ -3,6 +3,8 @@ import Clibgit2
 
 /// Manages libgit2 library lifecycle
 /// Thread-safe singleton that initializes libgit2 once and shuts it down on app termination
+// SAFETY: Thread-safe via NSLock protecting mutable state. libgit2 itself is thread-safe
+// after initialization.
 nonisolated final class Libgit2Service: @unchecked Sendable {
     static let shared = Libgit2Service()
 
