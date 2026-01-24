@@ -462,26 +462,11 @@ struct ChatMessageList: View {
     }
 
     private var processingIndicator: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.mini)
-                .frame(width: 14, height: 14)
-
-            if currentThought != nil {
-                Text(cachedThoughtRendered)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .modifier(ShimmerEffect(bandSize: 0.38, duration: 2.2, baseOpacity: 0.08, highlightOpacity: 1.0))
-                    .transition(.opacity)
-            } else {
-                Text("chat.agent.thinking", bundle: .main)
-                    .font(.callout)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.secondary)
-                    .modifier(ShimmerEffect(bandSize: 0.38, duration: 2.2, baseOpacity: 0.08, highlightOpacity: 1.0))
-            }
-        }
+        AgentThinkingView(
+            agentName: selectedAgent,
+            thought: cachedThoughtText,
+            renderMarkdown: renderInlineMarkdown
+        )
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
