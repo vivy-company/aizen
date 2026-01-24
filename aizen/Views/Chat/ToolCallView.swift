@@ -16,10 +16,12 @@ struct ToolCallView: View {
     var onOpenDetails: ((ToolCall) -> Void)? = nil
     var agentSession: AgentSession? = nil
     var onOpenInEditor: ((String) -> Void)? = nil
-    var childToolCalls: [ToolCall] = []  // Children for Task tool calls
+    var childToolCalls: [ToolCall] = []
 
     @State private var isExpanded: Bool
     @State private var userExpanded: Bool = false
+    @State private var isHovering: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
 
     init(toolCall: ToolCall, currentIterationId: String? = nil, onOpenDetails: ((ToolCall) -> Void)? = nil, agentSession: AgentSession? = nil, onOpenInEditor: ((String) -> Void)? = nil, childToolCalls: [ToolCall] = []) {
         self.toolCall = toolCall
@@ -29,10 +31,8 @@ struct ToolCallView: View {
         self.onOpenInEditor = onOpenInEditor
         self.childToolCalls = childToolCalls
 
-        // Collapse tool calls from previous iterations
         let isCurrentIteration = currentIterationId == nil || toolCall.iterationId == currentIterationId
 
-        // Default expanded for current iteration edit/diff content (terminal collapsed by default)
         let kind = toolCall.kind
         let shouldExpand = isCurrentIteration && (kind == .edit || kind == .delete ||
             toolCall.content.contains { content in
@@ -43,137 +43,188 @@ struct ToolCallView: View {
             })
         self._isExpanded = State(initialValue: shouldExpand)
     }
+    
+    private var toolAccentColor: Color {
+        toolCall.resolvedKind.accentColor
+    }
+    
+    private var blockBackground: Color {
+        colorScheme == .dark ? Color(white: 0.11) : Color(white: 0.97)
+    }
+    
+    private var headerBackground: Color {
+        colorScheme == .dark ? Color(white: 0.13) : Color(white: 0.95)
+    }
+    
+    private var borderColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Header row (always visible)
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
-                    userExpanded = true
-                }
-            }) {
-                HStack(spacing: 8) {
-                    // Status dot
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 6, height: 6)
-
-                    // Tool icon
-                    toolIcon
-                        .foregroundColor(.secondary)
-                        .frame(width: 12, height: 12)
-
-                    // Title
-                    Text(toolCall.title)
-                        .font(.system(size: 11))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-
-                    // Child count badge for Task tool calls
-                    if isTaskToolCall && !childToolCalls.isEmpty {
-                        Text("(\(childToolCalls.count))")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                    }
-
-                    // Expand indicator if has content or children
-                    if hasContent || !childToolCalls.isEmpty {
-                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundStyle(.tertiary)
-                    }
-
-                    Spacer(minLength: 6)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 3)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            // Expandable content
+        VStack(alignment: .leading, spacing: 0) {
+            headerRow
+            
             if isExpanded && (hasContent || !childToolCalls.isEmpty) {
-                if !shouldShowContent {
-                    Text("Running…")
+                Divider()
+                    .opacity(0.3)
+                
+                expandedContent
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(blockBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(borderColor, lineWidth: 0.5)
+        )
+        .overlay(alignment: .leading) {
+            accentStripe
+        }
+        .shadow(
+            color: .black.opacity(colorScheme == .dark ? 0.2 : 0.06),
+            radius: isHovering ? 4 : 2,
+            x: 0,
+            y: 1
+        )
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contextMenu { contextMenuContent }
+    }
+    
+    private var accentStripe: some View {
+        UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 6)
+            .fill(toolAccentColor)
+            .frame(width: 3)
+    }
+    
+    private var headerRow: some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isExpanded.toggle()
+                userExpanded = true
+            }
+        }) {
+            HStack(spacing: 8) {
+                toolIcon
+                    .foregroundStyle(toolAccentColor)
+                    .frame(width: 14, height: 14)
+
+                Text(toolCall.title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                if isTaskToolCall && !childToolCalls.isEmpty {
+                    Text("(\(childToolCalls.count))")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
-                        .padding(.vertical, 4)
-                        .transition(.opacity)
                 }
 
-                // Child tool calls for Task (rendered inline)
-                if shouldShowContent, isTaskToolCall && !childToolCalls.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(childToolCalls) { child in
-                            ToolCallView(
-                                toolCall: child,
-                                currentIterationId: currentIterationId,
-                                agentSession: agentSession,
-                                onOpenInEditor: onOpenInEditor,
-                                childToolCalls: []  // Children are leaf nodes
-                            )
-                            .padding(.leading, 12)
-                        }
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                Spacer(minLength: 6)
+                
+                CompactStatusBadge(status: toolCall.status)
+
+                if hasContent || !childToolCalls.isEmpty {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
                 }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(headerBackground)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+    
+    @ViewBuilder
+    private var expandedContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if !shouldShowContent {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(width: 12, height: 12)
+                    Text("Running...")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
 
-                // Original content (for non-Task or Task's own summary)
-                if shouldShowContent, hasContent {
-                    inlineContentView
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-
-                    // Open in Editor button for file operations
-                    if let path = filePath, onOpenInEditor != nil {
-                        Button(action: { onOpenInEditor?(path) }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "doc.text")
-                                Text("Open in Editor")
-                            }
-                            .font(.system(size: 10))
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundColor(.blue)
-                        .padding(.top, 4)
+            if shouldShowContent, isTaskToolCall && !childToolCalls.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(childToolCalls) { child in
+                        ToolCallView(
+                            toolCall: child,
+                            currentIterationId: currentIterationId,
+                            agentSession: agentSession,
+                            onOpenInEditor: onOpenInEditor,
+                            childToolCalls: []
+                        )
                     }
+                }
+            }
+
+            if shouldShowContent, hasContent {
+                inlineContentView
+
+                if let path = filePath, onOpenInEditor != nil {
+                    Button(action: { onOpenInEditor?(path) }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.text")
+                            Text("Open in Editor")
+                        }
+                        .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.blue)
+                    .padding(.top, 4)
                 }
             }
         }
-        .background(backgroundColor)
-        .cornerRadius(3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contextMenu {
-            if onOpenDetails != nil {
-                Button {
-                    onOpenDetails?(toolCall)
-                } label: {
-                    Label("Open Details", systemImage: "arrow.up.right.square")
-                }
+    }
+    
+    @ViewBuilder
+    private var contextMenuContent: some View {
+        if onOpenDetails != nil {
+            Button {
+                onOpenDetails?(toolCall)
+            } label: {
+                Label("Open Details", systemImage: "arrow.up.right.square")
+            }
+        }
+
+        if let output = copyableOutput {
+            Button {
+                Clipboard.copy(output)
+            } label: {
+                Label("Copy Output", systemImage: "doc.on.doc")
+            }
+        }
+
+        if let path = filePath {
+            Button {
+                Clipboard.copy(path)
+            } label: {
+                Label("Copy Path", systemImage: "link")
             }
 
-            if let output = copyableOutput {
+            if onOpenInEditor != nil {
+                Divider()
                 Button {
-                    Clipboard.copy(output)
+                    onOpenInEditor?(path)
                 } label: {
-                    Label("Copy Output", systemImage: "doc.on.doc")
-                }
-            }
-
-            if let path = filePath {
-                Button {
-                    Clipboard.copy(path)
-                } label: {
-                    Label("Copy Path", systemImage: "link")
-                }
-
-                if onOpenInEditor != nil {
-                    Divider()
-                    Button {
-                        onOpenInEditor?(path)
-                    } label: {
-                        Label("Open in Editor", systemImage: "doc.text")
-                    }
+                    Label("Open in Editor", systemImage: "doc.text")
                 }
             }
         }
