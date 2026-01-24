@@ -46,6 +46,15 @@ extension AgentSession {
         let displayName = metadata?.name ?? agentName
         AgentUsageStore.shared.recordSessionStart(agentId: agentName)
         addSystemMessage("Session started with \(displayName) in \(workingDir)")
+        
+        if let chatSessionId = chatSessionId {
+            do {
+                try await persistSessionId(chatSessionId: chatSessionId)
+            } catch {
+                logger.error("Failed to persist session ID: \(error.localizedDescription)")
+                addSystemMessage("⚠️ Session created but not saved. It may not be available after restart.")
+            }
+        }
     }
 
     /// Helper to perform authentication and create session

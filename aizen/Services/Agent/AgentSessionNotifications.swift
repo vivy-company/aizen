@@ -38,7 +38,7 @@ extension AgentSession {
         let logger = self.logger
         let rawParams = notification.params
 
-        notificationProcessingTask = Task(priority: .userInitiated) { [weak self] in
+        notificationProcessingTask = Task { @MainActor [weak self] in
             if let previousTask {
                 await previousTask.value
             }
@@ -127,6 +127,10 @@ extension AgentSession {
                     activeTaskIds.removeAll { $0 == toolCallId }
                 }
             case .agentMessageChunk(let block):
+                if isResumingSession {
+                    logger.debug("[\(self.agentName)] Skipping agentMessageChunk during session resume")
+                    break
+                }
                 clearThoughtBuffer()
                 currentThought = nil
                 let (text, blockContent) = textAndContent(from: block)

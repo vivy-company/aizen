@@ -94,6 +94,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     private var lastAgentChunkAt: Date?
     private static let finalizeIdleDelay: TimeInterval = 0.2
     private var isModeChanging = false
+    var isResumingSession = false
     private var thoughtBuffer: String = ""
     private var thoughtFlushTask: Task<Void, Never>?
     private static let thoughtUpdateInterval: TimeInterval = 0.06
@@ -417,6 +418,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         
         sessionState = .initializing
         isActive = true
+        isResumingSession = true
         self.chatSessionId = chatSessionId
         
         guard !acpSessionId.isEmpty,
@@ -470,6 +472,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             )
         } catch {
             isActive = false
+            isResumingSession = false
             sessionState = .failed("loadSession failed: \(error.localizedDescription)")
             self.acpClient = nil
             logger.error("[\(agentName)] loadSession failed: \(error.localizedDescription)")
@@ -483,6 +486,11 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         let displayName = metadata?.name ?? agentName
         AgentUsageStore.shared.recordSessionStart(agentId: agentName)
         addSystemMessage("Session resumed with \(displayName) in \(workingDir)")
+        
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            self.isResumingSession = false
+        }
     }
     
     private func initializeClient(
@@ -579,7 +587,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         return (client, initResponse)
     }
     
-    private func persistSessionId(chatSessionId: UUID) async throws {
+    func persistSessionId(chatSessionId: UUID) async throws {
         guard let sessionId = sessionId else {
             logger.warning("Attempted to persist session ID but no ACP session ID available")
             return
