@@ -14,6 +14,7 @@ struct InlineTerminalView: View {
 
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
+    @AppStorage("terminalThemeName") private var themeName = "Aizen Dark"
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var output: String = ""
@@ -22,6 +23,10 @@ struct InlineTerminalView: View {
     @State private var isExpanded: Bool = true
     @State private var isHovering: Bool = false
 
+    private var theme: TerminalThemeProvider {
+        TerminalThemeProvider(themeName: themeName)
+    }
+    
     private var fontSize: CGFloat {
         max(terminalFontSize - 2, 9)
     }
@@ -35,33 +40,23 @@ struct InlineTerminalView: View {
     }
     
     private var resolvedExitCode: ExitCodeStatus {
-        if isRunning {
-            return .running
-        }
+        if isRunning { return .running }
         if let code = exitCode {
             return code == 0 ? .success : .failure(code: code)
         }
         return hasOutput ? .success : .unknown
     }
     
-    private var backgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.08) : Color(white: 0.96)
-    }
-    
-    private var headerBackground: Color {
-        colorScheme == .dark ? Color(white: 0.12) : Color(white: 0.94)
-    }
-    
-    private var borderColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.1)
+    private var exitCodeColor: Color {
+        resolvedExitCode.color(provider: theme)
     }
     
     private var accentColor: Color {
         switch resolvedExitCode {
-        case .success: return .green
-        case .failure: return .red
-        case .running: return .orange
-        case .unknown: return .orange
+        case .success: return theme.ansiGreen
+        case .failure: return theme.ansiRed
+        case .running: return theme.ansiYellow
+        case .unknown: return theme.ansiYellow
         }
     }
 
@@ -76,11 +71,11 @@ struct InlineTerminalView: View {
                 outputView
             }
         }
-        .background(backgroundColor)
+        .background(theme.background)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(borderColor, lineWidth: 0.5)
+                .stroke(theme.borderColor, lineWidth: 0.5)
         )
         .overlay(alignment: .leading) {
             UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 6)
@@ -112,21 +107,21 @@ struct InlineTerminalView: View {
         HStack(spacing: 8) {
             Image(systemName: "terminal.fill")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.orange)
+                .foregroundStyle(theme.promptColor)
             
             if let cmd = command, !cmd.isEmpty {
                 Text("$")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(theme.promptColor)
                 
                 Text(cmd)
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(theme.foreground)
                     .lineLimit(1)
             } else {
                 Text("Terminal Output")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(theme.foreground)
             }
             
             Spacer()
@@ -140,7 +135,7 @@ struct InlineTerminalView: View {
             } label: {
                 Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.ansiMuted)
             }
             .buttonStyle(.plain)
             
@@ -150,7 +145,7 @@ struct InlineTerminalView: View {
                 } label: {
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.ansiMuted)
                 }
                 .buttonStyle(.plain)
                 .opacity(isHovering ? 1 : 0)
@@ -159,7 +154,7 @@ struct InlineTerminalView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(headerBackground)
+        .background(theme.headerBackground)
     }
     
     private var exitCodeBadge: some View {
@@ -180,13 +175,15 @@ struct InlineTerminalView: View {
                     .font(.system(size: 9, weight: .semibold))
             }
             
-            Text(resolvedExitCode.label)
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            if let label = resolvedExitCode.label {
+                Text(label)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            }
         }
-        .foregroundStyle(resolvedExitCode.color)
+        .foregroundStyle(exitCodeColor)
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
-        .background(resolvedExitCode.color.opacity(0.15))
+        .background(exitCodeColor.opacity(0.15))
         .clipShape(Capsule())
     }
     
@@ -195,11 +192,12 @@ struct InlineTerminalView: View {
             if trimmedOutput.isEmpty {
                 Text(isRunning ? "Waiting for output..." : "No output")
                     .font(.custom(terminalFontName, size: fontSize))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(theme.ansiMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 Text(ANSIParser.parse(trimmedOutput))
                     .font(.custom(terminalFontName, size: fontSize))
+                    .foregroundStyle(theme.foreground)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: true, vertical: false)
                     .frame(maxWidth: .infinity, alignment: .leading)

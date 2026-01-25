@@ -10,31 +10,38 @@ import AppKit
 
 // MARK: - ANSI Color Provider
 
-/// Provides ANSI colors from the user's selected theme
 nonisolated struct ANSIColorProvider {
     static let shared = ANSIColorProvider()
 
     private var cachedThemeName: String?
     private var cachedPalette: [Int: NSColor]?
 
-    /// Get the current theme's palette, with caching
-    mutating func getPalette() -> [Int: NSColor] {
-        let themeName = UserDefaults.standard.string(forKey: "editorTheme") ?? "Aizen Dark"
+    private func currentThemeName() -> String {
+        UserDefaults.standard.string(forKey: "terminalThemeName") ?? "Aizen Dark"
+    }
 
-        // Return cached palette if theme hasn't changed
+    mutating func getPalette() -> [Int: NSColor] {
+        let themeName = currentThemeName()
+
         if themeName == cachedThemeName, let palette = cachedPalette {
             return palette
         }
 
-        // Load and cache new palette
         if let palette = GhosttyThemeParser.loadANSIPalette(named: themeName), !palette.isEmpty {
             cachedThemeName = themeName
             cachedPalette = palette
             return palette
         }
 
-        // Return Aizen Dark defaults
         return Self.aizenDarkPalette
+    }
+    
+    func getBackgroundColor() -> Color {
+        Color(nsColor: GhosttyThemeParser.loadBackgroundColor(named: currentThemeName()))
+    }
+    
+    func getForegroundColor() -> Color {
+        color(for: 7)
     }
 
     /// Aizen Dark fallback palette
@@ -201,34 +208,32 @@ nonisolated struct ANSIParser {
     static func styledString(_ text: String, style: ANSITextStyle) -> AttributedString {
         var attributed = AttributedString(text)
 
-        // Foreground color
         if case .default = style.foreground {
-            // Use primary color
         } else {
             attributed.foregroundColor = style.foreground.color
         }
 
-        // Apply dim effect
+        if case .default = style.background {
+        } else {
+            attributed.backgroundColor = style.background.color
+        }
+
         if style.dim {
             attributed.foregroundColor = (attributed.foregroundColor ?? .primary).opacity(0.6)
         }
 
-        // Bold
         if style.bold {
             attributed.font = .system(size: 11, weight: .bold, design: .monospaced)
         }
 
-        // Italic
         if style.italic {
             attributed.font = .system(size: 11, design: .monospaced).italic()
         }
 
-        // Underline
         if style.underline {
             attributed.underlineStyle = .single
         }
 
-        // Strikethrough
         if style.strikethrough {
             attributed.strikethroughStyle = .single
         }

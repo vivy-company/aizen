@@ -21,6 +21,7 @@ struct ToolCallView: View {
     @State private var isExpanded: Bool
     @State private var userExpanded: Bool = false
     @State private var isHovering: Bool = false
+    @State private var completedAt: Date? = nil
     @Environment(\.colorScheme) private var colorScheme
 
     init(toolCall: ToolCall, currentIterationId: String? = nil, onOpenDetails: ((ToolCall) -> Void)? = nil, agentSession: AgentSession? = nil, onOpenInEditor: ((String) -> Void)? = nil, childToolCalls: [ToolCall] = []) {
@@ -97,6 +98,16 @@ struct ToolCallView: View {
         .animation(.easeInOut(duration: 0.2), value: isExpanded)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu { contextMenuContent }
+        .onChange(of: toolCall.status) { oldStatus, newStatus in
+            if oldStatus == .inProgress && newStatus != .inProgress && completedAt == nil {
+                completedAt = Date()
+            }
+        }
+        .onAppear {
+            if toolCall.status != .inProgress && completedAt == nil {
+                completedAt = Date()
+            }
+        }
     }
     
     private var accentStripe: some View {
@@ -321,7 +332,9 @@ struct ToolCallView: View {
                     command: extractCommand() ?? toolCall.title,
                     output: textContent.text,
                     exitCode: resolvedExitCodeStatus,
-                    isStreaming: toolCall.status == .inProgress
+                    isStreaming: toolCall.status == .inProgress,
+                    startTime: toolCall.timestamp,
+                    endTime: completedAt
                 )
             } else if let semanticBlock = parseSemanticContent(textContent.text) {
                 semanticBlock

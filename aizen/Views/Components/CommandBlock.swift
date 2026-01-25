@@ -2,9 +2,8 @@
 //  CommandBlock.swift
 //  aizen
 //
-//  Shell command display with prompt styling, exit code badge, and expandable output
-//
 
+import Combine
 import SwiftUI
 
 // MARK: - Exit Code
@@ -15,11 +14,11 @@ enum ExitCodeStatus {
     case running
     case unknown
     
-    var color: Color {
+    func color(provider: TerminalThemeProvider) -> Color {
         switch self {
-        case .success: return .green
-        case .failure: return .red
-        case .running: return .blue
+        case .success: return provider.ansiGreen
+        case .failure: return provider.ansiRed
+        case .running: return provider.ansiBlue
         case .unknown: return .secondary
         }
     }
@@ -33,13 +32,48 @@ enum ExitCodeStatus {
         }
     }
     
-    var label: String {
+    var label: String? {
         switch self {
-        case .success: return "0"
+        case .success: return nil
         case .failure(let code): return "\(code)"
-        case .running: return "..."
-        case .unknown: return "?"
+        case .running: return nil
+        case .unknown: return nil
         }
+    }
+}
+
+// MARK: - Terminal Theme Provider
+
+struct TerminalThemeProvider {
+    let themeName: String
+    
+    var background: Color {
+        Color(nsColor: GhosttyThemeParser.loadBackgroundColor(named: themeName))
+    }
+    
+    var headerBackground: Color {
+        let bg = GhosttyThemeParser.loadBackgroundColor(named: themeName)
+        let isLight = bg.luminance > 0.5
+        return Color(nsColor: bg.darken(by: isLight ? 0.05 : -0.1))
+    }
+    
+    var foreground: Color {
+        ANSIColorProvider.shared.color(for: 7)
+    }
+    
+    var promptColor: Color {
+        ANSIColorProvider.shared.color(for: 3)
+    }
+    
+    var ansiRed: Color { ANSIColorProvider.shared.color(for: 1) }
+    var ansiGreen: Color { ANSIColorProvider.shared.color(for: 2) }
+    var ansiYellow: Color { ANSIColorProvider.shared.color(for: 3) }
+    var ansiBlue: Color { ANSIColorProvider.shared.color(for: 4) }
+    var ansiMuted: Color { ANSIColorProvider.shared.color(for: 8) }
+    
+    var borderColor: Color {
+        let bg = GhosttyThemeParser.loadBackgroundColor(named: themeName)
+        return Color(nsColor: bg.darken(by: bg.luminance > 0.5 ? 0.15 : -0.2))
     }
 }
 
@@ -51,10 +85,20 @@ struct CommandBlock: View {
     let exitCode: ExitCodeStatus
     var workingDirectory: String?
     var isStreaming: Bool = false
+    var startTime: Date?
+    var endTime: Date?
     
     @State private var isExpanded = true
     @State private var isHovering = false
+    @State private var elapsedTime: TimeInterval = 0
+    @AppStorage("terminalThemeName") private var themeName = "Aizen Dark"
     @Environment(\.colorScheme) private var colorScheme
+    
+    private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
+    
+    private var theme: TerminalThemeProvider {
+        TerminalThemeProvider(themeName: themeName)
+    }
     
     private var hasOutput: Bool {
         guard let output = output else { return false }
@@ -70,16 +114,39 @@ struct CommandBlock: View {
         return trimmedOutput.components(separatedBy: "\n").count
     }
     
-    private var backgroundColor: Color {
-        colorScheme == .dark ? Color(white: 0.08) : Color(white: 0.96)
+    private var exitCodeColor: Color {
+        exitCode.color(provider: theme)
     }
     
-    private var headerBackground: Color {
-        colorScheme == .dark ? Color(white: 0.12) : Color(white: 0.94)
+    private var durationText: String? {
+        if let start = startTime {
+            let duration: TimeInterval
+            if let end = endTime {
+                duration = end.timeIntervalSince(start)
+            } else if case .running = exitCode {
+                duration = elapsedTime
+            } else {
+                return nil
+            }
+            return formatDuration(duration)
+        }
+        return nil
     }
     
-    private var borderColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.1)
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        if duration < 1 {
+            return String(format: "%.0fms", duration * 1000)
+        } else if duration < 60 {
+            return String(format: "%.1fs", duration)
+        } else if duration < 3600 {
+            let mins = Int(duration) / 60
+            let secs = Int(duration) % 60
+            return "\(mins)m \(secs)s"
+        } else {
+            let hours = Int(duration) / 3600
+            let mins = (Int(duration) % 3600) / 60
+            return "\(hours)h \(mins)m"
+        }
     }
     
     var body: some View {
@@ -93,15 +160,15 @@ struct CommandBlock: View {
                 outputView
             }
         }
-        .background(backgroundColor)
+        .background(theme.background)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(borderColor, lineWidth: 1)
+                .stroke(theme.borderColor, lineWidth: 1)
         )
         .overlay(alignment: .leading) {
             UnevenRoundedRectangle(topLeadingRadius: 8, bottomLeadingRadius: 8)
-                .fill(exitCode.color)
+                .fill(exitCodeColor)
                 .frame(width: 3)
         }
         .shadow(
@@ -116,21 +183,31 @@ struct CommandBlock: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: isExpanded)
+        .onReceive(timer) { _ in
+            if case .running = exitCode, let start = startTime {
+                elapsedTime = Date().timeIntervalSince(start)
+            }
+        }
+        .onAppear {
+            if let start = startTime {
+                elapsedTime = Date().timeIntervalSince(start)
+            }
+        }
     }
     
     private var headerView: some View {
         HStack(spacing: 8) {
             Image(systemName: "terminal.fill")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.orange)
+                .foregroundStyle(theme.promptColor)
             
             Text("$")
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundStyle(.orange)
+                .foregroundStyle(theme.promptColor)
             
             Text(command)
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .foregroundStyle(.primary)
+                .foregroundStyle(theme.foreground)
                 .lineLimit(1)
                 .textSelection(.enabled)
             
@@ -139,8 +216,14 @@ struct CommandBlock: View {
             if let dir = workingDirectory {
                 Text(shortenPath(dir))
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(theme.ansiMuted)
                     .lineLimit(1)
+            }
+            
+            if let duration = durationText {
+                Text(duration)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(theme.ansiMuted)
             }
             
             exitCodeBadge
@@ -171,7 +254,7 @@ struct CommandBlock: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(headerBackground)
+        .background(theme.headerBackground)
     }
     
     private var exitCodeBadge: some View {
@@ -185,21 +268,23 @@ struct CommandBlock: View {
                     .font(.system(size: 9, weight: .semibold))
             }
             
-            Text(exitCode.label)
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            if let label = exitCode.label {
+                Text(label)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            }
         }
-        .foregroundStyle(exitCode.color)
+        .foregroundStyle(exitCodeColor)
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
-        .background(exitCode.color.opacity(0.15))
+        .background(exitCodeColor.opacity(0.15))
         .clipShape(Capsule())
     }
     
     private var outputView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            Text(trimmedOutput)
+            Text(ANSIParser.parse(trimmedOutput))
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.primary.opacity(0.9))
+                .foregroundStyle(theme.foreground)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: true, vertical: false)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -207,7 +292,7 @@ struct CommandBlock: View {
         .frame(maxHeight: 200)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(backgroundColor)
+        .background(theme.background)
         .overlay(alignment: .bottomTrailing) {
             if outputLineCount > 10 {
                 Text("\(outputLineCount) lines")
@@ -266,14 +351,17 @@ struct CommandBlock: View {
                 ✓ built in 1.24s
                 """,
                 exitCode: .success,
-                workingDirectory: "/Users/dev/my-project"
+                workingDirectory: "/Users/dev/my-project",
+                startTime: Date().addingTimeInterval(-1.24),
+                endTime: Date()
             )
             
             CommandBlock(
                 command: "cargo build --release",
                 output: nil,
                 exitCode: .running,
-                workingDirectory: "/Users/dev/rust-app"
+                workingDirectory: "/Users/dev/rust-app",
+                startTime: Date().addingTimeInterval(-45)
             )
             
             CommandBlock(
@@ -285,7 +373,9 @@ struct CommandBlock: View {
                 ModuleNotFoundError: No module named 'missing_module'
                 """,
                 exitCode: .failure(code: 1),
-                workingDirectory: "/Users/dev/python-project"
+                workingDirectory: "/Users/dev/python-project",
+                startTime: Date().addingTimeInterval(-0.35),
+                endTime: Date()
             )
             
             CommandBlock(
@@ -298,7 +388,9 @@ struct CommandBlock: View {
                 -rw-r--r--   1 user  staff   567 Jan 24 10:25 package.json
                 drwxr-xr-x   8 user  staff   256 Jan 24 10:30 src
                 """,
-                exitCode: .success
+                exitCode: .success,
+                startTime: Date().addingTimeInterval(-0.012),
+                endTime: Date()
             )
         }
         .padding()
