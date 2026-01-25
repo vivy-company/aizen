@@ -206,7 +206,7 @@ struct InlineTerminalView: View {
         .frame(maxHeight: 150)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color(red: 0.11, green: 0.11, blue: 0.13))
+        .background(theme.background)
     }
 
     private func startLoading() {

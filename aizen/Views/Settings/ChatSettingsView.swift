@@ -7,16 +7,44 @@
 
 import SwiftUI
 
+// MARK: - Tool Call Expansion Mode
+
+enum ToolCallExpansionMode: String, CaseIterable, Identifiable {
+    case expanded = "expanded"      // All expanded by default
+    case collapsed = "collapsed"    // All collapsed by default
+    case smart = "smart"           // Expand current iteration, collapse past
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .expanded: return "Expanded"
+        case .collapsed: return "Collapsed"
+        case .smart: return "Smart"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .expanded: return "All tool calls expanded"
+        case .collapsed: return "All tool calls collapsed"
+        case .smart: return "Current expanded, past collapsed"
+        }
+    }
+}
+
 // MARK: - Chat Settings Keys
 
 enum ChatSettings {
     static let fontFamilyKey = "chatFontFamily"
     static let fontSizeKey = "chatFontSize"
     static let blockSpacingKey = "chatBlockSpacing"
+    static let toolCallExpansionModeKey = "toolCallExpansionMode"
 
     static let defaultFontFamily: String = "System Font"
     static let defaultFontSize: Double = 14.0
     static let defaultBlockSpacing: Double = 8.0
+    static let defaultToolCallExpansionMode: String = ToolCallExpansionMode.smart.rawValue
 
     static let fontSizeRange: ClosedRange<Double> = 12...20
     static let blockSpacingRange: ClosedRange<Double> = 4...16
@@ -28,8 +56,16 @@ struct ChatSettingsView: View {
     @AppStorage(ChatSettings.fontFamilyKey) private var fontFamily = ChatSettings.defaultFontFamily
     @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
     @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+    @AppStorage(ChatSettings.toolCallExpansionModeKey) private var toolCallExpansionMode = ChatSettings.defaultToolCallExpansionMode
 
     @State private var availableFonts: [String] = []
+    
+    private var selectedExpansionMode: Binding<ToolCallExpansionMode> {
+        Binding(
+            get: { ToolCallExpansionMode(rawValue: toolCallExpansionMode) ?? .smart },
+            set: { toolCallExpansionMode = $0.rawValue }
+        )
+    }
 
     private func loadSystemFonts() -> [String] {
         let fontManager = NSFontManager.shared
@@ -88,6 +124,21 @@ struct ChatSettingsView: View {
             }
 
             Section {
+                Picker("Tool Calls", selection: selectedExpansionMode) {
+                    ForEach(ToolCallExpansionMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                
+                Text(selectedExpansionMode.wrappedValue.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Tool Call Display")
+            }
+
+            Section {
                 VStack(alignment: .leading, spacing: blockSpacing) {
                     Text("Heading")
                         .font(previewHeadingFont)
@@ -118,6 +169,7 @@ struct ChatSettingsView: View {
                     fontFamily = ChatSettings.defaultFontFamily
                     chatFontSize = ChatSettings.defaultFontSize
                     blockSpacing = ChatSettings.defaultBlockSpacing
+                    toolCallExpansionMode = ChatSettings.defaultToolCallExpansionMode
                 }
             }
         }

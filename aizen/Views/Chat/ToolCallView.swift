@@ -23,6 +23,7 @@ struct ToolCallView: View {
     @State private var isHovering: Bool = false
     @State private var completedAt: Date? = nil
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(ChatSettings.toolCallExpansionModeKey) private var expansionModeSetting = ChatSettings.defaultToolCallExpansionMode
 
     init(toolCall: ToolCall, currentIterationId: String? = nil, onOpenDetails: ((ToolCall) -> Void)? = nil, agentSession: AgentSession? = nil, onOpenInEditor: ((String) -> Void)? = nil, childToolCalls: [ToolCall] = []) {
         self.toolCall = toolCall
@@ -32,17 +33,28 @@ struct ToolCallView: View {
         self.onOpenInEditor = onOpenInEditor
         self.childToolCalls = childToolCalls
 
-        let isCurrentIteration = currentIterationId == nil || toolCall.iterationId == currentIterationId
-
-        let kind = toolCall.kind
-        let shouldExpand = isCurrentIteration && (kind == .edit || kind == .delete ||
-            toolCall.content.contains { content in
-                switch content {
-                case .diff: return true
-                default: return false
-                }
-            })
-        self._isExpanded = State(initialValue: shouldExpand)
+        self._isExpanded = State(initialValue: false)
+    }
+    
+    private func computeInitialExpansion() -> Bool {
+        let mode = ToolCallExpansionMode(rawValue: expansionModeSetting) ?? .smart
+        
+        switch mode {
+        case .expanded:
+            return true
+        case .collapsed:
+            return false
+        case .smart:
+            let isCurrentIteration = currentIterationId == nil || toolCall.iterationId == currentIterationId
+            let kind = toolCall.kind
+            return isCurrentIteration && (kind == .edit || kind == .delete ||
+                toolCall.content.contains { content in
+                    switch content {
+                    case .diff: return true
+                    default: return false
+                    }
+                })
+        }
     }
     
     private var toolAccentColor: Color {
@@ -106,6 +118,9 @@ struct ToolCallView: View {
         .onAppear {
             if toolCall.status != .inProgress && completedAt == nil {
                 completedAt = Date()
+            }
+            if !userExpanded {
+                isExpanded = computeInitialExpansion()
             }
         }
     }
@@ -222,7 +237,11 @@ struct ToolCallView: View {
                 }
             }
 
-            if shouldShowContent, hasContent {
+            if let question = questionContent {
+                QuestionInputView(questionContent: question) { answers in
+                    handleQuestionResponse(answers: answers)
+                }
+            } else if shouldShowContent, hasContent {
                 inlineContentView
 
                 if let path = filePath, onOpenInEditor != nil {
@@ -318,11 +337,20 @@ struct ToolCallView: View {
     private var isTaskToolCall: Bool {
         !childToolCalls.isEmpty
     }
+    
+    private var isQuestionToolCall: Bool {
+        questionContent != nil
+    }
+    
+    private var questionContent: QuestionContent? {
+        guard let rawInput = toolCall.rawInput?.value as? [String: Any] else { return nil }
+        return QuestionContent.parse(from: rawInput)
+    }
 
     // MARK: - Inline Content
 
     private var hasContent: Bool {
-        !toolCall.content.isEmpty
+        !toolCall.content.isEmpty || isQuestionToolCall
     }
 
     private var isFinal: Bool {
@@ -438,6 +466,27 @@ struct ToolCallView: View {
         Color(.controlBackgroundColor).opacity(0.2)
     }
 
+}
+
+// MARK: - Highlighted Text Content View
+
+// MARK: - Question Response Handler
+
+extension ToolCallView {
+    func handleQuestionResponse(answers: [String]) {
+        guard let session = agentSession else { return }
+        
+        let answerText = answers.count == 1 ? answers[0] : answers.joined(separator: ", ")
+        
+        Task { @MainActor in
+            do {
+                try await session.sendMessage(content: answerText)
+            } catch {
+                // Silent catch: UI already shows "submitted" state
+                print("Failed to send question response: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - Highlighted Text Content View

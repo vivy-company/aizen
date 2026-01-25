@@ -98,11 +98,28 @@ struct MarkdownView: View {
                 }
             }
 
-            // Streaming buffer (incomplete content)
             if isStreaming && !viewModel.streamingBuffer.isEmpty {
-                StreamingTextView(text: viewModel.streamingBuffer, allowSelection: false)
-                    .padding(.vertical, 2)
+                let buffer = viewModel.streamingBuffer
+                let isPendingBlock = buffer.hasPrefix("```") || 
+                                     buffer.hasPrefix("$$") || 
+                                     buffer.trimmingCharacters(in: .whitespaces).hasPrefix("|")
+                
+                if isPendingBlock {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                            .frame(width: 12, height: 12)
+                        Text("Rendering...")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
                     .transition(.opacity)
+                } else {
+                    StreamingTextView(text: buffer, allowSelection: false)
+                        .padding(.vertical, 2)
+                        .transition(.opacity)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -298,6 +315,8 @@ struct CombinedTextBlockView: View {
     @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
     @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
     @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+    
+    private let theme = MarkdownThemeProvider()
 
     private func chatFont(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
         if chatFontFamily == "System Font" {
@@ -332,15 +351,17 @@ struct CombinedTextBlockView: View {
 
             switch block.type {
             case .paragraph(let content):
-                result.append(content.nsAttributedString(
+                result.append(content.themedNSAttributedString(
                     baseFont: chatFont(size: fontSize),
-                    baseColor: .labelColor
+                    baseColor: .labelColor,
+                    theme: theme
                 ))
 
             case .heading(let content, let level):
-                result.append(content.nsAttributedString(
+                result.append(content.themedNSAttributedString(
                     baseFont: fontForHeading(level: level, baseSize: fontSize),
-                    baseColor: .labelColor
+                    baseColor: .labelColor,
+                    theme: theme
                 ))
 
             case .blockQuote(let nestedBlocks):
@@ -381,9 +402,10 @@ struct CombinedTextBlockView: View {
                 result.append(fnDef)
                 for defBlock in defBlocks {
                     if case .paragraph(let content) = defBlock.type {
-                        let contentAttr = content.nsAttributedString(
+                        let contentAttr = content.themedNSAttributedString(
                             baseFont: chatFont(size: fontSize - 1),
-                            baseColor: .secondaryLabelColor
+                            baseColor: .secondaryLabelColor,
+                            theme: theme
                         )
                         result.append(contentAttr)
                     }
@@ -420,9 +442,10 @@ struct CombinedTextBlockView: View {
             if case .paragraph(let content) = block.type {
                 let base = chatFont(size: fontSize)
                 let italic = NSFontManager.shared.convert(base, toHaveTrait: .italicFontMask)
-                let contentAttr = content.nsAttributedString(
+                let contentAttr = content.themedNSAttributedString(
                     baseFont: italic,
-                    baseColor: .secondaryLabelColor
+                    baseColor: .secondaryLabelColor,
+                    theme: theme
                 )
                 result.append(contentAttr)
             }
@@ -456,14 +479,15 @@ struct CombinedTextBlockView: View {
                 string: indent + bullet,
                 attributes: [
                     .font: chatFont(size: fontSize),
-                    .foregroundColor: NSColor.secondaryLabelColor
+                    .foregroundColor: theme.listMarkerColor
                 ]
             )
             result.append(bulletAttr)
 
-            var contentAttr = item.content.nsAttributedString(
+            var contentAttr = item.content.themedNSAttributedString(
                 baseFont: chatFont(size: fontSize),
-                baseColor: .labelColor
+                baseColor: .labelColor,
+                theme: theme
             )
             if item.checkbox == .checked {
                 let mutable = NSMutableAttributedString(attributedString: contentAttr)
@@ -1070,6 +1094,7 @@ struct SelectableTextView: NSViewRepresentable {
     let content: MarkdownInlineContent
     let baseFont: NSFont
     let baseColor: NSColor
+    var theme: MarkdownThemeProvider = MarkdownThemeProvider()
 
     func makeNSView(context: Context) -> FixedTextView {
         let textView = FixedTextView()
@@ -1087,8 +1112,7 @@ struct SelectableTextView: NSViewRepresentable {
     }
 
     func updateNSView(_ textView: FixedTextView, context: Context) {
-        let attributed = content.nsAttributedString(baseFont: baseFont, baseColor: baseColor)
-        // Only update if content changed
+        let attributed = content.themedNSAttributedString(baseFont: baseFont, baseColor: baseColor, theme: theme)
         if textView.attributedString() != attributed {
             textView.textStorage?.setAttributedString(attributed)
         }
@@ -1174,6 +1198,8 @@ struct ListItemView: View {
     @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
     @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
 
+    private let theme = MarkdownThemeProvider()
+    
     private var chatFont: Font {
         chatFontFamily == "System Font" ? .system(size: chatFontSize) : .custom(chatFontFamily, size: chatFontSize)
     }
@@ -1186,30 +1212,32 @@ struct ListItemView: View {
         }
         return NSFont.systemFont(ofSize: size)
     }
+    
+    private var markerColor: Color {
+        Color(nsColor: theme.listMarkerColor)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: blockSpacing * 0.25) {
             HStack(alignment: .top, spacing: 6) {
-                // Indentation
                 if item.depth > 0 {
                     Spacer()
                         .frame(width: CGFloat(item.depth) * 16)
                 }
 
-                // Checkbox, bullet, or number
                 if let checkbox = item.checkbox {
                     Image(systemName: checkbox == .checked ? "checkmark.square.fill" : "square")
-                        .foregroundStyle(checkbox == .checked ? .green : .secondary)
+                        .foregroundStyle(checkbox == .checked ? .green : markerColor)
                         .font(chatFont)
                         .frame(width: 16)
                 } else if item.listOrdered {
                     Text("\(item.listStartIndex + item.itemIndex).")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(markerColor)
                         .font(chatFont)
                         .frame(minWidth: 16, alignment: .trailing)
                 } else {
                     Text(bulletForDepth(item.depth))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(markerColor)
                         .font(chatFont)
                         .frame(width: 16)
                 }

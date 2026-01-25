@@ -16,9 +16,11 @@ struct ToolCallGroupView: View {
     var childToolCallsProvider: (String) -> [ToolCall] = { _ in [] }
 
     @State private var isExpanded: Bool = false
+    @State private var userExpanded: Bool = false
     @State private var isHovering: Bool = false
     @State private var expandedToolCalls: Set<String> = []
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(ChatSettings.toolCallExpansionModeKey) private var expansionModeSetting = ChatSettings.defaultToolCallExpansionMode
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -56,6 +58,24 @@ struct ToolCallGroupView: View {
         .animation(.easeInOut(duration: 0.2), value: isExpanded)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu { contextMenuContent }
+        .onAppear {
+            if !userExpanded {
+                isExpanded = computeInitialExpansion()
+            }
+        }
+    }
+    
+    private func computeInitialExpansion() -> Bool {
+        let mode = ToolCallExpansionMode(rawValue: expansionModeSetting) ?? .smart
+        
+        switch mode {
+        case .expanded:
+            return true
+        case .collapsed:
+            return false
+        case .smart:
+            return false
+        }
     }
 
     // MARK: - Context Menu
@@ -108,6 +128,7 @@ struct ToolCallGroupView: View {
         Button(action: {
             withAnimation(.easeInOut(duration: 0.2)) {
                 isExpanded.toggle()
+                userExpanded = true
             }
         }) {
             HStack(spacing: 8) {

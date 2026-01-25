@@ -217,7 +217,6 @@ nonisolated struct ResourceContent: Codable {
 }
 
 extension EmbeddedResourceType {
-    /// Convenience accessor for the resource URI regardless of variant
     var uri: String? {
         switch self {
         case .text(let contents): return contents.uri
@@ -225,7 +224,6 @@ extension EmbeddedResourceType {
         }
     }
 
-    /// Convenience accessor for the resource mime type regardless of variant
     var mimeType: String? {
         switch self {
         case .text(let contents): return contents.mimeType
@@ -233,11 +231,47 @@ extension EmbeddedResourceType {
         }
     }
 
-    /// Convenience accessor for embedded text contents
     var text: String? {
         switch self {
         case .text(let contents): return contents.text
         case .blob: return nil
         }
     }
+}
+
+// MARK: - Question Content (for mcp_question tool)
+
+nonisolated struct QuestionContent: Codable {
+    let questions: [Question]
+    
+    static func parse(from rawInput: [String: Any]) -> QuestionContent? {
+        guard let questionsData = rawInput["questions"] else { return nil }
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: ["questions": questionsData])
+            return try JSONDecoder().decode(QuestionContent.self, from: jsonData)
+        } catch {
+            return nil
+        }
+    }
+}
+
+nonisolated struct Question: Codable, Identifiable {
+    let question: String
+    let header: String
+    let options: [QuestionOption]
+    let multiple: Bool?
+    let custom: Bool?
+    
+    var id: String { header }
+    
+    var allowsMultiple: Bool { multiple ?? false }
+    var allowsCustom: Bool { custom ?? true }
+}
+
+nonisolated struct QuestionOption: Codable, Identifiable, Hashable {
+    let label: String
+    let description: String
+    
+    var id: String { label }
 }

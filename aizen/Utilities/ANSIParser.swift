@@ -77,6 +77,16 @@ nonisolated struct ANSIColorProvider {
         }
         return .primary
     }
+    
+    /// Get NSColor for ANSI index from theme (for NSAttributedString)
+    func nsColor(for index: Int) -> NSColor {
+        var provider = self
+        let palette = provider.getPalette()
+        if let nsColor = palette[index] {
+            return nsColor
+        }
+        return Self.aizenDarkPalette[index] ?? .labelColor
+    }
 }
 
 // MARK: - ANSI Color Definitions

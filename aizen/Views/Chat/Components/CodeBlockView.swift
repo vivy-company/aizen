@@ -36,6 +36,7 @@ struct CodeBlockView: View {
     }
 
     @State private var highlightedText: AttributedString?
+    @State private var highlightedPreview: AttributedString?
     @State private var isHovering = false
     @State private var isExpanded = false
     @State private var didSetInitialExpand = false
@@ -94,9 +95,10 @@ struct CodeBlockView: View {
     }
 
     private var shouldHighlight: Bool {
-        guard !isStreaming, isExpanded else { return false }
-        if trimmedCode.count > 4000 { return false }
-        return lineCount <= 200
+        guard !isStreaming else { return false }
+        let codeToCheck = isExpanded ? trimmedCode : previewText
+        if codeToCheck.count > 4000 { return false }
+        return true
     }
 
     var body: some View {
@@ -144,20 +146,19 @@ struct CodeBlockView: View {
 
             Group {
                 if isExpanded {
-                    codeContent(text: trimmedCode, displayLineCount: lineCount, useHighlight: true)
+                    codeContent(text: trimmedCode, displayLineCount: lineCount, highlighted: highlightedText)
                 } else {
-                    codeContent(text: previewText, displayLineCount: previewLineCount, useHighlight: false)
+                    codeContent(text: previewText, displayLineCount: previewLineCount, highlighted: highlightedPreview)
                 }
             }
             .task(id: highlightTaskKey) {
                 guard shouldHighlight else {
-                    if highlightedText != nil {
-                        highlightedText = nil
-                    }
+                    if highlightedText != nil { highlightedText = nil }
+                    if highlightedPreview != nil { highlightedPreview = nil }
                     return
                 }
-                let snapshot = trimmedCode
-                await performHighlight(codeSnapshot: snapshot)
+                await performHighlight(codeSnapshot: trimmedCode, isPreview: false)
+                await performHighlight(codeSnapshot: previewText, isPreview: true)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -186,7 +187,7 @@ struct CodeBlockView: View {
         "\(trimmedCode.hashValue)-\(language ?? "none")-\(effectiveThemeName)-\(isStreaming ? "stream" : "final")-\(isExpanded ? "expanded" : "collapsed")"
     }
 
-    private func performHighlight(codeSnapshot: String) async {
+    private func performHighlight(codeSnapshot: String, isPreview: Bool) async {
         let detectedLanguage: CodeLanguage
         if let lang = language, !lang.isEmpty {
             detectedLanguage = LanguageDetection.languageFromFence(lang)
@@ -194,22 +195,21 @@ struct CodeBlockView: View {
             detectedLanguage = .default
         }
 
-        // Load theme
         let theme = GhosttyThemeParser.loadTheme(named: effectiveThemeName) ?? defaultTheme()
 
-        // Use shared highlighting queue (limits concurrent highlighting, provides caching)
         if let attributed = await HighlightingQueue.shared.highlight(
             code: codeSnapshot,
             language: detectedLanguage,
             theme: theme
         ) {
-            if codeSnapshot == trimmedCode {
-                highlightedText = attributed
-            }
-        } else {
-            // Fallback to plain text on error or cancellation
-            if highlightedText == nil, codeSnapshot == trimmedCode {
-                highlightedText = AttributedString(codeSnapshot)
+            if isPreview {
+                if codeSnapshot == previewText {
+                    highlightedPreview = attributed
+                }
+            } else {
+                if codeSnapshot == trimmedCode {
+                    highlightedText = attributed
+                }
             }
         }
     }
@@ -221,7 +221,7 @@ struct CodeBlockView: View {
     }
 
     @ViewBuilder
-    private func codeContent(text: String, displayLineCount: Int, useHighlight: Bool) -> some View {
+    private func codeContent(text: String, displayLineCount: Int, highlighted: AttributedString?) -> some View {
         ScrollView(.horizontal, showsIndicators: true) {
             HStack(alignment: .top, spacing: 0) {
                 VStack(alignment: .trailing, spacing: 0) {
@@ -239,7 +239,7 @@ struct CodeBlockView: View {
                     .frame(height: CGFloat(displayLineCount) * 18)
 
                 Group {
-                    if useHighlight, let highlighted = highlightedText {
+                    if let highlighted = highlighted {
                         Text(highlighted)
                     } else {
                         Text(text)
