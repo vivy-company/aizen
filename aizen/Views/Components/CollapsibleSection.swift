@@ -84,12 +84,6 @@ struct CollapsibleSection<Header: View, Content: View, Summary: View>: View {
             isExpanded.toggle()
         }
     }
-    
-    func expanded(_ value: Bool) -> CollapsibleSection {
-        var copy = self
-        copy._isExpanded = State(initialValue: value)
-        return copy
-    }
 }
 
 extension CollapsibleSection where Summary == EmptyView {

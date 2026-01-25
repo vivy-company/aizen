@@ -468,8 +468,6 @@ struct ToolCallView: View {
 
 }
 
-// MARK: - Highlighted Text Content View
-
 // MARK: - Question Response Handler
 
 extension ToolCallView {

@@ -924,15 +924,31 @@ nonisolated final class MarkdownParser {
             }
             
             // Table detection: buffer lines starting with | until separator row confirms table
-            if !inCodeBlock && !inMathBlock && isLineStart && content[i] == "|" {
-                if potentialTableStart == nil {
-                    potentialTableStart = lineStart
+            // Require at least 2 pipes in header line to reduce false positives
+            if !inCodeBlock && !inMathBlock && isLineStart {
+                let lineContent = content[lineStart...]
+                let firstNewline = lineContent.firstIndex(of: "\n") ?? content.endIndex
+                let currentLine = String(content[lineStart..<firstNewline])
+                let trimmedLine = currentLine.trimmingCharacters(in: .whitespaces)
+                
+                if trimmedLine.hasPrefix("|") && trimmedLine.filter({ $0 == "|" }).count >= 2 {
+                    if potentialTableStart == nil {
+                        potentialTableStart = lineStart
+                    }
                 }
             }
             
-            if !inCodeBlock && !inMathBlock && potentialTableStart != nil {
+            if !inCodeBlock && !inMathBlock && potentialTableStart != nil && content[i] == "|" {
                 let remaining = content[i...]
-                if remaining.hasPrefix("|--") || remaining.hasPrefix("| --") || remaining.hasPrefix("|:--") || remaining.hasPrefix("| :--") {
+                let isSeparatorStart = remaining.hasPrefix("|--") || 
+                                       remaining.hasPrefix("| --") || 
+                                       remaining.hasPrefix("|:--") || 
+                                       remaining.hasPrefix("| :--") ||
+                                       remaining.hasPrefix("|---") ||
+                                       remaining.hasPrefix("| ---") ||
+                                       remaining.hasPrefix("|:---") ||
+                                       remaining.hasPrefix("| :---")
+                if isSeparatorStart {
                     var endOfSep = i
                     while endOfSep < content.endIndex && content[endOfSep] != "\n" {
                         endOfSep = content.index(after: endOfSep)

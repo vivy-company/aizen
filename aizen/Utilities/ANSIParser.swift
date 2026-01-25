@@ -10,26 +10,36 @@ import AppKit
 
 // MARK: - ANSI Color Provider
 
-nonisolated struct ANSIColorProvider {
+/// Provides ANSI colors from the user's selected Ghostty theme.
+/// Uses a static cache to avoid repeated theme file parsing.
+nonisolated final class ANSIColorProvider {
     static let shared = ANSIColorProvider()
+    
+    private static var cachedThemeName: String?
+    private static var cachedPalette: [Int: NSColor]?
+    private static var cachedBackground: NSColor?
+    private static let cacheLock = NSLock()
 
-    private var cachedThemeName: String?
-    private var cachedPalette: [Int: NSColor]?
-
+    private init() {}
+    
     private func currentThemeName() -> String {
         UserDefaults.standard.string(forKey: "terminalThemeName") ?? "Aizen Dark"
     }
 
-    mutating func getPalette() -> [Int: NSColor] {
+    func getPalette() -> [Int: NSColor] {
         let themeName = currentThemeName()
+        
+        Self.cacheLock.lock()
+        defer { Self.cacheLock.unlock() }
 
-        if themeName == cachedThemeName, let palette = cachedPalette {
+        if themeName == Self.cachedThemeName, let palette = Self.cachedPalette {
             return palette
         }
 
         if let palette = GhosttyThemeParser.loadANSIPalette(named: themeName), !palette.isEmpty {
-            cachedThemeName = themeName
-            cachedPalette = palette
+            Self.cachedThemeName = themeName
+            Self.cachedPalette = palette
+            Self.cachedBackground = GhosttyThemeParser.loadBackgroundColor(named: themeName)
             return palette
         }
 
@@ -37,11 +47,31 @@ nonisolated struct ANSIColorProvider {
     }
     
     func getBackgroundColor() -> Color {
-        Color(nsColor: GhosttyThemeParser.loadBackgroundColor(named: currentThemeName()))
+        let themeName = currentThemeName()
+        
+        Self.cacheLock.lock()
+        defer { Self.cacheLock.unlock() }
+        
+        if themeName == Self.cachedThemeName, let bg = Self.cachedBackground {
+            return Color(nsColor: bg)
+        }
+        
+        let bg = GhosttyThemeParser.loadBackgroundColor(named: themeName)
+        Self.cachedBackground = bg
+        return Color(nsColor: bg)
     }
     
     func getForegroundColor() -> Color {
         color(for: 7)
+    }
+    
+    /// Invalidate cache when theme changes
+    func invalidateCache() {
+        Self.cacheLock.lock()
+        defer { Self.cacheLock.unlock() }
+        Self.cachedThemeName = nil
+        Self.cachedPalette = nil
+        Self.cachedBackground = nil
     }
 
     /// Aizen Dark fallback palette
@@ -66,12 +96,10 @@ nonisolated struct ANSIColorProvider {
 
     /// Get color for ANSI index from theme
     func color(for index: Int) -> Color {
-        var provider = self
-        let palette = provider.getPalette()
+        let palette = getPalette()
         if let nsColor = palette[index] {
             return Color(nsColor)
         }
-        // Fallback to Aizen Dark
         if let nsColor = Self.aizenDarkPalette[index] {
             return Color(nsColor)
         }
@@ -80,8 +108,7 @@ nonisolated struct ANSIColorProvider {
     
     /// Get NSColor for ANSI index from theme (for NSAttributedString)
     func nsColor(for index: Int) -> NSColor {
-        var provider = self
-        let palette = provider.getPalette()
+        let palette = getPalette()
         if let nsColor = palette[index] {
             return nsColor
         }
@@ -175,13 +202,15 @@ nonisolated struct ANSITextStyle: Sendable {
 // MARK: - ANSI Parser
 
 nonisolated struct ANSIParser {
-    /// Parse ANSI-encoded string to AttributedString
+    /// Precompiled regex for ANSI escape sequences (avoids recompilation per parse)
+    private static let ansiRegex: NSRegularExpression? = {
+        try? NSRegularExpression(pattern: "\u{001B}\\[([0-9;]*)m", options: [])
+    }()
+    
     static func parse(_ input: String) -> AttributedString {
         var result = AttributedString()
         var style = ANSITextStyle()
-        // Regex to match ANSI escape sequences
-        let pattern = "\u{001B}\\[([0-9;]*)m"
-        let regex = try? NSRegularExpression(pattern: pattern, options: [])
+        let regex = ansiRegex
 
         var lastEnd = input.startIndex
 
@@ -419,13 +448,10 @@ nonisolated extension ANSIParser {
         return result
     }
 
-    /// Parse a single line with initial style state, returns attributed string and final style
     private static func parseLine(_ input: String, initialStyle: ANSITextStyle) -> (AttributedString, ANSITextStyle) {
         var result = AttributedString()
         var style = initialStyle
-
-        let pattern = "\u{001B}\\[([0-9;]*)m"
-        let regex = try? NSRegularExpression(pattern: pattern, options: [])
+        let regex = ansiRegex
 
         var lastEnd = input.startIndex
         let nsString = input as NSString
@@ -469,6 +495,8 @@ struct ANSILazyLogView: View {
 
     @State private var parsedLines: [ANSIParsedLine] = []
     @State private var isProcessing = true
+    @State private var parseGeneration: Int = 0
+    @State private var currentTask: Task<Void, Never>?
 
     init(_ logs: String, fontSize: CGFloat = 11) {
         self.logs = logs
@@ -515,13 +543,21 @@ struct ANSILazyLogView: View {
         .onAppear {
             parseLogsAsync(logs)
         }
+        .onDisappear {
+            currentTask?.cancel()
+        }
     }
 
     private func parseLogsAsync(_ text: String) {
+        currentTask?.cancel()
+        parseGeneration += 1
+        let generation = parseGeneration
         isProcessing = true
-        Task.detached(priority: .userInitiated) {
+        
+        currentTask = Task.detached(priority: .userInitiated) {
             let lines = ANSIParser.parseLines(text)
             await MainActor.run {
+                guard generation == parseGeneration else { return }
                 parsedLines = lines
                 isProcessing = false
             }

@@ -10,50 +10,42 @@ import SwiftUI
 // MARK: - Thinking Dots Animation
 
 struct ThinkingDotsView: View {
-    @State private var animationPhase: Int = 0
-    
     private let dotCount = 3
     private let dotSize: CGFloat = 6
     private let spacing: CGFloat = 4
+    private let interval: TimeInterval = 0.4
     
     var body: some View {
-        HStack(spacing: spacing) {
-            ForEach(0..<dotCount, id: \.self) { index in
-                Circle()
-                    .fill(Color.secondary)
-                    .frame(width: dotSize, height: dotSize)
-                    .scaleEffect(scaleForDot(at: index))
-                    .opacity(opacityForDot(at: index))
+        TimelineView(.periodic(from: .now, by: interval)) { timeline in
+            let phase = Int(timeline.date.timeIntervalSinceReferenceDate / interval) % dotCount
+            HStack(spacing: spacing) {
+                ForEach(0..<dotCount, id: \.self) { index in
+                    Circle()
+                        .fill(Color.secondary)
+                        .frame(width: dotSize, height: dotSize)
+                        .scaleEffect(scaleForDot(at: index, phase: phase))
+                        .opacity(opacityForDot(at: index, phase: phase))
+                        .animation(.easeInOut(duration: 0.3), value: phase)
+                }
             }
-        }
-        .onAppear {
-            startAnimation()
         }
     }
     
-    private func scaleForDot(at index: Int) -> CGFloat {
-        let phase = (animationPhase + index) % dotCount
-        switch phase {
+    private func scaleForDot(at index: Int, phase: Int) -> CGFloat {
+        let adjustedPhase = (phase + index) % dotCount
+        switch adjustedPhase {
         case 0: return 1.0
         case 1: return 0.7
         default: return 0.5
         }
     }
     
-    private func opacityForDot(at index: Int) -> Double {
-        let phase = (animationPhase + index) % dotCount
-        switch phase {
+    private func opacityForDot(at index: Int, phase: Int) -> Double {
+        let adjustedPhase = (phase + index) % dotCount
+        switch adjustedPhase {
         case 0: return 1.0
         case 1: return 0.6
         default: return 0.3
-        }
-    }
-    
-    private func startAnimation() {
-        Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
-            withAnimation(.easeInOut(duration: 0.3)) {
-                animationPhase = (animationPhase + 1) % dotCount
-            }
         }
     }
 }

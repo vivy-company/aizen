@@ -53,11 +53,11 @@ struct CodeBlockView: View {
     }
 
     private var headerBackground: Color {
-        CodeBlockColors.headerBackground(for: colorScheme)
+        CodeBlockColors.headerBackground()
     }
 
     private var codeBackground: Color {
-        CodeBlockColors.contentBackground(for: colorScheme)
+        CodeBlockColors.contentBackground()
     }
 
     private var languageIcon: String {

@@ -59,11 +59,11 @@ struct MermaidDiagramView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var headerBackground: Color {
-        CodeBlockColors.headerBackground(for: colorScheme)
+        CodeBlockColors.headerBackground()
     }
 
     private var contentBackground: Color {
-        CodeBlockColors.contentBackground(for: colorScheme)
+        CodeBlockColors.contentBackground()
     }
 
     var body: some View {

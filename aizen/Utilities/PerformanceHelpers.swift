@@ -106,9 +106,9 @@ class Throttler {
     }
 }
 
-// MARK: - Equatable View Wrapper
+// MARK: - Stable Equatable Wrapper
 
-struct EquatableView<Content: View, Value: Equatable>: View, Equatable {
+struct StableEquatableWrapper<Content: View, Value: Equatable>: View, Equatable {
     let content: Content
     let value: Value
     
@@ -121,7 +121,7 @@ struct EquatableView<Content: View, Value: Equatable>: View, Equatable {
         content
     }
     
-    static func == (lhs: EquatableView<Content, Value>, rhs: EquatableView<Content, Value>) -> Bool {
+    static func == (lhs: StableEquatableWrapper<Content, Value>, rhs: StableEquatableWrapper<Content, Value>) -> Bool {
         lhs.value == rhs.value
     }
 }
@@ -130,7 +130,7 @@ struct EquatableView<Content: View, Value: Equatable>: View, Equatable {
 
 extension View {
     func equatable<Value: Equatable>(by value: Value) -> some View {
-        EquatableView(value: value) { self }
+        StableEquatableWrapper(value: value) { self }
     }
     
     func onFirstAppear(perform action: @escaping () -> Void) -> some View {

@@ -65,8 +65,8 @@ enum ChatSettings {
     static let fontFamilyKey = "chatFontFamily"
     static let fontSizeKey = "chatFontSize"
     static let blockSpacingKey = "chatBlockSpacing"
-    static let toolCallExpansionModeKey = "toolCallExpansionMode"
-    static let codeBlockExpansionModeKey = "codeBlockExpansionMode"
+    static let toolCallExpansionModeKey = "chatToolCallExpansionMode"
+    static let codeBlockExpansionModeKey = "chatCodeBlockExpansionMode"
     static let enableAnimationsKey = "chatEnableAnimations"
 
     static let defaultFontFamily: String = "System Font"
