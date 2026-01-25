@@ -11,12 +11,7 @@ import os.log
 actor ScriptAgentInstaller {
     static let shared = ScriptAgentInstaller()
 
-    private let shellLoader: ShellEnvironmentLoader
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "ScriptInstaller")
-
-    init(shellLoader: ShellEnvironmentLoader = .shared) {
-        self.shellLoader = shellLoader
-    }
 
     // MARK: - Installation
 
@@ -32,7 +27,7 @@ actor ScriptAgentInstaller {
         let command = "/usr/bin/curl -fsSL \(escapedURL) | /bin/sh"
         process.arguments = ["-c", command]
 
-        let shellEnv = await shellLoader.loadShellEnvironment()
+        let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
         process.environment = shellEnv
 
         let pipe = Pipe()
