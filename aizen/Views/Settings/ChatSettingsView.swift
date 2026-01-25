@@ -33,6 +33,32 @@ enum ToolCallExpansionMode: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Code Block Expansion Mode
+
+enum CodeBlockExpansionMode: String, CaseIterable, Identifiable {
+    case auto = "auto"
+    case expanded = "expanded"
+    case collapsed = "collapsed"
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .auto: return "Auto"
+        case .expanded: return "Expanded"
+        case .collapsed: return "Collapsed"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .auto: return "Small blocks expanded, large collapsed"
+        case .expanded: return "All code blocks expanded"
+        case .collapsed: return "All code blocks collapsed"
+        }
+    }
+}
+
 // MARK: - Chat Settings Keys
 
 enum ChatSettings {
@@ -40,11 +66,15 @@ enum ChatSettings {
     static let fontSizeKey = "chatFontSize"
     static let blockSpacingKey = "chatBlockSpacing"
     static let toolCallExpansionModeKey = "toolCallExpansionMode"
+    static let codeBlockExpansionModeKey = "codeBlockExpansionMode"
+    static let enableAnimationsKey = "chatEnableAnimations"
 
     static let defaultFontFamily: String = "System Font"
     static let defaultFontSize: Double = 14.0
     static let defaultBlockSpacing: Double = 8.0
     static let defaultToolCallExpansionMode: String = ToolCallExpansionMode.smart.rawValue
+    static let defaultCodeBlockExpansionMode: String = CodeBlockExpansionMode.auto.rawValue
+    static let defaultEnableAnimations: Bool = true
 
     static let fontSizeRange: ClosedRange<Double> = 12...20
     static let blockSpacingRange: ClosedRange<Double> = 4...16
@@ -57,13 +87,22 @@ struct ChatSettingsView: View {
     @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
     @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
     @AppStorage(ChatSettings.toolCallExpansionModeKey) private var toolCallExpansionMode = ChatSettings.defaultToolCallExpansionMode
+    @AppStorage(ChatSettings.codeBlockExpansionModeKey) private var codeBlockExpansionMode = ChatSettings.defaultCodeBlockExpansionMode
+    @AppStorage(ChatSettings.enableAnimationsKey) private var enableAnimations = ChatSettings.defaultEnableAnimations
 
     @State private var availableFonts: [String] = []
     
-    private var selectedExpansionMode: Binding<ToolCallExpansionMode> {
+    private var selectedToolExpansionMode: Binding<ToolCallExpansionMode> {
         Binding(
             get: { ToolCallExpansionMode(rawValue: toolCallExpansionMode) ?? .smart },
             set: { toolCallExpansionMode = $0.rawValue }
+        )
+    }
+    
+    private var selectedCodeExpansionMode: Binding<CodeBlockExpansionMode> {
+        Binding(
+            get: { CodeBlockExpansionMode(rawValue: codeBlockExpansionMode) ?? .auto },
+            set: { codeBlockExpansionMode = $0.rawValue }
         )
     }
 
@@ -124,18 +163,39 @@ struct ChatSettingsView: View {
             }
 
             Section {
-                Picker("Tool Calls", selection: selectedExpansionMode) {
+                Picker("Tool Calls", selection: selectedToolExpansionMode) {
                     ForEach(ToolCallExpansionMode.allCases) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
                 
-                Text(selectedExpansionMode.wrappedValue.description)
+                Text(selectedToolExpansionMode.wrappedValue.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                Picker("Code Blocks", selection: selectedCodeExpansionMode) {
+                    ForEach(CodeBlockExpansionMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                
+                Text(selectedCodeExpansionMode.wrappedValue.description)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
-                Text("Tool Call Display")
+                Text("Content Display")
+            }
+            
+            Section {
+                Toggle("Enable Animations", isOn: $enableAnimations)
+                
+                Text("Smooth transitions for expanding/collapsing content")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Behavior")
             }
 
             Section {
@@ -170,6 +230,8 @@ struct ChatSettingsView: View {
                     chatFontSize = ChatSettings.defaultFontSize
                     blockSpacing = ChatSettings.defaultBlockSpacing
                     toolCallExpansionMode = ChatSettings.defaultToolCallExpansionMode
+                    codeBlockExpansionMode = ChatSettings.defaultCodeBlockExpansionMode
+                    enableAnimations = ChatSettings.defaultEnableAnimations
                 }
             }
         }

@@ -43,6 +43,8 @@ struct CodeBlockView: View {
     @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
     @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
     @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
+    @AppStorage(ChatSettings.codeBlockExpansionModeKey) private var codeBlockExpansionMode = ChatSettings.defaultCodeBlockExpansionMode
+    @AppStorage(ChatSettings.enableAnimationsKey) private var enableAnimations = ChatSettings.defaultEnableAnimations
     @Environment(\.colorScheme) private var colorScheme
 
     private var effectiveThemeName: String {
@@ -168,13 +170,22 @@ struct CodeBlockView: View {
         )
         .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 4, x: 0, y: 2)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            if enableAnimations {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isHovering = hovering
+                }
+            } else {
                 isHovering = hovering
             }
         }
         .task(id: trimmedCode.hashValue) {
             guard !didSetInitialExpand else { return }
-            isExpanded = lineCount <= 12
+            let mode = CodeBlockExpansionMode(rawValue: codeBlockExpansionMode) ?? .auto
+            switch mode {
+            case .auto: isExpanded = lineCount <= 12
+            case .expanded: isExpanded = true
+            case .collapsed: isExpanded = false
+            }
             didSetInitialExpand = true
         }
     }
@@ -215,7 +226,11 @@ struct CodeBlockView: View {
     }
 
     private func toggleExpanded() {
-        withAnimation(.easeInOut(duration: 0.15)) {
+        if enableAnimations {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isExpanded.toggle()
+            }
+        } else {
             isExpanded.toggle()
         }
     }
