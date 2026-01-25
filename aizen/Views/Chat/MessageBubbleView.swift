@@ -99,6 +99,10 @@ struct MessageBubbleView: View {
                             }
 
                             HStack(spacing: 8) {
+                                if !message.isComplete {
+                                    PulsingDotView(color: .blue, size: 5)
+                                }
+                                
                                 Text(formatTimestamp(message.timestamp))
                                     .font(.system(size: 10))
                                     .foregroundStyle(.tertiary)

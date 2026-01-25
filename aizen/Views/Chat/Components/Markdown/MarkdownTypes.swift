@@ -868,16 +868,22 @@ nonisolated final class MarkdownParser {
         var inMathBlock = false
         var codeBlockStart: String.Index?
         var mathBlockStart: String.Index?
+        var potentialTableStart: String.Index?
         var lastStableBoundary = content.startIndex
         var i = content.startIndex
+        var lineStart = content.startIndex
 
         while i < content.endIndex {
+            let isLineStart = (i == content.startIndex) || (i > content.startIndex && content[content.index(before: i)] == "\n")
+            if isLineStart {
+                lineStart = i
+            }
+            
             // Check for $$ math block
             if content[i] == "$" && !inCodeBlock {
                 let remaining = content[i...]
                 if remaining.hasPrefix("$$") {
                     if inMathBlock {
-                        // End of math block
                         let endOfMath = content.index(i, offsetBy: 2, limitedBy: content.endIndex) ?? content.endIndex
                         inMathBlock = false
                         mathBlockStart = nil
@@ -885,7 +891,6 @@ nonisolated final class MarkdownParser {
                         i = endOfMath
                         continue
                     } else {
-                        // Start of math block
                         inMathBlock = true
                         mathBlockStart = i
                         i = content.index(i, offsetBy: 2, limitedBy: content.endIndex) ?? content.endIndex
@@ -917,10 +922,49 @@ nonisolated final class MarkdownParser {
                     }
                 }
             }
+            
+            // Table detection: buffer lines starting with | until separator row confirms table
+            // Require at least 2 pipes in header line to reduce false positives
+            if !inCodeBlock && !inMathBlock && isLineStart {
+                let lineContent = content[lineStart...]
+                let firstNewline = lineContent.firstIndex(of: "\n") ?? content.endIndex
+                let currentLine = String(content[lineStart..<firstNewline])
+                let trimmedLine = currentLine.trimmingCharacters(in: .whitespaces)
+                
+                if trimmedLine.hasPrefix("|") && trimmedLine.filter({ $0 == "|" }).count >= 2 {
+                    if potentialTableStart == nil {
+                        potentialTableStart = lineStart
+                    }
+                }
+            }
+            
+            if !inCodeBlock && !inMathBlock && potentialTableStart != nil && content[i] == "|" {
+                let remaining = content[i...]
+                let isSeparatorStart = remaining.hasPrefix("|--") || 
+                                       remaining.hasPrefix("| --") || 
+                                       remaining.hasPrefix("|:--") || 
+                                       remaining.hasPrefix("| :--") ||
+                                       remaining.hasPrefix("|---") ||
+                                       remaining.hasPrefix("| ---") ||
+                                       remaining.hasPrefix("|:---") ||
+                                       remaining.hasPrefix("| :---")
+                if isSeparatorStart {
+                    var endOfSep = i
+                    while endOfSep < content.endIndex && content[endOfSep] != "\n" {
+                        endOfSep = content.index(after: endOfSep)
+                    }
+                    if endOfSep < content.endIndex {
+                        endOfSep = content.index(after: endOfSep)
+                    }
+                    potentialTableStart = nil
+                    lastStableBoundary = endOfSep
+                }
+            }
 
             if !inCodeBlock && !inMathBlock && content[i] == "\n" {
                 let next = content.index(after: i)
                 if next < content.endIndex && content[next] == "\n" {
+                    potentialTableStart = nil
                     lastStableBoundary = content.index(after: next)
                 }
             }
@@ -930,10 +974,13 @@ nonisolated final class MarkdownParser {
 
         // If we're inside an unclosed block, reset to before that block
         if inCodeBlock, let start = codeBlockStart {
-            lastStableBoundary = start
+            lastStableBoundary = min(lastStableBoundary, start)
         }
         if inMathBlock, let start = mathBlockStart {
             lastStableBoundary = min(lastStableBoundary, start)
+        }
+        if let tableStart = potentialTableStart {
+            lastStableBoundary = min(lastStableBoundary, tableStart)
         }
 
         let stable = String(content[..<lastStableBoundary])

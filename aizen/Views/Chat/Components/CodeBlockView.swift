@@ -36,12 +36,15 @@ struct CodeBlockView: View {
     }
 
     @State private var highlightedText: AttributedString?
+    @State private var highlightedPreview: AttributedString?
     @State private var isHovering = false
     @State private var isExpanded = false
     @State private var didSetInitialExpand = false
     @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
     @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
     @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
+    @AppStorage(ChatSettings.codeBlockExpansionModeKey) private var codeBlockExpansionMode = ChatSettings.defaultCodeBlockExpansionMode
+    @AppStorage(ChatSettings.enableAnimationsKey) private var enableAnimations = ChatSettings.defaultEnableAnimations
     @Environment(\.colorScheme) private var colorScheme
 
     private var effectiveThemeName: String {
@@ -50,11 +53,11 @@ struct CodeBlockView: View {
     }
 
     private var headerBackground: Color {
-        CodeBlockColors.headerBackground(for: colorScheme)
+        CodeBlockColors.headerBackground()
     }
 
     private var codeBackground: Color {
-        CodeBlockColors.contentBackground(for: colorScheme)
+        CodeBlockColors.contentBackground()
     }
 
     private var languageIcon: String {
@@ -94,9 +97,10 @@ struct CodeBlockView: View {
     }
 
     private var shouldHighlight: Bool {
-        guard !isStreaming, isExpanded else { return false }
-        if trimmedCode.count > 4000 { return false }
-        return lineCount <= 200
+        guard !isStreaming else { return false }
+        let codeToCheck = isExpanded ? trimmedCode : previewText
+        if codeToCheck.count > 4000 { return false }
+        return true
     }
 
     var body: some View {
@@ -144,20 +148,19 @@ struct CodeBlockView: View {
 
             Group {
                 if isExpanded {
-                    codeContent(text: trimmedCode, displayLineCount: lineCount, useHighlight: true)
+                    codeContent(text: trimmedCode, displayLineCount: lineCount, highlighted: highlightedText)
                 } else {
-                    codeContent(text: previewText, displayLineCount: previewLineCount, useHighlight: false)
+                    codeContent(text: previewText, displayLineCount: previewLineCount, highlighted: highlightedPreview)
                 }
             }
             .task(id: highlightTaskKey) {
                 guard shouldHighlight else {
-                    if highlightedText != nil {
-                        highlightedText = nil
-                    }
+                    if highlightedText != nil { highlightedText = nil }
+                    if highlightedPreview != nil { highlightedPreview = nil }
                     return
                 }
-                let snapshot = trimmedCode
-                await performHighlight(codeSnapshot: snapshot)
+                await performHighlight(codeSnapshot: trimmedCode, isPreview: false)
+                await performHighlight(codeSnapshot: previewText, isPreview: true)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -167,13 +170,22 @@ struct CodeBlockView: View {
         )
         .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 4, x: 0, y: 2)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            if enableAnimations {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isHovering = hovering
+                }
+            } else {
                 isHovering = hovering
             }
         }
         .task(id: trimmedCode.hashValue) {
             guard !didSetInitialExpand else { return }
-            isExpanded = lineCount <= 12
+            let mode = CodeBlockExpansionMode(rawValue: codeBlockExpansionMode) ?? .auto
+            switch mode {
+            case .auto: isExpanded = lineCount <= 12
+            case .expanded: isExpanded = true
+            case .collapsed: isExpanded = false
+            }
             didSetInitialExpand = true
         }
     }
@@ -186,7 +198,7 @@ struct CodeBlockView: View {
         "\(trimmedCode.hashValue)-\(language ?? "none")-\(effectiveThemeName)-\(isStreaming ? "stream" : "final")-\(isExpanded ? "expanded" : "collapsed")"
     }
 
-    private func performHighlight(codeSnapshot: String) async {
+    private func performHighlight(codeSnapshot: String, isPreview: Bool) async {
         let detectedLanguage: CodeLanguage
         if let lang = language, !lang.isEmpty {
             detectedLanguage = LanguageDetection.languageFromFence(lang)
@@ -194,34 +206,37 @@ struct CodeBlockView: View {
             detectedLanguage = .default
         }
 
-        // Load theme
         let theme = GhosttyThemeParser.loadTheme(named: effectiveThemeName) ?? defaultTheme()
 
-        // Use shared highlighting queue (limits concurrent highlighting, provides caching)
         if let attributed = await HighlightingQueue.shared.highlight(
             code: codeSnapshot,
             language: detectedLanguage,
             theme: theme
         ) {
-            if codeSnapshot == trimmedCode {
-                highlightedText = attributed
-            }
-        } else {
-            // Fallback to plain text on error or cancellation
-            if highlightedText == nil, codeSnapshot == trimmedCode {
-                highlightedText = AttributedString(codeSnapshot)
+            if isPreview {
+                if codeSnapshot == previewText {
+                    highlightedPreview = attributed
+                }
+            } else {
+                if codeSnapshot == trimmedCode {
+                    highlightedText = attributed
+                }
             }
         }
     }
 
     private func toggleExpanded() {
-        withAnimation(.easeInOut(duration: 0.15)) {
+        if enableAnimations {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isExpanded.toggle()
+            }
+        } else {
             isExpanded.toggle()
         }
     }
 
     @ViewBuilder
-    private func codeContent(text: String, displayLineCount: Int, useHighlight: Bool) -> some View {
+    private func codeContent(text: String, displayLineCount: Int, highlighted: AttributedString?) -> some View {
         ScrollView(.horizontal, showsIndicators: true) {
             HStack(alignment: .top, spacing: 0) {
                 VStack(alignment: .trailing, spacing: 0) {
@@ -239,7 +254,7 @@ struct CodeBlockView: View {
                     .frame(height: CGFloat(displayLineCount) * 18)
 
                 Group {
-                    if useHighlight, let highlighted = highlightedText {
+                    if let highlighted = highlighted {
                         Text(highlighted)
                     } else {
                         Text(text)

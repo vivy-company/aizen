@@ -2,17 +2,21 @@
 //  CodeBlockColors.swift
 //  aizen
 //
-//  Shared color tokens for code/diagram blocks
+//  Shared color tokens for code/diagram blocks using Ghostty theme
 //
 
 import SwiftUI
 
 enum CodeBlockColors {
-    static func headerBackground(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.15) : Color(white: 0.95)
+    @AppStorage("terminalThemeName") private static var themeName = "Aizen Dark"
+    
+    static func headerBackground() -> Color {
+        let bg = GhosttyThemeParser.loadBackgroundColor(named: themeName)
+        let isLight = bg.luminance > 0.5
+        return Color(nsColor: bg.darken(by: isLight ? 0.05 : -0.08))
     }
 
-    static func contentBackground(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.1) : Color(white: 0.98)
+    static func contentBackground() -> Color {
+        Color(nsColor: GhosttyThemeParser.loadBackgroundColor(named: themeName))
     }
 }

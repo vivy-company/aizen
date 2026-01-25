@@ -19,6 +19,19 @@ struct ChatControlsBar: View {
     let showsUsage: Bool
 
     @State private var showingAuthClearedMessage = false
+    @AppStorage(ChatSettings.toolCallExpansionModeKey) private var expansionMode = ChatSettings.defaultToolCallExpansionMode
+    
+    private var currentExpansionMode: ToolCallExpansionMode {
+        ToolCallExpansionMode(rawValue: expansionMode) ?? .smart
+    }
+    
+    private var expansionModeIcon: String {
+        switch currentExpansionMode {
+        case .expanded: return "rectangle.expand.vertical"
+        case .collapsed: return "rectangle.compress.vertical"
+        case .smart: return "sparkles.rectangle.stack"
+        }
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -57,6 +70,26 @@ struct ChatControlsBar: View {
                 .buttonStyle(.plain)
                 .help("Usage")
             }
+            
+            Menu {
+                ForEach(ToolCallExpansionMode.allCases) { mode in
+                    Button {
+                        expansionMode = mode.rawValue
+                    } label: {
+                        HStack {
+                            Text(mode.displayName)
+                            if mode == currentExpansionMode {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: expansionModeIcon)
+                    .foregroundColor(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .help("Tool call display: \(currentExpansionMode.displayName)")
 
             Menu {
                 Button("New Session") {
