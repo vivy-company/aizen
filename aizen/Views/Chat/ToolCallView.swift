@@ -257,10 +257,17 @@ struct ToolCallView: View {
         }
         return nil
     }
+    
+    private func extractCommand() -> String? {
+        guard let rawInput = toolCall.rawInput?.value as? [String: Any] else { return nil }
+        return rawInput["command"] as? String
+    }
+    
+    private func extractExitCode() -> Int? {
+        guard let rawOutput = toolCall.rawOutput?.value as? [String: Any] else { return nil }
+        return rawOutput["exitCode"] as? Int ?? rawOutput["exit_code"] as? Int
+    }
 
-    // MARK: - Task Detection
-
-    /// Check if this tool call is a Task (subagent) - detected by having children
     private var isTaskToolCall: Bool {
         !childToolCalls.isEmpty
     }
@@ -296,7 +303,12 @@ struct ToolCallView: View {
         case .diff(let diff):
             InlineDiffView(diff: diff, allowCompute: isFinal)
         case .terminal(let terminal):
-            InlineTerminalView(terminalId: terminal.terminalId, agentSession: agentSession)
+            InlineTerminalView(
+                terminalId: terminal.terminalId,
+                agentSession: agentSession,
+                command: extractCommand(),
+                exitCode: extractExitCode()
+            )
         }
     }
 
@@ -304,15 +316,48 @@ struct ToolCallView: View {
     private func inlineContentBlock(_ block: ContentBlock) -> some View {
         switch block {
         case .text(let textContent):
-            HighlightedTextContentView(
-                text: textContent.text,
-                filePath: filePath,
-                allowHighlight: isFinal,
-                allowSelection: isFinal
-            )
+            if toolCall.kind == .execute {
+                CommandBlock(
+                    command: extractCommand() ?? toolCall.title,
+                    output: textContent.text,
+                    exitCode: resolvedExitCodeStatus,
+                    isStreaming: toolCall.status == .inProgress
+                )
+            } else if let semanticBlock = parseSemanticContent(textContent.text) {
+                semanticBlock
+            } else {
+                HighlightedTextContentView(
+                    text: textContent.text,
+                    filePath: filePath,
+                    allowHighlight: isFinal,
+                    allowSelection: isFinal
+                )
+            }
         default:
             EmptyView()
         }
+    }
+    
+    private var resolvedExitCodeStatus: ExitCodeStatus {
+        if toolCall.status == .inProgress {
+            return .running
+        }
+        if let code = extractExitCode() {
+            return code == 0 ? .success : .failure(code: code)
+        }
+        switch toolCall.status {
+        case .completed: return .success
+        case .failed: return .failure(code: 1)
+        default: return .unknown
+        }
+    }
+    
+    @ViewBuilder
+    private func parseSemanticContent(_ text: String) -> SemanticBlockView? {
+        if let result = EmojiSemanticPatterns.detect(in: text), !result.content.isEmpty {
+            return SemanticBlockView(type: result.type, content: result.content)
+        }
+        return nil
     }
 
     // MARK: - Status

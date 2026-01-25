@@ -1,7 +1,7 @@
 //  InlineTerminalView.swift
 //  aizen
 //
-//  Inline terminal output view with ANSI color support
+//  Inline terminal output view with command block styling and ANSI color support
 //
 
 import SwiftUI
@@ -9,51 +9,96 @@ import SwiftUI
 struct InlineTerminalView: View {
     let terminalId: String
     var agentSession: AgentSession?
+    var command: String?
+    var exitCode: Int?
 
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var output: String = ""
-    @State private var isRunning: Bool = false
+    @State private var isRunning: Bool = true
     @State private var loadTask: Task<Void, Never>?
+    @State private var isExpanded: Bool = true
+    @State private var isHovering: Bool = false
 
     private var fontSize: CGFloat {
-        max(terminalFontSize - 2, 9) // Slightly smaller for inline view
+        max(terminalFontSize - 2, 9)
+    }
+    
+    private var trimmedOutput: String {
+        TerminalOutputDefaults.trimmedOutput(output)
+    }
+    
+    private var hasOutput: Bool {
+        !trimmedOutput.isEmpty
+    }
+    
+    private var resolvedExitCode: ExitCodeStatus {
+        if isRunning {
+            return .running
+        }
+        if let code = exitCode {
+            return code == 0 ? .success : .failure(code: code)
+        }
+        return hasOutput ? .success : .unknown
+    }
+    
+    private var backgroundColor: Color {
+        colorScheme == .dark ? Color(white: 0.08) : Color(white: 0.96)
+    }
+    
+    private var headerBackground: Color {
+        colorScheme == .dark ? Color(white: 0.12) : Color(white: 0.94)
+    }
+    
+    private var borderColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.1)
+    }
+    
+    private var accentColor: Color {
+        switch resolvedExitCode {
+        case .success: return .green
+        case .failure: return .red
+        case .running: return .orange
+        case .unknown: return .orange
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Terminal output with ANSI colors
-            ScrollView {
-                let displayOutput = TerminalOutputDefaults.trimmedOutput(output)
-                if displayOutput.isEmpty {
-                    Text("Waiting for output...")
-                        .font(.custom(terminalFontName, size: fontSize))
-                        .foregroundStyle(.tertiary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text(ANSIParser.parse(displayOutput))
-                        .font(.custom(terminalFontName, size: fontSize))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .frame(maxHeight: 150)
-            .padding(8)
-            .background(Color(red: 0.11, green: 0.11, blue: 0.13))
-            .cornerRadius(6)
-
-            // Running indicator below
-            if isRunning {
-                HStack(spacing: 4) {
-                    ScaledProgressView(size: 12)
-                    Text("Running...")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 4)
+            headerView
+            
+            if isExpanded {
+                Divider()
+                    .opacity(0.5)
+                
+                outputView
             }
         }
+        .background(backgroundColor)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(borderColor, lineWidth: 0.5)
+        )
+        .overlay(alignment: .leading) {
+            UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 6)
+                .fill(accentColor)
+                .frame(width: 3)
+        }
+        .shadow(
+            color: .black.opacity(colorScheme == .dark ? 0.2 : 0.06),
+            radius: isHovering ? 4 : 2,
+            x: 0,
+            y: 1
+        )
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
         .onAppear {
             startLoading()
         }
@@ -62,9 +107,111 @@ struct InlineTerminalView: View {
             loadTask = nil
         }
     }
+    
+    private var headerView: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "terminal.fill")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.orange)
+            
+            if let cmd = command, !cmd.isEmpty {
+                Text("$")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.orange)
+                
+                Text(cmd)
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            } else {
+                Text("Terminal Output")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.primary)
+            }
+            
+            Spacer()
+            
+            exitCodeBadge
+            
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            
+            if let cmd = command, !cmd.isEmpty {
+                Button {
+                    Clipboard.copy(cmd)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .opacity(isHovering ? 1 : 0)
+                .help("Copy command")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(headerBackground)
+    }
+    
+    private var exitCodeBadge: some View {
+        HStack(spacing: 4) {
+            switch resolvedExitCode {
+            case .running:
+                ProgressView()
+                    .scaleEffect(0.5)
+                    .frame(width: 10, height: 10)
+            case .success:
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 9, weight: .semibold))
+            case .failure:
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 9, weight: .semibold))
+            case .unknown:
+                Image(systemName: "questionmark.circle")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            
+            Text(resolvedExitCode.label)
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+        }
+        .foregroundStyle(resolvedExitCode.color)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(resolvedExitCode.color.opacity(0.15))
+        .clipShape(Capsule())
+    }
+    
+    private var outputView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            if trimmedOutput.isEmpty {
+                Text(isRunning ? "Waiting for output..." : "No output")
+                    .font(.custom(terminalFontName, size: fontSize))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(ANSIParser.parse(trimmedOutput))
+                    .font(.custom(terminalFontName, size: fontSize))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(maxHeight: 150)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color(red: 0.11, green: 0.11, blue: 0.13))
+    }
 
     private func startLoading() {
-        // Cancel any existing task before starting new one
         loadTask?.cancel()
 
         loadTask = Task { [weak agentSession] in
@@ -73,7 +220,6 @@ struct InlineTerminalView: View {
             var exitedIterations = 0
             let gracePeriodIterations = TerminalOutputDefaults.gracePeriodIterations
 
-            // Poll for output with cancellation support
             for _ in 0..<TerminalOutputDefaults.maxPollIterationsInline {
                 if Task.isCancelled { break }
 
@@ -90,10 +236,8 @@ struct InlineTerminalView: View {
                     }
                 }
 
-                // If process exited, use grace period to catch any remaining output
                 if !running {
                     exitedIterations += 1
-                    // Exit after grace period OR if we have output
                     if exitedIterations >= gracePeriodIterations || !terminalOutput.isEmpty {
                         break
                     }

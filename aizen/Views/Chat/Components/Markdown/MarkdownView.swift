@@ -78,12 +78,21 @@ struct MarkdownView: View {
                     .transition(.opacity)
 
                 case .imageRow(let images):
-                    // Render consecutive images in a flow layout (wraps to new lines)
                     FlowLayout(spacing: 4) {
                         ForEach(Array(images.enumerated()), id: \.offset) { _, img in
                             LinkedImageView(url: img.url, alt: img.alt, linkURL: img.linkURL, basePath: basePath)
                         }
                     }
+                    .padding(.vertical, 2)
+                    .transition(.opacity)
+                    
+                case .semanticBlock(let type, let title, let contentBlocks):
+                    SemanticBlockWithContentView(
+                        type: type,
+                        title: title,
+                        contentBlocks: contentBlocks,
+                        isStreaming: isStreaming && groupIndex == groups.count - 1
+                    )
                     .padding(.vertical, 2)
                     .transition(.opacity)
                 }
@@ -110,43 +119,63 @@ struct MarkdownView: View {
         }
     }
 
-    /// Groups consecutive text blocks together for unified selection
     private func groupBlocks(_ blocks: [MarkdownBlock]) -> [BlockGroup] {
         var groups: [BlockGroup] = []
         var currentTextBlocks: [MarkdownBlock] = []
         var currentImageRow: [(url: String, alt: String?, linkURL: String?)] = []
+        var index = 0
 
-        for block in blocks {
-            // Check if this is an image-only paragraph (for badge rows)
+        while index < blocks.count {
+            let block = blocks[index]
+            
             let images = extractImages(from: block)
             if !images.isEmpty {
-                // Flush text blocks first
                 if !currentTextBlocks.isEmpty {
                     groups.append(.textGroup(currentTextBlocks))
                     currentTextBlocks = []
                 }
                 currentImageRow.append(contentsOf: images)
-            } else {
-                // Flush accumulated image row
-                if !currentImageRow.isEmpty {
-                    groups.append(.imageRow(currentImageRow))
-                    currentImageRow = []
-                }
-
-                if isTextBlock(block) {
-                    currentTextBlocks.append(block)
-                } else {
-                    // Flush accumulated text blocks
-                    if !currentTextBlocks.isEmpty {
-                        groups.append(.textGroup(currentTextBlocks))
-                        currentTextBlocks = []
-                    }
-                    groups.append(.specialBlock(block))
-                }
+                index += 1
+                continue
             }
+            
+            if !currentImageRow.isEmpty {
+                groups.append(.imageRow(currentImageRow))
+                currentImageRow = []
+            }
+            
+            if let emojiHeader = detectStandaloneEmojiHeader(from: block) {
+                if !currentTextBlocks.isEmpty {
+                    groups.append(.textGroup(currentTextBlocks))
+                    currentTextBlocks = []
+                }
+                
+                var contentBlocks: [MarkdownBlock] = []
+                index += 1
+                while index < blocks.count {
+                    let nextBlock = blocks[index]
+                    if detectStandaloneEmojiHeader(from: nextBlock) != nil { break }
+                    if case .thematicBreak = nextBlock.type { break }
+                    if case .heading = nextBlock.type { break }
+                    contentBlocks.append(nextBlock)
+                    index += 1
+                }
+                groups.append(.semanticBlock(type: emojiHeader.type, title: emojiHeader.title, contentBlocks: contentBlocks))
+                continue
+            }
+            
+            if isTextBlock(block) {
+                currentTextBlocks.append(block)
+            } else {
+                if !currentTextBlocks.isEmpty {
+                    groups.append(.textGroup(currentTextBlocks))
+                    currentTextBlocks = []
+                }
+                groups.append(.specialBlock(block))
+            }
+            index += 1
         }
 
-        // Flush remaining
         if !currentImageRow.isEmpty {
             groups.append(.imageRow(currentImageRow))
         }
@@ -155,6 +184,18 @@ struct MarkdownView: View {
         }
 
         return groups
+    }
+    
+    private func detectStandaloneEmojiHeader(from block: MarkdownBlock) -> (type: SemanticBlockType, title: String?)? {
+        let content: MarkdownInlineContent
+        switch block.type {
+        case .paragraph(let c): content = c
+        case .heading(let c, _): content = c
+        default: return nil
+        }
+        let text = content.plainText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let result = EmojiSemanticPatterns.detectHeader(in: text) else { return nil }
+        return (result.type, result.title)
     }
 
     /// Extract all images from a block if it contains ONLY images (possibly linked)
@@ -221,13 +262,21 @@ struct MarkdownView: View {
     private func isTextBlock(_ block: MarkdownBlock) -> Bool {
         switch block.type {
         case .paragraph(let content):
-            // Paragraphs with images need special rendering
-            return !content.containsImages
+            // Paragraphs with images or emoji patterns need special rendering
+            if content.containsImages { return false }
+            if detectEmojiSemanticType(from: content) != nil { return false }
+            return true
         case .heading, .blockQuote, .list, .thematicBreak, .footnoteReference, .footnoteDefinition:
             return true
         case .codeBlock, .mermaidDiagram, .mathBlock, .table, .image, .htmlBlock:
             return false
         }
+    }
+    
+    private func detectEmojiSemanticType(from content: MarkdownInlineContent) -> (type: SemanticBlockType, strippedContent: String)? {
+        let text = content.plainText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let result = EmojiSemanticPatterns.detect(in: text), !result.content.isEmpty else { return nil }
+        return (result.type, result.content)
     }
 }
 
@@ -236,7 +285,8 @@ struct MarkdownView: View {
 private enum BlockGroup {
     case textGroup([MarkdownBlock])
     case specialBlock(MarkdownBlock)
-    case imageRow([(url: String, alt: String?, linkURL: String?)])  // Horizontal row of images/badges
+    case imageRow([(url: String, alt: String?, linkURL: String?)])
+    case semanticBlock(type: SemanticBlockType, title: String?, contentBlocks: [MarkdownBlock])
 }
 
 // MARK: - Combined Text Block View
@@ -493,18 +543,27 @@ struct CombinedTextBlockView: View {
 
 // MARK: - Special Block Renderer
 
-/// Renders blocks that need special handling (code, mermaid, math, tables, images, paragraphs with images)
 struct SpecialBlockRenderer: View {
     let block: MarkdownBlock
     var isStreaming: Bool = false
     var basePath: String? = nil
+    
+    private func detectEmojiSemanticType(from content: MarkdownInlineContent) -> (type: SemanticBlockType, strippedContent: String)? {
+        let text = content.plainText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let result = EmojiSemanticPatterns.detect(in: text), !result.content.isEmpty else { return nil }
+        return (result.type, result.content)
+    }
 
     var body: some View {
         switch block.type {
         case .paragraph(let content):
-            // Paragraph with images
-            MixedContentParagraphView(content: content, basePath: basePath)
-                .padding(.vertical, 2)
+            if let semantic = detectEmojiSemanticType(from: content) {
+                SemanticBlockView(type: semantic.type, content: semantic.strippedContent)
+                    .padding(.vertical, 2)
+            } else {
+                MixedContentParagraphView(content: content, basePath: basePath)
+                    .padding(.vertical, 2)
+            }
 
         case .codeBlock(let code, let language, _):
             CodeBlockView(code: code, language: language, isStreaming: isStreaming)
@@ -538,6 +597,54 @@ struct SpecialBlockRenderer: View {
         default:
             EmptyView()
         }
+    }
+}
+
+// MARK: - Semantic Block With Content View
+
+struct SemanticBlockWithContentView: View {
+    let type: SemanticBlockType
+    let title: String?
+    let contentBlocks: [MarkdownBlock]
+    var isStreaming: Bool = false
+    
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: type.icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(type.accentColor)
+                
+                Text(title ?? type.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(type.accentColor)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            
+            if !contentBlocks.isEmpty {
+                VStack(alignment: .leading, spacing: blockSpacing * 0.5) {
+                    ForEach(Array(contentBlocks.enumerated()), id: \.offset) { index, block in
+                        let isLast = index == contentBlocks.count - 1
+                        BlockRenderer(block: block, isStreaming: isStreaming && isLast)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
+                .padding(.top, 4)
+            }
+        }
+        .background(type.backgroundColor(for: colorScheme))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(type.borderColor(for: colorScheme), lineWidth: 1)
+        )
     }
 }
 
@@ -1139,8 +1246,51 @@ struct BlockQuoteView: View {
     let isStreaming: Bool
 
     @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+    @Environment(\.colorScheme) private var colorScheme
+    
+    private var detectedAdmonition: (type: SemanticBlockType, title: String?)? {
+        guard let firstBlock = blocks.first,
+              case .paragraph(let content) = firstBlock.type else {
+            return nil
+        }
+        
+        let text = content.plainText
+        let patterns: [(prefix: String, type: SemanticBlockType, title: String)] = [
+            ("[!NOTE]", .note, "Note"),
+            ("[!TIP]", .info, "Tip"),
+            ("[!INFO]", .info, "Info"),
+            ("[!IMPORTANT]", .warning, "Important"),
+            ("[!WARNING]", .warning, "Warning"),
+            ("[!CAUTION]", .warning, "Caution"),
+            ("[!ERROR]", .error, "Error"),
+            ("[!DANGER]", .error, "Danger"),
+            ("[!SUCCESS]", .success, "Success"),
+            ("**Note:**", .note, "Note"),
+            ("**Tip:**", .info, "Tip"),
+            ("**Info:**", .info, "Info"),
+            ("**Warning:**", .warning, "Warning"),
+            ("**Important:**", .warning, "Important"),
+            ("**Error:**", .error, "Error"),
+            ("**Success:**", .success, "Success"),
+        ]
+        
+        for (prefix, type, title) in patterns {
+            if text.hasPrefix(prefix) {
+                return (type, title)
+            }
+        }
+        return nil
+    }
 
     var body: some View {
+        if let admonition = detectedAdmonition {
+            admonitionView(type: admonition.type, title: admonition.title)
+        } else {
+            standardBlockQuote
+        }
+    }
+    
+    private var standardBlockQuote: some View {
         HStack(alignment: .top, spacing: blockSpacing) {
             Rectangle()
                 .fill(Color.secondary.opacity(0.4))
@@ -1153,6 +1303,102 @@ struct BlockQuoteView: View {
             }
             .foregroundStyle(.secondary)
         }
+    }
+    
+    @ViewBuilder
+    private func admonitionView(type: SemanticBlockType, title: String?) -> some View {
+        let bgColor = type.backgroundColor(for: colorScheme)
+        let borderColor = type.borderColor(for: colorScheme)
+        
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: type.icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(type.accentColor)
+                
+                Text(title ?? type.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(type.accentColor)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            
+            VStack(alignment: .leading, spacing: blockSpacing * 0.5) {
+                ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
+                    if index == 0, case .paragraph(let content) = block.type {
+                        let strippedContent = stripAdmonitionPrefix(content)
+                        if !strippedContent.elements.isEmpty {
+                            SelectableTextView(
+                                content: strippedContent,
+                                baseFont: NSFont.systemFont(ofSize: 12),
+                                baseColor: .labelColor
+                            )
+                        }
+                    } else {
+                        BlockRenderer(block: block, isStreaming: isStreaming)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 10)
+            .padding(.top, 4)
+        }
+        .background(bgColor)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(borderColor, lineWidth: 1)
+        )
+    }
+    
+    private func stripAdmonitionPrefix(_ content: MarkdownInlineContent) -> MarkdownInlineContent {
+        let prefixes = [
+            "[!NOTE]", "[!TIP]", "[!INFO]", "[!IMPORTANT]", "[!WARNING]",
+            "[!CAUTION]", "[!ERROR]", "[!DANGER]", "[!SUCCESS]",
+            "**Note:**", "**Tip:**", "**Info:**", "**Warning:**",
+            "**Important:**", "**Error:**", "**Success:**"
+        ]
+        
+        var elements = content.elements
+        guard !elements.isEmpty else { return content }
+        
+        if case .text(var text) = elements[0] {
+            for prefix in prefixes {
+                if text.hasPrefix(prefix) {
+                    text = String(text.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+                    if text.isEmpty {
+                        elements.removeFirst()
+                    } else {
+                        elements[0] = .text(text)
+                    }
+                    break
+                }
+            }
+        }
+        
+        if !elements.isEmpty, case .strong(let innerContent) = elements[0] {
+            let strongText = innerContent.plainText
+            
+            let strongPrefixes = ["Note:", "Tip:", "Info:", "Warning:", "Important:", "Error:", "Success:"]
+            for prefix in strongPrefixes {
+                if strongText == prefix || strongText.hasPrefix(prefix) {
+                    elements.removeFirst()
+                    if elements.first != nil, case .text(var nextText) = elements.first {
+                        nextText = nextText.trimmingCharacters(in: .whitespaces)
+                        if nextText.isEmpty {
+                            elements.removeFirst()
+                        } else {
+                            elements[0] = .text(nextText)
+                        }
+                    }
+                    break
+                }
+            }
+        }
+        
+        return MarkdownInlineContent(elements: elements)
     }
 }
 

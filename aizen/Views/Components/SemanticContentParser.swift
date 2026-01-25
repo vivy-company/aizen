@@ -7,6 +7,77 @@
 
 import Foundation
 
+// MARK: - Emoji Semantic Patterns
+
+enum EmojiSemanticPatterns {
+    
+    struct Pattern {
+        let emojis: [String]
+        let keywords: [String]
+        let type: SemanticBlockType
+        let title: String
+    }
+    
+    static let patterns: [Pattern] = [
+        Pattern(emojis: ["⚠️", "⚠", "🟡", "🟠"], keywords: ["warning", "caution", "warn"], type: .warning, title: "Warning"),
+        Pattern(emojis: ["❌", "🔴", "🛑"], keywords: ["error", "failed", "failure", "fail"], type: .error, title: "Error"),
+        Pattern(emojis: ["✅", "✓", "🟢"], keywords: ["success", "done", "passed", "complete", "ok"], type: .success, title: "Success"),
+        Pattern(emojis: ["ℹ️", "ℹ", "💡"], keywords: ["info", "note", "information", "tip"], type: .info, title: "Info"),
+        Pattern(emojis: ["📝", "📋"], keywords: ["note", "notes"], type: .note, title: "Note"),
+    ]
+    
+    static func detect(in text: String) -> (type: SemanticBlockType, title: String, content: String)? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        for pattern in patterns {
+            for emoji in pattern.emojis {
+                guard trimmed.hasPrefix(emoji) else { continue }
+                
+                var afterEmoji = String(trimmed.dropFirst(emoji.count)).trimmingCharacters(in: .whitespaces)
+                let lowercased = afterEmoji.lowercased()
+                
+                for keyword in pattern.keywords {
+                    if lowercased.hasPrefix(keyword) {
+                        var content = String(afterEmoji.dropFirst(keyword.count))
+                        if content.hasPrefix(":") { content = String(content.dropFirst()) }
+                        content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                        return (pattern.type, pattern.title, content)
+                    }
+                }
+                
+                if afterEmoji.hasPrefix(":") {
+                    afterEmoji = String(afterEmoji.dropFirst()).trimmingCharacters(in: .whitespaces)
+                }
+                if !afterEmoji.isEmpty {
+                    return (pattern.type, pattern.title, afterEmoji)
+                }
+            }
+        }
+        return nil
+    }
+    
+    static func detectHeader(in text: String, maxLength: Int = 50) -> (type: SemanticBlockType, title: String)? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count < maxLength else { return nil }
+        
+        for pattern in patterns {
+            for emoji in pattern.emojis {
+                guard trimmed.hasPrefix(emoji) else { continue }
+                
+                let afterEmoji = String(trimmed.dropFirst(emoji.count))
+                    .trimmingCharacters(in: .whitespaces)
+                    .lowercased()
+                let withoutColon = afterEmoji.hasSuffix(":") ? String(afterEmoji.dropLast()) : afterEmoji
+                
+                if withoutColon.isEmpty || pattern.keywords.contains(withoutColon) {
+                    return (pattern.type, pattern.title)
+                }
+            }
+        }
+        return nil
+    }
+}
+
 // MARK: - Parsed Content Types
 
 enum ParsedContentBlock: Identifiable {
