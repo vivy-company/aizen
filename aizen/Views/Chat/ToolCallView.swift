@@ -148,6 +148,8 @@ struct ToolCallView: View {
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
+                
+                hoverActions
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -155,6 +157,40 @@ struct ToolCallView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+    
+    @ViewBuilder
+    private var hoverActions: some View {
+        HStack(spacing: 4) {
+            if let output = copyableOutput {
+                HoverActionButton(
+                    icon: "doc.on.doc",
+                    help: "Copy output"
+                ) {
+                    Clipboard.copy(output)
+                }
+            }
+            
+            if let path = filePath, onOpenInEditor != nil {
+                HoverActionButton(
+                    icon: "arrow.up.forward.square",
+                    help: "Open in editor"
+                ) {
+                    onOpenInEditor?(path)
+                }
+            }
+            
+            if onOpenDetails != nil {
+                HoverActionButton(
+                    icon: "info.circle",
+                    help: "View details"
+                ) {
+                    onOpenDetails?(toolCall)
+                }
+            }
+        }
+        .opacity(isHovering ? 1 : 0)
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
     }
     
     @ViewBuilder
