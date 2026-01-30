@@ -67,21 +67,39 @@ actor ProcessExecutor {
 
         // Set up non-blocking output capture using readabilityHandler
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            guard !data.isEmpty else {
+            do {
+                guard let data = try handle.read(upToCount: 65536) else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
+                guard !data.isEmpty else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
+                dataCollector.appendStdout(data)
+            } catch {
                 handle.readabilityHandler = nil
-                return
             }
-            dataCollector.appendStdout(data)
         }
 
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            guard !data.isEmpty else {
+            do {
+                guard let data = try handle.read(upToCount: 65536) else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
+                guard !data.isEmpty else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
+                dataCollector.appendStderr(data)
+            } catch {
                 handle.readabilityHandler = nil
-                return
             }
-            dataCollector.appendStderr(data)
         }
 
         // Run process and wait asynchronously for termination
@@ -95,8 +113,8 @@ actor ProcessExecutor {
                     stderrPipe.fileHandleForReading.readabilityHandler = nil
 
                     // Read any remaining data
-                    let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                    let remainingStderr = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    let remainingStdout = (try? stdoutPipe.fileHandleForReading.readToEnd()) ?? Data()
+                    let remainingStderr = (try? stderrPipe.fileHandleForReading.readToEnd()) ?? Data()
 
                     dataCollector.appendStdout(remainingStdout)
                     dataCollector.appendStderr(remainingStderr)
@@ -198,26 +216,42 @@ actor ProcessExecutor {
 
         let stream = AsyncStream<StreamOutput> { continuation in
             stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty else {
+                do {
+                    guard let data = try handle.read(upToCount: 65536) else {
+                        handle.readabilityHandler = nil
+                        try? handle.close()
+                        return
+                    }
+                    guard !data.isEmpty else {
+                        handle.readabilityHandler = nil
+                        try? handle.close()
+                        return
+                    }
+                    if let text = String(data: data, encoding: .utf8) {
+                        continuation.yield(.stdout(text))
+                    }
+                } catch {
                     handle.readabilityHandler = nil
-                    try? handle.close()
-                    return
-                }
-                if let text = String(data: data, encoding: .utf8) {
-                    continuation.yield(.stdout(text))
                 }
             }
 
             stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty else {
+                do {
+                    guard let data = try handle.read(upToCount: 65536) else {
+                        handle.readabilityHandler = nil
+                        try? handle.close()
+                        return
+                    }
+                    guard !data.isEmpty else {
+                        handle.readabilityHandler = nil
+                        try? handle.close()
+                        return
+                    }
+                    if let text = String(data: data, encoding: .utf8) {
+                        continuation.yield(.stderr(text))
+                    }
+                } catch {
                     handle.readabilityHandler = nil
-                    try? handle.close()
-                    return
-                }
-                if let text = String(data: data, encoding: .utf8) {
-                    continuation.yield(.stderr(text))
                 }
             }
 

@@ -81,7 +81,7 @@ struct WorktreeCreateSheet: View {
 
                     TextField(currentPlaceholder, text: $branchName)
                         .textFieldStyle(.roundedBorder)
-                        .onChange(of: branchName) { _ in
+                        .onChange(of: branchName) { _, _ in
                             validateBranchName()
                         }
                         .onSubmit {

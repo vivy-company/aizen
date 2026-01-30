@@ -70,6 +70,13 @@ final class SessionPersistenceService {
             self.logger.info("Saved ACP session ID for ChatSession \(chatSessionId.uuidString)")
         }
     }
+
+    func clearSessionId(for chatSessionId: UUID, in context: NSManagedObjectContext) async throws {
+        try await modifySession(chatSessionId, in: context) { chatSession in
+            chatSession.acpSessionId = nil
+            self.logger.info("Cleared ACP session ID for ChatSession \(chatSessionId.uuidString)")
+        }
+    }
     
     func getSessionId(for chatSessionId: UUID, in context: NSManagedObjectContext) async -> String? {
         await context.perform {

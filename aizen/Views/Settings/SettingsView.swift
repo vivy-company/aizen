@@ -115,8 +115,14 @@ struct SettingsView: View {
                     .padding(.vertical, 10)
             }
         } detail: {
-            NavigationStack {
-                detailView
+            if #available(macOS 14.0, *) {
+                NavigationStack {
+                    detailView
+                }
+            } else {
+                NavigationStack {
+                    detailView
+                }
             }
         }
         .toolbar {

@@ -144,7 +144,7 @@ struct BranchSelectorView: View {
         .onAppear {
             loadBranches()
         }
-        .onChange(of: searchText) { _ in
+        .onChange(of: searchText) { _, _ in
             filterBranches()
         }
     }

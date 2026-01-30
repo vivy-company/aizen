@@ -47,7 +47,7 @@ actor UVAgentInstaller {
         }
 
         if process.terminationStatus != 0 {
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorData = (try? errorPipe.fileHandleForReading.readToEnd()) ?? Data()
             let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
             throw AgentInstallError.installFailed(message: "uv install failed: \(errorMessage)")
         }
@@ -79,7 +79,7 @@ actor UVAgentInstaller {
             try process.run()
             process.waitUntilExit()
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
             try? pipe.fileHandleForReading.close()
             try? errorPipe.fileHandleForReading.close()
             if let output = String(data: data, encoding: .utf8) {
@@ -144,7 +144,7 @@ actor UVAgentInstaller {
         defer { try? errorPipe.fileHandleForReading.close() }
 
         if installProcess.terminationStatus != 0 {
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorData = (try? errorPipe.fileHandleForReading.readToEnd()) ?? Data()
             let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
             throw AgentInstallError.installFailed(message: "Failed to install uv: \(errorMessage)")
         }

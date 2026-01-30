@@ -82,8 +82,8 @@ actor PostCreateActionExecutor {
             try process.run()
             process.waitUntilExit()
 
-            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let outputData = (try? outputPipe.fileHandleForReading.readToEnd()) ?? Data()
+            let errorData = (try? errorPipe.fileHandleForReading.readToEnd()) ?? Data()
 
             let output = String(data: outputData, encoding: .utf8) ?? ""
             let errorOutput = String(data: errorData, encoding: .utf8) ?? ""

@@ -64,13 +64,13 @@ struct WorkflowRunDetailView: View {
                     logsPanel
                 }
             }
-            .onChange(of: jobs) { newJobs in
+            .onChange(of: jobs) { _, newJobs in
                 // Auto-select first failed job or first job when jobs load
                 if selectedJobId == nil && !newJobs.isEmpty {
                     selectedJobId = newJobs.first(where: { $0.conclusion == .failure })?.id ?? newJobs.first?.id
                 }
             }
-            .onChange(of: run.id) { _ in
+            .onChange(of: run.id) { _, _ in
                 // Reset job selection when run changes
                 selectedJobId = nil
             }

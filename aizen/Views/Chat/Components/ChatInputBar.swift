@@ -26,6 +26,7 @@ struct ChatInputBar: View {
     let currentModeId: String?
     let selectedAgent: String
     let isSessionReady: Bool
+    let isRestoringSession: Bool
     let audioService: AudioService
     @ObservedObject var autocompleteHandler: UnifiedAutocompleteHandler
 
@@ -45,6 +46,13 @@ struct ChatInputBar: View {
     private let gradientColors: [Color] = [
         .accentColor.opacity(0.7), .accentColor.opacity(0.4), .accentColor.opacity(0.7)
     ]
+
+    private var placeholderKey: LocalizedStringKey {
+        if isSessionReady {
+            return "chat.input.placeholder"
+        }
+        return isRestoringSession ? "chat.session.restoring" : "chat.session.starting"
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -80,7 +88,7 @@ struct ChatInputBar: View {
                     .transition(.opacity)
                 } else {
                     if inputText.isEmpty {
-                        Text(isSessionReady ? String(localized: "chat.input.placeholder") : String(localized: "chat.session.starting"))
+                        Text(placeholderKey)
                             .font(.system(size: 14))
                             .foregroundStyle(.tertiary)
                             .padding(.top, 6)

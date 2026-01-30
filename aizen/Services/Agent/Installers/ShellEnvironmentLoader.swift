@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum ShellEnvironmentLoader {
+nonisolated enum ShellEnvironmentLoader {
 
     // MARK: - Environment Loading
 
@@ -17,7 +17,7 @@ enum ShellEnvironmentLoader {
         }.value
     }
 
-    private static func loadShellEnvironmentBlocking() -> [String: String] {
+    nonisolated private static func loadShellEnvironmentBlocking() -> [String: String] {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let shellName = (shell as NSString).lastPathComponent
 
@@ -49,7 +49,7 @@ enum ShellEnvironmentLoader {
             try process.run()
             process.waitUntilExit()
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
             try? pipe.fileHandleForReading.close()
             try? errorPipe.fileHandleForReading.close()
             if let output = String(data: data, encoding: .utf8) {

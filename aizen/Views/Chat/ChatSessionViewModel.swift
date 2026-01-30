@@ -46,6 +46,7 @@ class ChatSessionViewModel: ObservableObject {
 
     // Historical messages loaded from Core Data (separate from live session)
     var historicalMessages: [MessageItem] = []
+    var historicalToolCalls: [ToolCall] = []
 
     var messages: [MessageItem] {
         let source = currentAgentSession?.messages ?? historicalMessages
@@ -76,6 +77,7 @@ class ChatSessionViewModel: ObservableObject {
     @Published var hasModes: Bool = false
     @Published var currentModeId: String?
     @Published var sessionState: SessionState = .idle
+    @Published var isResumingSession: Bool = false
 
     // MARK: - Internal State
 
@@ -230,10 +232,128 @@ class ChatSessionViewModel: ObservableObject {
                     isComplete: true
                 )
             }
+
+            var toolCallMap: [String: ToolCall] = [:]
+            for chatMessage in messages {
+                let records = (chatMessage.toolCalls as? Set<ToolCallRecord>) ?? []
+                for record in records {
+                    if let call = decodeToolCall(from: record) {
+                        toolCallMap[call.toolCallId] = call
+                    }
+                }
+            }
+            historicalToolCalls = toolCallMap.values.sorted { $0.timestamp < $1.timestamp }
             
             logger.info("Parsed \(self.historicalMessages.count) valid historical messages")
         } catch {
             logger.error("Failed to fetch historical messages: \(error.localizedDescription)")
+        }
+    }
+
+    private func decodeToolCall(from record: ToolCallRecord) -> ToolCall? {
+        let id = record.id ?? ""
+        guard !id.isEmpty else { return nil }
+
+        let title = record.title ?? ""
+        let kind = ToolKind(rawValue: record.kind ?? "")
+        let status = ToolStatus(rawValue: record.status ?? "") ?? .completed
+        let timestamp = record.timestamp ?? Date()
+
+        if let json = record.contentJSON,
+           let data = json.data(using: .utf8) {
+            let decoder = JSONDecoder()
+            if let decoded = try? decoder.decode(ToolCall.self, from: data) {
+                return decoded
+            }
+            if let content = try? decoder.decode([ToolCallContent].self, from: data) {
+                return ToolCall(
+                    toolCallId: id,
+                    title: title,
+                    kind: kind,
+                    status: status,
+                    content: content,
+                    locations: nil,
+                    rawInput: nil,
+                    rawOutput: nil,
+                    timestamp: timestamp,
+                    iterationId: nil,
+                    parentToolCallId: nil
+                )
+            }
+        }
+
+        return ToolCall(
+            toolCallId: id,
+            title: title,
+            kind: kind,
+            status: status,
+            content: [],
+            locations: nil,
+            rawInput: nil,
+            rawOutput: nil,
+            timestamp: timestamp,
+            iterationId: nil,
+            parentToolCallId: nil
+        )
+    }
+
+    private func compactHistoryMarkdown() -> String? {
+        let recentMessages = historicalMessages.suffix(30)
+        let recentToolCalls = historicalToolCalls.suffix(40)
+
+        guard !recentMessages.isEmpty || !recentToolCalls.isEmpty else { return nil }
+
+        func compactText(_ text: String, limit: Int) -> String {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.count > limit else { return trimmed }
+            return String(trimmed.prefix(limit)) + "…"
+        }
+
+        var lines: [String] = []
+        lines.append("# Restored session context")
+        lines.append("")
+        lines.append("Summary of the previous session for context only.")
+
+        if !recentMessages.isEmpty {
+            lines.append("")
+            lines.append("## Messages")
+            for message in recentMessages {
+                let role: String
+                switch message.role {
+                case .user: role = "User"
+                case .agent: role = "Assistant"
+                case .system: role = "System"
+                }
+                let text = compactText(message.content, limit: 600)
+                if text.isEmpty { continue }
+                lines.append("- **\(role)**: \(text)")
+            }
+        }
+
+        if !recentToolCalls.isEmpty {
+            lines.append("")
+            lines.append("## Tool calls")
+            for call in recentToolCalls {
+                let title = compactText(call.title, limit: 160)
+                let status = call.status.rawValue
+                let kind = call.kind?.rawValue ?? "other"
+                lines.append("- \(title) _(kind: \(kind), status: \(status))_")
+            }
+        }
+
+        let result = lines.joined(separator: "\n")
+        if result.count <= 12000 {
+            return result
+        }
+        return String(result.prefix(12000)) + "\n…"
+    }
+
+    private func hasHistoryAttachment() -> Bool {
+        attachments.contains { attachment in
+            if case .text(let content) = attachment {
+                return content.hasPrefix("# Restored session context")
+            }
+            return false
         }
     }
     
@@ -259,6 +379,9 @@ class ChatSessionViewModel: ObservableObject {
         if let existingSession = sessionManager.getAgentSession(for: sessionId) {
             if existingSession.messages.isEmpty && !historicalMessages.isEmpty {
                 existingSession.messages = historicalMessages
+            }
+            if existingSession.toolCalls.isEmpty && !historicalToolCalls.isEmpty {
+                existingSession.loadPersistedToolCalls(historicalToolCalls)
             }
             
             currentAgentSession = existingSession
@@ -287,24 +410,11 @@ class ChatSessionViewModel: ObservableObject {
                 Task { [self] in
                     defer { self.settingUpSessionId = nil }
                     do {
-                        if let acpSessionId = await SessionPersistenceService.shared.getSessionId(
-                            for: sessionId,
-                            in: self.viewContext
-                        ) {
-                            self.logger.info("Resuming existing ACP session: \(acpSessionId)")
-                            try await existingSession.resume(
-                                acpSessionId: acpSessionId,
-                                agentName: self.selectedAgent,
-                                workingDir: worktreePath,
-                                chatSessionId: sessionId
-                            )
-                        } else {
-                            try await existingSession.start(
-                                agentName: self.selectedAgent,
-                                workingDir: worktreePath,
-                                chatSessionId: sessionId
-                            )
-                        }
+                        try await startOrResumeSession(
+                            existingSession,
+                            sessionId: sessionId,
+                            worktreePath: worktreePath
+                        )
                         await sendPendingMessageIfNeeded()
                     } catch {
                         self.logger.error("Failed to start session for \(self.selectedAgent): \(error.localizedDescription)")
@@ -329,6 +439,9 @@ class ChatSessionViewModel: ObservableObject {
         if !historicalMessages.isEmpty {
             newSession.messages = historicalMessages
         }
+        if !historicalToolCalls.isEmpty {
+            newSession.loadPersistedToolCalls(historicalToolCalls)
+        }
         
         let worktreeName = worktree.branch ?? "Chat"
         sessionManager.setAgentSession(newSession, for: sessionId, worktreeName: worktreeName)
@@ -350,24 +463,11 @@ class ChatSessionViewModel: ObservableObject {
 
             if !newSession.isActive {
                 do {
-                    if let acpSessionId = await SessionPersistenceService.shared.getSessionId(
-                        for: sessionId,
-                        in: self.viewContext
-                    ) {
-                        self.logger.info("Resuming existing ACP session: \(acpSessionId)")
-                        try await newSession.resume(
-                            acpSessionId: acpSessionId,
-                            agentName: self.selectedAgent,
-                            workingDir: worktreePath,
-                            chatSessionId: sessionId
-                        )
-                    } else {
-                        try await newSession.start(
-                            agentName: self.selectedAgent,
-                            workingDir: worktreePath,
-                            chatSessionId: sessionId
-                        )
-                    }
+                    try await startOrResumeSession(
+                        newSession,
+                        sessionId: sessionId,
+                        worktreePath: worktreePath
+                    )
                     await sendPendingMessageIfNeeded()
                 } catch {
                     self.logger.error("Failed to start new session for \(self.selectedAgent): \(error.localizedDescription)")
@@ -437,6 +537,98 @@ class ChatSessionViewModel: ObservableObject {
         }
     }
 
+    private func startOrResumeSession(
+        _ agentSession: AgentSession,
+        sessionId: UUID,
+        worktreePath: String
+    ) async throws {
+        if agentSession.isActive || agentSession.sessionState.isInitializing {
+            return
+        }
+
+        if let acpSessionId = await SessionPersistenceService.shared.getSessionId(
+            for: sessionId,
+            in: viewContext
+        ),
+        !acpSessionId.isEmpty {
+            do {
+                logger.info("Resuming existing ACP session: \(acpSessionId)")
+                try await agentSession.resume(
+                    acpSessionId: acpSessionId,
+                    agentName: selectedAgent,
+                    workingDir: worktreePath,
+                    chatSessionId: sessionId
+                )
+                return
+            } catch {
+                var shouldClearSessionId = true
+                var shouldShowFailure = true
+                var shouldAttachHistory = false
+                var fallbackMessage: String?
+
+                if let sessionError = error as? AgentSessionError {
+                    if case .sessionAlreadyActive = sessionError {
+                        return
+                    }
+                    if case .sessionResumeUnsupported = sessionError {
+                        shouldAttachHistory = true
+                        fallbackMessage = "\(selectedAgentDisplayName) does not support session restore. Starting a new session with local history attached."
+                        shouldClearSessionId = false
+                        shouldShowFailure = false
+                    }
+                }
+                if let acpError = error as? ACPClientError,
+                   case .agentError = acpError {
+                    let message = (acpError.errorDescription ?? "").lowercased()
+                    if message.contains("not found") || message.contains("resource_not_found") || message.contains("session not found") {
+                        shouldAttachHistory = true
+                        fallbackMessage = "Previous session not found on the agent. Starting a new session with local history attached."
+                        shouldClearSessionId = true
+                        shouldShowFailure = false
+                    }
+                }
+                if shouldAttachHistory,
+                   !hasHistoryAttachment(),
+                   let compact = compactHistoryMarkdown() {
+                    let attachment = ChatAttachment.text(compact)
+                    sessionManager.setPendingAttachments(attachments + [attachment], for: sessionId)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        attachments.append(attachment)
+                    }
+                }
+                if let fallbackMessage {
+                    agentSession.addSystemMessage(fallbackMessage)
+                }
+                if shouldShowFailure {
+                    logger.error("Failed to resume ACP session \(acpSessionId): \(error.localizedDescription)")
+                    agentSession.addSystemMessage("Failed to restore previous session. Starting a new one.")
+                }
+                if shouldClearSessionId {
+                    do {
+                        try await SessionPersistenceService.shared.clearSessionId(for: sessionId, in: viewContext)
+                    } catch {
+                        logger.error("Failed to clear persisted session ID: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+
+        do {
+            try await agentSession.start(
+                agentName: selectedAgent,
+                workingDir: worktreePath,
+                chatSessionId: sessionId
+            )
+        } catch {
+            if let sessionError = error as? AgentSessionError {
+                if case .sessionAlreadyActive = sessionError {
+                    return
+                }
+            }
+            throw error
+        }
+    }
+
     // MARK: - Derived State Updates
     private func updateDerivedState(from session: AgentSession) {
         needsAuth = session.needsAuthentication
@@ -447,6 +639,7 @@ class ChatSessionViewModel: ObservableObject {
         hasModes = !session.availableModes.isEmpty
         currentModeId = session.currentModeId
         sessionState = session.sessionState
+        isResumingSession = session.isResumingSession
         showingPermissionAlert = session.permissionHandler.showingPermissionAlert
         currentPermissionRequest = session.permissionHandler.permissionRequest
     }
@@ -501,7 +694,7 @@ class ChatSessionViewModel: ObservableObject {
         newChatSession.worktree = worktree
         
         Task {
-            let displayName = await AgentRegistry.shared.getMetadata(for: selectedAgent)?.name ?? selectedAgent.capitalized
+            let displayName = AgentRegistry.shared.getMetadata(for: selectedAgent)?.name ?? selectedAgent.capitalized
             newChatSession.title = displayName
             
             do {
@@ -740,6 +933,13 @@ class ChatSessionViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state in
                 self?.sessionState = state
+            }
+            .store(in: &cancellables)
+
+        session.$isResumingSession
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isResuming in
+                self?.isResumingSession = isResuming
             }
             .store(in: &cancellables)
 

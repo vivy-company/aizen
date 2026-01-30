@@ -288,29 +288,49 @@ private final class CodexRPCClient: @unchecked Sendable {
         let stdoutLineContinuation = self.stdoutLineContinuation
         let stdoutBuffer = LineBuffer()
         stdoutHandle.readabilityHandler = { handle in
-            let data = handle.availableData
-            if data.isEmpty {
+            do {
+                guard let data = try handle.read(upToCount: 65536) else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    stdoutLineContinuation.finish()
+                    return
+                }
+                guard !data.isEmpty else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    stdoutLineContinuation.finish()
+                    return
+                }
+
+                let lines = stdoutBuffer.appendAndDrainLines(data)
+                for lineData in lines {
+                    stdoutLineContinuation.yield(lineData)
+                }
+            } catch {
                 handle.readabilityHandler = nil
                 stdoutLineContinuation.finish()
-                return
-            }
-
-            let lines = stdoutBuffer.appendAndDrainLines(data)
-            for lineData in lines {
-                stdoutLineContinuation.yield(lineData)
             }
         }
 
         let stderrHandle = self.stderrPipe.fileHandleForReading
         stderrHandle.readabilityHandler = { handle in
-            let data = handle.availableData
-            if data.isEmpty {
+            do {
+                guard let data = try handle.read(upToCount: 65536) else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
+                guard !data.isEmpty else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
+                guard let text = String(data: data, encoding: .utf8), !text.isEmpty else { return }
+                for line in text.split(whereSeparator: \.isNewline) {
+                    self.recordStderr(String(line))
+                }
+            } catch {
                 handle.readabilityHandler = nil
-                return
-            }
-            guard let text = String(data: data, encoding: .utf8), !text.isEmpty else { return }
-            for line in text.split(whereSeparator: \.isNewline) {
-                self.recordStderr(String(line))
             }
         }
     }

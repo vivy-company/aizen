@@ -217,7 +217,7 @@ actor TmuxSessionManager {
             try process.run()
             process.waitUntilExit()
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
             try? pipe.fileHandleForReading.close()
             guard let output = String(data: data, encoding: .utf8) else {
                 return []

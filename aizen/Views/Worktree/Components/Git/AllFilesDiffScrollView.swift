@@ -31,7 +31,7 @@ struct AllFilesDiffScrollView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
-            .onChange(of: scrollToFile) { file in
+            .onChange(of: scrollToFile) { _, file in
                 guard let file = file else { return }
                 withAnimation(.easeInOut(duration: 0.25)) {
                     proxy.scrollTo(file, anchor: .top)

@@ -323,15 +323,69 @@ actor ACPClient {
 
         let response = try await sendRequest(method: "session/load", params: request)
 
-        guard let result = response.result else {
-            if let error = response.error {
-                throw ACPClientError.agentError(error)
+        if let error = response.error {
+            if isSessionAlreadyActive(error) {
+                return LoadSessionResponse(sessionId: sessionId)
             }
-            throw ACPClientError.invalidResponse
+            throw ACPClientError.agentError(error)
+        }
+
+        if let extracted = extractSessionId(from: response.result) {
+            return LoadSessionResponse(sessionId: extracted)
+        }
+
+        guard let result = response.result else {
+            return LoadSessionResponse(sessionId: sessionId)
         }
 
         let data = try encoder.encode(result)
-        return try decoder.decode(LoadSessionResponse.self, from: data)
+        do {
+            return try decoder.decode(LoadSessionResponse.self, from: data)
+        } catch {
+            return LoadSessionResponse(sessionId: sessionId)
+        }
+    }
+
+    private func extractSessionId(from result: AnyCodable?) -> SessionId? {
+        guard let value = result?.value else { return nil }
+
+        if let dict = value as? [String: Any] {
+            if let id = dict["sessionId"] as? String ?? dict["session_id"] as? String {
+                return SessionId(id)
+            }
+        }
+
+        if let dict = value as? [String: AnyCodable] {
+            if let id = dict["sessionId"]?.value as? String ?? dict["session_id"]?.value as? String {
+                return SessionId(id)
+            }
+        }
+
+        return nil
+    }
+
+    private func isSessionAlreadyActive(_ error: JSONRPCError) -> Bool {
+        let message = error.message.lowercased()
+        if message.contains("already active") || message.contains("already started") || message.contains("already exists") {
+            return true
+        }
+
+        if let dataString = error.data?.value as? String {
+            let lower = dataString.lowercased()
+            if lower.contains("already active") || lower.contains("already started") || lower.contains("already exists") {
+                return true
+            }
+        }
+
+        if let data = error.data?.value as? [String: Any],
+           let details = data["details"] as? String {
+            let lower = details.lowercased()
+            if lower.contains("already active") || lower.contains("already started") || lower.contains("already exists") {
+                return true
+            }
+        }
+
+        return false
     }
 
     func sendRequest<T: Encodable>(
@@ -354,7 +408,6 @@ actor ACPClient {
             method: method,
             params: paramsValue
         )
-
         return try await withRequestTimeout(seconds: timeout, requestId: requestId) {
             try await withCheckedThrowingContinuation { continuation in
                 Task {
@@ -467,13 +520,6 @@ actor ACPClient {
                 await handleResponse(response)
 
             case .notification(let notification):
-                if let params = notification.params?.value as? [String: Any],
-                   let update = params["update"] as? [String: Any],
-                   let type = update["type"] as? String {
-                    logger.info("Received notification: \(notification.method) update.type=\(type)")
-                } else {
-                    logger.info("Received notification: \(notification.method)")
-                }
                 notificationContinuation.yield(notification)
 
             case .request(let request):
@@ -495,7 +541,6 @@ actor ACPClient {
             logger.warning("Received response for unknown request id=\(response.id), no pending request found. Pending: \(stillPending)")
             return
         }
-
         continuation.resume(returning: response)
     }
 

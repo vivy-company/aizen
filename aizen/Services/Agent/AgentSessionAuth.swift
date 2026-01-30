@@ -37,6 +37,10 @@ extension AgentSession {
             self.availableModels = modelsInfo.availableModels
             self.currentModelId = modelsInfo.currentModelId
         }
+        
+        if let configOptions = sessionResponse.configOptions {
+            self.availableConfigOptions = configOptions
+        }
 
         // Start notification listener if not already started
         if notificationTask == nil {

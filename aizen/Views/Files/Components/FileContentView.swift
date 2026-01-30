@@ -53,7 +53,7 @@ struct FileContentView: View {
                     GeometryReader { geometry in
                         Color.clear
                             .onAppear { breadcrumbWidth = geometry.size.width }
-                            .onChange(of: geometry.size.width) { newValue in
+                            .onChange(of: geometry.size.width) { _, newValue in
                                 breadcrumbWidth = newValue
                             }
                     }

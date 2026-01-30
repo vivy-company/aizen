@@ -94,7 +94,7 @@ struct CustomAgentFormView: View {
                         TextField("Path", text: $executablePath)
                             .textFieldStyle(.roundedBorder)
                             .help("Enter or paste executable path, or use Browse button")
-                            .onChange(of: executablePath) { _ in
+                            .onChange(of: executablePath) { _, _ in
                                 pathValidationResult = nil
                             }
                             .onSubmit {
@@ -112,7 +112,7 @@ struct CustomAgentFormView: View {
                     TextField("Launch arguments (optional)", text: $launchArgsText)
                         .textFieldStyle(.roundedBorder)
                         .help("Space-separated arguments (e.g., agent stdio, --experimental-acp)")
-                        .onChange(of: launchArgsText) { _ in
+                        .onChange(of: launchArgsText) { _, _ in
                             pathValidationResult = nil
                         }
                         .onSubmit {

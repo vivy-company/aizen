@@ -144,13 +144,23 @@ actor OpenCodeConfigService {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "OpenCodeConfig")
     
     private var configPath: String {
-        let home = fileManager.homeDirectoryForCurrentUser.path
-        return "\(home)/.config/opencode/opencode.json"
+        resolveConfigPath()
     }
     
     private var configDirectory: String {
-        let home = fileManager.homeDirectoryForCurrentUser.path
-        return "\(home)/.config/opencode"
+        resolveConfigDirectory()
+    }
+
+    func currentConfigPath() -> String {
+        configPath
+    }
+
+    func currentConfigDirectory() -> String {
+        configDirectory
+    }
+
+    func currentOMOConfigPath() -> String {
+        (configDirectory as NSString).appendingPathComponent("oh-my-opencode.json")
     }
     
     func configExists() -> Bool {
@@ -166,12 +176,7 @@ actor OpenCodeConfigService {
             throw OpenCodeConfigError.parseError("Could not read file")
         }
         
-        do {
-            let decoder = JSONDecoder()
-            return try decoder.decode(OpenCodeConfig.self, from: data)
-        } catch {
-            throw OpenCodeConfigError.parseError(error.localizedDescription)
-        }
+        return try decodeConfig(from: data)
     }
     
     func writeConfig(_ config: OpenCodeConfig) throws {
@@ -325,7 +330,181 @@ actor OpenCodeConfigService {
     }
     
     func openConfigInFinder() {
-        let url = URL(fileURLWithPath: configPath)
-        NSWorkspace.shared.activateFileViewerSelecting([url])
+        let path = configPath
+        if fileManager.fileExists(atPath: path) {
+            let url = URL(fileURLWithPath: path)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            let url = URL(fileURLWithPath: configDirectory)
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func decodeConfig(from data: Data) throws -> OpenCodeConfig {
+        let decoder = JSONDecoder()
+        do {
+            return try decoder.decode(OpenCodeConfig.self, from: data)
+        } catch {
+            guard let text = String(data: data, encoding: .utf8) else {
+                throw OpenCodeConfigError.parseError(error.localizedDescription)
+            }
+            let stripped = removeTrailingCommas(from: stripJSONC(text))
+            guard let cleanedData = stripped.data(using: .utf8) else {
+                throw OpenCodeConfigError.parseError(error.localizedDescription)
+            }
+            do {
+                return try decoder.decode(OpenCodeConfig.self, from: cleanedData)
+            } catch {
+                throw OpenCodeConfigError.parseError(error.localizedDescription)
+            }
+        }
+    }
+
+    private func resolveConfigPath() -> String {
+        let env = ProcessInfo.processInfo.environment
+        if let explicit = env["OPENCODE_CONFIG"], !explicit.isEmpty {
+            return expandTilde(explicit)
+        }
+        if let dir = env["OPENCODE_CONFIG_DIR"], !dir.isEmpty {
+            let resolvedDir = expandTilde(dir)
+            return (resolvedDir as NSString).appendingPathComponent("opencode.json")
+        }
+        let home = fileManager.homeDirectoryForCurrentUser.path
+        return "\(home)/.config/opencode/opencode.json"
+    }
+
+    private func resolveConfigDirectory() -> String {
+        let env = ProcessInfo.processInfo.environment
+        if let dir = env["OPENCODE_CONFIG_DIR"], !dir.isEmpty {
+            return expandTilde(dir)
+        }
+        if let explicit = env["OPENCODE_CONFIG"], !explicit.isEmpty {
+            return (expandTilde(explicit) as NSString).deletingLastPathComponent
+        }
+        let home = fileManager.homeDirectoryForCurrentUser.path
+        return "\(home)/.config/opencode"
+    }
+
+    private func expandTilde(_ path: String) -> String {
+        (path as NSString).expandingTildeInPath
+    }
+
+    private func stripJSONC(_ input: String) -> String {
+        let chars = Array(input)
+        var output: [Character] = []
+        var i = 0
+        var inString = false
+        var isEscaped = false
+        var inSingleLineComment = false
+        var inMultiLineComment = false
+
+        while i < chars.count {
+            let ch = chars[i]
+            let next = i + 1 < chars.count ? chars[i + 1] : nil
+
+            if inSingleLineComment {
+                if ch == "\n" {
+                    inSingleLineComment = false
+                    output.append(ch)
+                }
+                i += 1
+                continue
+            }
+
+            if inMultiLineComment {
+                if ch == "*" && next == "/" {
+                    inMultiLineComment = false
+                    i += 2
+                    continue
+                }
+                i += 1
+                continue
+            }
+
+            if inString {
+                output.append(ch)
+                if isEscaped {
+                    isEscaped = false
+                } else if ch == "\\" {
+                    isEscaped = true
+                } else if ch == "\"" {
+                    inString = false
+                }
+                i += 1
+                continue
+            }
+
+            if ch == "\"" {
+                inString = true
+                output.append(ch)
+                i += 1
+                continue
+            }
+
+            if ch == "/" && next == "/" {
+                inSingleLineComment = true
+                i += 2
+                continue
+            }
+
+            if ch == "/" && next == "*" {
+                inMultiLineComment = true
+                i += 2
+                continue
+            }
+
+            output.append(ch)
+            i += 1
+        }
+
+        return String(output)
+    }
+
+    private func removeTrailingCommas(from input: String) -> String {
+        let chars = Array(input)
+        var output: [Character] = []
+        var i = 0
+        var inString = false
+        var isEscaped = false
+
+        while i < chars.count {
+            let ch = chars[i]
+
+            if inString {
+                output.append(ch)
+                if isEscaped {
+                    isEscaped = false
+                } else if ch == "\\" {
+                    isEscaped = true
+                } else if ch == "\"" {
+                    inString = false
+                }
+                i += 1
+                continue
+            }
+
+            if ch == "\"" {
+                inString = true
+                output.append(ch)
+                i += 1
+                continue
+            }
+
+            if ch == "," {
+                var j = i + 1
+                while j < chars.count, chars[j].isWhitespace {
+                    j += 1
+                }
+                if j < chars.count, (chars[j] == "}" || chars[j] == "]") {
+                    i += 1
+                    continue
+                }
+            }
+
+            output.append(ch)
+            i += 1
+        }
+
+        return String(output)
     }
 }

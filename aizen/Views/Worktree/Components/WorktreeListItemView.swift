@@ -390,7 +390,7 @@ struct WorktreeListItemView: View {
                 }
             )
         }
-        .onChange(of: selectedBranchForSwitch) { newBranch in
+        .onChange(of: selectedBranchForSwitch) { _, newBranch in
             if let branch = newBranch {
                 switchToBranch(branch)
                 selectedBranchForSwitch = nil

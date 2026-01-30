@@ -36,7 +36,7 @@ struct RootView: View {
                 showingLicenseDeepLinkSheet = true
             }
         }
-        .onChange(of: gitChangesContext) { newContext in
+        .onChange(of: gitChangesContext) { _, newContext in
             if let ctx = newContext, !ctx.worktree.isDeleted {
                 // Close existing window if any
                 gitPanelController?.close()

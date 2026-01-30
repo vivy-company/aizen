@@ -169,6 +169,7 @@ struct ChatSessionView: View {
                         currentModeId: viewModel.currentModeId,
                         selectedAgent: viewModel.selectedAgent,
                         isSessionReady: viewModel.isSessionReady,
+                        isRestoringSession: viewModel.isResumingSession,
                         audioService: viewModel.audioService,
                         autocompleteHandler: viewModel.autocompleteHandler,
                         onSend: { sendMessage() },

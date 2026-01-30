@@ -33,7 +33,7 @@ struct PostCreateActionsView: View {
         .onAppear {
             actions = repository.postCreateActions
         }
-        .onChange(of: actions) { newValue in
+        .onChange(of: actions) { _, newValue in
             repository.postCreateActions = newValue
             try? viewContext.save()
         }

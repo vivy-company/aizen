@@ -66,12 +66,12 @@ struct SplitTerminalView: View {
     var body: some View {
         renderNode(layout)
             // Persist layout changes without re-triggering the whole task chain
-            .onChange(of: layout) { _ in
+            .onChange(of: layout) { _, _ in
                 guard isSelected else { return }
                 scheduleLayoutSave()
             }
             // Persist focused pane changes separately
-            .onChange(of: focusedPaneId) { _ in
+            .onChange(of: focusedPaneId) { _, _ in
                 guard isSelected else { return }
                 scheduleFocusSave()
                 applyTitleForFocusedPane()
@@ -90,7 +90,7 @@ struct SplitTerminalView: View {
                 }
             }
             // Trigger focus when tab becomes selected (views are kept alive via opacity)
-            .onChange(of: isSelected) { newValue in
+            .onChange(of: isSelected) { _, newValue in
                 if newValue {
                     // Force focus update by toggling focusedPaneId
                     let currentFocus = focusedPaneId

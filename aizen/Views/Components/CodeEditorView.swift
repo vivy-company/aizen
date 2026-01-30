@@ -85,12 +85,12 @@ struct CodeEditorView: View {
         )
         .disabled(!isEditable)
         .clipped()
-        .onChange(of: content) { newValue in
+        .onChange(of: content) { _, newValue in
             if text != newValue {
                 text = newValue
             }
         }
-        .onChange(of: text) { newValue in
+        .onChange(of: text) { _, newValue in
             if isEditable {
                 onContentChange?(newValue)
             }
@@ -99,12 +99,12 @@ struct CodeEditorView: View {
             // Load git diff status when view appears
             scheduleDiffReload()
         }
-        .onChange(of: content) { _ in
+        .onChange(of: content) { _, _ in
             guard !hasUnsavedChanges else { return }
             // Reload git diff when saved content changes
             scheduleDiffReload()
         }
-        .onChange(of: hasUnsavedChanges) { isDirty in
+        .onChange(of: hasUnsavedChanges) { _, isDirty in
             if isDirty {
                 diffReloadTask?.cancel()
             } else {

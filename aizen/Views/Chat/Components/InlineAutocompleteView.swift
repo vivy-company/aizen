@@ -80,6 +80,8 @@ private struct AutocompleteListView: View {
     let itemsVersion: Int
     let onTap: (AutocompleteItem) -> Void
 
+    private let minListHeight: CGFloat = 96
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: true) {
@@ -101,14 +103,14 @@ private struct AutocompleteListView: View {
                     }
                 }
             }
-            .frame(maxHeight: 240)
-            .onChange(of: itemsVersion) { _ in
+            .frame(minHeight: minListHeight, maxHeight: 240)
+            .onChange(of: itemsVersion) { _, _ in
                 // Scroll to top when items list changes (user typed new chars)
                 withAnimation(.easeOut(duration: 0.1)) {
                     proxy.scrollTo("autocomplete-top", anchor: .top)
                 }
             }
-            .onChange(of: selectedIndex) { newValue in
+            .onChange(of: selectedIndex) { _, newValue in
                 guard newValue >= 0 && newValue < items.count else { return }
                 withAnimation(.easeOut(duration: 0.1)) {
                     proxy.scrollTo(items[newValue].id, anchor: .center)

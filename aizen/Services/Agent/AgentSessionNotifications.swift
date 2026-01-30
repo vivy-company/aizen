@@ -58,6 +58,15 @@ extension AgentSession {
 
     /// Process session update
     private func processUpdate(_ update: SessionUpdate) {
+        if suppressResumedAgentMessages {
+            switch update {
+            case .toolCall, .toolCallUpdate:
+                return
+            default:
+                break
+            }
+        }
+
         switch update {
             case .toolCall(let toolCallUpdate):
                 // Mark any in-progress agent message as complete before tool execution
@@ -127,13 +136,13 @@ extension AgentSession {
                     activeTaskIds.removeAll { $0 == toolCallId }
                 }
             case .agentMessageChunk(let block):
-                if isResumingSession {
-                    logger.debug("[\(self.agentName)] Skipping agentMessageChunk during session resume")
-                    break
-                }
                 clearThoughtBuffer()
                 currentThought = nil
                 let (text, blockContent) = textAndContent(from: block)
+                if shouldSkipResumedAgentChunk(text: text, hasContentBlocks: !blockContent.isEmpty) {
+                    logger.debug("[\(self.agentName)] Skipping agentMessageChunk during session resume replay")
+                    break
+                }
                 logger.debug("[\(self.agentName)] agentMessageChunk: text=\(text.prefix(50))..., blocks=\(blockContent.count)")
                 if text.isEmpty && blockContent.isEmpty { break }
                 recordAgentChunk()
@@ -171,11 +180,10 @@ extension AgentSession {
                 currentModeId = mode
                 currentMode = SessionMode(rawValue: mode)
             case .configOptionUpdate(let configOptions):
-                // Store config options for UI rendering
-                // Config options take precedence over legacy modes/models
-                if !configOptions.isEmpty {
-                    // TODO: Update UI to display config options
-                    // For now, just log them
+                availableConfigOptions = configOptions
+                if configOptions.isEmpty {
+                    logger.info("Config options cleared")
+                } else {
                     logger.info("Config options updated: \(configOptions.count) options")
                 }
         }

@@ -352,7 +352,7 @@ struct FileSearchWindowContent: View {
             .background(Color.clear)
             .scrollIndicators(.hidden)
             .frame(maxHeight: 380)
-            .onChange(of: viewModel.selectedIndex) { newIndex in
+            .onChange(of: viewModel.selectedIndex) { _, newIndex in
                 // No animation for smoother single-item navigation
                 proxy.scrollTo(newIndex, anchor: .center)
             }

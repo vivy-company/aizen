@@ -74,8 +74,8 @@ actor GitBranchService {
         try process.run()
         process.waitUntilExit()
 
-        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        let errorOutput = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let output = String(data: (try? pipe.fileHandleForReading.readToEnd()) ?? Data(), encoding: .utf8) ?? ""
+        let errorOutput = String(data: (try? errorPipe.fileHandleForReading.readToEnd()) ?? Data(), encoding: .utf8) ?? ""
         try? pipe.fileHandleForReading.close()
         try? errorPipe.fileHandleForReading.close()
 

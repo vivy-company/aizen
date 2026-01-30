@@ -39,7 +39,7 @@ actor NPMAgentInstaller {
         }
 
         if process.terminationStatus != 0 {
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorData = (try? errorPipe.fileHandleForReading.readToEnd()) ?? Data()
             let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
             throw AgentInstallError.installFailed(message: errorMessage)
         }

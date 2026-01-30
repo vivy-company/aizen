@@ -127,13 +127,13 @@ struct GitPanelWindowContent: View {
             // Ensure any workflow log polling stops when the window closes.
             workflowService.clearSelection()
         }
-        .onChange(of: gitStatus) { _ in
+        .onChange(of: gitStatus) { _, _ in
             let changed = updateChangedFilesCache()
             if changed {
                 reloadDiffDebounced()
             }
         }
-        .onChange(of: selectedHistoryCommit) { commit in
+        .onChange(of: selectedHistoryCommit) { _, commit in
             Task {
                 await loadDiff(for: commit)
             }
@@ -415,7 +415,7 @@ struct GitPanelWindowContent: View {
         .task {
             await loadDiff(for: nil)
         }
-        .onChange(of: diffOutput) { _ in
+        .onChange(of: diffOutput) { _, _ in
             validateCommentsAgainstDiff()
         }
     }

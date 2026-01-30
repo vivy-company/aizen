@@ -43,12 +43,6 @@ struct WorktreeSessionManager {
         guard !session.isDeleted else { return }
 
         let sessionId = session.id
-        #if DEBUG
-        logger.info("closeChatSession called for session \(sessionId?.uuidString ?? "nil")")
-        logger.info("  - session.worktree before: \(session.worktree?.id?.uuidString ?? "nil")")
-        logger.info("  - session.messageCount: \(session.messageCount)")
-        #endif
-        
         if let id = session.id {
             ChatSessionManager.shared.removeAgentSession(for: id)
         }
@@ -69,36 +63,8 @@ struct WorktreeSessionManager {
         // The session remains in database for history
         session.worktree = nil
         
-        #if DEBUG
-        logger.info("  - session.worktree after: \(session.worktree?.id?.uuidString ?? "nil")")
-        logger.info("  - session.isDeleted before save: \(session.isDeleted)")
-        #endif
-        
         do {
             try context.save()
-            #if DEBUG
-            logger.info("  - session.isDeleted after save: \(session.isDeleted)")
-            
-            if let sessionId = sessionId {
-                Task.detached {
-                    let fetchRequest: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-                    fetchRequest.predicate = NSPredicate(format: "id == %@", sessionId as CVarArg)
-                    if let existingSession = try? context.fetch(fetchRequest).first {
-                        await MainActor.run {
-                            logger.info("  - ✅ VERIFIED: Session still exists in database")
-                            logger.info("  - Session has \(existingSession.messageCount) messages")
-                            logger.info("  - Session worktree: \(existingSession.worktree?.id?.uuidString ?? "nil")")
-                        }
-                    } else {
-                        await MainActor.run {
-                            logger.error("  - ❌ ERROR: Session was DELETED from database!")
-                        }
-                    }
-                }
-            }
-            
-            logger.info("Successfully closed chat session (nullified worktree)")
-            #endif
         } catch {
             logger.error("Failed to close chat session: \(error.localizedDescription)")
         }

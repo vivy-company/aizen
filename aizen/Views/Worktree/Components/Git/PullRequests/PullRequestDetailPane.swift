@@ -39,7 +39,7 @@ struct PullRequestDetailPane: View {
         .sheet(isPresented: $showRequestChangesSheet) {
             requestChangesSheet
         }
-        .onChange(of: pr.id) { _ in
+        .onChange(of: pr.id) { _, _ in
             commentText = ""
             conversationAction = .comment
             showRequestChangesSheet = false

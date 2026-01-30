@@ -73,7 +73,7 @@ struct FileBrowserSessionView: View {
         .onAppear {
             openPendingFileIfNeeded()
         }
-        .onChange(of: fileToOpenFromSearch) { _ in
+        .onChange(of: fileToOpenFromSearch) { _, _ in
             openPendingFileIfNeeded()
         }
     }

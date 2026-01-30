@@ -99,10 +99,10 @@ struct MarkdownView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .animation(isStreaming ? nil : .easeOut(duration: 0.15), value: viewModel.blocks.count)
         .animation(isStreaming ? nil : .easeOut(duration: 0.1), value: viewModel.streamingBuffer)
-        .onChange(of: content) { newContent in
+        .onChange(of: content) { _, newContent in
             viewModel.parse(newContent, isStreaming: isStreaming)
         }
-        .onChange(of: isStreaming) { newIsStreaming in
+        .onChange(of: isStreaming) { _, newIsStreaming in
             viewModel.parse(content, isStreaming: newIsStreaming)
         }
         .onAppear {

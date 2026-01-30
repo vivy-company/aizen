@@ -70,7 +70,7 @@ struct CompanionDivider: View {
             .onAppear {
                 cachedDividerColor = Color(nsColor: GhosttyThemeParser.loadDividerColor(named: terminalThemeName))
             }
-            .onChange(of: terminalThemeName) { _ in
+            .onChange(of: terminalThemeName) { _, _ in
                 cachedDividerColor = Color(nsColor: GhosttyThemeParser.loadDividerColor(named: terminalThemeName))
             }
             .onDisappear {

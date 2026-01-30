@@ -28,7 +28,7 @@ actor AgentRegistry {
     static let shared = AgentRegistry()
 
     // SAFETY: UserDefaults is thread-safe for read/write operations
-    private nonisolated let defaults: UserDefaults
+    private nonisolated(unsafe) let defaults: UserDefaults
     private let authPreferencesKey = "acpAgentAuthPreferences"
     private let metadataStoreKey = "agentMetadataStore"
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "AgentRegistry")

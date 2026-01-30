@@ -258,10 +258,10 @@ struct CommandPaletteContent: View {
                 isSearchFocused = true
             }
         }
-        .onChange(of: allWorktrees.count) { _ in
+        .onChange(of: allWorktrees.count) { _, _ in
             viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
         }
-        .onChange(of: currentWorktreeId) { _ in
+        .onChange(of: currentWorktreeId) { _, _ in
             viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
         }
         .background {
@@ -312,7 +312,7 @@ struct CommandPaletteContent: View {
             .background(Color.clear)
             .scrollIndicators(.hidden)
             .frame(maxHeight: 380)
-            .onChange(of: viewModel.selectedIndex) { newIndex in
+            .onChange(of: viewModel.selectedIndex) { _, newIndex in
                 proxy.scrollTo(newIndex, anchor: .center)
             }
         }

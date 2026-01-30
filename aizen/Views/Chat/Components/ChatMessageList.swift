@@ -268,7 +268,7 @@ struct ChatMessageList: View {
             }
         }
         .animation((allowAnimations && !isResizing) ? .easeInOut(duration: 0.25) : nil, value: showLoadingView)
-        .onChange(of: shouldShowLoading) { newValue in
+        .onChange(of: shouldShowLoading) { _, newValue in
             if newValue {
                 // Start showing loading
                 showLoadingView = true
@@ -305,7 +305,7 @@ struct ChatMessageList: View {
                 allowAnimations = true
             }
         }
-        .onChange(of: currentThought) { newThought in
+        .onChange(of: currentThought) { _, newThought in
             updateCachedThought(newThought)
         }
     }
@@ -402,7 +402,7 @@ struct ChatMessageList: View {
                     }
                 }
             }
-            .onChange(of: scrollRequest) { request in
+            .onChange(of: scrollRequest) { _, request in
                 guard !isResizing else { return }
                 guard let request = request else { return }
                 guard case .item(let targetId, let anchor) = request.target else { return }

@@ -110,7 +110,7 @@ actor GitWorktreeService {
 
         guard process.terminationStatus == 0 else { return }
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
         try? pipe.fileHandleForReading.close()
         let output = String(data: data, encoding: .utf8) ?? ""
 

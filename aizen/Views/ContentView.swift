@@ -155,7 +155,7 @@ struct ContentView: View {
                 hasShownOnboarding = true
             }
         }
-        .onChange(of: selectedWorkspace) { newValue in
+        .onChange(of: selectedWorkspace) { _, newValue in
             selectedWorkspaceId = newValue?.id?.uuidString
 
             // Restore last selected repository for this workspace
@@ -172,7 +172,7 @@ struct ContentView: View {
                 selectedRepository = nil
             }
         }
-        .onChange(of: selectedRepository) { newValue in
+        .onChange(of: selectedRepository) { _, newValue in
             selectedRepositoryId = newValue?.id?.uuidString
 
             if let repo = newValue, repo.isDeleted || repo.isFault {
@@ -195,7 +195,7 @@ struct ContentView: View {
                 selectedWorktree = worktrees.first(where: { $0.isPrimary })
             }
         }
-        .onChange(of: selectedWorktree) { newValue in
+        .onChange(of: selectedWorktree) { _, newValue in
             selectedWorktreeId = newValue?.id?.uuidString
 
             if let newWorktree = newValue, !newWorktree.isDeleted {

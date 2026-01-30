@@ -9,6 +9,7 @@ import AppKit
 import CoreData
 import SwiftUI
 
+@MainActor
 final class SessionsWindowManager {
     static let shared = SessionsWindowManager()
 
@@ -17,28 +18,27 @@ final class SessionsWindowManager {
     private init() {}
 
     func show(context: NSManagedObjectContext, worktreeId: UUID? = nil) {
-        if let existing = window, existing.isVisible {
-            existing.makeKeyAndOrderFront(nil)
-            return
-        }
-
         let contentView = SessionsListView(worktreeId: worktreeId)
             .environment(\.managedObjectContext, context)
             .modifier(AppearanceModifier())
 
-        let hostingController = NSHostingController(rootView: contentView)
-        let window = NSWindow(contentViewController: hostingController)
-        window.title = "Chat Sessions"
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
-        window.titlebarAppearsTransparent = true
-        window.isReleasedWhenClosed = false
-        window.toolbarStyle = .unified
-        window.setContentSize(NSSize(width: 800, height: 600))
-        window.minSize = NSSize(width: 600, height: 400)
+        if let existing = window {
+            existing.contentView = NSHostingView(rootView: contentView)
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
 
-        let toolbar = NSToolbar(identifier: "SessionsToolbar")
-        toolbar.showsBaselineSeparator = false
-        window.toolbar = toolbar
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = NSHostingView(rootView: contentView)
+        window.title = "Sessions"
+        window.toolbarStyle = .unified
+        window.minSize = NSSize(width: 600, height: 400)
+        window.isReleasedWhenClosed = false
         window.center()
 
         self.window = window

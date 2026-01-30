@@ -12,27 +12,40 @@ struct SessionsListView: View {
     @StateObject private var viewModel: SessionsListViewModel
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
-    
-    @FetchRequest private var sessions: FetchedResults<ChatSession>
-    
+
     init(worktreeId: UUID? = nil) {
         let vm = SessionsListViewModel(worktreeId: worktreeId)
         _viewModel = StateObject(wrappedValue: vm)
-        let request = vm.buildFetchRequest()
-        _sessions = FetchRequest(fetchRequest: request)
     }
     
     var body: some View {
         VStack(spacing: 0) {
-            filterToolbar
-            
-            if sessions.isEmpty {
-                emptyState
-            } else {
-                sessionsList
-            }
+            headerView
+            Divider()
+            contentView
         }
         .frame(minWidth: 700, idealWidth: 900, maxWidth: .infinity, minHeight: 500, idealHeight: 650, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Picker("", selection: $viewModel.selectedFilter) {
+                    Label("All", systemImage: "square.grid.2x2").tag(SessionsListViewModel.SessionFilter.all)
+                    Label("Active", systemImage: "bolt.fill").tag(SessionsListViewModel.SessionFilter.active)
+                    Label("Archived", systemImage: "archivebox").tag(SessionsListViewModel.SessionFilter.archived)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+
+            ToolbarItem(placement: .navigation) {
+                Spacer().frame(width: 12)
+            }
+
+            ToolbarItem(placement: .navigation) {
+                agentFilterMenu
+            }
+        }
+        .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search sessions")
         .alert("Error", isPresented: Binding(
             get: { viewModel.errorMessage != nil },
             set: { if !$0 { viewModel.errorMessage = nil } }
@@ -45,35 +58,105 @@ struct SessionsListView: View {
                 Text(errorMessage)
             }
         }
-        .onChange(of: viewModel.selectedFilter) { _, _ in updateFetchRequest() }
-        .onChange(of: viewModel.searchText) { _, _ in updateFetchRequest() }
-        .onChange(of: viewModel.selectedWorktreeId) { _, _ in updateFetchRequest() }
-        .onChange(of: viewModel.fetchLimit) { _, _ in updateFetchRequest() }
+        .task {
+            await viewModel.reloadSessions(in: viewContext)
+        }
+        .onChange(of: viewModel.selectedFilter) { _, _ in
+            Task { await viewModel.reloadSessions(in: viewContext) }
+        }
+        .onChange(of: viewModel.searchText) { _, _ in
+            Task { await viewModel.reloadSessions(in: viewContext) }
+        }
+        .onChange(of: viewModel.selectedWorktreeId) { _, _ in
+            Task { await viewModel.reloadSessions(in: viewContext) }
+        }
+        .onChange(of: viewModel.selectedAgentName) { _, _ in
+            Task { await viewModel.reloadSessions(in: viewContext) }
+        }
+        .onChange(of: viewModel.fetchLimit) { _, _ in
+            Task { await viewModel.reloadSessions(in: viewContext) }
+        }
     }
     
-    private var filterToolbar: some View {
-        HStack {
-            Picker("Filter", selection: $viewModel.selectedFilter) {
-                ForEach(SessionsListViewModel.SessionFilter.allCases, id: \.self) { filter in
-                    Text(filter.rawValue).tag(filter)
+    private var headerView: some View {
+        HStack(spacing: 12) {
+            Text("Sessions")
+                .font(.headline)
+
+            if !viewModel.sessions.isEmpty {
+                TagBadge(text: "\(viewModel.sessions.count)", color: .secondary, cornerRadius: 6)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var agentFilterMenu: some View {
+        Menu {
+            Button {
+                viewModel.selectedAgentName = nil
+            } label: {
+                Label("All Agents", systemImage: "person.2")
+            }
+
+            if !viewModel.availableAgents.isEmpty {
+                Divider()
+            }
+
+            ForEach(viewModel.availableAgents, id: \.self) { agentName in
+                Button {
+                    viewModel.selectedAgentName = agentName
+                } label: {
+                    HStack(spacing: 8) {
+                        AgentIconView(agent: agentName, size: 14)
+                        Text(agentName)
+                    }
                 }
             }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 300)
-            
-            Spacer()
-            
-            SearchField(
-                placeholder: "Search sessions...",
-                text: $viewModel.searchText,
-                trailing: { EmptyView() }
-            )
-            .frame(width: 200)
+        } label: {
+            HStack(spacing: 6) {
+                if let selectedAgent = viewModel.selectedAgentName {
+                    AgentIconView(agent: selectedAgent, size: 14)
+                } else {
+                    Image(systemName: "person.2")
+                        .font(.system(size: 12))
+                }
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
         }
-        .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .disabled(viewModel.availableAgents.isEmpty)
     }
     
+    private var contentView: some View {
+        Group {
+            if viewModel.isLoading && viewModel.sessions.isEmpty {
+                loadingState
+            } else if viewModel.sessions.isEmpty {
+                emptyState
+            } else {
+                sessionsList
+            }
+        }
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            ProgressView()
+            Text("Loading sessions...")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "bubble.left.and.bubble.right")
@@ -92,34 +175,42 @@ struct SessionsListView: View {
     }
     
     private var sessionsList: some View {
-        List {
-            ForEach(sessions, id: \.id) { session in
-                SessionRowView(session: session)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        viewModel.resumeSession(session)
-                        dismiss()
-                    }
-                    .contextMenu {
-                        sessionContextMenu(for: session)
-                    }
-            }
-            
-            if sessions.count >= viewModel.fetchLimit {
-                HStack {
-                    Spacer()
-                    Button("Load More") {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(viewModel.sessions, id: \.id) { session in
+                    SessionRowView(session: session)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            viewModel.resumeSession(session)
+                            dismiss()
+                        }
+                        .contextMenu {
+                            sessionContextMenu(for: session)
+                        }
+
+                    Divider()
+                        .padding(.leading, 12)
+                }
+
+                if viewModel.sessions.count >= viewModel.fetchLimit {
+                    Button {
                         viewModel.loadMore()
+                    } label: {
+                        if viewModel.isLoading {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else {
+                            Text("Load More")
+                        }
                     }
                     .buttonStyle(.plain)
                     .foregroundColor(.accentColor)
-                    .padding(.vertical, 8)
-                    Spacer()
+                    .padding(.vertical, 12)
                 }
-                .listRowSeparator(.hidden)
             }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
         }
-        .listStyle(.inset)
     }
     
     @ViewBuilder
@@ -156,16 +247,13 @@ struct SessionsListView: View {
         }
     }
     
-    private func updateFetchRequest() {
-        sessions.nsPredicate = viewModel.buildFetchRequest().predicate
-    }
 }
 
 struct SessionRowView: View {
     let session: ChatSession
     
-    @Environment(\.managedObjectContext) private var viewContext
     @State private var cachedSummary: String = ""
+    @State private var isHovered = false
     
     private static let timestampFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
@@ -179,24 +267,40 @@ struct SessionRowView: View {
         }
         return Self.timestampFormatter.localizedString(for: lastMessage, relativeTo: Date())
     }
+
+    private var agentName: String {
+        let name = session.agentName ?? ""
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? SessionsListViewModel.unknownAgentLabel : trimmed
+    }
+
+    private var sessionTitle: String {
+        if !cachedSummary.isEmpty {
+            return cachedSummary
+        }
+        if let title = session.title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return title
+        }
+        return "Untitled Session"
+    }
     
     private func computeSessionSummary() -> String {
-        // Get first user message for summary
+        // Use most recent user message for summary
         guard let messages = session.messages as? Set<ChatMessage> else {
             return "No messages yet"
         }
-        
+
         let sortedMessages = messages
             .filter { $0.role == "user" }
             .sorted { (m1, m2) -> Bool in
                 let t1 = m1.timestamp ?? Date.distantPast
                 let t2 = m2.timestamp ?? Date.distantPast
-                return t1 < t2
+                return t1 > t2
             }
-        
-        guard let firstMessage = sortedMessages.first,
-              let contentJSON = firstMessage.contentJSON else {
-            return "Waiting for first message..."
+
+        guard let latestMessage = sortedMessages.first,
+              let contentJSON = latestMessage.contentJSON else {
+            return "No user messages yet"
         }
         
         // Extract text from contentJSON
@@ -204,13 +308,13 @@ struct SessionRowView: View {
             return "Unable to load message"
         }
         
-        guard let content = try? JSONDecoder().decode([MessageContent].self, from: contentData) else {
-            return "Unable to parse message"
+        guard let contentBlocks = try? JSONDecoder().decode([ContentBlock].self, from: contentData) else {
+            return contentJSON
         }
         
         var textParts: [String] = []
-        for item in content {
-            if case .text(let textContent) = item {
+        for block in contentBlocks {
+            if case .text(let textContent) = block {
                 textParts.append(textContent.text)
             }
         }
@@ -232,61 +336,72 @@ struct SessionRowView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 8) {
-                Text(session.agentName ?? "Unknown Agent")
-                    .font(.headline)
-                
-                if session.archived {
-                    Image(systemName: "archivebox.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+        HStack(alignment: .top, spacing: 12) {
+            AgentIconView(agent: session.agentName ?? "claude", size: 18)
+                .frame(width: 22, height: 22)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text(sessionTitle)
+                        .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    Spacer()
+
+                    Text(relativeTimestamp)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
                 }
-                
-                Text("•")
-                    .foregroundColor(.secondary)
-                
-                Text(cachedSummary)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                
-                Spacer()
-                
-                Text(relativeTimestamp)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            HStack(spacing: 8) {
-                Text("\(session.messageCount) messages")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                if let worktreeName = session.worktree?.branch {
-                    Text("•")
-                        .foregroundColor(.secondary)
-                    
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(.caption2)
-                        Text(worktreeName)
+
+                HStack(spacing: 8) {
+                    Text(agentName)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+
+                    if session.archived {
+                        TagBadge(text: "Archived", color: .orange, cornerRadius: 4, backgroundOpacity: 0.2)
                     }
-                    .font(.caption)
-                    .foregroundColor(.blue)
-                }
-                
-                if let createdAt = session.createdAt {
+
                     Text("•")
-                        .foregroundColor(.secondary)
-                    
-                    Text("Created \(createdAt, formatter: Self.dateFormatter)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.quaternary)
+
+                    Text("\(session.messageCount) messages")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+
+                    if let worktreeName = session.worktree?.branch {
+                        Text("•")
+                            .foregroundStyle(.quaternary)
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.branch")
+                                .font(.system(size: 10))
+                            Text(worktreeName)
+                        }
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    }
+
+                    if let createdAt = session.createdAt {
+                        Text("•")
+                            .foregroundStyle(.quaternary)
+
+                        Text("Created \(createdAt, formatter: Self.dateFormatter)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
         }
-        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .modifier(SelectableRowModifier(isSelected: false, isHovered: isHovered))
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .task(id: session.id) {
             cachedSummary = computeSessionSummary()
         }
@@ -298,49 +413,6 @@ struct SessionRowView: View {
         formatter.timeStyle = .short
         return formatter
     }()
-}
-
-// Helper for decoding message content
-private enum MessageContent: Decodable {
-    case text(MessageTextContent)
-    case toolUse(MessageToolUseContent)
-    case toolResult(MessageToolResultContent)
-    
-    private enum CodingKeys: String, CodingKey {
-        case type
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
-        
-        switch type {
-        case "text":
-            self = .text(try MessageTextContent(from: decoder))
-        case "tool_use":
-            self = .toolUse(try MessageToolUseContent(from: decoder))
-        case "tool_result":
-            self = .toolResult(try MessageToolResultContent(from: decoder))
-        default:
-            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown type: \(type)")
-        }
-    }
-}
-
-private struct MessageTextContent: Decodable {
-    let type: String
-    let text: String
-}
-
-private struct MessageToolUseContent: Decodable {
-    let type: String
-    let id: String
-    let name: String
-}
-
-private struct MessageToolResultContent: Decodable {
-    let type: String
-    let tool_use_id: String
 }
 
 #Preview {

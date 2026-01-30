@@ -184,12 +184,12 @@ struct GitPanelWindowContentWithToolbar: View {
                 gitActionsToolbar
             }
         }
-        .onChange(of: selectedTab) { newTab in
+        .onChange(of: selectedTab) { _, newTab in
             if newTab == .prs {
                 loadHostingInfoIfNeeded()
             }
         }
-        .onChange(of: gitStatus.currentBranch) { _ in
+        .onChange(of: gitStatus.currentBranch) { _, _ in
             Task {
                 await refreshPRStatus()
             }
@@ -229,7 +229,7 @@ struct GitPanelWindowContentWithToolbar: View {
                 }
             )
         }
-        .onChange(of: selectedBranchInfo) { newBranch in
+        .onChange(of: selectedBranchInfo) { _, newBranch in
             if let branch = newBranch {
                 gitOperations.switchBranch(branch.name)
             }
@@ -339,7 +339,7 @@ struct GitPanelWindowContentWithToolbar: View {
                 .disabled(isOperationPending)
             }
         }
-        .onChange(of: gitRepositoryService.isOperationPending) { pending in
+        .onChange(of: gitRepositoryService.isOperationPending) { _, pending in
             if !pending {
                 currentOperation = nil
             }

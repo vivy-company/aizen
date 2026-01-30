@@ -145,7 +145,7 @@ struct ActiveWorktreesView: View {
         .frame(minWidth: 860, minHeight: 540)
         .onAppear { metrics.start() }
         .onDisappear { metrics.stop() }
-        .onChange(of: activeWorktreeIDs) { _ in
+        .onChange(of: activeWorktreeIDs) { _, _ in
             syncSelectionIfNeeded()
         }
         .toolbar {

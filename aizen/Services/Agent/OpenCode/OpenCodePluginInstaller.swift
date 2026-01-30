@@ -34,6 +34,8 @@ struct OpenCodePluginInfo {
     let displayName: String
     let description: String
     let npmPackage: String
+    let iconName: String?
+    let accentColorName: String?
     let isInstalled: Bool
     let installedVersion: String?
     let latestVersion: String?
@@ -51,12 +53,7 @@ actor OpenCodePluginInstaller {
     private let configService: OpenCodeConfigService
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "OpenCodePluginInstaller")
     
-    static let knownPlugins: [(name: String, displayName: String, description: String, npmPackage: String)] = [
-        ("oh-my-opencode", "Oh My OpenCode", "Plugin system with custom agents, hooks, and MCP servers", "oh-my-opencode"),
-        ("opencode-openai-codex-auth", "OpenAI Codex Auth", "Authentication for OpenAI Codex models", "opencode-openai-codex-auth"),
-        ("opencode-gemini-auth", "Gemini Auth", "Authentication for Google Gemini models", "opencode-gemini-auth"),
-        ("opencode-antigravity-auth", "Antigravity Auth", "OAuth authentication for Antigravity models", "opencode-antigravity-auth")
-    ]
+    private static let registryPlugins: [OpenCodePluginDefinition] = OpenCodePluginRegistryLoader.load()
     
     init(configService: OpenCodeConfigService = .shared) {
         self.configService = configService
@@ -68,7 +65,7 @@ actor OpenCodePluginInstaller {
             throw OpenCodePluginError.installFailed("Invalid package name: \(name)")
         }
         
-        guard Self.knownPlugins.contains(where: { $0.npmPackage == name }) else {
+        guard Self.pluginDefinition(forPackage: name) != nil else {
             throw OpenCodePluginError.installFailed("Unknown plugin: \(name)")
         }
     }
@@ -248,6 +245,7 @@ actor OpenCodePluginInstaller {
         let home = fm.homeDirectoryForCurrentUser.path
         
         let packageJsonPaths = [
+            findPackageJsonInOpenCodeCache(packageName, home: home),
             findPackageJsonInNVM(packageName, home: home),
             findPackageJsonInFNM(packageName, home: home),
             findPackageJsonInAsdf(packageName, home: home),
@@ -349,6 +347,15 @@ actor OpenCodePluginInstaller {
         }
         return nil
     }
+
+    private func findPackageJsonInOpenCodeCache(_ packageName: String, home: String) -> String? {
+        let cacheRoot = ProcessInfo.processInfo.environment["OPENCODE_CACHE_DIR"] ?? "\(home)/.cache/opencode"
+        let cachePath = "\(cacheRoot)/node_modules/\(packageName)/package.json"
+        if FileManager.default.fileExists(atPath: cachePath) {
+            return cachePath
+        }
+        return nil
+    }
     
     func getLatestVersion(_ packageName: String) async -> String? {
         let shellEnv = await ShellEnvironmentLoader.loadShellEnvironment()
@@ -363,7 +370,7 @@ actor OpenCodePluginInstaller {
     }
     
     func getPluginInfo(_ pluginName: String) async -> OpenCodePluginInfo? {
-        guard let known = Self.knownPlugins.first(where: { $0.name == pluginName }) else {
+        guard let known = Self.pluginDefinition(named: pluginName) else {
             return nil
         }
         
@@ -376,6 +383,8 @@ actor OpenCodePluginInstaller {
             displayName: known.displayName,
             description: known.description,
             npmPackage: known.npmPackage,
+            iconName: known.icon,
+            accentColorName: known.accentColor,
             isInstalled: isInstalled,
             installedVersion: installedVersion,
             latestVersion: nil,
@@ -385,7 +394,8 @@ actor OpenCodePluginInstaller {
     
     func getAllPluginInfo() async -> [OpenCodePluginInfo] {
         var infos: [OpenCodePluginInfo] = []
-        for known in Self.knownPlugins {
+        let sorted = Self.sortedRegistryPlugins()
+        for known in sorted {
             if let info = await getPluginInfo(known.name) {
                 infos.append(info)
             }
@@ -458,12 +468,18 @@ actor OpenCodePluginInstaller {
     }
     
     func installAndRegister(_ pluginName: String, onProgress: ((String) -> Void)? = nil) async throws {
-        guard let known = Self.knownPlugins.first(where: { $0.name == pluginName }) else {
+        guard let known = Self.pluginDefinition(named: pluginName) else {
             throw OpenCodePluginError.installFailed("Unknown plugin: \(pluginName)")
         }
         
         onProgress?("Installing \(known.displayName)...\n")
-        try await install(known.npmPackage, onProgress: onProgress)
+        do {
+            try await install(known.npmPackage, onProgress: onProgress)
+        } catch OpenCodePluginError.npmNotFound {
+            onProgress?("npm not found; registering plugin only. OpenCode will install it on next run.\n")
+            try await configService.registerPlugin(pluginName)
+            return
+        }
         
         do {
             onProgress?("\nRegistering plugin in OpenCode config...\n")
@@ -477,7 +493,7 @@ actor OpenCodePluginInstaller {
     }
     
     func uninstallAndUnregister(_ pluginName: String) async throws {
-        guard let known = Self.knownPlugins.first(where: { $0.name == pluginName }) else {
+        guard let known = Self.pluginDefinition(named: pluginName) else {
             throw OpenCodePluginError.uninstallFailed("Unknown plugin: \(pluginName)")
         }
         
@@ -501,5 +517,29 @@ actor OpenCodePluginInstaller {
         }
         
         return (isInstalled, isRegistered, message)
+    }
+
+    private static func pluginDefinition(named name: String) -> OpenCodePluginDefinition? {
+        registryPlugins.first { $0.name == name }
+    }
+
+    private static func pluginDefinition(forPackage package: String) -> OpenCodePluginDefinition? {
+        registryPlugins.first { $0.npmPackage == package }
+    }
+
+    private static func sortedRegistryPlugins() -> [OpenCodePluginDefinition] {
+        registryPlugins.sorted { lhs, rhs in
+            switch (lhs.sortOrder, rhs.sortOrder) {
+            case let (l?, r?):
+                if l != r { return l < r }
+                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+            case (nil, nil):
+                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+            case (nil, _?):
+                return false
+            case (_?, nil):
+                return true
+            }
+        }
     }
 }

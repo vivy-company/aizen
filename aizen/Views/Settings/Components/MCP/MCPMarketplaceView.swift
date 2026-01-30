@@ -111,7 +111,7 @@ struct MCPMarketplaceView: View {
             .padding(8)
             .background(Color(NSColor.textBackgroundColor))
             .cornerRadius(8)
-            .onChange(of: searchQuery) { newValue in
+            .onChange(of: searchQuery) { _, newValue in
                 // Debounced search
                 searchTask?.cancel()
                 searchTask = Task {

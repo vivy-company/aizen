@@ -68,7 +68,7 @@ actor BinaryAgentInstaller {
         try? fileManager.removeItem(atPath: tarPath)
 
         if process.terminationStatus != 0 {
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorData = (try? errorPipe.fileHandleForReading.readToEnd()) ?? Data()
             let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
             throw AgentInstallError.installFailed(message: "Extraction failed: \(errorMessage)")
         }
@@ -109,7 +109,7 @@ actor BinaryAgentInstaller {
         try? fileManager.removeItem(atPath: zipPath)
 
         if process.terminationStatus != 0 {
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorData = (try? errorPipe.fileHandleForReading.readToEnd()) ?? Data()
             let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
             throw AgentInstallError.installFailed(message: "Extraction failed: \(errorMessage)")
         }

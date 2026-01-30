@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "plugins": [
+    {
+      "name": "oh-my-opencode",
+      "displayName": "Oh My OpenCode",
+      "description": "Plugin system with custom agents, hooks, and MCP servers",
+      "npmPackage": "oh-my-opencode",
+      "icon": "sparkles",
+      "accentColor": "purple",
+      "sortOrder": 0
+    },
+    {
+      "name": "opencode-openai-codex-auth",
+      "displayName": "OpenAI Codex Auth",
+      "description": "Authentication for OpenAI Codex models",
+      "npmPackage": "opencode-openai-codex-auth",
+      "icon": "key.fill",
+      "accentColor": "blue",
+      "sortOrder": 1
+    },
+    {
+      "name": "opencode-gemini-auth",
+      "displayName": "Gemini Auth",
+      "description": "Authentication for Google Gemini models",
+      "npmPackage": "opencode-gemini-auth",
+      "icon": "bolt.shield.fill",
+      "accentColor": "orange",
+      "sortOrder": 2
+    },
+    {
+      "name": "opencode-antigravity-auth",
+      "displayName": "Antigravity Auth",
+      "description": "OAuth authentication for Antigravity models",
+      "npmPackage": "opencode-antigravity-auth",
+      "icon": "person.crop.circle.badge.checkmark",
+      "accentColor": "green",
+      "sortOrder": 3
+    }
+  ]
+}

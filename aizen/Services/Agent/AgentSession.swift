@@ -94,7 +94,12 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     private var lastAgentChunkAt: Date?
     private static let finalizeIdleDelay: TimeInterval = 0.2
     private var isModeChanging = false
-    var isResumingSession = false
+    @Published var isResumingSession = false
+    private var resumeReplayAgentMessages: [String] = []
+    private var resumeReplayIndex: Int = 0
+    private var resumeReplayBuffer: String = ""
+    var suppressResumedAgentMessages = false
+    var persistedToolCallIds: Set<String> = []
     private var thoughtBuffer: String = ""
     private var thoughtFlushTask: Task<Void, Never>?
     private static let thoughtUpdateInterval: TimeInterval = 0.06
@@ -276,13 +281,20 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         self.agentName = agentName
         self.workingDirectory = workingDir
 
-        let (client, initResponse) = try await initializeClient(
-            agentName: agentName,
-            workingDir: workingDir,
-            startTime: startTime,
-            previousAgentName: previousAgentName,
-            previousWorkingDir: previousWorkingDir
-        )
+        let client: ACPClient
+        let initResponse: InitializeResponse
+        do {
+            (client, initResponse) = try await initializeClient(
+                agentName: agentName,
+                workingDir: workingDir,
+                startTime: startTime,
+                previousAgentName: previousAgentName,
+                previousWorkingDir: previousWorkingDir
+            )
+        } catch {
+            isActive = false
+            throw error
+        }
 
         if let authMethods = initResponse.authMethods, !authMethods.isEmpty {
             self.authMethods = authMethods
@@ -419,6 +431,8 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         sessionState = .initializing
         isActive = true
         isResumingSession = true
+        suppressResumedAgentMessages = true
+        prepareResumeReplayState()
         self.chatSessionId = chatSessionId
         
         guard !acpSessionId.isEmpty,
@@ -426,18 +440,24 @@ class AgentSession: ObservableObject, ACPClientDelegate {
               acpSessionId.allSatisfy({ $0.isASCII && !$0.isNewline }) else {
             sessionState = .failed("Invalid ACP session ID format")
             isActive = false
+            isResumingSession = false
+            clearResumeReplayState()
             throw AgentSessionError.custom("Invalid ACP session ID format")
         }
         
         guard FileManager.default.fileExists(atPath: workingDir) else {
             sessionState = .failed("Working directory no longer exists: \(workingDir)")
             isActive = false
+            isResumingSession = false
+            clearResumeReplayState()
             throw AgentSessionError.custom("Working directory no longer exists: \(workingDir)")
         }
         
         guard FileManager.default.isReadableFile(atPath: workingDir) else {
             sessionState = .failed("Working directory not accessible: \(workingDir)")
             isActive = false
+            isResumingSession = false
+            clearResumeReplayState()
             throw AgentSessionError.custom("Working directory not accessible: \(workingDir)")
         }
         
@@ -450,13 +470,32 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         self.agentName = agentName
         self.workingDirectory = workingDir
         
-        let (client, _) = try await initializeClient(
-            agentName: agentName,
-            workingDir: workingDir,
-            startTime: startTime,
-            previousAgentName: previousAgentName,
-            previousWorkingDir: previousWorkingDir
-        )
+        let client: ACPClient
+        let initResponse: InitializeResponse
+        do {
+            (client, initResponse) = try await initializeClient(
+                agentName: agentName,
+                workingDir: workingDir,
+                startTime: startTime,
+                previousAgentName: previousAgentName,
+                previousWorkingDir: previousWorkingDir
+            )
+        } catch {
+            isActive = false
+            isResumingSession = false
+            clearResumeReplayState()
+            throw error
+        }
+
+        let canLoadSession = initResponse.agentCapabilities.loadSession ?? false
+        guard canLoadSession else {
+            isActive = false
+            isResumingSession = false
+            clearResumeReplayState()
+            sessionState = .failed("Agent does not support session resume")
+            logger.error("[\(agentName)] Agent does not support session resume (loadSession capability)")
+            throw AgentSessionError.sessionResumeUnsupported
+        }
         
         logger.info("[\(agentName)] Loading session \(acpSessionId)...")
         let sessionResponse: LoadSessionResponse
@@ -473,6 +512,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         } catch {
             isActive = false
             isResumingSession = false
+            clearResumeReplayState()
             sessionState = .failed("loadSession failed: \(error.localizedDescription)")
             self.acpClient = nil
             logger.error("[\(agentName)] loadSession failed: \(error.localizedDescription)")
@@ -490,7 +530,65 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
             self.isResumingSession = false
+            self.clearResumeReplayState()
         }
+    }
+
+    private func prepareResumeReplayState() {
+        resumeReplayAgentMessages = messages
+            .filter { $0.role == .agent }
+            .map { $0.content }
+        resumeReplayIndex = 0
+        resumeReplayBuffer = ""
+    }
+
+    func clearResumeReplayState() {
+        resumeReplayAgentMessages.removeAll()
+        resumeReplayIndex = 0
+        resumeReplayBuffer = ""
+        suppressResumedAgentMessages = false
+    }
+
+    func shouldSkipResumedAgentChunk(text: String, hasContentBlocks: Bool) -> Bool {
+        if suppressResumedAgentMessages {
+            return true
+        }
+        guard isResumingSession else { return false }
+
+        guard !text.isEmpty else {
+            if hasContentBlocks {
+                isResumingSession = false
+                clearResumeReplayState()
+                return false
+            }
+            return true
+        }
+
+        guard resumeReplayIndex < resumeReplayAgentMessages.count else {
+            isResumingSession = false
+            clearResumeReplayState()
+            return false
+        }
+
+        let target = resumeReplayAgentMessages[resumeReplayIndex]
+        let candidate = resumeReplayBuffer + text
+
+        if target.hasPrefix(candidate) {
+            resumeReplayBuffer = candidate
+            if candidate == target {
+                resumeReplayIndex += 1
+                resumeReplayBuffer = ""
+                if resumeReplayIndex >= resumeReplayAgentMessages.count {
+                    isResumingSession = false
+                    clearResumeReplayState()
+                }
+            }
+            return true
+        }
+
+        isResumingSession = false
+        clearResumeReplayState()
+        return false
     }
     
     private func initializeClient(
@@ -569,6 +667,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         }
         
         self.agentCapabilities = initResponse.agentCapabilities
+        logger.info("[\(agentName)] Agent capabilities: loadSession=\(initResponse.agentCapabilities.loadSession ?? false)")
         
         versionCheckTask = Task { [weak self] in
             guard let self = self else { return }
@@ -991,10 +1090,20 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         toolCallOrder.removeAll()
         pendingToolCallUpdatesById.removeAll()
         pendingToolCallContentById.removeAll()
+        persistedToolCallIds.removeAll()
         for (_, task) in toolCallContentFlushTasks {
             task.cancel()
         }
         toolCallContentFlushTasks.removeAll()
+    }
+
+    func loadPersistedToolCalls(_ toolCalls: [ToolCall]) {
+        clearToolCalls()
+        let sortedCalls = toolCalls.sorted { $0.timestamp < $1.timestamp }
+        for call in sortedCalls {
+            upsertToolCall(call)
+            persistedToolCallIds.insert(call.toolCallId)
+        }
     }
 
     private func trimToolCallsIfNeeded() {
@@ -1077,6 +1186,7 @@ enum MessageRole {
 enum AgentSessionError: LocalizedError {
     case sessionAlreadyActive
     case sessionNotActive
+    case sessionResumeUnsupported
     case agentNotFound(String)
     case agentNotExecutable(String)
     case clientNotInitialized
@@ -1088,6 +1198,8 @@ enum AgentSessionError: LocalizedError {
             return "Session is already active"
         case .sessionNotActive:
             return "No active session"
+        case .sessionResumeUnsupported:
+            return "Agent does not support session resume"
         case .agentNotFound(let name):
             return
                 "Agent '\(name)' not configured. Please set the executable path in Settings → AI Agents, or click 'Auto Discover' to find it automatically."

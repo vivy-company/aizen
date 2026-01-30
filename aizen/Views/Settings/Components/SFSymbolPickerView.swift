@@ -186,10 +186,10 @@ struct SFSymbolPickerView: View {
         }
         .frame(width: 540, height: 480)
         .background(Color(NSColor.windowBackgroundColor))
-        .onChange(of: searchText) { _ in
+        .onChange(of: searchText) { _, _ in
             displayLimit = pageSize
         }
-        .onChange(of: selectedCategory) { _ in
+        .onChange(of: selectedCategory) { _, _ in
             displayLimit = pageSize
         }
     }

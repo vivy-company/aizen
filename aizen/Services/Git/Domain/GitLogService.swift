@@ -49,7 +49,7 @@ actor GitLogService {
         try process.run()
         process.waitUntilExit()
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
         try? pipe.fileHandleForReading.close()
         return String(data: data, encoding: .utf8) ?? ""
     }

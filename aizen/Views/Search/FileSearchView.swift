@@ -74,7 +74,7 @@ struct FileSearchView: View {
         .onDisappear {
             removeKeyboardMonitoring()
         }
-        .onChange(of: viewModel.searchQuery) { _ in
+        .onChange(of: viewModel.searchQuery) { _, _ in
             viewModel.performSearch()
         }
     }
@@ -131,7 +131,7 @@ struct FileSearchView: View {
                 .padding(.vertical, 6)
             }
             .frame(maxHeight: 400)
-            .onChange(of: viewModel.selectedIndex) { newIndex in
+            .onChange(of: viewModel.selectedIndex) { _, newIndex in
                 withAnimation(.easeOut(duration: 0.1)) {
                     proxy.scrollTo(newIndex, anchor: .center)
                 }

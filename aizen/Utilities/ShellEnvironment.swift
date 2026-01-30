@@ -51,12 +51,9 @@ nonisolated enum ShellEnvironment {
     /// Safe to call from any context (main thread, actors, etc.)
     nonisolated static func loadUserShellEnvironmentAsync() async -> [String: String] {
         // Fast path: already cached
-        cacheLock.lock()
-        if let cached = cachedEnvironment {
-            cacheLock.unlock()
+        if let cached = cachedEnvironmentSnapshot() {
             return cached
         }
-        cacheLock.unlock()
         
         // Load on background thread and await result
         return await withCheckedContinuation { continuation in
@@ -65,6 +62,12 @@ nonisolated enum ShellEnvironment {
                 continuation.resume(returning: env)
             }
         }
+    }
+
+    private nonisolated static func cachedEnvironmentSnapshot() -> [String: String]? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return cachedEnvironment
     }
     
     /// Blocking version that waits for environment to be loaded.
@@ -161,7 +164,7 @@ nonisolated enum ShellEnvironment {
             try process.run()
             process.waitUntilExit()
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
             try? pipe.fileHandleForReading.close()
             try? errorPipe.fileHandleForReading.close()
             if let output = String(data: data, encoding: .utf8) {

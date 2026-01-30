@@ -248,7 +248,7 @@ struct GeneralSettingsView: View {
                         Text(language.displayName).tag(language)
                     }
                 }
-                .onChange(of: selectedLanguage) { newValue in
+                .onChange(of: selectedLanguage) { _, newValue in
                     guard hasLoadedLanguage else { return }
                     applyLanguage(newValue)
                 }

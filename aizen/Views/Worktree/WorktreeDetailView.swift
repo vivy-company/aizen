@@ -498,7 +498,7 @@ struct WorktreeDetailView: View {
                 validateSelectedTab()
                 cachedTerminalBackgroundColor = getTerminalBackgroundColor()
             }
-            .onChange(of: terminalThemeName) { _ in
+            .onChange(of: terminalThemeName) { _, _ in
                 cachedTerminalBackgroundColor = getTerminalBackgroundColor()
             }
             .toolbar {
@@ -531,22 +531,22 @@ struct WorktreeDetailView: View {
     @ViewBuilder
     private var navigationContent: some View {
         contentWithBasicModifiers
-            .onChange(of: selectedTab) { _ in
+            .onChange(of: selectedTab) { _, _ in
                 saveTabState()
             }
-            .onChange(of: viewModel.selectedChatSessionId) { newValue in
+            .onChange(of: viewModel.selectedChatSessionId) { _, newValue in
                 guard let worktreeId = worktree.id else { return }
                 tabStateManager.saveSessionId(newValue, for: "chat", worktreeId: worktreeId)
             }
-            .onChange(of: viewModel.selectedTerminalSessionId) { newValue in
+            .onChange(of: viewModel.selectedTerminalSessionId) { _, newValue in
                 guard let worktreeId = worktree.id else { return }
                 tabStateManager.saveSessionId(newValue, for: "terminal", worktreeId: worktreeId)
             }
-            .onChange(of: viewModel.selectedBrowserSessionId) { newValue in
+            .onChange(of: viewModel.selectedBrowserSessionId) { _, newValue in
                 guard let worktreeId = worktree.id else { return }
                 tabStateManager.saveSessionId(newValue, for: "browser", worktreeId: worktreeId)
             }
-            .onChange(of: viewModel.selectedFileSessionId) { newValue in
+            .onChange(of: viewModel.selectedFileSessionId) { _, newValue in
                 guard let worktreeId = worktree.id else { return }
                 tabStateManager.saveSessionId(newValue, for: "files", worktreeId: worktreeId)
             }

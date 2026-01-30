@@ -62,6 +62,7 @@ struct ChatTabView: View {
     }
 
     @FetchRequest private var sessions: FetchedResults<ChatSession>
+    @FetchRequest private var recentSessions: FetchedResults<ChatSession>
 
     init(
         worktree: Worktree,
@@ -89,6 +90,20 @@ struct ChatTabView: View {
             predicate: predicate,
             animation: nil
         )
+
+        let recentRequest: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
+        if let worktreeId = worktree.id {
+            recentRequest.predicate = NSPredicate(
+                format: "(worktree.id == %@ OR worktree == nil) AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
+                worktreeId as CVarArg
+            )
+        } else {
+            recentRequest.predicate = NSPredicate(value: false)
+        }
+        recentRequest.sortDescriptors = [NSSortDescriptor(key: "lastMessageAt", ascending: false)]
+        recentRequest.fetchLimit = 3
+        recentRequest.relationshipKeyPathsForPrefetching = ["worktree"]
+        self._recentSessions = FetchRequest(fetchRequest: recentRequest, animation: nil)
     }
 
     var body: some View {
@@ -99,10 +114,10 @@ struct ChatTabView: View {
                 .onAppear {
                     syncSelectionAndCache()
                 }
-                .onChange(of: selectedSessionId) { _ in
+                .onChange(of: selectedSessionId) { _, _ in
                     updateCacheForSelection()
                 }
-                .onChange(of: sessions.count) { _ in
+                .onChange(of: sessions.count) { _, _ in
                     syncSelectionAndCache()
                 }
         }
@@ -216,13 +231,13 @@ struct ChatTabView: View {
                     didLoadWidths = true
                 }
             }
-            .onChange(of: geometry.size.width) { newWidth in
+            .onChange(of: geometry.size.width) { _, newWidth in
                 clampPanelWidths(containerWidth: newWidth)
             }
-            .onChange(of: leftPanelType) { _ in
+            .onChange(of: leftPanelType) { _, _ in
                 clampPanelWidths(containerWidth: geometry.size.width)
             }
-            .onChange(of: rightPanelType) { _ in
+            .onChange(of: rightPanelType) { _, _ in
                 clampPanelWidths(containerWidth: geometry.size.width)
             }
         }
@@ -354,18 +369,31 @@ struct ChatTabView: View {
 
             // Responsive layout: row if <=5 agents, column if >5
             if enabledAgents.count <= 5 {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     ForEach(enabledAgents, id: \.id) { agentMetadata in
                         agentButton(for: agentMetadata)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
             } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.fixed(100), spacing: 12), count: 3), spacing: 12) {
-                    ForEach(enabledAgents, id: \.id) { agentMetadata in
-                        agentButton(for: agentMetadata)
+                HStack {
+                    Spacer(minLength: 0)
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 56, maximum: 64), spacing: 10)],
+                        spacing: 10
+                    ) {
+                        ForEach(enabledAgents, id: \.id) { agentMetadata in
+                            agentButton(for: agentMetadata)
+                        }
                     }
+                    .frame(maxWidth: 420)
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 20)
+            }
+
+            if !recentSessions.isEmpty {
+                resumeSessionSeparator
+                recentSessionsSection
             }
 
             Spacer()
@@ -380,17 +408,58 @@ struct ChatTabView: View {
         }
     }
 
+    private var resumeSessionSeparator: some View {
+        HStack(spacing: 12) {
+            Rectangle()
+                .fill(Color.secondary.opacity(0.2))
+                .frame(height: 1)
+            Text("Or resume a recent session")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Rectangle()
+                .fill(Color.secondary.opacity(0.2))
+                .frame(height: 1)
+        }
+        .frame(width: 420)
+    }
+
+    private var recentSessionsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("Recent Sessions")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button("Show more") {
+                    SessionsWindowManager.shared.show(context: viewContext)
+                }
+                .buttonStyle(.link)
+            }
+
+            VStack(spacing: 8) {
+                ForEach(recentSessions, id: \.objectID) { session in
+                    Button {
+                        resumeRecentSession(session)
+                    } label: {
+                        recentSessionRow(session)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .frame(maxWidth: 420)
+        .padding(.horizontal, 24)
+    }
+
     @ViewBuilder
     private func agentButton(for agentMetadata: AgentMetadata) -> some View {
         Button {
             createNewSession(withAgent: agentMetadata.id)
         } label: {
-            VStack(spacing: 8) {
-                AgentIconView(metadata: agentMetadata, size: 12)
-                Text(agentMetadata.name)
-                    .font(.system(size: 13, weight: .medium))
-            }
-            .frame(width: 100, height: 80)
+            AgentIconView(metadata: agentMetadata, size: 14)
+                .frame(width: 54, height: 54)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
             .overlay {
                 RoundedRectangle(cornerRadius: 12)
@@ -398,6 +467,7 @@ struct ChatTabView: View {
             }
         }
         .buttonStyle(.plain)
+        .help(agentMetadata.name)
     }
 
     private func loadEnabledAgents() {
@@ -405,6 +475,132 @@ struct ChatTabView: View {
             enabledAgents = AgentRegistry.shared.getEnabledAgents()
         }
     }
+
+    private func recentSessionRow(_ session: ChatSession) -> some View {
+        let summary = sessionSummary(session)
+        let agentName = sessionAgentLabel(session)
+        let timestamp = relativeTimestamp(for: session)
+
+        return HStack(spacing: 10) {
+            AgentIconView(agent: session.agentName ?? "claude", size: 14)
+                .frame(width: 20, height: 20)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(summary)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Text(agentName)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Text(timestamp)
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(.separator.opacity(0.3), lineWidth: 1)
+        }
+    }
+
+    private func sessionSummary(_ session: ChatSession) -> String {
+        guard let messages = session.messages as? Set<ChatMessage> else {
+            return "Untitled Session"
+        }
+
+        let latestUser = messages
+            .filter { $0.role == "user" }
+            .sorted { (m1, m2) -> Bool in
+                let t1 = m1.timestamp ?? Date.distantPast
+                let t2 = m2.timestamp ?? Date.distantPast
+                return t1 > t2
+            }
+            .first
+
+        if let contentJSON = latestUser?.contentJSON,
+           let contentData = contentJSON.data(using: .utf8),
+           let contentBlocks = try? JSONDecoder().decode([ContentBlock].self, from: contentData) {
+            var textParts: [String] = []
+            for block in contentBlocks {
+                if case .text(let textContent) = block {
+                    textParts.append(textContent.text)
+                }
+            }
+            let text = textParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.isEmpty {
+                return "Empty message"
+            }
+            return truncate(text, limit: 80)
+        }
+
+        if let title = session.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+            return truncate(title, limit: 80)
+        }
+
+        return "Untitled Session"
+    }
+
+    private func sessionAgentLabel(_ session: ChatSession) -> String {
+        let name = session.agentName ?? ""
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? SessionsListViewModel.unknownAgentLabel : trimmed
+    }
+
+    private func relativeTimestamp(for session: ChatSession) -> String {
+        guard let lastMessage = session.lastMessageAt else {
+            return "No messages"
+        }
+        return Self.recentTimestampFormatter.localizedString(for: lastMessage, relativeTo: Date())
+    }
+
+    private func truncate(_ text: String, limit: Int) -> String {
+        guard text.count > limit else { return text }
+        return String(text.prefix(limit)) + "..."
+    }
+
+    private func resumeRecentSession(_ session: ChatSession) {
+        guard let sessionId = session.id else { return }
+
+        if session.worktree == nil {
+            session.worktree = worktree
+            do {
+                try viewContext.save()
+                viewContext.refresh(session, mergeChanges: false)
+            } catch {
+                logger.error("Failed to reattach session: \(error.localizedDescription)")
+                return
+            }
+        }
+
+        guard let worktree = session.worktree, !worktree.isDeleted else { return }
+        guard let worktreeId = worktree.id else { return }
+        guard let worktreePath = worktree.path, FileManager.default.fileExists(atPath: worktreePath) else { return }
+
+        NotificationCenter.default.post(
+            name: .resumeChatSession,
+            object: nil,
+            userInfo: [
+                "chatSessionId": sessionId,
+                "worktreeId": worktreeId
+            ]
+        )
+    }
+
+    private static let recentTimestampFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
 
     private func createNewSession(withAgent agent: String) {
         guard let context = worktree.managedObjectContext else { return }

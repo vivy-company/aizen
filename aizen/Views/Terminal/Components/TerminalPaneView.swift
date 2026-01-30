@@ -105,7 +105,7 @@ struct TerminalPaneView: View {
                         .transition(.opacity)
                 }
             }
-            .onChange(of: geo.size) { _ in
+            .onChange(of: geo.size) { _, _ in
                 handleSizeChange()
             }
         }
@@ -121,7 +121,7 @@ struct TerminalPaneView: View {
                     }
                 }
         )
-        .onChange(of: isFocused) { newValue in
+        .onChange(of: isFocused) { _, newValue in
             if newValue {
                 shouldFocus = true
                 focusVersion += 1
@@ -154,13 +154,13 @@ struct TerminalPaneView: View {
                 showingVoiceRecording = false
             }
         }
-        .onChange(of: voiceAction) { action in
+        .onChange(of: voiceAction) { _, action in
             if let action = action {
                 handleVoiceAction(action)
                 voiceAction = nil
             }
         }
-        .onChange(of: showingVoiceRecording) { isRecording in
+        .onChange(of: showingVoiceRecording) { _, isRecording in
             onVoiceRecordingChanged(isRecording)
         }
         .alert("Voice Input Unavailable", isPresented: $showingPermissionError) {

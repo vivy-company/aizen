@@ -32,6 +32,11 @@ extension AgentSession {
             throw AgentSessionError.clientNotInitialized
         }
 
+        if suppressResumedAgentMessages {
+            suppressResumedAgentMessages = false
+            clearResumeReplayState()
+        }
+
         // Start new iteration - previous tool calls remain visible but will be collapsed
         currentIterationId = UUID().uuidString
 
@@ -357,7 +362,8 @@ extension AgentSession {
         flushAgentMessageBuffer()
         if let lastIndex = messages.lastIndex(where: { $0.role == .agent && !$0.isComplete }) {
             let completedMessage = messages[lastIndex]
-            let executionTime = completedMessage.startTime.map { Date().timeIntervalSince($0) }
+            let completionTimestamp = Date()
+            let executionTime = completedMessage.startTime.map { completionTimestamp.timeIntervalSince($0) }
             let updatedMessage = MessageItem(
                 id: completedMessage.id,
                 role: completedMessage.role,
@@ -376,6 +382,9 @@ extension AgentSession {
             
             if let chatSessionId = chatSessionId,
                let messageId = UUID(uuidString: completedMessage.id) {
+                let toolCallsToPersist = toolCalls.filter {
+                    !persistedToolCallIds.contains($0.toolCallId) && $0.timestamp <= completionTimestamp
+                }
                 Task {
                     do {
                         try await self.persistMessage(
@@ -383,8 +392,10 @@ extension AgentSession {
                             role: "agent",
                             content: completedMessage.content,
                             contentBlocks: completedMessage.contentBlocks,
-                            chatSessionId: chatSessionId
+                            chatSessionId: chatSessionId,
+                            toolCalls: toolCallsToPersist
                         )
+                        self.persistedToolCallIds.formUnion(toolCallsToPersist.map { $0.toolCallId })
                     } catch {
                         self.logger.error("Failed to persist completed agent message: \(error.localizedDescription)")
                     }
@@ -440,10 +451,12 @@ extension AgentSession {
         role: String,
         content: String,
         contentBlocks: [ContentBlock],
-        chatSessionId: UUID
+        chatSessionId: UUID,
+        toolCalls: [ToolCall] = []
     ) async throws {
         let context = PersistenceController.shared.container.newBackgroundContext()
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        let agentName = self.agentName
         
         try await context.perform {
             let fetchRequest: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
@@ -458,7 +471,7 @@ extension AgentSession {
             chatMessage.id = id
             chatMessage.role = role
             chatMessage.timestamp = Date()
-            chatMessage.agentName = self.agentName
+            chatMessage.agentName = agentName
             
             let encoder = JSONEncoder()
             if let contentJSON = try? encoder.encode(contentBlocks),
@@ -467,9 +480,30 @@ extension AgentSession {
             } else {
                 chatMessage.contentJSON = content
             }
-            
+
             chatMessage.session = chatSession
-            
+
+            if !toolCalls.isEmpty {
+                for call in toolCalls {
+                    let record = ToolCallRecord(context: context)
+                    record.id = call.toolCallId
+                    record.title = call.title
+                    record.kind = call.kind?.rawValue ?? ToolKind.other.rawValue
+                    record.status = call.status.rawValue
+                    record.timestamp = call.timestamp
+                    if let encoded = try? encoder.encode(call),
+                       let jsonString = String(data: encoded, encoding: .utf8) {
+                        record.contentJSON = jsonString
+                    } else if let encoded = try? encoder.encode(call.content),
+                              let jsonString = String(data: encoded, encoding: .utf8) {
+                        record.contentJSON = jsonString
+                    } else {
+                        record.contentJSON = ""
+                    }
+                    record.message = chatMessage
+                }
+            }
+
             try context.save()
         }
     }

@@ -44,7 +44,7 @@ actor ACPProcessManager {
 
     // MARK: - Process Lifecycle
 
-    func launch(agentPath: String, arguments: [String] = [], workingDirectory: String? = nil) async throws {
+    func launch(agentPath: String, arguments: [String] = [], workingDirectory: String? = nil) throws {
         guard process == nil else {
             // Process already running - this is an invalid state
             throw ACPClientError.invalidResponse
@@ -98,8 +98,7 @@ actor ACPProcessManager {
         }
 
         // Load user's shell environment for full access to their commands
-        // Use async version to ensure we get the complete environment with all user vars (e.g., OPENCODE=1)
-        var environment = await ShellEnvironment.loadUserShellEnvironmentAsync()
+        var environment = ShellEnvironment.loadUserShellEnvironment()
 
         // Respect requested working directory: set both cwd and PWD/OLDPWD
         if let workingDirectory, !workingDirectory.isEmpty {

@@ -82,33 +82,51 @@ actor XcodeBuildService {
 
         // Read stdout
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            guard !data.isEmpty else {
-                handle.readabilityHandler = nil
-                return
-            }
-
-            if let output = String(data: data, encoding: .utf8) {
-                logBuffer.appendStdout(output)
-
-                // Parse progress from output
-                let progress = self.parseProgress(from: output)
-                if let progress = progress {
-                    continuation.yield(.building(progress: progress))
+            do {
+                guard let data = try handle.read(upToCount: 65536) else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
                 }
+                guard !data.isEmpty else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
+
+                if let output = String(data: data, encoding: .utf8) {
+                    logBuffer.appendStdout(output)
+
+                    // Parse progress from output
+                    let progress = self.parseProgress(from: output)
+                    if let progress = progress {
+                        continuation.yield(.building(progress: progress))
+                    }
+                }
+            } catch {
+                handle.readabilityHandler = nil
             }
         }
 
         // Read stderr
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            guard !data.isEmpty else {
-                handle.readabilityHandler = nil
-                return
-            }
+            do {
+                guard let data = try handle.read(upToCount: 65536) else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
+                guard !data.isEmpty else {
+                    handle.readabilityHandler = nil
+                    try? handle.close()
+                    return
+                }
 
-            if let output = String(data: data, encoding: .utf8) {
-                logBuffer.appendStderr(output)
+                if let output = String(data: data, encoding: .utf8) {
+                    logBuffer.appendStderr(output)
+                }
+            } catch {
+                handle.readabilityHandler = nil
             }
         }
 
@@ -125,8 +143,8 @@ actor XcodeBuildService {
                     stderrPipe.fileHandleForReading.readabilityHandler = nil
 
                     // Read any remaining data
-                    let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                    let remainingStderr = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    let remainingStdout = (try? stdoutPipe.fileHandleForReading.readToEnd()) ?? Data()
+                    let remainingStderr = (try? stderrPipe.fileHandleForReading.readToEnd()) ?? Data()
 
                     if let str = String(data: remainingStdout, encoding: .utf8) {
                         logBuffer.appendStdout(str)

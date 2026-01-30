@@ -76,7 +76,7 @@ struct XcodeLogSheetView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                 }
-                .onChange(of: buildManager.logOutput.count) { _ in
+                .onChange(of: buildManager.logOutput.count) { _, _ in
                     if autoScroll {
                         withAnimation(.easeOut(duration: 0.1)) {
                             proxy.scrollTo("bottom", anchor: .bottom)

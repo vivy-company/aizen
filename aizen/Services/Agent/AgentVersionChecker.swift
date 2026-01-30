@@ -119,7 +119,7 @@ actor AgentVersionChecker {
             try process.run()
             process.waitUntilExit()
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
             try? pipe.fileHandleForReading.close()
             try? errorPipe.fileHandleForReading.close()
             if let version = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -298,7 +298,7 @@ actor AgentVersionChecker {
             try process.run()
             process.waitUntilExit()
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
             try? pipe.fileHandleForReading.close()
             try? errorPipe.fileHandleForReading.close()
             if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),

@@ -16,10 +16,15 @@ final class SessionsListViewModel: ObservableObject {
     @Published var selectedFilter: SessionFilter = .active
     @Published var searchText: String = ""
     @Published var selectedWorktreeId: UUID?
+    @Published var selectedAgentName: String?
+    @Published var availableAgents: [String] = []
     @Published var errorMessage: String?
     @Published var fetchLimit: Int = 10
+    @Published var sessions: [ChatSession] = []
+    @Published var isLoading: Bool = false
     
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "SessionsList")
+    nonisolated static let unknownAgentLabel = "Unknown Agent"
     
     init(worktreeId: UUID? = nil) {
         self.selectedWorktreeId = worktreeId
@@ -28,34 +33,111 @@ final class SessionsListViewModel: ObservableObject {
     func loadMore() {
         fetchLimit += 10
     }
+
+    func reloadSessions(in context: NSManagedObjectContext) async {
+        let filter = selectedFilter
+        let search = searchText
+        let worktreeId = selectedWorktreeId
+        let agentName = selectedAgentName
+        let limit = fetchLimit
+        let unknownAgentLabel = Self.unknownAgentLabel
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let results = try await context.perform {
+                let request = Self.buildFetchRequest(
+                    filter: filter,
+                    searchText: search,
+                    worktreeId: worktreeId,
+                    fetchLimit: limit,
+                    agentName: agentName
+                )
+                return try context.fetch(request)
+            }
+            sessions = results
+            let agents = try await context.perform {
+                let request = Self.buildAgentNamesRequest(
+                    filter: filter,
+                    worktreeId: worktreeId
+                )
+                let results = try context.fetch(request)
+                var names = Set<String>()
+                var hasUnknown = false
+
+                for item in results {
+                    if let name = item["agentName"] as? String {
+                        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if trimmed.isEmpty {
+                            hasUnknown = true
+                        } else {
+                            names.insert(trimmed)
+                        }
+                    } else {
+                        hasUnknown = true
+                    }
+                }
+
+                var ordered = Array(names).sorted(by: { $0.localizedStandardCompare($1) == .orderedAscending })
+                if hasUnknown {
+                    ordered.append(unknownAgentLabel)
+                }
+                return ordered
+            }
+            availableAgents = agents
+
+            if let selected = selectedAgentName, selected == unknownAgentLabel {
+                if !availableAgents.contains(unknownAgentLabel) {
+                    selectedAgentName = nil
+                }
+            } else if let selected = selectedAgentName, !availableAgents.contains(selected) {
+                selectedAgentName = nil
+            }
+        } catch {
+            logger.error("Failed to fetch sessions: \(error.localizedDescription)")
+            errorMessage = "Failed to load sessions: \(error.localizedDescription)"
+        }
+    }
     
     enum SessionFilter: String, CaseIterable {
         case all = "All"
         case active = "Active"
         case archived = "Archived"
-        
-        var predicate: NSPredicate? {
-            switch self {
-            case .all:
-                return nil
-            case .active:
-                return NSPredicate(format: "archived == NO")
-            case .archived:
-                return NSPredicate(format: "archived == YES")
-            }
-        }
     }
     
     func buildFetchRequest() -> NSFetchRequest<ChatSession> {
-        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
+        Self.buildFetchRequest(
+            filter: selectedFilter,
+            searchText: searchText,
+            worktreeId: selectedWorktreeId,
+            fetchLimit: fetchLimit,
+            agentName: selectedAgentName
+        )
+    }
+
+    nonisolated static func buildFetchRequest(
+        filter: SessionFilter,
+        searchText: String,
+        worktreeId: UUID?,
+        fetchLimit: Int,
+        agentName: String?
+    ) -> NSFetchRequest<ChatSession> {
+        let request = NSFetchRequest<ChatSession>(entityName: "ChatSession")
         
         var predicates: [NSPredicate] = []
+
+        // Only include sessions with at least one user message
+        predicates.append(NSPredicate(format: "SUBQUERY(messages, $m, $m.role == 'user').@count > 0"))
         
-        if let filterPredicate = selectedFilter.predicate {
-            predicates.append(filterPredicate)
+        switch filter {
+        case .all:
+            break
+        case .active:
+            predicates.append(NSPredicate(format: "archived == NO"))
+        case .archived:
+            predicates.append(NSPredicate(format: "archived == YES"))
         }
         
-        if let worktreeId = selectedWorktreeId {
+        if let worktreeId = worktreeId {
             // Show sessions for this worktree AND closed sessions (worktree == nil)
             let worktreePredicate = NSPredicate(format: "worktree.id == %@ OR worktree == nil", worktreeId as CVarArg)
             predicates.append(worktreePredicate)
@@ -68,19 +150,66 @@ final class SessionsListViewModel: ObservableObject {
             )
             predicates.append(searchPredicate)
         }
+
+        if let agentName = agentName {
+            if agentName == Self.unknownAgentLabel {
+                predicates.append(NSPredicate(format: "agentName == nil OR agentName == ''"))
+            } else {
+                predicates.append(NSPredicate(format: "agentName == %@", agentName))
+            }
+        }
         
         if !predicates.isEmpty {
             request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
         }
         
         request.sortDescriptors = [
-            NSSortDescriptor(keyPath: \ChatSession.lastMessageAt, ascending: false)
+            NSSortDescriptor(key: "lastMessageAt", ascending: false)
         ]
         
         request.relationshipKeyPathsForPrefetching = ["worktree"]
         request.fetchBatchSize = 10
         request.fetchLimit = fetchLimit
         
+        return request
+    }
+
+    nonisolated static func buildAgentNamesRequest(
+        filter: SessionFilter,
+        worktreeId: UUID?
+    ) -> NSFetchRequest<NSDictionary> {
+        let request = NSFetchRequest<NSDictionary>(entityName: "ChatSession")
+        request.resultType = .dictionaryResultType
+        request.propertiesToFetch = ["agentName"]
+        request.returnsDistinctResults = true
+
+        var predicates: [NSPredicate] = []
+
+        // Only include sessions with at least one user message
+        predicates.append(NSPredicate(format: "SUBQUERY(messages, $m, $m.role == 'user').@count > 0"))
+
+        switch filter {
+        case .all:
+            break
+        case .active:
+            predicates.append(NSPredicate(format: "archived == NO"))
+        case .archived:
+            predicates.append(NSPredicate(format: "archived == YES"))
+        }
+
+        if let worktreeId = worktreeId {
+            let worktreePredicate = NSPredicate(format: "worktree.id == %@ OR worktree == nil", worktreeId as CVarArg)
+            predicates.append(worktreePredicate)
+        }
+
+        if !predicates.isEmpty {
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+        }
+
+        request.sortDescriptors = [
+            NSSortDescriptor(key: "agentName", ascending: true)
+        ]
+
         return request
     }
     

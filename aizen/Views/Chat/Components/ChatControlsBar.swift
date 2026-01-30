@@ -51,7 +51,7 @@ struct ChatControlsBar: View {
                 AgentConfigMenu(session: agentSession)
             }
 
-            if hasModes, let agentSession = currentAgentSession {
+            if hasModes, let agentSession = currentAgentSession, agentSession.availableConfigOptions.isEmpty {
                 ModeSelectorView(session: agentSession)
             }
 

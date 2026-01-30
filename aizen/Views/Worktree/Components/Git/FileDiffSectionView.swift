@@ -55,7 +55,7 @@ struct FileDiffSectionView: View {
             loadTask?.cancel()
             loadTask = nil
         }
-        .onChange(of: isExpanded) { expanded in
+        .onChange(of: isExpanded) { _, expanded in
             if expanded && diffLines == nil && !isLoading && !diffViewModel.isBatchLoading {
                 loadDiff()
             } else if !expanded {

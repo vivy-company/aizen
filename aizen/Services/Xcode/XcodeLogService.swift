@@ -34,18 +34,26 @@ actor XcodeLogService {
             // Read stdout in background
             DispatchQueue.global(qos: .userInitiated).async {
                 outputHandle.readabilityHandler = { handle in
-                    let data = handle.availableData
-                    guard !data.isEmpty else {
-                        handle.readabilityHandler = nil
-                        try? handle.close()
-                        return
-                    }
-
-                    if let text = String(data: data, encoding: .utf8) {
-                        let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
-                        for line in lines {
-                            continuation.yield(line)
+                    do {
+                        guard let data = try handle.read(upToCount: 65536) else {
+                            handle.readabilityHandler = nil
+                            try? handle.close()
+                            return
                         }
+                        guard !data.isEmpty else {
+                            handle.readabilityHandler = nil
+                            try? handle.close()
+                            return
+                        }
+
+                        if let text = String(data: data, encoding: .utf8) {
+                            let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
+                            for line in lines {
+                                continuation.yield(line)
+                            }
+                        }
+                    } catch {
+                        handle.readabilityHandler = nil
                     }
                 }
             }
@@ -53,18 +61,26 @@ actor XcodeLogService {
             // Read stderr in background
             DispatchQueue.global(qos: .userInitiated).async {
                 errorHandle.readabilityHandler = { handle in
-                    let data = handle.availableData
-                    guard !data.isEmpty else {
-                        handle.readabilityHandler = nil
-                        try? handle.close()
-                        return
-                    }
-
-                    if let text = String(data: data, encoding: .utf8) {
-                        let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
-                        for line in lines {
-                            continuation.yield("[stderr] \(line)")
+                    do {
+                        guard let data = try handle.read(upToCount: 65536) else {
+                            handle.readabilityHandler = nil
+                            try? handle.close()
+                            return
                         }
+                        guard !data.isEmpty else {
+                            handle.readabilityHandler = nil
+                            try? handle.close()
+                            return
+                        }
+
+                        if let text = String(data: data, encoding: .utf8) {
+                            let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
+                            for line in lines {
+                                continuation.yield("[stderr] \(line)")
+                            }
+                        }
+                    } catch {
+                        handle.readabilityHandler = nil
                     }
                 }
             }
@@ -123,19 +139,27 @@ actor XcodeLogService {
         do {
             // Use readabilityHandler for non-blocking output (no busy-wait loop)
             outputHandle.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty else {
-                    // Empty data means EOF, clean up handler
-                    handle.readabilityHandler = nil
-                    try? handle.close()
-                    return
-                }
-
-                if let text = String(data: data, encoding: .utf8) {
-                    let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
-                    for line in lines {
-                        continuation.yield(line)
+                do {
+                    guard let data = try handle.read(upToCount: 65536) else {
+                        // Empty data means EOF, clean up handler
+                        handle.readabilityHandler = nil
+                        try? handle.close()
+                        return
                     }
+                    guard !data.isEmpty else {
+                        handle.readabilityHandler = nil
+                        try? handle.close()
+                        return
+                    }
+
+                    if let text = String(data: data, encoding: .utf8) {
+                        let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
+                        for line in lines {
+                            continuation.yield(line)
+                        }
+                    }
+                } catch {
+                    handle.readabilityHandler = nil
                 }
             }
 
@@ -152,8 +176,9 @@ actor XcodeLogService {
                         try? outputHandle.close()
 
                         // Read any remaining data
-                        let remainingData = outputHandle.readDataToEndOfFile()
-                        if let text = String(data: remainingData, encoding: .utf8), !text.isEmpty {
+                        if let remainingData = try? outputHandle.readToEnd(),
+                           let text = String(data: remainingData, encoding: .utf8),
+                           !text.isEmpty {
                             let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
                             for line in lines {
                                 continuation.yield(line)
@@ -240,19 +265,27 @@ actor XcodeLogService {
         do {
             // Use readabilityHandler for non-blocking output (no busy-wait loop)
             outputHandle.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty else {
-                    // Empty data means EOF, clean up handler
-                    handle.readabilityHandler = nil
-                    try? handle.close()
-                    return
-                }
-
-                if let text = String(data: data, encoding: .utf8) {
-                    let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
-                    for line in lines {
-                        continuation.yield(line)
+                do {
+                    guard let data = try handle.read(upToCount: 65536) else {
+                        // Empty data means EOF, clean up handler
+                        handle.readabilityHandler = nil
+                        try? handle.close()
+                        return
                     }
+                    guard !data.isEmpty else {
+                        handle.readabilityHandler = nil
+                        try? handle.close()
+                        return
+                    }
+
+                    if let text = String(data: data, encoding: .utf8) {
+                        let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
+                        for line in lines {
+                            continuation.yield(line)
+                        }
+                    }
+                } catch {
+                    handle.readabilityHandler = nil
                 }
             }
 
@@ -269,8 +302,9 @@ actor XcodeLogService {
                         try? outputHandle.close()
 
                         // Read any remaining data
-                        let remainingData = outputHandle.readDataToEndOfFile()
-                        if let text = String(data: remainingData, encoding: .utf8), !text.isEmpty {
+                        if let remainingData = try? outputHandle.readToEnd(),
+                           let text = String(data: remainingData, encoding: .utf8),
+                           !text.isEmpty {
                             let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
                             for line in lines {
                                 continuation.yield(line)
