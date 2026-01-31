@@ -521,6 +521,21 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         
         self.sessionId = sessionResponse.sessionId
         self.sessionState = .ready
+
+        if let modesInfo = sessionResponse.modes {
+            self.availableModes = modesInfo.availableModes
+            self.currentModeId = modesInfo.currentModeId
+            logger.info("[\(agentName)] Modes (resume): current=\(modesInfo.currentModeId), available=\(modesInfo.availableModes.map { $0.id })")
+        }
+
+        if let modelsInfo = sessionResponse.models {
+            self.availableModels = modelsInfo.availableModels
+            self.currentModelId = modelsInfo.currentModelId
+        }
+
+        if let configOptions = sessionResponse.configOptions {
+            self.availableConfigOptions = configOptions
+        }
         
         let metadata = AgentRegistry.shared.getMetadata(for: agentName)
         let displayName = metadata?.name ?? agentName

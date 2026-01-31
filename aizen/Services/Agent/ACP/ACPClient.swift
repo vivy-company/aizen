@@ -325,25 +325,49 @@ actor ACPClient {
 
         if let error = response.error {
             if isSessionAlreadyActive(error) {
-                return LoadSessionResponse(sessionId: sessionId)
+                return LoadSessionResponse(sessionId: sessionId, modes: nil, models: nil, configOptions: nil)
             }
             throw ACPClientError.agentError(error)
         }
 
-        if let extracted = extractSessionId(from: response.result) {
-            return LoadSessionResponse(sessionId: extracted)
-        }
+        let extractedSessionId = extractSessionId(from: response.result)
 
         guard let result = response.result else {
-            return LoadSessionResponse(sessionId: sessionId)
+            return LoadSessionResponse(
+                sessionId: extractedSessionId ?? sessionId,
+                modes: nil,
+                models: nil,
+                configOptions: nil
+            )
         }
 
         let data = try encoder.encode(result)
-        do {
-            return try decoder.decode(LoadSessionResponse.self, from: data)
-        } catch {
-            return LoadSessionResponse(sessionId: sessionId)
+        if let payload = try? decoder.decode(LoadSessionResponsePayload.self, from: data) {
+            return LoadSessionResponse(
+                sessionId: payload.sessionId ?? extractedSessionId ?? sessionId,
+                modes: payload.modes,
+                models: payload.models,
+                configOptions: payload.configOptions
+            )
         }
+
+        if let decoded = try? decoder.decode(LoadSessionResponse.self, from: data) {
+            return decoded
+        }
+
+        return LoadSessionResponse(
+            sessionId: extractedSessionId ?? sessionId,
+            modes: nil,
+            models: nil,
+            configOptions: nil
+        )
+    }
+
+    private struct LoadSessionResponsePayload: Decodable {
+        let sessionId: SessionId?
+        let modes: ModesInfo?
+        let models: ModelsInfo?
+        let configOptions: [SessionConfigOption]?
     }
 
     private func extractSessionId(from result: AnyCodable?) -> SessionId? {

@@ -43,9 +43,17 @@ nonisolated struct NewSessionResponse: Codable {
 
 nonisolated struct LoadSessionResponse: Codable {
     let sessionId: SessionId
+    // Legacy API (backward compatibility)
+    let modes: ModesInfo?
+    let models: ModelsInfo?
+    // New API (takes precedence over modes/models)
+    let configOptions: [SessionConfigOption]?
 
     enum CodingKeys: String, CodingKey {
         case sessionId
+        case modes
+        case models
+        case configOptions
     }
 }
 
