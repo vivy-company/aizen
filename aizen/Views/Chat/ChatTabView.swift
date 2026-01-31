@@ -22,6 +22,7 @@ struct ChatTabView: View {
     @State private var enabledAgents: [AgentMetadata] = []
     @State private var cachedSessionIds: [UUID] = []
     private let maxCachedSessions = 10
+    private let recentSessionsLimit = 3
 
     // Companion panel state (persisted) - Left
     @AppStorage("companionLeftPanelType") private var leftPanelType: String = ""
@@ -101,7 +102,7 @@ struct ChatTabView: View {
             recentRequest.predicate = NSPredicate(value: false)
         }
         recentRequest.sortDescriptors = [NSSortDescriptor(key: "lastMessageAt", ascending: false)]
-        recentRequest.fetchLimit = 3
+        recentRequest.fetchLimit = recentSessionsLimit
         recentRequest.relationshipKeyPathsForPrefetching = ["worktree"]
         self._recentSessions = FetchRequest(fetchRequest: recentRequest, animation: nil)
     }
@@ -439,7 +440,7 @@ struct ChatTabView: View {
             }
 
             VStack(spacing: 8) {
-                ForEach(recentSessions, id: \.objectID) { session in
+                ForEach(Array(recentSessions.prefix(recentSessionsLimit)), id: \.objectID) { session in
                     Button {
                         resumeRecentSession(session)
                     } label: {
