@@ -96,6 +96,8 @@ struct AgentLoadingView: View {
             return Color(red: 0.4, green: 0.5, blue: 0.9)  // Gemini blue
         case "codex", "openai":
             return Color(red: 0.3, green: 0.75, blue: 0.65)  // OpenAI teal
+        case "copilot":
+            return Color(red: 0.25, green: 0.6, blue: 0.9)  // Copilot blue
         case "droid":
             return Color(red: 0.933, green: 0.376, blue: 0.094)  // Droid orange (#EE6018)
         case "kimi":

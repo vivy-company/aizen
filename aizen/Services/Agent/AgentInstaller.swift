@@ -78,6 +78,8 @@ actor AgentInstaller {
             return (agentDir as NSString).appendingPathComponent("node_modules/.bin/claude-code-acp")
         case "codex":
             return (agentDir as NSString).appendingPathComponent("node_modules/.bin/codex-acp")
+        case "copilot":
+            return (agentDir as NSString).appendingPathComponent("node_modules/.bin/copilot")
         case "droid":
             return (homeDir as NSString).appendingPathComponent(".local/bin/droid")
         case "gemini":

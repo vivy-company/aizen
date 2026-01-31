@@ -13,6 +13,7 @@ extension AgentRegistry {
     static let builtInExecutableNames: [String: [String]] = [
         "claude": ["claude-code-acp"],
         "codex": ["codex-acp", "codex"],
+        "copilot": ["copilot"],
         "droid": ["droid"],
         "gemini": ["gemini"],
         "kimi": ["kimi"],

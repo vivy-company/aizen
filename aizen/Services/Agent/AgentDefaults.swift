@@ -25,6 +25,8 @@ extension AgentRegistry {
             return "\(basePath)/claude/node_modules/.bin/claude-code-acp"
         case "codex":
             return "\(basePath)/codex/node_modules/.bin/codex-acp"
+        case "copilot":
+            return "\(basePath)/copilot/node_modules/.bin/copilot"
         case "droid":
             return "\(home)/.local/bin/droid"
         case "gemini":
@@ -88,6 +90,20 @@ extension AgentRegistry {
                 executablePath: Self.managedPath(for: "codex"),
                 launchArgs: [],
                 installMethod: .npm(package: "@zed-industries/codex-acp")
+            )
+        }
+
+        updateBuiltInAgent("copilot", in: &metadata) {
+            AgentMetadata(
+                id: "copilot",
+                name: "GitHub Copilot",
+                description: "GitHub Copilot CLI agent with ACP support",
+                iconType: .builtin("copilot"),
+                isBuiltIn: true,
+                isEnabled: true,
+                executablePath: Self.managedPath(for: "copilot"),
+                launchArgs: ["--acp", "--stdio"],
+                installMethod: .npm(package: "@github/copilot")
             )
         }
 

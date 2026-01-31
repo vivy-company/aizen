@@ -92,6 +92,11 @@ struct AgentIconView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: size, height: size)
+        case "copilot":
+            Image("copilot")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
         case "droid":
             Image("droid")
                 .resizable()
