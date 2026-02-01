@@ -435,7 +435,7 @@ struct ChatTabView: View {
                 Spacer()
 
                 Button("Show more") {
-                    SessionsWindowManager.shared.show(context: viewContext)
+                    SessionsWindowManager.shared.show(context: viewContext, worktreeId: worktree.id)
                 }
                 .buttonStyle(.link)
             }

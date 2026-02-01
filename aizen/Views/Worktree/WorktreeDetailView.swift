@@ -423,8 +423,13 @@ struct WorktreeDetailView: View {
     }
 
     private func navigateToChatSession(_ sessionId: UUID) {
-        let chatSessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
-        if chatSessions.contains(where: { $0.id == sessionId }) {
+        // Fetch session directly to check if it belongs to this worktree
+        // (avoids stale relationship cache after reattachment)
+        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktree.id! as CVarArg)
+        request.fetchLimit = 1
+
+        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
             selectedTab = "chat"
             viewModel.selectedChatSessionId = sessionId
         } else {
@@ -440,9 +445,13 @@ struct WorktreeDetailView: View {
         guard let sessionId = notification.userInfo?["chatSessionId"] as? UUID else {
             return
         }
-        // Verify this session belongs to current worktree before switching
-        let chatSessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
-        if chatSessions.contains(where: { $0.id == sessionId }) {
+        // Fetch session directly to verify it belongs to this worktree
+        // (avoids stale relationship cache after reattachment)
+        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktree.id! as CVarArg)
+        request.fetchLimit = 1
+
+        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
             selectedTab = "chat"
             viewModel.selectedChatSessionId = sessionId
         }
