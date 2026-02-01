@@ -7,7 +7,6 @@
 
 import Foundation
 import Combine
-import os
 
 // MARK: - AgentSession + Notifications
 
@@ -26,17 +25,12 @@ extension AgentSession {
     /// Handle incoming session update notifications
     func handleNotification(_ notification: JSONRPCNotification) {
         guard notification.method == "session/update" else {
-            logger.debug("[\(self.agentName)] Ignoring notification method: \(notification.method)")
             return
         }
-
-        logger.debug("[\(self.agentName)] Received session/update notification")
 
         let params = notification.params?.value as? [String: Any] ?? [:]
 
         let previousTask = notificationProcessingTask
-        let logger = self.logger
-        let rawParams = notification.params
 
         notificationProcessingTask = Task { @MainActor [weak self] in
             if let previousTask {
@@ -51,7 +45,6 @@ extension AgentSession {
 
                 self?.processUpdate(updateNotification.update)
             } catch {
-                logger.warning("Failed to parse session update: \(error.localizedDescription)\nRaw params: \(String(describing: rawParams))")
             }
         }
     }
@@ -71,14 +64,6 @@ extension AgentSession {
             case .toolCall(let toolCallUpdate):
                 // Mark any in-progress agent message as complete before tool execution
                 markLastMessageComplete()
-
-                // Handle terminal_info meta (experimental Claude Code feature)
-                if let meta = toolCallUpdate._meta,
-                   let terminalInfo = meta["terminal_info"]?.value as? [String: Any],
-                   let terminalIdStr = terminalInfo["terminal_id"] as? String {
-                    // Terminal output will be streamed via terminal_output meta in ToolCallUpdate
-                    logger.debug("Tool call \(toolCallUpdate.toolCallId) has associated terminal: \(terminalIdStr)")
-                }
 
                 // Check if this is a Task (subagent) tool call
                 let isTaskTool = isTaskToolCall(toolCallUpdate)
@@ -140,10 +125,8 @@ extension AgentSession {
                 currentThought = nil
                 let (text, blockContent) = textAndContent(from: block)
                 if shouldSkipResumedAgentChunk(text: text, hasContentBlocks: !blockContent.isEmpty) {
-                    logger.debug("[\(self.agentName)] Skipping agentMessageChunk during session resume replay")
                     break
                 }
-                logger.debug("[\(self.agentName)] agentMessageChunk: text=\(text.prefix(50))..., blocks=\(blockContent.count)")
                 if text.isEmpty && blockContent.isEmpty { break }
                 recordAgentChunk()
 
@@ -182,9 +165,7 @@ extension AgentSession {
             case .configOptionUpdate(let configOptions):
                 availableConfigOptions = configOptions
                 if configOptions.isEmpty {
-                    logger.info("Config options cleared")
                 } else {
-                    logger.info("Config options updated: \(configOptions.count) options")
                 }
         }
     }
@@ -328,7 +309,6 @@ extension AgentSession {
     }
 
     private func handleNotificationStreamEnded() {
-        logger.warning("Notification stream ended; finalizing current turn")
         if isStreaming {
             isStreaming = false
         }

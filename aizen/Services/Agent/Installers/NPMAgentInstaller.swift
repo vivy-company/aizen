@@ -6,12 +6,10 @@
 //
 
 import Foundation
-import os.log
 
 actor NPMAgentInstaller {
     static let shared = NPMAgentInstaller()
 
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "NPMInstaller")
 
     init() {
     }
@@ -46,7 +44,6 @@ actor NPMAgentInstaller {
 
         if let version = getInstalledVersion(package: package, targetDir: targetDir) {
             saveVersionManifest(version: version, targetDir: targetDir)
-            logger.info("Installed \(package) version \(version)")
         }
     }
 

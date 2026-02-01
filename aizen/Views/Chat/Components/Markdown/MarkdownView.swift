@@ -54,6 +54,8 @@ struct MarkdownView: View {
     @StateObject private var viewModel = MarkdownViewModel()
 
     var body: some View {
+        let blockTransition: AnyTransition = isStreaming ? .identity : .opacity
+
         VStack(alignment: .leading, spacing: blockSpacing) {
             // Group consecutive text blocks for cross-block selection
             let groups = groupBlocks(viewModel.blocks)
@@ -65,7 +67,7 @@ struct MarkdownView: View {
                     CombinedTextBlockView(blocks: blocks)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.vertical, 2)
-                        .transition(.opacity)
+                        .transition(blockTransition)
 
                 case .specialBlock(let block):
                     // Render special blocks separately
@@ -75,7 +77,7 @@ struct MarkdownView: View {
                         isStreaming: isStreaming && isLastBlock,
                         basePath: basePath
                     )
-                    .transition(.opacity)
+                    .transition(blockTransition)
 
                 case .imageRow(let images):
                     // Render consecutive images in a flow layout (wraps to new lines)
@@ -85,7 +87,7 @@ struct MarkdownView: View {
                         }
                     }
                     .padding(.vertical, 2)
-                    .transition(.opacity)
+                    .transition(blockTransition)
                 }
             }
 
@@ -93,12 +95,14 @@ struct MarkdownView: View {
             if isStreaming && !viewModel.streamingBuffer.isEmpty {
                 StreamingTextView(text: viewModel.streamingBuffer, allowSelection: false)
                     .padding(.vertical, 2)
-                    .transition(.opacity)
+                    .transition(blockTransition)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(isStreaming ? nil : .easeOut(duration: 0.15), value: viewModel.blocks.count)
-        .animation(isStreaming ? nil : .easeOut(duration: 0.1), value: viewModel.streamingBuffer)
+        .fixedSize(horizontal: false, vertical: true)
+        .transaction { transaction in
+            transaction.disablesAnimations = true
+        }
         .onChange(of: content) { _, newContent in
             viewModel.parse(newContent, isStreaming: isStreaming)
         }
@@ -519,7 +523,7 @@ struct SpecialBlockRenderer: View {
                 .padding(.vertical, 8)
 
         case .table(let rows, let alignments):
-            ScrollView(.horizontal, showsIndicators: false) {
+            HorizontalOnlyScrollView(showsIndicators: false) {
                 TableBlockView(rows: rows, alignments: alignments)
             }
             .padding(.vertical, 4)
@@ -634,28 +638,33 @@ final class MarkdownViewModel: ObservableObject {
                     break
                 }
 
-                let (contentSnapshot, isStreamingSnapshot, interval) = await MainActor.run { [weak self] in
-                    guard let self else { return ("", false, UInt64(0)) }
+                let (contentSnapshot, isStreamingSnapshot, interval, lastParsedLength) = await MainActor.run { [weak self] in
+                    guard let self else { return ("", false, UInt64(0), 0) }
                     let interval = self.pendingContent.count > self.streamingLargeContentThreshold
                         ? self.streamingLargeIntervalNanos
                         : self.streamingIntervalNanos
-                    return (self.pendingContent, self.pendingIsStreaming, interval)
+                    return (self.pendingContent, self.pendingIsStreaming, interval, self.lastParsedLength)
                 }
 
-                let parser = MarkdownParser()
-                let document = parser.parseStreaming(contentSnapshot, isComplete: false)
-                await MainActor.run { [weak self] in
-                    guard let self, generation == self.parseGeneration else { return }
-                    self.blocks = document.blocks
-                    self.streamingBuffer = document.streamingBuffer
-                    self.lastParsedLength = contentSnapshot.count
+                if contentSnapshot.count != lastParsedLength {
+                    let parser = MarkdownParser()
+                    let document = parser.parseStreaming(contentSnapshot, isComplete: false)
+                    await MainActor.run { [weak self] in
+                        guard let self, generation == self.parseGeneration else { return }
+                        self.blocks = document.blocks
+                        self.streamingBuffer = document.streamingBuffer
+                        self.lastParsedLength = contentSnapshot.count
+                    }
                 }
 
                 if !isStreamingSnapshot {
                     break
                 }
 
-                try? await Task.sleep(nanoseconds: interval)
+                let sleepInterval = (contentSnapshot.count == lastParsedLength)
+                    ? max(interval, 32_000_000)
+                    : interval
+                try? await Task.sleep(nanoseconds: sleepInterval)
                 guard !Task.isCancelled else { return }
             }
 
@@ -749,7 +758,7 @@ struct BlockRenderer: View {
                 .padding(.vertical, blockSpacing * 0.5)
 
         case .table(let rows, let alignments):
-            ScrollView(.horizontal, showsIndicators: false) {
+            HorizontalOnlyScrollView(showsIndicators: false) {
                 TableBlockView(rows: rows, alignments: alignments)
             }
             .padding(.vertical, blockSpacing * 0.5)

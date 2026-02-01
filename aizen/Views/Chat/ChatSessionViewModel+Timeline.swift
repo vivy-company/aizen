@@ -303,6 +303,7 @@ extension ChatSessionViewModel {
         let addedIds = newIds.subtracting(previousMessageIds)
         let removedIds = previousMessageIds.subtracting(newIds)
         let hasStructuralChanges = !addedIds.isEmpty || !removedIds.isEmpty
+        let isStreaming = currentAgentSession?.isStreaming ?? false
 
         // Check if any newly added messages are agent messages (triggers grouping)
         let newAgentMessageAdded = newMessages.contains { msg in
@@ -311,15 +312,8 @@ extension ChatSessionViewModel {
 
         // If a new agent message arrived, rebuild with grouping to collapse previous tool calls
         if newAgentMessageAdded {
-            let isStreaming = currentAgentSession?.isStreaming ?? false
             // Skip animation during streaming to prevent layout issues
-            if isStreaming {
-                rebuildTimelineWithGrouping(isStreaming: isStreaming)
-            } else {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    rebuildTimelineWithGrouping(isStreaming: isStreaming)
-                }
-            }
+            rebuildTimelineWithGrouping(isStreaming: isStreaming)
             previousMessageIds = newIds
             return
         }
@@ -352,8 +346,15 @@ extension ChatSessionViewModel {
 
             // 1. Insert new messages FIRST (changes structure/indices)
             for newMsg in newMessages where addedIds.contains(newMsg.id) {
-                insertTimelineItem(.message(newMsg), into: &updatedItems)
-                didMutate = true
+                if isStreaming {
+                    if !updatedItems.contains(where: { $0.stableId == newMsg.id }) {
+                        updatedItems.append(.message(newMsg))
+                        didMutate = true
+                    }
+                } else {
+                    insertTimelineItem(.message(newMsg), into: &updatedItems)
+                    didMutate = true
+                }
             }
 
             // 2. Rebuild index IMMEDIATELY after structural changes
@@ -377,29 +378,16 @@ extension ChatSessionViewModel {
             }
         }
 
-        // Only animate structural changes after initial load
-        if hasStructuralChanges && !previousMessageIds.isEmpty {
-            withAnimation(.easeInOut(duration: 0.2)) { updateBlock() }
-        } else {
-            updateBlock()
-        }
+        updateBlock()
 
         // Update tracked IDs for next sync
         previousMessageIds = newIds
 
-        // Always jump when a new message is added.
-        if !addedIds.isEmpty {
-            if let newestUserMessage = newMessages.last(where: { addedIds.contains($0.id) && $0.role == .user }) {
-                suppressNextAutoScroll = true
-                requestScrollToItem(
-                    id: newestUserMessage.id,
-                    anchor: .top,
-                    force: true,
-                    animated: true
-                )
-            } else {
-                requestScrollToBottom(force: true, animated: true)
-            }
+        // New message behavior:
+        // - If pinned, keep following bottom.
+        // - If not pinned, do nothing (user is reading history).
+        if !addedIds.isEmpty, isNearBottom {
+            requestScrollToBottom(force: false, animated: false)
         }
     }
 
@@ -409,6 +397,7 @@ extension ChatSessionViewModel {
         let addedIds = newIds.subtracting(previousToolCallIds)
         let removedIds = previousToolCallIds.subtracting(newIds)
         let hasStructuralChanges = !addedIds.isEmpty || !removedIds.isEmpty
+        let isStreaming = currentAgentSession?.isStreaming ?? false
         let updateBlock = { [self] in
             var updatedItems = timelineItems
             var updatedIndex = timelineIndex
@@ -422,8 +411,15 @@ extension ChatSessionViewModel {
 
             // 1. Insert new tool calls FIRST (changes structure/indices)
             for newCall in newToolCalls where addedIds.contains(newCall.id) {
-                insertTimelineItem(.toolCall(newCall), into: &updatedItems)
-                didMutate = true
+                if isStreaming {
+                    if !updatedItems.contains(where: { $0.stableId == newCall.id }) {
+                        updatedItems.append(.toolCall(newCall))
+                        didMutate = true
+                    }
+                } else {
+                    insertTimelineItem(.toolCall(newCall), into: &updatedItems)
+                    didMutate = true
+                }
             }
 
             // 2. Rebuild index IMMEDIATELY after structural changes
@@ -447,13 +443,7 @@ extension ChatSessionViewModel {
             }
         }
 
-        // Only animate structural changes after initial load and when not streaming
-        let isStreaming = currentAgentSession?.isStreaming ?? false
-        if hasStructuralChanges && !previousToolCallIds.isEmpty && !isStreaming {
-            withAnimation(.easeInOut(duration: 0.2)) { updateBlock() }
-        } else {
-            updateBlock()
-        }
+        updateBlock()
 
         rebuildChildToolCallsIndex()
 

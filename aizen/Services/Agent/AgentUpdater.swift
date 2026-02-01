@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os.log
 
 enum AgentUpdateError: Error, LocalizedError {
     case updateFailed(String)
@@ -28,7 +27,6 @@ enum AgentUpdateError: Error, LocalizedError {
 actor AgentUpdater {
     static let shared = AgentUpdater()
 
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "AgentUpdater")
     private var updatingAgents: Set<String> = []
 
     private init() {}
@@ -87,10 +85,8 @@ actor AgentUpdater {
             try await AgentInstaller.shared.updateAgent(metadata)
             await AgentVersionChecker.shared.clearCache(for: agentName)
             await MainActor.run { onProgress("Update complete!") }
-            logger.info("Successfully updated \(agentName)")
         } catch {
             await MainActor.run { onProgress("Update failed: \(error.localizedDescription)") }
-            logger.error("Failed to update \(agentName): \(error.localizedDescription)")
             throw error
         }
     }

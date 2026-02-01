@@ -6,9 +6,7 @@
 //  Handles plugin registration, not installation (that's OpenCodePluginInstaller's job)
 //
 
-import AppKit
 import Foundation
-import os.log
 
 enum OpenCodeConfigError: Error, LocalizedError {
     case configNotFound
@@ -30,7 +28,7 @@ enum OpenCodeConfigError: Error, LocalizedError {
     }
 }
 
-struct OpenCodeConfig: Codable {
+nonisolated struct OpenCodeConfig: Codable {
     var plugin: [String]?
     private var additionalProperties: [String: OpenCodeAnyCodable] = [:]
     
@@ -69,7 +67,7 @@ struct OpenCodeConfig: Codable {
     }
 }
 
-private struct DynamicCodingKey: CodingKey {
+private nonisolated struct DynamicCodingKey: CodingKey {
     var stringValue: String
     var intValue: Int?
     
@@ -84,7 +82,7 @@ private struct DynamicCodingKey: CodingKey {
     }
 }
 
-private struct OpenCodeAnyCodable: Codable {
+private nonisolated struct OpenCodeAnyCodable: Codable {
     let value: Any
     
     init(_ value: Any) {
@@ -141,7 +139,6 @@ actor OpenCodeConfigService {
     static let shared = OpenCodeConfigService()
     
     private let fileManager = FileManager.default
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "OpenCodeConfig")
     
     private var configPath: String {
         resolveConfigPath()
@@ -208,7 +205,6 @@ actor OpenCodeConfigService {
                 try fileManager.removeItem(atPath: configPath)
             }
             try fileManager.moveItem(atPath: tempPath, toPath: configPath)
-            logger.info("OpenCode config updated successfully")
         } catch {
             throw OpenCodeConfigError.writeError(error.localizedDescription)
         }
@@ -234,20 +230,16 @@ actor OpenCodeConfigService {
             config = try readConfig()
         } catch OpenCodeConfigError.configNotFound {
             config = OpenCodeConfig()
-        } catch OpenCodeConfigError.parseError(let detail) {
-            logger.error("Config corrupted, attempting recovery: \(detail)")
+        } catch OpenCodeConfigError.parseError {
             let backupPath = configPath + ".backup"
             if fileManager.fileExists(atPath: backupPath) {
-                logger.info("Restoring from backup...")
                 do {
                     try restoreBackup()
                     config = try readConfig()
                 } catch {
-                    logger.warning("Backup restore failed, creating new config")
                     config = OpenCodeConfig()
                 }
             } else {
-                logger.warning("No backup found, creating new config")
                 config = OpenCodeConfig()
             }
         } catch {
@@ -260,7 +252,6 @@ actor OpenCodeConfigService {
             entry == pluginName || entry.hasPrefix(pluginName + "@")
         }
         guard !alreadyRegistered else {
-            logger.debug("Plugin \(pluginName) already registered")
             return
         }
         
@@ -268,7 +259,6 @@ actor OpenCodeConfigService {
         config.plugin = plugins
         
         try writeConfig(config)
-        logger.info("Registered plugin: \(pluginName)")
     }
     
     func unregisterPlugin(_ pluginName: String) throws {
@@ -286,7 +276,6 @@ actor OpenCodeConfigService {
         config.plugin = plugins.isEmpty ? nil : plugins
         
         try writeConfig(config)
-        logger.info("Unregistered plugin: \(pluginName)")
     }
     
     func setPluginEnabled(_ pluginName: String, enabled: Bool) throws {
@@ -326,20 +315,8 @@ actor OpenCodeConfigService {
         }
         
         try fileManager.moveItem(atPath: backupPath, toPath: configPath)
-        logger.info("Config restored from backup")
     }
     
-    func openConfigInFinder() {
-        let path = configPath
-        if fileManager.fileExists(atPath: path) {
-            let url = URL(fileURLWithPath: path)
-            NSWorkspace.shared.activateFileViewerSelecting([url])
-        } else {
-            let url = URL(fileURLWithPath: configDirectory)
-            NSWorkspace.shared.open(url)
-        }
-    }
-
     private func decodeConfig(from data: Data) throws -> OpenCodeConfig {
         let decoder = JSONDecoder()
         do {

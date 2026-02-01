@@ -9,7 +9,6 @@ import Combine
 import Foundation
 import CoreData
 import UniformTypeIdentifiers
-import os.log
 
 /// Session lifecycle state for clear status tracking
 enum SessionState: Equatable {
@@ -86,7 +85,6 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     var notificationTask: Task<Void, Never>?
     var notificationProcessingTask: Task<Void, Never>?
     var versionCheckTask: Task<Void, Never>?
-    let logger = Logger.forCategory("AgentSession")
     private var finalizeMessageTask: Task<Void, Never>?
     
     // Session persistence
@@ -273,7 +271,6 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         self.chatSessionId = chatSessionId
 
         let startTime = CFAbsoluteTimeGetCurrent()
-        logger.info("[\(agentName)] Session start begin")
 
         let previousAgentName = self.agentName
         let previousWorkingDir = self.workingDirectory
@@ -305,16 +302,11 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             if shouldSkipAuth {
                 // User has previously authenticated externally (e.g., claude /login)
                 // Try session directly with normal timeout
-                logger.info(
-                    "[\(agentName)] Skipping auth (previously succeeded without explicit auth)...")
                 do {
                     try await createSessionDirectly(workingDir: workingDir, client: client)
                     return
                 } catch {
                     // Auth may have expired, clear skip preference and show dialog
-                    logger.info(
-                        "[\(agentName)] Session failed despite skip preference: \(error.localizedDescription)"
-                    )
                     AgentRegistry.shared.clearAuthPreference(for: agentName)
                     // Fall through to show auth dialog
                 }
@@ -325,9 +317,6 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                         client: client, authMethodId: savedAuthMethod, workingDir: workingDir)
                     return
                 } catch {
-                    logger.error(
-                        "Saved auth method '\(savedAuthMethod)' failed: \(error.localizedDescription)"
-                    )
                     addSystemMessage(
                         "⚠️ Saved authentication method failed. Please re-authenticate.")
                     AgentRegistry.shared.clearAuthPreference(for: agentName)
@@ -336,14 +325,11 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             } else {
                 // No saved preference - try session without auth first (user may have logged in externally)
                 do {
-                    logger.info("[\(agentName)] Trying session without auth first...")
                     try await createSessionDirectly(workingDir: workingDir, client: client)
                     // Success! Save skip preference for future sessions
                     AgentRegistry.shared.saveSkipAuth(for: agentName)
                     return
                 } catch {
-                    logger.info(
-                        "[\(agentName)] Session without auth failed: \(error.localizedDescription)")
                     // Check if error indicates API key/custom endpoint issue
                     let errorMessage = error.localizedDescription.lowercased()
                     if isAuthRequiredError(error) {
@@ -367,7 +353,6 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         }
 
         // Create new session
-        logger.info("[\(agentName)] Creating new session...")
         let sessionResponse: NewSessionResponse
         do {
             let mcpServers = await resolveMCPServers()
@@ -377,14 +362,10 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                 mcpServers: mcpServers,
                 timeout: sessionTimeout
             )
-            logger.info(
-                "[\(agentName)] Session created in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms, sessionId: \(sessionResponse.sessionId.value)"
-            )
         } catch {
             isActive = false
             sessionState = .failed("newSession failed: \(error.localizedDescription)")
             self.acpClient = nil
-            logger.error("[\(agentName)] newSession failed: \(error.localizedDescription)")
             throw error
         }
 
@@ -395,7 +376,6 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         if let modesInfo = sessionResponse.modes {
             self.availableModes = modesInfo.availableModes
             self.currentModeId = modesInfo.currentModeId
-            logger.info("[\(agentName)] Modes: current=\(modesInfo.currentModeId), available=\(modesInfo.availableModes.map { $0.id })")
         }
 
         if let modelsInfo = sessionResponse.models {
@@ -416,7 +396,6 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             do {
                 try await persistSessionId(chatSessionId: chatSessionId)
             } catch {
-                logger.error("Failed to persist session ID: \(error.localizedDescription)")
                 addSystemMessage("⚠️ Session created but not saved. It may not be available after restart.")
             }
         }
@@ -462,7 +441,6 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         }
         
         let startTime = CFAbsoluteTimeGetCurrent()
-        logger.info("[\(agentName)] Session resume begin for ACP session \(acpSessionId)")
         
         let previousAgentName = self.agentName
         let previousWorkingDir = self.workingDirectory
@@ -493,11 +471,9 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             isResumingSession = false
             clearResumeReplayState()
             sessionState = .failed("Agent does not support session resume")
-            logger.error("[\(agentName)] Agent does not support session resume (loadSession capability)")
             throw AgentSessionError.sessionResumeUnsupported
         }
         
-        logger.info("[\(agentName)] Loading session \(acpSessionId)...")
         let sessionResponse: LoadSessionResponse
         do {
             let mcpServers = await resolveMCPServers()
@@ -506,16 +482,12 @@ class AgentSession: ObservableObject, ACPClientDelegate {
                 cwd: workingDir,
                 mcpServers: mcpServers
             )
-            logger.info(
-                "[\(agentName)] Session loaded in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms"
-            )
         } catch {
             isActive = false
             isResumingSession = false
             clearResumeReplayState()
             sessionState = .failed("loadSession failed: \(error.localizedDescription)")
             self.acpClient = nil
-            logger.error("[\(agentName)] loadSession failed: \(error.localizedDescription)")
             throw error
         }
         
@@ -525,7 +497,6 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         if let modesInfo = sessionResponse.modes {
             self.availableModes = modesInfo.availableModes
             self.currentModeId = modesInfo.currentModeId
-            logger.info("[\(agentName)] Modes (resume): current=\(modesInfo.currentModeId), available=\(modesInfo.availableModes.map { $0.id })")
         }
 
         if let modelsInfo = sessionResponse.models {
@@ -624,86 +595,116 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             throw AgentSessionError.custom("Agent not configured")
         }
         
-        let client = ACPClient()
-        self.acpClient = client
-        await client.setDelegate(self)
-        
         let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
+        let launchArgCandidates = launchArgCandidates(for: agentName, primary: launchArgs)
+        var lastFailure: (stage: String, error: Error)?
         
-        do {
-            logger.info("[\(agentName)] Launching process...")
-            try await client.launch(
-                agentPath: agentPath,
-                arguments: launchArgs,
-                workingDirectory: workingDir
-            )
-            logger.info(
-                "[\(agentName)] Process launched in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms"
-            )
-        } catch {
+        for (index, args) in launchArgCandidates.enumerated() {
+            let isLastAttempt = index == launchArgCandidates.count - 1
+            let client = ACPClient()
+            await client.setDelegate(self)
+            
+            do {
+                try await client.launch(
+                    agentPath: agentPath,
+                    arguments: args,
+                    workingDirectory: workingDir
+                )
+            } catch {
+                lastFailure = (stage: "launch", error: error)
+                await client.terminate()
+                if !isLastAttempt {
+                    continue
+                }
+                break
+            }
+            
+            let initResponse: InitializeResponse
+            do {
+                initResponse = try await client.initialize(
+                    protocolVersion: 1,
+                    capabilities: ClientCapabilities(
+                        fs: FileSystemCapabilities(
+                            readTextFile: true,
+                            writeTextFile: true
+                        ),
+                        terminal: true,
+                        meta: [
+                            "terminal_output": AnyCodable(true),
+                            "terminal-auth": AnyCodable(true)
+                        ]
+                    ),
+                    timeout: 120.0
+                )
+            } catch {
+                lastFailure = (stage: "initialize", error: error)
+                await client.terminate()
+                if !isLastAttempt {
+                    continue
+                }
+                break
+            }
+            
+            self.acpClient = client
+            startNotificationListener(client: client)
+            
+            if args != launchArgs, var metadata = AgentRegistry.shared.getMetadata(for: agentName) {
+                metadata.launchArgs = args
+                await AgentRegistry.shared.updateAgent(metadata)
+            }
+            
+            self.agentCapabilities = initResponse.agentCapabilities
+            
+            versionCheckTask = Task { [weak self] in
+                guard let self = self else { return }
+                let versionInfo = await AgentVersionChecker.shared.checkVersion(for: agentName)
+                await MainActor.run {
+                    self.versionInfo = versionInfo
+                    if versionInfo.isOutdated {
+                        self.needsUpdate = true
+                        self.addSystemMessage(
+                            "⚠️ Update available: \(agentName) v\(versionInfo.current ?? "?") → v\(versionInfo.latest ?? "?")"
+                        )
+                    }
+                }
+            }
+            
+            return (client, initResponse)
+        }
+        
+        if let failure = lastFailure {
             isActive = false
-            sessionState = .failed(error.localizedDescription)
+            if failure.stage == "initialize" {
+                sessionState = .failed("Initialize failed: \(failure.error.localizedDescription)")
+            } else {
+                sessionState = .failed(failure.error.localizedDescription)
+            }
             self.agentName = previousAgentName
             self.workingDirectory = previousWorkingDir
             self.acpClient = nil
-            logger.error("[\(agentName)] Launch failed: \(error.localizedDescription)")
-            throw error
+            throw failure.error
         }
         
-        startNotificationListener(client: client)
+        throw AgentSessionError.custom("Agent failed to start")
         
-        logger.info("[\(agentName)] Sending initialize request...")
-        let initResponse: InitializeResponse
-        do {
-            initResponse = try await client.initialize(
-                protocolVersion: 1,
-                capabilities: ClientCapabilities(
-                    fs: FileSystemCapabilities(
-                        readTextFile: true,
-                        writeTextFile: true
-                    ),
-                    terminal: true,
-                    meta: [
-                        "terminal_output": AnyCodable(true),
-                        "terminal-auth": AnyCodable(true)
-                    ]
-                ),
-                timeout: 120.0
-            )
-            logger.info(
-                "[\(agentName)] Initialize completed in \(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - startTime) * 1000))ms"
-            )
-        } catch {
-            isActive = false
-            sessionState = .failed("Initialize failed: \(error.localizedDescription)")
-            self.acpClient = nil
-            logger.error("[\(agentName)] Initialize failed: \(error.localizedDescription)")
-            throw error
-        }
         
-        self.agentCapabilities = initResponse.agentCapabilities
-        logger.info("[\(agentName)] Agent capabilities: loadSession=\(initResponse.agentCapabilities.loadSession ?? false)")
-        
-        versionCheckTask = Task { [weak self] in
-            guard let self = self else { return }
-            let versionInfo = await AgentVersionChecker.shared.checkVersion(for: agentName)
-            await MainActor.run {
-                self.versionInfo = versionInfo
-                if versionInfo.isOutdated {
-                    self.needsUpdate = true
-                    self.addSystemMessage(
-                        "⚠️ Update available: \(agentName) v\(versionInfo.current ?? "?") → v\(versionInfo.latest ?? "?")"
-                    )
-                }
+    }
+
+    private func launchArgCandidates(for agentName: String, primary: [String]) -> [[String]] {
+        var candidates: [[String]] = [primary]
+
+        if agentName.lowercased() == "kimi" {
+            let fallbacks = [["acp"], ["--acp"]]
+            for args in fallbacks where !candidates.contains(where: { $0 == args }) {
+                candidates.append(args)
             }
         }
-        
-        return (client, initResponse)
+
+        return candidates
     }
     
     func persistSessionId(chatSessionId: UUID) async throws {
         guard let sessionId = sessionId else {
-            logger.warning("Attempted to persist session ID but no ACP session ID available")
             return
         }
         
@@ -714,7 +715,6 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             for: chatSessionId,
             in: context
         )
-        logger.info("Persisted ACP session ID for ChatSession \(chatSessionId.uuidString)")
     }
 
     func resolveMCPServers() async -> [MCPServerConfig] {
@@ -732,7 +732,6 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             switch entry.type {
             case "stdio":
                 guard let command = entry.command else {
-                    logger.warning("[\(self.agentName)] MCP server '\(name)' missing command")
                     continue
                 }
                 let env = (entry.env ?? [:]).sorted { $0.key < $1.key }.map { EnvVariable(name: $0.key, value: $0.value, _meta: nil) }
@@ -747,11 +746,9 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             case "http":
                 guard allowHTTP else {
                     skippedRemote.append(name)
-                    logger.info("[\(self.agentName)] MCP server '\(name)' skipped (HTTP not supported)")
                     continue
                 }
                 guard let url = entry.url else {
-                    logger.warning("[\(self.agentName)] MCP server '\(name)' missing url")
                     continue
                 }
                 let config = HTTPServerConfig(name: name, url: url, headers: [], _meta: nil)
@@ -759,17 +756,15 @@ class AgentSession: ObservableObject, ACPClientDelegate {
             case "sse":
                 guard allowSSE else {
                     skippedRemote.append(name)
-                    logger.info("[\(self.agentName)] MCP server '\(name)' skipped (SSE not supported)")
                     continue
                 }
                 guard let url = entry.url else {
-                    logger.warning("[\(self.agentName)] MCP server '\(name)' missing url")
                     continue
                 }
                 let config = SSEServerConfig(name: name, url: url, headers: [], _meta: nil)
                 configs.append(.sse(config))
             default:
-                logger.warning("[\(self.agentName)] MCP server '\(name)' has unknown type '\(entry.type)'")
+                break
             }
         }
 
@@ -801,29 +796,22 @@ class AgentSession: ObservableObject, ACPClientDelegate {
 
     /// Set mode by ID
     func setModeById(_ modeId: String) async throws {
-        logger.info("setModeById called: \(modeId) (current: \(self.currentModeId ?? "nil"))")
 
         // Skip if already on this mode or a change is in progress
         guard modeId != currentModeId, !isModeChanging else {
-            logger.info("Skipping mode change: already on mode or change in progress")
             return
         }
 
         guard let sessionId = sessionId, let client = acpClient else {
-            logger.error("setModeById failed: session not active")
             throw AgentSessionError.sessionNotActive
         }
 
         isModeChanging = true
         defer { isModeChanging = false }
 
-        logger.info("Sending session/set_mode request...")
         let response = try await client.setMode(sessionId: sessionId, modeId: modeId)
         if response.success {
-            logger.info("Mode change succeeded: \(modeId)")
             currentModeId = modeId
-        } else {
-            logger.warning("Mode change response indicated failure")
         }
     }
 

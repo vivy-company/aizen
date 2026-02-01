@@ -494,7 +494,7 @@ struct ANSILazyLogView: View {
                 }
             }
         }
-        .onChange(of: logs) { newLogs in
+        .onChange(of: logs) { _, newLogs in
             parseLogsAsync(newLogs)
         }
         .onAppear {

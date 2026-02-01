@@ -44,7 +44,8 @@ enum TimelineItem {
         switch self {
         case .message(let msg):
             // Include content length so SwiftUI re-renders when streaming content changes
-            return "\(msg.id)-\(msg.content.count)"
+            let completionKey = msg.isComplete ? "done" : "stream"
+            return "\(msg.id)-\(msg.content.count)-\(msg.contentBlocks.count)-\(completionKey)"
         case .toolCall(let tool):
             // Include status so SwiftUI re-renders when tool status changes
             return "\(tool.id)-\(tool.status.rawValue)"

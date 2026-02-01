@@ -2,226 +2,10 @@
 //  ChatMessageList.swift
 //  aizen
 //
-//  Message list view with timeline items
+//  Simple SwiftUI-based chat message list with auto-scroll behavior.
 //
 
-import AppKit
-import QuartzCore
 import SwiftUI
-
-// MARK: - Scroll Observation
-
-private struct ScrollViewObserver: NSViewRepresentable {
-    let onScroll: (CGFloat, CGFloat, CGFloat) -> Void
-    let scrollToBottomRequest: UUID?
-    let animated: Bool
-    let force: Bool
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onScroll: onScroll)
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        DispatchQueue.main.async {
-            context.coordinator.attach(to: view)
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.onScroll = onScroll
-
-        // Check if we need to scroll
-        let currentRequest = scrollToBottomRequest
-        let lastRequest = context.coordinator.lastScrollRequest
-
-        DispatchQueue.main.async {
-            context.coordinator.attach(to: nsView)
-
-            // Only scroll if request changed
-            if currentRequest != lastRequest {
-                context.coordinator.lastScrollRequest = currentRequest
-                if currentRequest != nil {
-                    context.coordinator.scrollToBottom(animated: animated)
-                }
-            }
-        }
-    }
-
-    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-        coordinator.tearDownObservers()
-    }
-
-    final class Coordinator: NSObject {
-        var onScroll: (CGFloat, CGFloat, CGFloat) -> Void
-        var lastScrollRequest: UUID?
-        private(set) weak var scrollView: NSScrollView?
-        private weak var documentView: NSView?
-        private var boundsObserver: NSObjectProtocol?
-        private var frameObserver: NSObjectProtocol?
-        private var lastNotifyTime: CFTimeInterval = 0
-        private var pendingNotify: DispatchWorkItem?
-        private let minNotifyInterval: CFTimeInterval = 1.0 / 30.0
-
-        init(onScroll: @escaping (CGFloat, CGFloat, CGFloat) -> Void) {
-            self.onScroll = onScroll
-        }
-
-        deinit {
-            tearDownObservers()
-        }
-
-        func attach(to view: NSView) {
-            guard let foundScrollView = findScrollView(from: view) else { return }
-
-            if foundScrollView !== scrollView {
-                tearDownObservers()
-                scrollView = foundScrollView
-                observe(scrollView: foundScrollView)
-                return
-            }
-
-            if let foundDocumentView = foundScrollView.documentView,
-                foundDocumentView !== documentView
-            {
-                observeDocumentView(foundDocumentView)
-            }
-        }
-
-        func scrollToBottom(animated: Bool) {
-            guard let scrollView = scrollView,
-                let documentView = scrollView.documentView
-            else { return }
-
-            let contentHeight = documentView.bounds.height
-            let viewportHeight = scrollView.contentView.bounds.height
-            let maxY = max(0, contentHeight - viewportHeight)
-
-            let targetPoint: NSPoint
-            if documentView.isFlipped {
-                targetPoint = NSPoint(x: 0, y: maxY)
-            } else {
-                targetPoint = NSPoint(x: 0, y: 0)
-            }
-
-            if animated {
-                NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.25
-                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                    scrollView.contentView.animator().setBoundsOrigin(targetPoint)
-                }
-            } else {
-                scrollView.contentView.setBoundsOrigin(targetPoint)
-            }
-            scrollView.reflectScrolledClipView(scrollView.contentView)
-        }
-
-        private func findScrollView(from view: NSView) -> NSScrollView? {
-            if let scrollView = view.enclosingScrollView {
-                return scrollView
-            }
-
-            var currentSuperview = view.superview
-            while let current = currentSuperview {
-                if let scrollView = current as? NSScrollView {
-                    return scrollView
-                }
-                currentSuperview = current.superview
-            }
-
-            return nil
-        }
-
-        private func observe(scrollView: NSScrollView) {
-            scrollView.contentView.postsBoundsChangedNotifications = true
-            boundsObserver = NotificationCenter.default.addObserver(
-                forName: NSView.boundsDidChangeNotification,
-                object: scrollView.contentView,
-                queue: .main
-            ) { [weak self] _ in
-                self?.notifyScrollPosition()
-            }
-
-            if let documentView = scrollView.documentView {
-                observeDocumentView(documentView)
-            }
-
-            notifyScrollPosition()
-        }
-
-        private func observeDocumentView(_ documentView: NSView) {
-            if documentView === self.documentView {
-                return
-            }
-
-            if let frameObserver = frameObserver {
-                NotificationCenter.default.removeObserver(frameObserver)
-                self.frameObserver = nil
-            }
-
-            self.documentView = documentView
-            documentView.postsFrameChangedNotifications = true
-            frameObserver = NotificationCenter.default.addObserver(
-                forName: NSView.frameDidChangeNotification,
-                object: documentView,
-                queue: .main
-            ) { [weak self] _ in
-                self?.notifyScrollPosition()
-            }
-        }
-
-        private func notifyScrollPosition() {
-            guard let scrollView = scrollView else { return }
-            let now = CACurrentMediaTime()
-            let elapsed = now - lastNotifyTime
-            if elapsed < minNotifyInterval {
-                if pendingNotify == nil {
-                    let delay = minNotifyInterval - elapsed
-                    let workItem = DispatchWorkItem { [weak self] in
-                        self?.pendingNotify = nil
-                        self?.notifyScrollPosition()
-                    }
-                    pendingNotify = workItem
-                    DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
-                }
-                return
-            }
-            lastNotifyTime = now
-            if let pendingNotify = pendingNotify {
-                pendingNotify.cancel()
-                self.pendingNotify = nil
-            }
-            let contentHeight = scrollView.documentView?.bounds.height ?? 0
-            let viewportHeight = scrollView.contentView.bounds.height
-            let rawOffset = scrollView.contentView.bounds.origin.y
-            let offsetFromTop: CGFloat
-            if let documentView = scrollView.documentView, !documentView.isFlipped {
-                let maxOffset = max(0, contentHeight - viewportHeight)
-                offsetFromTop = maxOffset - rawOffset
-            } else {
-                offsetFromTop = rawOffset
-            }
-            onScroll(-offsetFromTop, contentHeight, viewportHeight)
-        }
-
-        func tearDownObservers() {
-            if let boundsObserver = boundsObserver {
-                NotificationCenter.default.removeObserver(boundsObserver)
-            }
-            if let frameObserver = frameObserver {
-                NotificationCenter.default.removeObserver(frameObserver)
-            }
-            if let pendingNotify = pendingNotify {
-                pendingNotify.cancel()
-            }
-            boundsObserver = nil
-            frameObserver = nil
-            documentView = nil
-            pendingNotify = nil
-        }
-    }
-}
 
 struct ChatMessageList: View {
     let timelineItems: [TimelineItem]
@@ -231,6 +15,7 @@ struct ChatMessageList: View {
     let currentThought: String?
     let currentIterationId: String?
     let scrollRequest: ChatSessionViewModel.ScrollRequest?
+    let turnAnchorMessageId: String?
     let shouldAutoScroll: Bool
     let isResizing: Bool
     let onAppear: () -> Void
@@ -241,225 +26,179 @@ struct ChatMessageList: View {
     var onScrollPositionChange: (Bool) -> Void = { _ in }
     var childToolCallsProvider: (String) -> [ToolCall] = { _ in [] }
 
-    // Minimum display time for loading view to prevent flashing
+    // MARK: - State
+
     @State private var showLoadingView = false
     @State private var loadingStartTime: Date?
-    private let minimumLoadingDuration: TimeInterval = 0.6
-    @State private var allowAnimations = false
-    @State private var cachedThoughtText: String? = nil
+    @State private var cachedThoughtText: String?
     @State private var cachedThoughtRendered: AttributedString = AttributedString("")
+    @State private var isNearBottom: Bool = true
+    @State private var bottomSensorVisible: Bool = true
+
+    private let minimumLoadingDuration: TimeInterval = 0.6
+    private let bottomAnchorId = "bottom_anchor"
+
+    // MARK: - Computed
 
     private var shouldShowLoading: Bool {
         isSessionInitializing && timelineItems.isEmpty
     }
 
-    private var enableScrollObserver: Bool {
-        true
+    private var visibleItems: [TimelineItem] {
+        timelineItems.filter { item in
+            if case .toolCall(let call) = item {
+                return call.parentToolCallId == nil
+            }
+            return true
+        }
     }
 
+    // MARK: - Body
+
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             if showLoadingView {
                 AgentLoadingView(agentName: selectedAgent)
                     .transition(.opacity)
             } else {
-                messageListContent
+                scrollContent
                     .transition(.opacity)
             }
         }
-        .animation((allowAnimations && !isResizing) ? .easeInOut(duration: 0.25) : nil, value: showLoadingView)
+        .animation(.easeInOut(duration: 0.2), value: showLoadingView)
         .onChange(of: shouldShowLoading) { _, newValue in
-            if newValue {
-                // Start showing loading
-                showLoadingView = true
-                loadingStartTime = Date()
-            } else {
-                // Ensure minimum display time before hiding
-                guard let startTime = loadingStartTime else {
-                    showLoadingView = false
-                    return
-                }
-                let elapsed = Date().timeIntervalSince(startTime)
-                let remaining = minimumLoadingDuration - elapsed
-                if remaining > 0 {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + remaining) {
-                        showLoadingView = false
-                    }
-                } else {
-                    showLoadingView = false
-                }
-            }
+            handleLoadingChange(newValue)
+        }
+        .onChange(of: currentThought) { _, newThought in
+            updateCachedThought(newThought)
         }
         .onAppear {
-            // Initialize loading state on appear
             if shouldShowLoading {
                 showLoadingView = true
                 loadingStartTime = Date()
             }
             updateCachedThought(currentThought)
         }
-        .task {
-            // Enable animations after a brief delay to avoid modifying state during view update
-            if !allowAnimations {
-                try? await Task.sleep(nanoseconds: 50_000_000)  // 50ms
-                allowAnimations = true
-            }
-        }
-        .onChange(of: currentThought) { _, newThought in
-            updateCachedThought(newThought)
-        }
     }
 
-    private var messageListContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 10) {
-                    ForEach(timelineItems, id: \.stableId) { item in
-                        switch item {
-                        case .message(let message):
-                            MessageBubbleView(
-                                message: message,
-                                agentName: message.role == .agent ? selectedAgent : nil
-                            )
-                            .id(message.id)
-                            .transition(
-                                message.isComplete
-                                    ? .opacity.combined(with: .scale(scale: 0.95)) : .identity)
-                        case .toolCall(let toolCall):
-                            // Skip child tool calls (rendered inside parent Task)
-                            if toolCall.parentToolCallId != nil {
-                                EmptyView()
-                            } else {
-                                let children = childToolCallsProvider(toolCall.toolCallId)
-                                ToolCallView(
-                                    toolCall: toolCall,
-                                    currentIterationId: currentIterationId,
-                                    onOpenDetails: { tapped in onToolTap(tapped) },
-                                    agentSession: agentSession,
-                                    onOpenInEditor: onOpenFileInEditor,
-                                    childToolCalls: children
-                                )
-                                .id(toolCall.id)
-                                .transition(
-                                    toolCall.status == .pending
-                                        ? .opacity.combined(with: .move(edge: .leading)) : .identity
-                                )
-                            }
-                        case .toolCallGroup(let group):
-                            ToolCallGroupView(
-                                group: group,
-                                currentIterationId: currentIterationId,
-                                agentSession: agentSession,
-                                onOpenDetails: { tapped in onToolTap(tapped) },
-                                onOpenInEditor: onOpenFileInEditor,
-                                childToolCallsProvider: childToolCallsProvider
-                            )
-                            .id(group.id)
-                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+    // MARK: - Scroll Content
 
-                        case .turnSummary(let summary):
-                            TurnSummaryView(
-                                summary: summary,
-                                onOpenInEditor: onOpenFileInEditor
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .id(summary.id)
-                            .transition(.opacity)
-                        }
+    private var scrollContent: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(visibleItems, id: \.stableId) { item in
+                        itemView(for: item)
+                            .id(item.stableId)
                     }
 
                     if isProcessing {
                         processingIndicator
+                            .padding(.horizontal, 20)
                             .id("processing")
-                            .transition(.opacity)
                     }
 
-                    // Bottom anchor for scroll position detection
+                    // Bottom sensor - detects when we're near bottom
                     Color.clear
                         .frame(height: 1)
-                        .id("bottom_anchor")
+                        .id(bottomAnchorId)
+                        .onAppear {
+                            if !bottomSensorVisible {
+                                bottomSensorVisible = true
+                                isNearBottom = true
+                                onScrollPositionChange(true)
+                            }
+                        }
+                        .onDisappear {
+                            if bottomSensorVisible {
+                                bottomSensorVisible = false
+                                isNearBottom = false
+                                onScrollPositionChange(false)
+                            }
+                        }
                 }
                 .padding(.vertical, 12)
-                .padding(.horizontal, 20)
-                .transaction { transaction in
-                    // Disable animations during initial load or when processing
-                    // to prevent empty screen issues during rapid updates
-                    if !allowAnimations || isProcessing || isResizing {
-                        transaction.disablesAnimations = true
-                    }
-                }
-                .background {
-                    if enableScrollObserver && !isResizing {
-                        ScrollViewObserver(
-                            onScroll: { offset, contentHeight, viewportHeight in
-                                updateScrollState(
-                                    offset: offset, content: contentHeight, viewport: viewportHeight)
-                            },
-                            scrollToBottomRequest: scrollToBottomRequestId,
-                            animated: scrollRequest?.animated ?? true,
-                            force: scrollRequest?.force ?? false
-                        )
-                    }
-                }
-            }
-            .onChange(of: scrollRequest) { _, request in
-                guard !isResizing else { return }
-                guard let request = request else { return }
-                guard case .item(let targetId, let anchor) = request.target else { return }
-                DispatchQueue.main.async {
-                    if request.animated && !isResizing {
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            proxy.scrollTo(targetId, anchor: anchor)
-                        }
-                    } else {
-                        proxy.scrollTo(targetId, anchor: anchor)
-                    }
-                }
             }
             .onAppear {
                 onAppear()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    scrollToBottomIfNeeded(proxy: proxy, animated: false)
+                }
+            }
+            .onChange(of: timelineItems.count) { _, _ in
+                if isNearBottom {
+                    scrollToBottomIfNeeded(proxy: proxy, animated: false)
+                }
+            }
+            .onChange(of: isProcessing) { _, processing in
+                if processing && isNearBottom {
+                    scrollToBottomIfNeeded(proxy: proxy, animated: false)
+                }
+            }
+            .onChange(of: currentThought) { _, _ in
+                if isNearBottom {
+                    scrollToBottomIfNeeded(proxy: proxy, animated: false)
+                }
+            }
+            .onChange(of: scrollRequest?.id) { _, _ in
+                if let request = scrollRequest {
+                    handleScrollRequest(request, proxy: proxy)
+                }
             }
         }
     }
 
-    /// Only trigger scroll if force is true or auto-scroll is enabled
-    private var shouldTriggerScroll: Bool {
-        guard let request = scrollRequest else { return false }
-        guard case .bottom = request.target else { return false }
-        return request.force || shouldAutoScroll
-    }
+    // MARK: - Item Views
 
-    private var scrollToBottomRequestId: UUID? {
-        guard let request = scrollRequest else { return nil }
-        guard case .bottom = request.target else { return nil }
-        guard shouldTriggerScroll else { return nil }
-        return request.id
-    }
+    @ViewBuilder
+    private func itemView(for item: TimelineItem) -> some View {
+        switch item {
+        case .message(let message):
+            MessageBubbleView(
+                message: message,
+                agentName: message.role == .agent ? selectedAgent : nil
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
 
-    @State private var lastReportedNearBottom: Bool? = nil
+        case .toolCall(let toolCall):
+            if toolCall.parentToolCallId == nil {
+                let children = childToolCallsProvider(toolCall.toolCallId)
+                ToolCallView(
+                    toolCall: toolCall,
+                    currentIterationId: currentIterationId,
+                    onOpenDetails: { onToolTap($0) },
+                    agentSession: agentSession,
+                    onOpenInEditor: onOpenFileInEditor,
+                    childToolCalls: children
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+            }
 
-    private func updateScrollState(
-        offset: CGFloat, content: CGFloat, viewport: CGFloat
-    ) {
-        // Calculate if we're near the bottom
-        // scrollOffset is negative when scrolled down (content moves up)
-        // When at bottom: -scrollOffset + viewportHeight >= contentHeight
-        let distanceFromBottom = content + offset - viewport
-        let isNearBottom = distanceFromBottom <= 50 || content <= viewport
+        case .toolCallGroup(let group):
+            ToolCallGroupView(
+                group: group,
+                currentIterationId: currentIterationId,
+                agentSession: agentSession,
+                onOpenDetails: { onToolTap($0) },
+                onOpenInEditor: onOpenFileInEditor,
+                childToolCallsProvider: childToolCallsProvider
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
 
-        // Only report when state changes
-        guard isNearBottom != lastReportedNearBottom else { return }
-        let nextValue = isNearBottom
-        let callback = onScrollPositionChange
-
-        // Use Task to defer state modification to next run loop iteration
-        // This avoids "Modifying state during view update" warnings
-        Task { @MainActor in
-            guard nextValue != lastReportedNearBottom else { return }
-            lastReportedNearBottom = nextValue
-            callback(nextValue)
+        case .turnSummary(let summary):
+            TurnSummaryView(
+                summary: summary,
+                onOpenInEditor: onOpenFileInEditor
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
         }
     }
+
+    // MARK: - Processing Indicator
 
     private var processingIndicator: some View {
         HStack(spacing: 8) {
@@ -473,7 +212,6 @@ struct ChatMessageList: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .modifier(ShimmerEffect(bandSize: 0.38, duration: 2.2, baseOpacity: 0.08, highlightOpacity: 1.0))
-                    .transition(.opacity)
             } else {
                 Text("chat.agent.thinking", bundle: .main)
                     .font(.callout)
@@ -483,6 +221,61 @@ struct ChatMessageList: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Scroll Helpers
+
+    private func scrollToBottomIfNeeded(proxy: ScrollViewProxy, animated: Bool) {
+        if animated {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(bottomAnchorId, anchor: .bottom)
+            }
+        } else {
+            proxy.scrollTo(bottomAnchorId, anchor: .bottom)
+        }
+        // State will be updated by onAppear of bottom sensor
+    }
+
+    private func handleScrollRequest(_ request: ChatSessionViewModel.ScrollRequest, proxy: ScrollViewProxy) {
+        switch request.target {
+        case .bottom:
+            // Immediately activate auto-follow mode
+            isNearBottom = true
+            bottomSensorVisible = true
+            onScrollPositionChange(true)
+            scrollToBottomIfNeeded(proxy: proxy, animated: request.animated)
+        case .item(let id, let anchor):
+            if request.animated {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(id, anchor: anchor)
+                }
+            } else {
+                proxy.scrollTo(id, anchor: anchor)
+            }
+        }
+    }
+
+    // MARK: - Loading Helpers
+
+    private func handleLoadingChange(_ shouldShow: Bool) {
+        if shouldShow {
+            showLoadingView = true
+            loadingStartTime = Date()
+        } else {
+            guard let startTime = loadingStartTime else {
+                showLoadingView = false
+                return
+            }
+            let elapsed = Date().timeIntervalSince(startTime)
+            let remaining = minimumLoadingDuration - elapsed
+            if remaining > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + remaining) {
+                    showLoadingView = false
+                }
+            } else {
+                showLoadingView = false
+            }
+        }
     }
 
     private func updateCachedThought(_ thought: String?) {

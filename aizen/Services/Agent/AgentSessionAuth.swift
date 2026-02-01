@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os
 
 // MARK: - AgentSession + Authentication
 
@@ -14,7 +13,6 @@ import os
 extension AgentSession {
     /// Helper to create session directly without authentication
     func createSessionDirectly(workingDir: String, client: ACPClient, timeout: TimeInterval = 60.0) async throws {
-        logger.info("[\(self.agentName)] createSessionDirectly with timeout \(timeout)s...")
         let mcpServers = await resolveMCPServers()
         let sessionTimeout = effectiveSessionTimeout(mcpServers: mcpServers, defaultTimeout: timeout)
         let sessionResponse = try await client.newSession(
@@ -22,7 +20,6 @@ extension AgentSession {
             mcpServers: mcpServers,
             timeout: sessionTimeout
         )
-        logger.info("[\(self.agentName)] Session created, sessionId: \(sessionResponse.sessionId.value)")
 
         self.sessionId = sessionResponse.sessionId
         self.isActive = true
@@ -55,7 +52,6 @@ extension AgentSession {
             do {
                 try await persistSessionId(chatSessionId: chatSessionId)
             } catch {
-                logger.error("Failed to persist session ID: \(error.localizedDescription)")
                 addSystemMessage("⚠️ Session created but not saved. It may not be available after restart.")
             }
         }

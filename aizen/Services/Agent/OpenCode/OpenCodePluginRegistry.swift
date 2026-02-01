@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os.log
 
 struct OpenCodePluginDefinition: Codable, Hashable {
     let name: String
@@ -24,12 +23,12 @@ struct OpenCodePluginRegistry: Codable {
 }
 
 enum OpenCodePluginRegistryLoader {
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "OpenCodePluginRegistry")
 
-    static func load() -> [OpenCodePluginDefinition] {
+    nonisolated static func load() -> [OpenCodePluginDefinition] {
+        let bundle = Bundle(for: BundleToken.self)
         let urls: [URL?] = [
-            Bundle.main.url(forResource: "OpenCodePlugins", withExtension: "json"),
-            Bundle.main.url(forResource: "OpenCodePlugins", withExtension: "json", subdirectory: "Resources")
+            bundle.url(forResource: "OpenCodePlugins", withExtension: "json"),
+            bundle.url(forResource: "OpenCodePlugins", withExtension: "json", subdirectory: "Resources")
         ]
 
         for url in urls.compactMap({ $0 }) {
@@ -40,13 +39,13 @@ enum OpenCodePluginRegistryLoader {
                     return registry.plugins
                 }
             } catch {
-                logger.error("Failed to load OpenCode plugin registry: \(error.localizedDescription)")
             }
         }
 
-        logger.warning("Falling back to built-in OpenCode plugin registry")
         return fallbackPlugins
     }
+
+    private final class BundleToken {}
 
     private static let fallbackPlugins: [OpenCodePluginDefinition] = [
         OpenCodePluginDefinition(

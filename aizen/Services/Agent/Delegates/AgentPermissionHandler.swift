@@ -8,7 +8,6 @@
 import Foundation
 import Combine
 import AppKit
-import os.log
 
 /// Main actor class responsible for handling permission requests from agents
 @MainActor
@@ -30,7 +29,6 @@ class AgentPermissionHandler: ObservableObject {
 
     private var permissionContinuation: CheckedContinuation<RequestPermissionResponse, Never>?
     private var timeoutTask: Task<Void, Never>?
-    private let logger = Logger.forCategory("PermissionHandler")
 
     /// Timeout for permission requests (5 minutes)
     private let permissionTimeout: Duration = .seconds(300)
@@ -43,8 +41,6 @@ class AgentPermissionHandler: ObservableObject {
 
     /// Handle permission request from agent - suspends until user responds or timeout
     func handlePermissionRequest(request: RequestPermissionRequest) async -> RequestPermissionResponse {
-        logger.info("Permission request received: \(request.message ?? "no message")")
-        logger.info("Options: \(request.options?.map { $0.optionId }.joined(separator: ", ") ?? "none")")
 
         // Cancel any existing timeout
         timeoutTask?.cancel()
@@ -87,8 +83,6 @@ class AgentPermissionHandler: ObservableObject {
     private func handleTimeout() {
         guard permissionContinuation != nil else { return }
 
-        logger.warning("Permission request timed out - auto-denying")
-
         showingPermissionAlert = false
         permissionRequest = nil
 
@@ -104,7 +98,6 @@ class AgentPermissionHandler: ObservableObject {
 
     /// Respond to a permission request with user's choice
     func respondToPermission(optionId: String) {
-        logger.info("Permission response: \(optionId)")
 
         // Cancel timeout - user responded in time
         timeoutTask?.cancel()
@@ -121,11 +114,8 @@ class AgentPermissionHandler: ObservableObject {
         if let continuation = permissionContinuation {
             let outcome = PermissionOutcome(optionId: optionId)
             let response = RequestPermissionResponse(outcome: outcome)
-            logger.info("Sending permission response with outcome: \(optionId)")
             continuation.resume(returning: response)
             permissionContinuation = nil
-        } else {
-            logger.warning("No continuation found for permission response")
         }
     }
 

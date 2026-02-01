@@ -88,6 +88,7 @@ struct MessageBubbleView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             if !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 MessageContentView(content: message.content, isStreaming: !message.isComplete)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
 
                             if !agentAttachmentBlocks.isEmpty {
@@ -132,7 +133,7 @@ struct MessageBubbleView: View {
                 .combined(with: .opacity),
             removal: .opacity
         ))
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: message.id)
+        .animation(message.isComplete ? .spring(response: 0.4, dampingFraction: 0.8) : nil, value: message.isComplete)
     }
 
     private var agentDisplayName: String {

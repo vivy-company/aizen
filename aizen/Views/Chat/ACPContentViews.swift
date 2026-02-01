@@ -241,7 +241,7 @@ struct ACPResourceView: View {
                 Divider()
 
                 if isCodeFile {
-                    ScrollView(.horizontal, showsIndicators: true) {
+                    HorizontalOnlyScrollView(showsIndicators: true) {
                         Group {
                             if let highlighted = highlightedText {
                                 Text(highlighted)

@@ -8,7 +8,6 @@
 import Foundation
 import UniformTypeIdentifiers
 import CoreData
-import os.log
 
 // MARK: - AgentSession + Messaging
 
@@ -112,14 +111,12 @@ extension AgentSession {
 
         // Mark streaming active before sending
         isStreaming = true
-        logger.info("[\(self.agentName)] Sending message: \(content.prefix(100))...")
 
         do {
             // Send to agent - notifications arrive asynchronously via AsyncStream
             // Response comes AFTER all notifications are sent, but our notification
             // listener Task may not have processed them all yet
-            let response = try await client.sendPrompt(sessionId: sessionId, content: contentBlocks)
-            logger.info("[\(self.agentName)] sendPrompt response received, stopReason: \(String(describing: response.stopReason))")
+            _ = try await client.sendPrompt(sessionId: sessionId, content: contentBlocks)
 
             // Delay setting isStreaming = false to allow buffered notifications to be processed
             // The AsyncStream may still have notifications queued that need to update messages
@@ -177,7 +174,6 @@ extension AgentSession {
             clearThoughtBuffer()
             currentThought = nil
         } catch {
-            logger.error("Error cancelling prompt: \(error.localizedDescription)")
             // Still reset streaming state even on error
             isStreaming = false
             resetFinalizeState()
@@ -352,7 +348,6 @@ extension AgentSession {
                         chatSessionId: chatSessionId
                     )
                 } catch {
-                    self.logger.error("Failed to persist user message: \(error.localizedDescription)")
                 }
             }
         }
@@ -397,7 +392,6 @@ extension AgentSession {
                         )
                         self.persistedToolCallIds.formUnion(toolCallsToPersist.map { $0.toolCallId })
                     } catch {
-                        self.logger.error("Failed to persist completed agent message: \(error.localizedDescription)")
                     }
                 }
             }

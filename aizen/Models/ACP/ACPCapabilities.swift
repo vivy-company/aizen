@@ -23,7 +23,7 @@ nonisolated struct ClientCapabilities: Codable {
     enum CodingKeys: String, CodingKey {
         case fs
         case terminal
-        case meta
+        case meta = "_meta"
     }
 }
 

@@ -6,12 +6,10 @@
 //
 
 import Foundation
-import os.log
 
 actor UVAgentInstaller {
     static let shared = UVAgentInstaller()
 
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "UVInstaller")
 
     init() {
     }
@@ -41,24 +39,31 @@ actor UVAgentInstaller {
 
         try process.run()
         process.waitUntilExit()
+        let stdoutData = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
+        let stderrData = (try? errorPipe.fileHandleForReading.readToEnd()) ?? Data()
         defer {
             try? pipe.fileHandleForReading.close()
             try? errorPipe.fileHandleForReading.close()
         }
 
+        let stdout = String(data: stdoutData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let stderr = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let combinedOutput = [stdout, stderr].filter { !$0.isEmpty }.joined(separator: "\n")
+
         if process.terminationStatus != 0 {
-            let errorData = (try? errorPipe.fileHandleForReading.readToEnd()) ?? Data()
-            let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
-            throw AgentInstallError.installFailed(message: "uv install failed: \(errorMessage)")
+            // Some uv installs return non-zero but still succeed - check if executable exists
+            let executablePath = (targetDir as NSString).appendingPathComponent(executableName)
+            guard FileManager.default.isExecutableFile(atPath: executablePath) else {
+                let errorMessage = combinedOutput.isEmpty ? "Unknown error" : combinedOutput
+                throw AgentInstallError.installFailed(message: "uv install failed: \(errorMessage)")
+            }
         }
 
         // Get and save installed version
         if let version = await getInstalledVersion(package: package, shellEnv: shellEnv) {
             saveVersionManifest(version: version, targetDir: targetDir)
-            logger.info("Installed \(package) version \(version) to \(targetDir)")
-        } else {
-            logger.info("Installed \(package) to \(targetDir)")
         }
+        // Version detection failure is non-fatal - package is still installed
     }
 
     // MARK: - Version Detection
@@ -94,7 +99,6 @@ actor UVAgentInstaller {
         } catch {
             try? pipe.fileHandleForReading.close()
             try? errorPipe.fileHandleForReading.close()
-            logger.error("Failed to get version for \(package): \(error)")
         }
 
         return nil
@@ -123,11 +127,8 @@ actor UVAgentInstaller {
         checkProcess.waitUntilExit()
 
         if checkProcess.terminationStatus == 0 {
-            logger.debug("uv is already installed")
             return
         }
-
-        logger.info("Installing uv...")
 
         // Install uv using the official installer
         let installProcess = Process()
@@ -148,8 +149,5 @@ actor UVAgentInstaller {
             let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
             throw AgentInstallError.installFailed(message: "Failed to install uv: \(errorMessage)")
         }
-
-        logger.info("uv installed successfully")
     }
-
 }

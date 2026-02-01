@@ -22,7 +22,7 @@ struct ClaudeUsageSnapshot {
 
 enum ClaudeUsageFetcher {
     static func fetch() async -> ClaudeUsageSnapshot {
-        var errors: [String] = []
+        let errors: [String] = []
         var notes: [String] = []
         var quota: [UsageQuotaWindow] = []
         var user: UsageUserIdentity?

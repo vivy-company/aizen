@@ -42,7 +42,6 @@ struct WorktreeSessionManager {
         guard let context = worktree.managedObjectContext else { return }
         guard !session.isDeleted else { return }
 
-        let sessionId = session.id
         if let id = session.id {
             ChatSessionManager.shared.removeAgentSession(for: id)
         }

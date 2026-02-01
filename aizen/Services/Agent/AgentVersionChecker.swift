@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os.log
 
 struct AgentVersionInfo: Codable {
     let current: String?
@@ -21,7 +20,6 @@ actor AgentVersionChecker {
     private var versionCache: [String: AgentVersionInfo] = [:]
     private var lastCheckTime: [String: Date] = [:]
     private let cacheExpiration: TimeInterval = 3600 // 1 hour
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "AgentVersion")
 
     private let baseInstallPath: String
 
@@ -129,7 +127,6 @@ actor AgentVersionChecker {
         } catch {
             try? pipe.fileHandleForReading.close()
             try? errorPipe.fileHandleForReading.close()
-            logger.error("Failed to get latest npm version for \(cleanPackage): \(error)")
         }
 
         return nil
@@ -266,7 +263,6 @@ actor AgentVersionChecker {
                 return version
             }
         } catch {
-            logger.error("Failed to get latest PyPI version for \(package): \(error)")
         }
 
         return nil

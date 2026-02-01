@@ -6,12 +6,10 @@
 //
 
 import Foundation
-import os.log
 
 actor ScriptAgentInstaller {
     static let shared = ScriptAgentInstaller()
 
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "ScriptInstaller")
 
     // MARK: - Installation
 
@@ -45,7 +43,6 @@ actor ScriptAgentInstaller {
         if process.terminationStatus != 0 {
             let errorData = (try? errorPipe.fileHandleForReading.readToEnd()) ?? Data()
             let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
-            logger.error("Script install failed: \(errorMessage)")
             throw AgentInstallError.installFailed(message: errorMessage)
         }
     }

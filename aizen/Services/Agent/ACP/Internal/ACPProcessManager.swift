@@ -7,7 +7,6 @@
 
 import Foundation
 import Darwin
-import os.log
 
 actor ACPProcessManager {
     // MARK: - Properties
@@ -24,7 +23,6 @@ actor ACPProcessManager {
 
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
-    private let logger: Logger
 
     private static let largeBufferWarningThreshold = 200000
     private static let largeBufferDumpMinGrowth = 8192
@@ -39,7 +37,6 @@ actor ACPProcessManager {
     init(encoder: JSONEncoder, decoder: JSONDecoder) {
         self.encoder = encoder
         self.decoder = decoder
-        self.logger = Logger.forCategory("ACPProcessManager")
     }
 
     // MARK: - Process Lifecycle
@@ -144,9 +141,8 @@ actor ACPProcessManager {
             let pid = proc.processIdentifier
             if setpgid(pid, pid) == 0 {
                 processGroupId = pid
-            } else {
-                logger.warning("Failed to set process group for pid=\(pid): \(String(cString: strerror(errno)))")
             }
+            // Ignore setpgid failure - process will still work, just without group termination
         }
         if proc.processIdentifier > 0 {
             let pid = proc.processIdentifier
@@ -277,7 +273,6 @@ actor ACPProcessManager {
         let pid = process?.processIdentifier
         let pgid = processGroupId
         await drainAndClosePipes()
-        logger.info("Agent process terminated with code: \(exitCode)")
         await ACPProcessRegistry.shared.removeProcess(pid: pid, pgid: pgid)
         await onTermination?(exitCode)
     }
@@ -356,17 +351,12 @@ actor ACPProcessManager {
             // JSON-RPC messages should start with object/array
             if first != 0x7B && first != 0x5B {
                 if let newline = readBuffer.firstIndex(of: 0x0A) {
-                    let dropped = readBuffer.prefix(upTo: newline)
                     let removeCount = readBuffer.distance(from: readBuffer.startIndex, to: newline) + 1
                     readBuffer.removeFirst(min(removeCount, readBuffer.count))
-                    if !dropped.isEmpty {
-                        logger.debug("Discarded non-JSON stdout line (\(dropped.count) bytes)")
-                    }
                     continue
                 }
 
                 if readBuffer.count > 4096 {
-                    logger.warning("Discarding \(self.readBuffer.count) bytes of non-JSON stdout")
                     self.readBuffer.removeAll(keepingCapacity: true)
                 }
                 return nil
@@ -419,7 +409,6 @@ actor ACPProcessManager {
         }
 
         if readBuffer.count > Self.largeBufferWarningThreshold {
-            logger.warning("Large buffer (\(self.readBuffer.count) bytes) without complete JSON message")
             dumpLargeBufferIfEnabled(reason: "incomplete_json")
         }
 
@@ -444,9 +433,8 @@ actor ACPProcessManager {
 
         do {
             try readBuffer.write(to: fileURL, options: [.atomic])
-            logger.warning("Dumped ACP stdout buffer to \(fileURL.path)")
         } catch {
-            logger.error("Failed to dump ACP stdout buffer: \(error.localizedDescription)")
+            // Ignore dump failures - this is a debug feature
         }
     }
 

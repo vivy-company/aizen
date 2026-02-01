@@ -7,12 +7,10 @@
 
 import Foundation
 import Darwin
-import os.log
 
 actor ACPProcessRegistry {
     static let shared = ACPProcessRegistry()
 
-    private let logger = Logger.forCategory("ACPProcessRegistry")
     private let registryURL: URL
     private let maxEntryAge: TimeInterval = 60 * 60 * 24 * 7 // 7 days
 
@@ -31,7 +29,7 @@ actor ACPProcessRegistry {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
-            logger.error("Failed to create ACP registry directory: \(error.localizedDescription)")
+            // Ignore - directory may already exist
         }
     }
 
@@ -71,7 +69,6 @@ actor ACPProcessRegistry {
             }
 
             guard matchesExpectedProcess(entry: entry, processes: processes) else {
-                logger.info("Skipping orphan cleanup for pid=\(entry.pid) pgid=\(entry.pgid ?? -1): command mismatch")
                 remaining.append(entry)
                 continue
             }
@@ -112,7 +109,6 @@ actor ACPProcessRegistry {
             let data = try JSONEncoder().encode(entries)
             try data.write(to: registryURL, options: [.atomic])
         } catch {
-            logger.error("Failed to write ACP registry: \(error.localizedDescription)")
         }
     }
 

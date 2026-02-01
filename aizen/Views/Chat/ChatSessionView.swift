@@ -85,6 +85,7 @@ struct ChatSessionView: View {
                         currentThought: viewModel.currentAgentSession?.currentThought,
                         currentIterationId: viewModel.currentAgentSession?.currentIterationId,
                         scrollRequest: viewModel.scrollRequest,
+                        turnAnchorMessageId: viewModel.turnAnchorMessageId,
                         shouldAutoScroll: viewModel.isNearBottom,
                         isResizing: isLayoutResizing,
                         onAppear: viewModel.loadMessages,
@@ -98,30 +99,23 @@ struct ChatSessionView: View {
                         agentSession: viewModel.currentAgentSession,
                         onScrollPositionChange: { isNearBottom in
                             if !isLayoutResizing {
-                                viewModel.isNearBottom = isNearBottom
+                                if viewModel.isNearBottom != isNearBottom {
+                                    viewModel.isNearBottom = isNearBottom
+                                }
                             }
                         },
                         childToolCallsProvider: { parentId in
                             viewModel.childToolCalls(for: parentId)
                         }
                     )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .layoutPriority(1)
 
                     if shouldShowScrollToBottom {
-                        Button(action: scrollToBottom) {
-                            Image(systemName: "arrow.down")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.primary)
-                                .padding(10)
-                                .background(.ultraThinMaterial, in: Circle())
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(.separator.opacity(0.3), lineWidth: 0.5)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.trailing, 16)
-                        .padding(.bottom, 16)
-                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                        scrollToBottomButton
+                            .padding(.trailing, 16)
+                            .padding(.bottom, 16)
+                            .transition(.opacity.combined(with: .scale(scale: 0.9)))
                     }
                 }
 
@@ -215,6 +209,8 @@ struct ChatSessionView: View {
         }
         .onDisappear {
             viewModel.persistDraftState(inputText: inputText)
+            viewModel.cancelPendingAutoScroll()
+            viewModel.scrollRequest = nil
             autocompleteWindow?.dismiss()
             NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
             stopKeyMonitorIfNeeded()
@@ -230,6 +226,8 @@ struct ChatSessionView: View {
                 NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
                 startKeyMonitorIfNeeded()
             } else {
+                viewModel.cancelPendingAutoScroll()
+                viewModel.scrollRequest = nil
                 autocompleteWindow?.dismiss()
                 NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
                 stopKeyMonitorIfNeeded()
@@ -351,6 +349,32 @@ struct ChatSessionView: View {
     private func scrollToBottom() {
         viewModel.isNearBottom = true
         viewModel.scrollToBottom()
+    }
+
+    @ViewBuilder
+    private var scrollToBottomButton: some View {
+        Button(action: scrollToBottom) {
+            if #available(macOS 26.0, *) {
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .padding(10)
+                    .glassEffect(.regular, in: Circle())
+                    .contentShape(Circle())
+            } else {
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .padding(10)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(
+                        Circle()
+                            .strokeBorder(.separator.opacity(0.3), lineWidth: 0.5)
+                    )
+                    .contentShape(Circle())
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func startKeyMonitorIfNeeded() {

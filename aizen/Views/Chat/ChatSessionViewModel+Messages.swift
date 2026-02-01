@@ -27,6 +27,8 @@ extension ChatSessionViewModel {
             // Re-enable auto-scroll when user sends a message
             isNearBottom = true
         }
+        // Force the timeline to pin to bottom so streaming follows immediately.
+        scrollToBottom()
 
         // Clear persisted draft since message is being sent
         if let sessionId = session.id {

@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import os.log
 
 extension Notification.Name {
     static let agentMetadataDidChange = Notification.Name("agentMetadataDidChange")
@@ -31,7 +30,6 @@ actor AgentRegistry {
     private nonisolated(unsafe) let defaults: UserDefaults
     private let authPreferencesKey = "acpAgentAuthPreferences"
     private let metadataStoreKey = "agentMetadataStore"
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "AgentRegistry")
 
     // MARK: - Persistence
 
@@ -60,7 +58,6 @@ actor AgentRegistry {
                 Self.updateNonisolatedCache(decoded)
                 return decoded
             } catch {
-                logger.error("Failed to decode agent metadata: \(error.localizedDescription)")
                 Self.updateNonisolatedCache([:])
                 return [:]
             }
@@ -76,7 +73,7 @@ actor AgentRegistry {
                     NotificationCenter.default.post(name: .agentMetadataDidChange, object: nil)
                 }
             } catch {
-                logger.error("Failed to encode agent metadata: \(error.localizedDescription)")
+                // Ignore encoding failure - metadata will be stale but not lost
             }
         }
     }

@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os.log
 
 // ACPClientDelegate is defined in ACPRequestRouter
 typealias ACPClientDelegate = ACPRequestDelegate
@@ -32,7 +31,6 @@ struct DebugMessage {
 actor ACPClient {
     // MARK: - Properties
 
-    private let logger = Logger.forCategory("ACPClient")
 
     private let processManager: ACPProcessManager
     private let requestRouter: ACPRequestRouter
@@ -550,33 +548,22 @@ actor ACPClient {
                 await handleIncomingRequest(request)
             }
         } catch {
-            // Log at warning level with full context to catch parsing issues
-            if let text = String(data: data, encoding: .utf8) {
-                logger.warning("Failed to parse message: \(error.localizedDescription)\nData: \(text.prefix(500))")
-            } else {
-                logger.warning("Failed to parse message: \(error.localizedDescription)")
-            }
+            // Silently ignore parse errors for non-JSON-RPC messages (e.g., agent stdout noise)
         }
     }
 
     private func handleResponse(_ response: JSONRPCResponse) async {
         guard let continuation = pendingRequests.removeValue(forKey: response.id) else {
-            let stillPending = pendingRequests.keys.map { String(describing: $0) }
-            logger.warning("Received response for unknown request id=\(response.id), no pending request found. Pending: \(stillPending)")
             return
         }
         continuation.resume(returning: response)
     }
 
     private func handleIncomingRequest(_ request: JSONRPCRequest) async {
-        logger.info("Incoming request: \(request.method) id=\(request.id)")
         do {
             let response = try await requestRouter.routeRequest(request)
-            logger.info("Request \(request.method) succeeded")
             try await sendSuccessResponse(requestId: request.id, result: response)
         } catch {
-            logger.error("Error handling request \(request.method): \(error.localizedDescription)")
-
             if let acpError = error as? ACPClientError, case .invalidResponse = acpError {
                 try? await sendErrorResponse(
                     requestId: request.id,
@@ -608,8 +595,6 @@ actor ACPClient {
     }
 
     private func handleTermination(exitCode: Int32) async {
-        logger.info("Agent process terminated with code: \(exitCode)")
-
         // Fail all pending requests
         for (_, continuation) in pendingRequests {
             continuation.resume(throwing: ACPClientError.processFailed(exitCode))

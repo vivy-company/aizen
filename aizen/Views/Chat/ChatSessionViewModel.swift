@@ -82,6 +82,7 @@ class ChatSessionViewModel: ObservableObject {
     // MARK: - Internal State
 
     @Published var scrollRequest: ScrollRequest?
+    @Published var turnAnchorMessageId: String?
     @Published var isNearBottom: Bool = true {
         didSet {
             if !isNearBottom {
@@ -96,6 +97,12 @@ class ChatSessionViewModel: ObservableObject {
     let logger = Logger.forCategory("ChatSession")
     var autoScrollTask: Task<Void, Never>?
     var suppressNextAutoScroll: Bool = false
+    private var streamFlushTask: Task<Void, Never>?
+    private var pendingStreamMessages: [MessageItem]?
+    private let streamFlushInterval: Duration = .milliseconds(50)
+    private var pendingStreamingRebuild: Bool = false
+    private var pendingStreamingRebuildRequiresToolCallSync: Bool = false
+    private var streamingRebuildTask: Task<Void, Never>?
     private var gitPauseApplied: Bool = false
     private var settingUpSessionId: UUID? = nil
 
@@ -834,15 +841,14 @@ class ChatSessionViewModel: ObservableObject {
             .sink { [weak self] newMessages in
                 guard let self = self else { return }
                 // AgentSession is @MainActor so we're already on main thread
-                // Direct call avoids coalescing of rapid streaming updates
-                self.syncMessages(newMessages)
-
-                // Only auto-scroll if user is near bottom
-                let shouldSkipAutoScroll = self.suppressNextAutoScroll
-                self.suppressNextAutoScroll = false
-                if self.isNearBottom && !shouldSkipAutoScroll {
-                    self.scrollToBottomDeferred()
+                if session.isStreaming {
+                    self.enqueueStreamingMessages(newMessages)
+                } else {
+                    self.flushStreamingMessagesIfNeeded()
+                    self.syncMessages(newMessages)
                 }
+
+                self.suppressNextAutoScroll = false
             }
             .store(in: &cancellables)
 
@@ -854,10 +860,7 @@ class ChatSessionViewModel: ObservableObject {
                 guard let self = self, let session = self.currentAgentSession else { return }
                 let newToolCalls = session.toolCalls
                 self.syncToolCalls(newToolCalls)
-                // Only auto-scroll if user is near bottom
-                if self.isNearBottom {
-                    self.scrollToBottomDeferred()
-                }
+                self.performStreamingRebuildIfReady()
             }
             .store(in: &cancellables)
 
@@ -969,15 +972,14 @@ class ChatSessionViewModel: ObservableObject {
                 self.wasStreaming = isStreaming
 
                 if streamingEnded {
-                    Task { @MainActor in
-                        // Delay to ensure all tool calls are synced
-                        try? await Task.sleep(for: .milliseconds(150))
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            self.rebuildTimelineWithGrouping(isStreaming: false)
-                        }
-                        self.previousMessageIds = Set(self.messages.map { $0.id })
-                        self.previousToolCallIds = Set(session.toolCalls.map { $0.id })
+                    if let lastAgent = session.messages.last(where: { $0.role == .agent }),
+                       lastAgent.isComplete == false {
+                        session.markLastMessageComplete()
                     }
+                    let currentToolCallIds = Set(session.toolCalls.map { $0.id })
+                    self.pendingStreamingRebuild = true
+                    self.pendingStreamingRebuildRequiresToolCallSync = currentToolCallIds != self.previousToolCallIds
+                    self.scheduleStreamingRebuild()
                 }
             }
             .store(in: &cancellables)
@@ -998,6 +1000,64 @@ class ChatSessionViewModel: ObservableObject {
                 self.currentPermissionRequest = request
             }
             .store(in: &cancellables)
+    }
+
+    private func enqueueStreamingMessages(_ newMessages: [MessageItem]) {
+        pendingStreamMessages = newMessages
+        scheduleStreamFlush()
+    }
+
+    private func scheduleStreamFlush() {
+        guard streamFlushTask == nil else { return }
+        streamFlushTask = Task { @MainActor in
+            defer { streamFlushTask = nil }
+            try? await Task.sleep(for: streamFlushInterval)
+            if Task.isCancelled {
+                return
+            }
+            flushStreamingMessagesIfNeeded()
+            if (currentAgentSession?.isStreaming ?? false), pendingStreamMessages != nil {
+                scheduleStreamFlush()
+            }
+        }
+    }
+
+    private func flushStreamingMessagesIfNeeded() {
+        if let pending = pendingStreamMessages {
+            pendingStreamMessages = nil
+            syncMessages(pending)
+        }
+    }
+
+    private func scheduleStreamingRebuild() {
+        guard streamingRebuildTask == nil else { return }
+        streamingRebuildTask = Task { @MainActor in
+            defer { streamingRebuildTask = nil }
+            try? await Task.sleep(for: .milliseconds(16))
+            if Task.isCancelled {
+                return
+            }
+            performStreamingRebuildIfReady()
+        }
+    }
+
+    private func performStreamingRebuildIfReady() {
+        guard pendingStreamingRebuild else { return }
+        guard !(currentAgentSession?.isStreaming ?? false) else { return }
+        if pendingStreamingRebuildRequiresToolCallSync {
+            let currentToolCallIds = Set(currentAgentSession?.toolCalls.map { $0.id } ?? [])
+            if currentToolCallIds != previousToolCallIds {
+                return
+            }
+        }
+        flushStreamingMessagesIfNeeded()
+        rebuildTimelineWithGrouping(isStreaming: false)
+        previousMessageIds = Set(messages.map { $0.id })
+        if let session = currentAgentSession {
+            previousToolCallIds = Set(session.toolCalls.map { $0.id })
+        }
+        pendingStreamingRebuild = false
+        pendingStreamingRebuildRequiresToolCallSync = false
     }
 
     private func extractLastBold(_ inlineElements: some Sequence<Markup>) -> AttributedString? {

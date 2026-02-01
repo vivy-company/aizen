@@ -6,14 +6,12 @@
 //
 
 import Foundation
-import os.log
 
 actor GitHubReleaseInstaller {
     static let shared = GitHubReleaseInstaller()
 
     private let urlSession: URLSession
     private let binaryInstaller: BinaryAgentInstaller
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "GitHubInstaller")
 
     init(urlSession: URLSession = .shared, binaryInstaller: BinaryAgentInstaller = .shared) {
         self.urlSession = urlSession
@@ -66,7 +64,6 @@ actor GitHubReleaseInstaller {
         // Save installed version to manifest (strip 'v' prefix if present)
         let version = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
         saveVersionManifest(version: version, targetDir: targetDir)
-        logger.info("Installed \(agentId) version \(version) from \(repo)")
     }
 
     // MARK: - Version Detection
@@ -94,7 +91,6 @@ actor GitHubReleaseInstaller {
                 return tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
             }
         } catch {
-            logger.error("Failed to get latest GitHub version for \(repo): \(error.localizedDescription)")
         }
 
         return nil

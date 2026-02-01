@@ -144,7 +144,7 @@ extension AgentRegistry {
                 isBuiltIn: true,
                 isEnabled: true,
                 executablePath: Self.managedPath(for: "kimi"),
-                launchArgs: ["--acp"],
+                launchArgs: ["acp"],
                 installMethod: .uv(package: "kimi-cli")
             )
         }

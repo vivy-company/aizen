@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import os.log
 
 enum OpenCodePluginError: Error, LocalizedError {
     case npmNotFound
@@ -51,7 +50,6 @@ actor OpenCodePluginInstaller {
     static let shared = OpenCodePluginInstaller()
     
     private let configService: OpenCodeConfigService
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "OpenCodePluginInstaller")
     
     private static let registryPlugins: [OpenCodePluginDefinition] = OpenCodePluginRegistryLoader.load()
     
@@ -445,10 +443,8 @@ actor OpenCodePluginInstaller {
         guard exitCode == 0 else {
             throw OpenCodePluginError.installFailed(stderrOutput)
         }
-        
-        logger.info("Installed global npm package: \(packageName)")
     }
-    
+
     func uninstall(_ packageName: String) async throws {
         try validatePackageName(packageName)
         
@@ -463,10 +459,8 @@ actor OpenCodePluginInstaller {
         guard result.succeeded else {
             throw OpenCodePluginError.uninstallFailed(result.stderr)
         }
-        
-        logger.info("Uninstalled global npm package: \(packageName)")
     }
-    
+
     func installAndRegister(_ pluginName: String, onProgress: ((String) -> Void)? = nil) async throws {
         guard let known = Self.pluginDefinition(named: pluginName) else {
             throw OpenCodePluginError.installFailed("Unknown plugin: \(pluginName)")

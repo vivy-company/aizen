@@ -222,7 +222,7 @@ struct CodeBlockView: View {
 
     @ViewBuilder
     private func codeContent(text: String, displayLineCount: Int, useHighlight: Bool) -> some View {
-        ScrollView(.horizontal, showsIndicators: true) {
+        HorizontalOnlyScrollView(showsIndicators: true) {
             HStack(alignment: .top, spacing: 0) {
                 VStack(alignment: .trailing, spacing: 0) {
                     ForEach(1...displayLineCount, id: \.self) { num in
