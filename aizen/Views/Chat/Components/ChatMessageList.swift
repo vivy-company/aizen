@@ -86,9 +86,10 @@ struct ChatMessageList: View {
     private var scrollContent: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 2) {
+                LazyVStack(spacing: 0) {
                     ForEach(visibleItems, id: \.stableId) { item in
                         itemView(for: item)
+                            .padding(.vertical, itemSpacing(for: item))
                             .id(item.stableId)
                     }
 
@@ -195,6 +196,17 @@ struct ChatMessageList: View {
             )
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
+        }
+    }
+
+    private func itemSpacing(for item: TimelineItem) -> CGFloat {
+        switch item {
+        case .message:
+            return 4  // 8pt total between messages
+        case .toolCall, .toolCallGroup:
+            return 1  // 2pt total between tool calls (tight)
+        case .turnSummary:
+            return 4
         }
     }
 
