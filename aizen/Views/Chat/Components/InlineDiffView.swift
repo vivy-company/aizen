@@ -4,6 +4,7 @@
 //  Inline diff view with syntax highlighting
 //
 
+import ACP
 import SwiftUI
 
 struct InlineDiffView: View {

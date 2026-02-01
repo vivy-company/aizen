@@ -5,8 +5,9 @@
 //  Tool details display dialog
 //
 
-import SwiftUI
+import ACP
 import Foundation
+import SwiftUI
 
 struct ToolDetailsSheet: View {
     @Environment(\.dismiss) private var dismiss

@@ -5,6 +5,7 @@
 //  Renders the active companion panel (terminal/files/browser)
 //
 
+import ACP
 import SwiftUI
 
 struct CompanionPanelView: View {

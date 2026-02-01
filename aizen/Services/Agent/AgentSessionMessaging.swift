@@ -5,6 +5,7 @@
 //  Messaging logic for AgentSession
 //
 
+import ACP
 import Foundation
 import UniformTypeIdentifiers
 import CoreData
@@ -242,8 +243,8 @@ extension AgentSession {
             let text = try await readTextFileAsync(url: url)
             let textResource = EmbeddedTextResourceContents(
                 text: text,
-                mimeType: mimeType,
                 uri: url.absoluteString,
+                mimeType: mimeType,
                 _meta: nil
             )
             let resourceContent = ResourceContent(
@@ -258,8 +259,8 @@ extension AgentSession {
             let base64 = data.base64EncodedString()
             let blobResource = EmbeddedBlobResourceContents(
                 blob: base64,
-                mimeType: mimeType,
                 uri: url.absoluteString,
+                mimeType: mimeType,
                 _meta: nil
             )
             let resourceContent = ResourceContent(

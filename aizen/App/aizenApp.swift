@@ -4,7 +4,7 @@
 //
 //  Created by Uladzislau Yakauleu on 17.10.25.
 //
-
+import ACP
 import SwiftUI
 import CoreData
 import Sparkle
@@ -83,7 +83,7 @@ struct aizenApp: App {
 
         // Best-effort cleanup for orphaned ACP agents from a previous crash
         Task {
-            await ACPProcessRegistry.shared.cleanupOrphanedProcesses()
+            await ProcessRegistry.shared.cleanupOrphanedProcesses()
         }
 
         // Initialize Sparkle updater

@@ -5,9 +5,10 @@
 //  Created by Uladzislau Yakauleu on 17.10.25.
 //
 
-import SwiftUI
-import os.log
+import ACP
 import Combine
+import os.log
+import SwiftUI
 
 struct WorktreeDetailView: View {
     @ObservedObject var worktree: Worktree

@@ -5,6 +5,7 @@
 //  Expandable view for grouped tool calls from a completed agent turn
 //
 
+import ACP
 import SwiftUI
 
 struct ToolCallGroupView: View {

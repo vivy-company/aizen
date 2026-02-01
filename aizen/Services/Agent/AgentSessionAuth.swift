@@ -5,6 +5,7 @@
 //  Authentication logic for AgentSession
 //
 
+import ACP
 import Foundation
 
 // MARK: - AgentSession + Authentication

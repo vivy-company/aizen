@@ -5,6 +5,7 @@
 //  Shared permission action button styling
 //
 
+import ACP
 import SwiftUI
 
 struct PermissionOptionButton: View {

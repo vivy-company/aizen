@@ -6,6 +6,7 @@
 //  Handles plugin registration, not installation (that's OpenCodePluginInstaller's job)
 //
 
+import ACP
 import Foundation
 
 enum OpenCodeConfigError: Error, LocalizedError {

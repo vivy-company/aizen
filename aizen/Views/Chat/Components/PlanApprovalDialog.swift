@@ -5,6 +5,7 @@
 //  Dialog for approving/rejecting agent plans
 //
 
+import ACP
 import SwiftUI
 
 struct PlanApprovalDialog: View {

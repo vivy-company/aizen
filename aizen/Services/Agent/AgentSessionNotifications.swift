@@ -5,6 +5,7 @@
 //  Notification handling logic for AgentSession
 //
 
+import ACP
 import Foundation
 import Combine
 

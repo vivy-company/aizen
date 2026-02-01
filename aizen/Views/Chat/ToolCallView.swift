@@ -4,11 +4,12 @@
 //  SwiftUI view for displaying tool execution details
 //
 
-import SwiftUI
-import Foundation
+import ACP
 import AppKit
 import CodeEditLanguages
 import CodeEditSourceEditor
+import Foundation
+import SwiftUI
 
 struct ToolCallView: View {
     let toolCall: ToolCall

@@ -5,6 +5,7 @@
 //  Agent detail view for Settings sidebar
 //
 
+import ACP
 import SwiftUI
 import UniformTypeIdentifiers
 

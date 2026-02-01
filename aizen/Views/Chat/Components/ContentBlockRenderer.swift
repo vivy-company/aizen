@@ -5,6 +5,7 @@
 //  Shared content block rendering across chat and tool views
 //
 
+import ACP
 import SwiftUI
 
 enum ContentBlockRenderStyle {

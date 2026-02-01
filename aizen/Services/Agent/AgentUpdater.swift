@@ -5,6 +5,7 @@
 //  Service to update ACP agents
 //
 
+import ACP
 import Foundation
 
 enum AgentUpdateError: Error, LocalizedError {

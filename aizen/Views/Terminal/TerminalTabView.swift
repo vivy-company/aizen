@@ -5,8 +5,9 @@
 //  Created by Uladzislau Yakauleu on 17.10.25.
 //
 
-import SwiftUI
+import ACP
 import os.log
+import SwiftUI
 
 struct TerminalTabView: View {
     @ObservedObject var worktree: Worktree

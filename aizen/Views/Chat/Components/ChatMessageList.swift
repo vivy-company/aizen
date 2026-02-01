@@ -5,6 +5,7 @@
 //  Simple SwiftUI-based chat message list with auto-scroll behavior.
 //
 
+import ACP
 import SwiftUI
 
 struct ChatMessageList: View {

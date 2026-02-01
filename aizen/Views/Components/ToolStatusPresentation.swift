@@ -5,6 +5,7 @@
 //  Shared presentation for tool status
 //
 
+import ACP
 import SwiftUI
 
 enum ToolStatusPresentation {

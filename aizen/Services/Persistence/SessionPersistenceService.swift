@@ -6,6 +6,7 @@
 //  Single Responsibility: Bridging between AgentSession (runtime) and ChatSession (persistence)
 //
 
+import ACP
 import Foundation
 import CoreData
 import os.log

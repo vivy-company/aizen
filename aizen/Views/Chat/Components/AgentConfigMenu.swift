@@ -5,6 +5,7 @@
 //  Created by Agent on 11.01.26.
 //
 
+import ACP
 import SwiftUI
 
 struct AgentConfigMenu: View {

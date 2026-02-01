@@ -5,6 +5,7 @@
 //  Session mode selector component
 //
 
+import ACP
 import SwiftUI
 
 struct ModeSelectorView: View {

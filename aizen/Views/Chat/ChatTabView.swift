@@ -5,9 +5,10 @@
 //  Chat tab management and empty state
 //
 
-import SwiftUI
+import ACP
 import CoreData
 import os.log
+import SwiftUI
 
 struct ChatTabView: View {
     let worktree: Worktree

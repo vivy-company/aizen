@@ -5,8 +5,9 @@
 //  SwiftUI view for displaying and managing chat sessions
 //
 
-import SwiftUI
+import ACP
 import CoreData
+import SwiftUI
 
 struct SessionsListView: View {
     @StateObject private var viewModel: SessionsListViewModel

@@ -5,6 +5,7 @@
 //  Message operations for chat sessions
 //
 
+import ACP
 import Foundation
 import SwiftUI
 

@@ -5,6 +5,7 @@
 //  Agent selector and mode controls bar
 //
 
+import ACP
 import SwiftUI
 
 struct ChatControlsBar: View {

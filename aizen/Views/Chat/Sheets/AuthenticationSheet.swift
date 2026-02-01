@@ -5,8 +5,9 @@
 //  Authentication dialog for agent sessions
 //
 
-import SwiftUI
+import ACP
 import os.log
+import SwiftUI
 
 struct AuthenticationSheet: View {
     private let logger = Logger.chat

@@ -5,8 +5,9 @@
 //  State model for unified autocomplete system
 //
 
-import Foundation
+import ACP
 import AppKit
+import Foundation
 
 // MARK: - Trigger Types
 

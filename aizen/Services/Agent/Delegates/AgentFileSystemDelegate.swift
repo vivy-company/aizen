@@ -5,6 +5,7 @@
 //  Created by Uladzislau Yakauleu on 17.10.25.
 //
 
+import ACP
 import Foundation
 
 /// Actor responsible for handling file system operations for agent sessions

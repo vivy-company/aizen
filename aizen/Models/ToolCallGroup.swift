@@ -5,6 +5,7 @@
 //  Groups tool calls from a completed agent turn for display
 //
 
+import ACP
 import Foundation
 
 // MARK: - File Change Summary

@@ -4,6 +4,7 @@
 //  Model and agent selection menu component
 //
 
+import ACP
 import SwiftUI
 
 struct ModelSelectorMenu: View {

@@ -5,6 +5,7 @@
 //  Agent list item component for Settings
 //
 
+import ACP
 import SwiftUI
 import UniformTypeIdentifiers
 

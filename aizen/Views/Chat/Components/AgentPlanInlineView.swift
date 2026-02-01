@@ -4,6 +4,7 @@
 //  Compact chip view for displaying agent plan progress
 //
 
+import ACP
 import SwiftUI
 
 struct AgentPlanInlineView: View {

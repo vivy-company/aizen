@@ -5,6 +5,7 @@
 //  Lightweight usage tracking for agent sessions
 //
 
+import ACP
 import Foundation
 import Combine
 

@@ -5,9 +5,10 @@
 //  ViewModel for worktree detail view managing session selection
 //
 
+import ACP
+import Combine
 import Foundation
 import SwiftUI
-import Combine
 
 @MainActor
 class WorktreeViewModel: ObservableObject {

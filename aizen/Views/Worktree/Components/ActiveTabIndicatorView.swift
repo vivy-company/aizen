@@ -5,6 +5,7 @@
 //  Created by Uladzislau Yakauleu on 19.11.25.
 //
 
+import ACP
 import SwiftUI
 
 struct ActiveTabIndicatorView: View {

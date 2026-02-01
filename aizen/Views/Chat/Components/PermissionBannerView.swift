@@ -5,8 +5,9 @@
 //  Glass toast notification for pending permission requests with inline actions.
 //
 
-import SwiftUI
+import ACP
 import CoreData
+import SwiftUI
 
 struct PermissionBannerView: View {
     let currentChatSessionId: UUID?

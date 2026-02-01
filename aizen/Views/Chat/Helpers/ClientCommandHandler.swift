@@ -5,9 +5,10 @@
 //  Centralized handler for client-side slash commands
 //
 
+import ACP
+import CoreData
 import Foundation
 import SwiftUI
-import CoreData
 
 @MainActor
 struct ClientCommand {

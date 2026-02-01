@@ -5,9 +5,10 @@
 //  Unified handler for @ file mentions and / commands autocomplete
 //
 
-import SwiftUI
+import ACP
 import Combine
 import os.log
+import SwiftUI
 
 @MainActor
 class UnifiedAutocompleteHandler: ObservableObject {

@@ -5,8 +5,9 @@
 //  Chat session interface with messages and input
 //
 
-import SwiftUI
+import ACP
 import CoreData
+import SwiftUI
 
 struct ChatSessionView: View {
     let worktree: Worktree

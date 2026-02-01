@@ -5,11 +5,12 @@
 //  Timeline and scrolling operations for chat sessions
 //
 
+import ACP
+import Combine
 import Foundation
 import ObjectiveC
-import SwiftUI
-import Combine
 import os
+import SwiftUI
 
 // MARK: - Timeline Index Storage
 private var timelineIndexKey: UInt8 = 0

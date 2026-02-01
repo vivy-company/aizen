@@ -5,6 +5,7 @@
 //  Timeline item combining messages and tool calls
 //
 
+import ACP
 import Foundation
 
 // MARK: - Turn Summary

@@ -5,6 +5,7 @@
 //  Markdown content rendering for plans
 //
 
+import ACP
 import SwiftUI
 
 struct PlanContentView: View {

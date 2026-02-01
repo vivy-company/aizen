@@ -5,6 +5,7 @@
 //  Created by Uladzislau Yakauleu on 17.10.25.
 //
 
+import ACP
 import Foundation
 
 /// Tracks state of a single terminal

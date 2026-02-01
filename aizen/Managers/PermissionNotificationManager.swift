@@ -5,6 +5,7 @@
 //  Handles macOS notifications for agent permission requests when app is not focused.
 //
 
+import ACP
 import Foundation
 import UserNotifications
 import AppKit

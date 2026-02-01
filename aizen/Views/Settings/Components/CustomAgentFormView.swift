@@ -5,6 +5,7 @@
 //  Form for adding/editing custom agents
 //
 
+import ACP
 import SwiftUI
 import UniformTypeIdentifiers
 

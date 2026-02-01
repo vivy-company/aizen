@@ -5,6 +5,7 @@
 //  Permission request UI
 //
 
+import ACP
 import SwiftUI
 
 struct PermissionRequestView: View {

@@ -5,11 +5,12 @@
 //  Business logic and state management for chat sessions
 //
 
-import SwiftUI
-import CoreData
+import ACP
 import Combine
+import CoreData
 import Markdown
 import os.log
+import SwiftUI
 
 // MARK: - Main ViewModel
 @MainActor

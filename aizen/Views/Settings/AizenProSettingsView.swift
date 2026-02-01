@@ -5,8 +5,9 @@
 //  Settings view for Aizen Pro license
 //
 
-import SwiftUI
+import ACP
 import Foundation
+import SwiftUI
 
 struct AizenProSettingsView: View {
     @ObservedObject var licenseManager: LicenseManager

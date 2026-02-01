@@ -5,6 +5,7 @@
 //  Created by Uladzislau Yakauleu on 04.11.25.
 //
 
+import ACP
 import SwiftUI
 
 // MARK: - Terminal Persistence Indicator

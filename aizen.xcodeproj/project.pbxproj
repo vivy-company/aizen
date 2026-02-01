@@ -35,6 +35,8 @@
 		CCA56A052ECB132E00955D13 /* CodeEditSymbols in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A042ECB132E00955D13 /* CodeEditSymbols */; };
 		CCA56A0B2ECB1EAF00955D13 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A0A2ECB1EAF00955D13 /* CodeEditSourceEditor */; };
 		CCA56A102ECB203200955D13 /* CodeEditLanguages in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A0F2ECB203200955D13 /* CodeEditLanguages */; };
+		CCACP0001000000000000001 /* ACP in Frameworks */ = {isa = PBXBuildFile; productRef = CCACP0002000000000000001 /* ACP */; };
+		CCACP0001000000000000002 /* ACP in Frameworks */ = {isa = PBXBuildFile; productRef = CCACP0002000000000000002 /* ACP */; };
 		CCB235112EEA7CA300041489 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA569F32ECB04F500955D13 /* CodeEditSourceEditor */; };
 		CCB235122EEA7CA300041489 /* CodeEditSourceEditor in Frameworks */ = {isa = PBXBuildFile; productRef = CCA569FE2ECB12A600955D13 /* CodeEditSourceEditor */; };
 		CCB235132EEA7CA300041489 /* CodeEditTextView in Frameworks */ = {isa = PBXBuildFile; productRef = CCA56A012ECB131C00955D13 /* CodeEditTextView */; };
@@ -163,6 +165,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CCACP0001000000000000002 /* ACP in Frameworks */,
 				89C3A37FB37B4F8A8E0CE8B4 /* AppIntents.framework in Frameworks */,
 				CC2917C82EFBDAE300440062 /* CodeEditSourceEditor in Frameworks */,
 				CC2917C92EFBDAE300440062 /* CodeEditTextView in Frameworks */,
@@ -188,6 +191,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CCACP0001000000000000001 /* ACP in Frameworks */,
 				98D8F68E63ED4B66AB2B8651 /* AppIntents.framework in Frameworks */,
 				CCB235162EEA7CA300041489 /* CodeEditSourceEditor in Frameworks */,
 				CCB235152EEA7CA300041489 /* CodeEditTextView in Frameworks */,
@@ -290,6 +294,7 @@
 			);
 			name = "aizen nightly";
 			packageProductDependencies = (
+				CCACP0002000000000000002 /* ACP */,
 				CC2917B52EFBDAE300440062 /* Markdown */,
 				CC2917B72EFBDAE300440062 /* Sparkle */,
 				CC2917B92EFBDAE300440062 /* SwiftTreeSitter */,
@@ -331,6 +336,7 @@
 			);
 			name = aizen;
 			packageProductDependencies = (
+				CCACP0002000000000000001 /* ACP */,
 				CCB04B732EA241B60007DBB1 /* Markdown */,
 				CC128B1A2EAF8DD600EA9A50 /* Sparkle */,
 				CCFE00062EBF000000000006 /* SwiftTreeSitter */,
@@ -457,6 +463,7 @@
 			mainGroup = CCB04B392EA241B30007DBB1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */,
 				CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */,
@@ -1351,6 +1358,14 @@
 				minimumVersion = 0.1.21;
 			};
 		};
+		CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/wiedymi/swift-acp";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apple/swift-markdown";
@@ -1481,6 +1496,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CCA56A0E2ECB203200955D13 /* XCRemoteSwiftPackageReference "CodeEditLanguages" */;
 			productName = CodeEditLanguages;
+		};
+		CCACP0002000000000000001 /* ACP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */;
+			productName = ACP;
+		};
+		CCACP0002000000000000002 /* ACP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */;
+			productName = ACP;
 		};
 		CCB04B732EA241B60007DBB1 /* Markdown */ = {
 			isa = XCSwiftPackageProductDependency;

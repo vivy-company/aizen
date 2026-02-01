@@ -5,9 +5,10 @@
 //  Marketplace for browsing and installing MCP servers
 //
 
-import SwiftUI
+import ACP
 import Combine
 import Foundation
+import SwiftUI
 
 struct MCPMarketplaceView: View {
     @Environment(\.dismiss) private var dismiss
