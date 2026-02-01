@@ -585,7 +585,7 @@ class ChatSessionViewModel: ObservableObject {
                         shouldShowFailure = false
                     }
                 }
-                if let acpError = error as? ACPClientError,
+                if let acpError = error as? ClientError,
                    case .agentError = acpError {
                     let message = (acpError.errorDescription ?? "").lowercased()
                     if message.contains("not found") || message.contains("resource_not_found") || message.contains("session not found") {

@@ -715,7 +715,7 @@ struct AgentDetailView: View {
 
         testTask = Task {
             do {
-                let tempClient = ACPClient()
+                let tempClient = Client()
 
                 try await tempClient.launch(
                     agentPath: path,

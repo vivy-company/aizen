@@ -13,7 +13,7 @@ import Foundation
 @MainActor
 extension AgentSession {
     /// Helper to create session directly without authentication
-    func createSessionDirectly(workingDir: String, client: ACPClient, timeout: TimeInterval = 60.0) async throws {
+    func createSessionDirectly(workingDir: String, client: Client, timeout: TimeInterval = 60.0) async throws {
         let mcpServers = await resolveMCPServers()
         let sessionTimeout = effectiveSessionTimeout(mcpServers: mcpServers, defaultTimeout: timeout)
         let sessionResponse = try await client.newSession(
@@ -59,7 +59,7 @@ extension AgentSession {
     }
 
     /// Helper to perform authentication and create session
-    func performAuthentication(client: ACPClient, authMethodId: String, workingDir: String) async throws {
+    func performAuthentication(client: Client, authMethodId: String, workingDir: String) async throws {
         let authResponse = try await client.authenticate(
             authMethodId: authMethodId,
             credentials: nil

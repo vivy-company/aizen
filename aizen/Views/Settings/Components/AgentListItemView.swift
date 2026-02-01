@@ -405,7 +405,7 @@ struct AgentListItemView: View {
         testTask = Task {
             do {
                 // Create temporary ACP client for testing
-                let tempClient = ACPClient()
+                let tempClient = Client()
 
                 // Launch the process with proper arguments
                 try await tempClient.launch(

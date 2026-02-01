@@ -462,7 +462,7 @@ struct MCPMarketplaceView: View {
         }
 
         let launchArgs = AgentRegistry.shared.getMetadata(for: agentId)?.launchArgs ?? []
-        let tempClient = ACPClient()
+        let tempClient = Client()
 
         do {
             try await tempClient.launch(agentPath: path, arguments: launchArgs)

@@ -14,7 +14,7 @@ import Combine
 @MainActor
 extension AgentSession {
     /// Start listening for notifications from the ACP client
-    func startNotificationListener(client: ACPClient) {
+    func startNotificationListener(client: Client) {
         notificationTask = Task { @MainActor in
             for await notification in await client.notifications {
                 handleNotification(notification)

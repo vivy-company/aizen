@@ -30,9 +30,9 @@ enum SessionState: Equatable {
     }
 }
 
-/// ObservableObject that wraps ACPClient for managing an agent session
+/// ObservableObject that wraps Client for managing an agent session
 @MainActor
-class AgentSession: ObservableObject, ACPClientDelegate {
+class AgentSession: ObservableObject, ClientDelegate {
     static let maxMessageCount = 500
     static let maxToolCallCount = 500
     // MARK: - Published Properties
@@ -80,7 +80,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
 
     // MARK: - Internal Properties
 
-    var acpClient: ACPClient?
+    var acpClient: Client?
     var cancellables = Set<AnyCancellable>()
     var process: Process?
     var notificationTask: Task<Void, Never>?
@@ -279,7 +279,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         self.agentName = agentName
         self.workingDirectory = workingDir
 
-        let client: ACPClient
+        let client: Client
         let initResponse: InitializeResponse
         do {
             (client, initResponse) = try await initializeClient(
@@ -449,7 +449,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         self.agentName = agentName
         self.workingDirectory = workingDir
         
-        let client: ACPClient
+        let client: Client
         let initResponse: InitializeResponse
         do {
             (client, initResponse) = try await initializeClient(
@@ -584,7 +584,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         startTime: CFAbsoluteTime,
         previousAgentName: String,
         previousWorkingDir: String
-    ) async throws -> (client: ACPClient, initResponse: InitializeResponse) {
+    ) async throws -> (client: Client, initResponse: InitializeResponse) {
         let agentPath = AgentRegistry.shared.getAgentPath(for: agentName)
         let isValid = AgentRegistry.shared.validateAgent(named: agentName)
         
@@ -602,7 +602,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         
         for (index, args) in launchArgCandidates.enumerated() {
             let isLastAttempt = index == launchArgCandidates.count - 1
-            let client = ACPClient()
+            let client = Client()
             await client.setDelegate(self)
             
             do {
@@ -914,7 +914,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
         missingAgentName = nil
     }
 
-    // MARK: - ACPClientDelegate Methods
+    // MARK: - ClientDelegate Methods
 
     // File operations are nonisolated to avoid blocking MainActor during large file I/O
     nonisolated func handleFileReadRequest(_ path: String, sessionId: String, line: Int?, limit: Int?)
@@ -1121,7 +1121,7 @@ class AgentSession: ObservableObject, ACPClientDelegate {
     }
 
     func isAuthRequiredError(_ error: Error) -> Bool {
-        if let acpError = error as? ACPClientError {
+        if let acpError = error as? ClientError {
             if case .agentError(let jsonError) = acpError {
                 if jsonError.code == -32000 { return true }
                 let message = jsonError.message.lowercased()

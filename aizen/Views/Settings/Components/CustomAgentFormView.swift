@@ -279,7 +279,7 @@ struct CustomAgentFormView: View {
 
         // Test ACP protocol
         do {
-            let tempClient = ACPClient()
+            let tempClient = Client()
 
             try await tempClient.launch(
                 agentPath: trimmedPath,
