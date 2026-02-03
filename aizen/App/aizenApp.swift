@@ -13,6 +13,13 @@ import AppKit
 // App delegate to handle window restoration cleanup
 class AizenAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Disable App Nap to prevent activation delays when clicking dock icon
+        ProcessInfo.processInfo.disableAutomaticTermination("Aizen needs responsive activation")
+        ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiatedAllowingIdleSystemSleep, .latencyCritical],
+            reason: "Prevent App Nap for responsive dock activation"
+        )
+
         // Close duplicate main windows that macOS incorrectly restored
         // Keep only one main window (non-GitPanel window)
         DispatchQueue.main.async {
