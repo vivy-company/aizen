@@ -224,8 +224,20 @@ extension AgentSession {
 
     private func coalesceAdjacentTextBlocks(_ blocks: [ToolCallContent]) -> [ToolCallContent] {
         var result: [ToolCallContent] = []
+        var seenDiffPaths = Set<String>()
 
         for block in blocks {
+            // Deduplicate diff blocks by path (keep first occurrence)
+            if case .diff(let diff) = block {
+                if seenDiffPaths.contains(diff.path) {
+                    continue
+                }
+                seenDiffPaths.insert(diff.path)
+                result.append(block)
+                continue
+            }
+
+            // Coalesce adjacent text blocks
             if case .content(let contentBlock) = block,
                case .text(let newText) = contentBlock,
                let last = result.last,
