@@ -81,29 +81,15 @@ struct WorktreeDetailView: View {
         gitRepositoryService.currentStatus.untrackedFiles.count > 0
     }
 
-    private func getTerminalBackgroundColor() -> Color? {
-        guard let resourcePath = Bundle.main.resourcePath else { return nil }
-        let themesPath = (resourcePath as NSString).appendingPathComponent("ghostty/themes")
-        let themeFile = (themesPath as NSString).appendingPathComponent(terminalThemeName)
-
-        guard let content = try? String(contentsOfFile: themeFile, encoding: .utf8) else {
-            return nil
+    private var detailSurfaceColor: Color {
+        if selectedTab == "terminal", let cachedTerminalBackgroundColor {
+            return cachedTerminalBackgroundColor
         }
+        return Color(nsColor: .windowBackgroundColor)
+    }
 
-        for line in content.split(separator: "\n", omittingEmptySubsequences: true) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("background") {
-                let parts = trimmed.split(separator: "=", maxSplits: 1)
-                if parts.count == 2 {
-                    let colorHex = parts[1].trimmingCharacters(in: .whitespaces)
-                    if let color = Color(hex: colorHex) {
-                        return color
-                    }
-                }
-            }
-        }
-
-        return nil
+    private func getTerminalBackgroundColor() -> Color {
+        Color(nsColor: GhosttyThemeParser.loadBackgroundColor(named: terminalThemeName))
     }
 
     @ViewBuilder
@@ -384,7 +370,7 @@ struct WorktreeDetailView: View {
         ZStack(alignment: .top) {
             contentView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(selectedTab == "terminal" ? cachedTerminalBackgroundColor : nil)
+                .background(detailSurfaceColor)
 
             // Permission banner for pending requests in other sessions
             PermissionBannerView(
@@ -502,6 +488,7 @@ struct WorktreeDetailView: View {
     private var contentWithBasicModifiers: some View {
         mainContentWithSidebars
             .navigationTitle(worktree.branch ?? String(localized: "worktree.session.worktree"))
+            .background(detailSurfaceColor.ignoresSafeArea(.container, edges: .top))
             .toolbarBackground(.visible, for: .windowToolbar)
             .toast()
             .onAppear {

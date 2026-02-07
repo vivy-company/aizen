@@ -462,8 +462,6 @@ struct WorkspaceSidebarView: View {
                 }
             }
 
-            Divider()
-
             // Support Aizen (only when not licensed)
             if !isLicenseActive {
                 Button {
@@ -521,7 +519,6 @@ struct WorkspaceSidebarView: View {
                 .padding(.vertical, 8)
                 .help("settings.title")
             }
-            .background(Color.primary.opacity(0.04))
         }
         .navigationTitle(LocalizedStringKey("workspace.repositories.title"))
         .sheet(isPresented: $showingWorkspaceSheet) {
