@@ -438,20 +438,18 @@ struct ChatSessionView: View {
     }
 
     private func handlePermissionPickerEscape(request: RequestPermissionRequest) {
-        // For plan permission, ESC closes picker but keeps plan visible in timeline.
-        if isPlanRequest(request) {
-            viewModel.showingPermissionAlert = false
-        } else {
-            if viewModel.isProcessing {
-                viewModel.cancelCurrentPrompt()
-            }
+        if viewModel.isProcessing {
+            viewModel.cancelCurrentPrompt()
+        }
 
-            if let optionId = preferredPermissionDismissOptionId(for: request),
-               let agentSession = viewModel.currentAgentSession {
-                agentSession.respondToPermission(optionId: optionId)
-            } else {
-                viewModel.showingPermissionAlert = false
-            }
+        if let optionId = preferredPermissionDismissOptionId(for: request),
+           let agentSession = viewModel.currentAgentSession {
+            agentSession.respondToPermission(optionId: optionId)
+        } else if let agentSession = viewModel.currentAgentSession {
+            // Ensure ESC always resolves a pending permission request.
+            agentSession.permissionHandler.cancelPendingRequest()
+        } else {
+            viewModel.showingPermissionAlert = false
         }
     }
 

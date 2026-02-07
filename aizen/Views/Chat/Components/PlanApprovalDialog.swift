@@ -455,14 +455,12 @@ struct PlanApprovalPickerView: View {
     }
 
     private func dismissRequest() {
-        if isPlanPermissionRequest {
-            onDismissWithoutResponse()
+        if let option = preferredDismissOption {
+            session.respondToPermission(optionId: option.optionId)
         } else {
-            if let option = preferredDismissOption {
-                session.respondToPermission(optionId: option.optionId)
-            } else {
-                onDismissWithoutResponse()
-            }
+            // Avoid leaving the agent turn blocked if no options are provided.
+            session.permissionHandler.cancelPendingRequest()
+            onDismissWithoutResponse()
         }
     }
 
