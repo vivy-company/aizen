@@ -1,7 +1,7 @@
 //  AgentPlanInlineView.swift
 //  aizen
 //
-//  Compact chip view for displaying agent plan progress
+//  Inline plan card for displaying agent plan progress
 //
 
 import ACP
@@ -10,6 +10,7 @@ import SwiftUI
 struct AgentPlanInlineView: View {
     let plan: Plan
     @State private var showingSheet = false
+    @State private var isExpanded = false
 
     private var completedCount: Int {
         plan.entries.filter { $0.status == .completed }.count
@@ -20,58 +21,139 @@ struct AgentPlanInlineView: View {
     }
 
     private var isAllDone: Bool {
-        completedCount == totalCount
+        totalCount > 0 && completedCount == totalCount
     }
 
-    private var currentEntry: PlanEntry? {
-        plan.entries.first { $0.status == .inProgress }
-            ?? plan.entries.first { $0.status == .pending }
+    private var previewEntries: [PlanEntry] {
+        if isExpanded {
+            return plan.entries
+        }
+        return Array(plan.entries.prefix(5))
+    }
+
+    private var hasMoreEntries: Bool {
+        totalCount > previewEntries.count
+    }
+
+    private var progressLabel: String {
+        "\(completedCount)/\(totalCount) completed"
+    }
+
+    private var progressColor: Color {
+        if plan.entries.contains(where: { $0.status == .inProgress }) {
+            return .blue
+        }
+        return .secondary
     }
 
     var body: some View {
-        if !isAllDone {
-            Button {
-                showingSheet = true
-            } label: {
-                HStack(spacing: 6) {
-                    // Animated dot indicator
-                    Circle()
-                        .fill(currentEntry?.status == .inProgress ? Color.blue : Color.secondary)
-                        .frame(width: 6, height: 6)
-                        .overlay {
-                            if currentEntry?.status == .inProgress {
-                                Circle()
-                                    .stroke(Color.blue.opacity(0.4), lineWidth: 2)
-                                    .scaleEffect(1.5)
-                            }
-                        }
+        if !plan.entries.isEmpty && !isAllDone {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .center, spacing: 10) {
+                    Text("Plan")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
 
-                    // Current task text
-                    if let entry = currentEntry {
-                        Text(entry.activeForm ?? entry.content)
-                            .font(.system(size: 11))
-                            .lineLimit(1)
+                    Spacer(minLength: 8)
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(progressColor)
+                            .frame(width: 8, height: 8)
+                        Text(progressLabel)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
                     }
 
-                    // Progress counter
-                    PillBadge(
-                        text: "\(completedCount)/\(totalCount)",
-                        color: .secondary,
-                        textColor: .secondary,
-                        font: .system(size: 10, weight: .medium),
-                        horizontalPadding: 6,
-                        verticalPadding: 2,
-                        backgroundOpacity: 0.25
-                    )
+                    Button {
+                        withAnimation(.spring(response: 0.22, dampingFraction: 0.88)) {
+                            isExpanded.toggle()
+                        }
+                    } label: {
+                        Label(isExpanded ? "Collapse" : "Expand", systemImage: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.secondary.opacity(0.16), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        showingSheet = true
+                    } label: {
+                        Label("Open sheet", systemImage: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.secondary.opacity(0.16), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.ultraThinMaterial, in: Capsule())
+
+                ZStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(Array(previewEntries.enumerated()), id: \.offset) { index, entry in
+                            PlanEntryRow(entry: entry, index: index + 1)
+                        }
+
+                        if hasMoreEntries {
+                            Text("+\(totalCount - previewEntries.count) more")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 2)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if hasMoreEntries {
+                        LinearGradient(
+                            colors: [
+                                Color.clear,
+                                Color(nsColor: .windowBackgroundColor).opacity(0.25),
+                                Color(nsColor: .windowBackgroundColor).opacity(0.55)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 54)
+                        .allowsHitTesting(false)
+                    }
+                }
             }
-            .buttonStyle(.plain)
+            .padding(16)
+            .background { cardBackground }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(.separator.opacity(0.3), lineWidth: 0.8)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .onTapGesture {
+                withAnimation(.spring(response: 0.22, dampingFraction: 0.88)) {
+                    isExpanded.toggle()
+                }
+            }
             .sheet(isPresented: $showingSheet) {
                 AgentPlanSheet(plan: plan)
+                    .frame(minWidth: 920, minHeight: 740)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var cardBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer {
+                shape
+                    .fill(.white.opacity(0.001))
+                    .glassEffect(.regular.interactive(), in: shape)
+                shape
+                    .fill(.white.opacity(0.03))
+            }
+        } else {
+            shape.fill(.ultraThinMaterial)
         }
     }
 }
@@ -86,10 +168,10 @@ struct AgentPlanSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             DetailHeaderBar(showsBackground: false) {
                 Text("Agent Plan")
-                    .font(.headline)
+                    .font(.title3)
+                    .fontWeight(.semibold)
             } trailing: {
                 HStack(spacing: 12) {
                     Text("\(completedCount)/\(plan.entries.count) completed")
@@ -101,7 +183,6 @@ struct AgentPlanSheet: View {
 
             Divider()
 
-            // Plan entries
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(plan.entries.enumerated()), id: \.offset) { index, entry in
@@ -111,7 +192,8 @@ struct AgentPlanSheet: View {
                 .padding()
             }
         }
-        .frame(width: 400, height: 300)
+        .background(.ultraThinMaterial)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -121,7 +203,6 @@ struct PlanEntryRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            // Status icon
             Group {
                 switch entry.status {
                 case .completed:
@@ -142,7 +223,7 @@ struct PlanEntryRow: View {
             .frame(width: 16)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.content)
+                Text(index > 0 ? "\(index). \(entry.content)" : entry.content)
                     .font(.system(size: 13))
                     .foregroundStyle(entry.status == .completed ? .secondary : .primary)
                     .strikethrough(entry.status == .completed)

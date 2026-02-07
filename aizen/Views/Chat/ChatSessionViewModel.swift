@@ -460,7 +460,7 @@ class ChatSessionViewModel: ObservableObject {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             previousMessageIds = Set(messages.map { $0.id })
             previousToolCallIds = Set(newSession.toolCalls.map { $0.id })
-            rebuildTimeline()
+            rebuildTimelineWithGrouping(isStreaming: newSession.isStreaming)
         }
 
         setupSessionObservers(session: newSession)

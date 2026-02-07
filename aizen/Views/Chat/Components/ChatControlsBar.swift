@@ -20,9 +20,6 @@ struct ChatControlsBar: View {
 
     let currentAgentSession: AgentSession?
     let hasModes: Bool
-    let attachments: [ChatAttachment]
-    let onRemoveAttachment: (ChatAttachment) -> Void
-    let plan: Plan?
     let onShowUsage: () -> Void
     let onShowHistory: () -> Void
     let showsUsage: Bool
@@ -37,24 +34,6 @@ struct ChatControlsBar: View {
 
             if hasModes, let agentSession = currentAgentSession, agentSession.availableConfigOptions.isEmpty {
                 ModeSelectorView(session: agentSession, showsBackground: false)
-            }
-
-            // Attachments and plan
-            if !attachments.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(attachments) { attachment in
-                            ChatAttachmentChip(attachment: attachment) {
-                                onRemoveAttachment(attachment)
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: 420, alignment: .leading)
-            }
-
-            if let plan = plan {
-                AgentPlanInlineView(plan: plan)
             }
 
             Spacer(minLength: 8)
@@ -93,5 +72,29 @@ struct ChatControlsBar: View {
         }
         .padding(.horizontal, Layout.horizontalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct ChatAttachmentsBar: View {
+    private enum Layout {
+        static let horizontalPadding: CGFloat = 10
+        static let chipSpacing: CGFloat = 8
+    }
+
+    let attachments: [ChatAttachment]
+    let onRemoveAttachment: (ChatAttachment) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Layout.chipSpacing) {
+                ForEach(attachments) { attachment in
+                    ChatAttachmentChip(attachment: attachment) {
+                        onRemoveAttachment(attachment)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Layout.horizontalPadding)
     }
 }

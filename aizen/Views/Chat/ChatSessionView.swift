@@ -82,6 +82,8 @@ struct ChatSessionView: View {
                         timelineItems: viewModel.timelineItems,
                         isProcessing: viewModel.isProcessing,
                         isSessionInitializing: viewModel.isSessionInitializing,
+                        pendingPlanRequest: pendingPlanTimelineRequest,
+                        currentPlan: pendingPlanTimelineRequest == nil ? viewModel.currentAgentPlan : nil,
                         selectedAgent: viewModel.selectedAgent,
                         currentThought: viewModel.currentAgentSession?.currentThought,
                         currentIterationId: viewModel.currentAgentSession?.currentIterationId,
@@ -122,52 +124,55 @@ struct ChatSessionView: View {
                 Spacer(minLength: 0)
 
                 VStack(spacing: 10) {
-                    // Permission Requests (excluding plan requests)
                     if let agentSession = viewModel.currentAgentSession,
-                       viewModel.showingPermissionAlert,
-                       let request = viewModel.currentPermissionRequest,
-                       !isPlanRequest(request) {
-                        HStack {
-                            PermissionRequestView(session: agentSession, request: request)
-                                .transition(.opacity)
-                            Spacer()
+                       let request = currentPermissionRequest {
+                        PlanApprovalPickerView(
+                            session: agentSession,
+                            request: request,
+                            onDismissWithoutResponse: { viewModel.showingPermissionAlert = false }
+                        )
+                        .transition(.opacity)
+                        .padding(.horizontal, 20)
+                    } else {
+                        if !viewModel.attachments.isEmpty {
+                            ChatAttachmentsBar(
+                                attachments: viewModel.attachments,
+                                onRemoveAttachment: viewModel.removeAttachment
+                            )
+                            .padding(.horizontal, 20)
                         }
+
+                        ChatInputBar(
+                            inputText: $inputText,
+                            pendingCursorPosition: $pendingCursorPosition,
+                            attachments: $viewModel.attachments,
+                            isProcessing: $viewModel.isProcessing,
+                            showingVoiceRecording: $showingVoiceRecording,
+                            showingAttachmentPicker: $showingAttachmentPicker,
+                            showingPermissionError: $showingPermissionError,
+                            permissionErrorMessage: $permissionErrorMessage,
+                            worktreePath: viewModel.worktree.path ?? "",
+                            session: viewModel.currentAgentSession,
+                            currentModeId: viewModel.currentModeId,
+                            selectedAgent: viewModel.selectedAgent,
+                            isSessionReady: viewModel.isSessionReady,
+                            isRestoringSession: viewModel.isResumingSession,
+                            audioService: viewModel.audioService,
+                            autocompleteHandler: viewModel.autocompleteHandler,
+                            onSend: { sendMessage() },
+                            onCancel: viewModel.cancelCurrentPrompt,
+                            onAutocompleteSelect: { handleAutocompleteSelection() },
+                            onImagePaste: { data, mimeType in
+                                viewModel.attachments.append(.image(data, mimeType: mimeType))
+                            },
+                            onAgentSelect: viewModel.requestAgentSwitch
+                        )
                         .padding(.horizontal, 20)
                     }
-
-                    ChatInputBar(
-                        inputText: $inputText,
-                        pendingCursorPosition: $pendingCursorPosition,
-                        attachments: $viewModel.attachments,
-                        isProcessing: $viewModel.isProcessing,
-                        showingVoiceRecording: $showingVoiceRecording,
-                        showingAttachmentPicker: $showingAttachmentPicker,
-                        showingPermissionError: $showingPermissionError,
-                        permissionErrorMessage: $permissionErrorMessage,
-                        worktreePath: viewModel.worktree.path ?? "",
-                        session: viewModel.currentAgentSession,
-                        currentModeId: viewModel.currentModeId,
-                        selectedAgent: viewModel.selectedAgent,
-                        isSessionReady: viewModel.isSessionReady,
-                        isRestoringSession: viewModel.isResumingSession,
-                        audioService: viewModel.audioService,
-                        autocompleteHandler: viewModel.autocompleteHandler,
-                        onSend: { sendMessage() },
-                        onCancel: viewModel.cancelCurrentPrompt,
-                        onAutocompleteSelect: { handleAutocompleteSelection() },
-                        onImagePaste: { data, mimeType in
-                            viewModel.attachments.append(.image(data, mimeType: mimeType))
-                        },
-                        onAgentSelect: viewModel.requestAgentSwitch
-                    )
-                    .padding(.horizontal, 20)
 
                     ChatControlsBar(
                         currentAgentSession: viewModel.currentAgentSession,
                         hasModes: viewModel.hasModes,
-                        attachments: viewModel.attachments,
-                        onRemoveAttachment: viewModel.removeAttachment,
-                        plan: viewModel.currentAgentPlan,
                         onShowUsage: { showingUsageSheet = true },
                         onShowHistory: {
                             SessionsWindowManager.shared.show(context: viewContext, worktreeId: worktree.id)
@@ -279,34 +284,6 @@ struct ChatSessionView: View {
         .sheet(item: $selectedToolCall) { toolCall in
             ToolDetailsSheet(toolCalls: [toolCall], agentSession: viewModel.currentAgentSession)
         }
-        .sheet(isPresented: Binding(
-            get: {
-                // Show plan approval sheet if we have a plan request
-                if viewModel.showingPermissionAlert,
-                   let request = viewModel.currentPermissionRequest,
-                   isPlanRequest(request) {
-                    return true
-                }
-                return false
-            },
-            set: { if !$0 {
-                viewModel.showingPermissionAlert = false
-            }}
-        )) {
-            // Plan approval dialog
-            if let request = viewModel.currentPermissionRequest,
-               isPlanRequest(request),
-               let agentSession = viewModel.currentAgentSession {
-                PlanApprovalDialog(
-                    session: agentSession,
-                    request: request,
-                    isPresented: Binding(
-                        get: { true },
-                        set: { if !$0 { viewModel.showingPermissionAlert = false } }
-                    )
-                )
-            }
-        }
         .alert(String(localized: "chat.agent.switch.title"), isPresented: $viewModel.showingAgentSwitchWarning) {
             Button(String(localized: "chat.button.cancel"), role: .cancel) {
                 viewModel.pendingAgentSwitch = nil
@@ -340,6 +317,22 @@ struct ChatSessionView: View {
             return false
         }
         return true
+    }
+
+    private var pendingPlanTimelineRequest: RequestPermissionRequest? {
+        guard let request = viewModel.currentPermissionRequest,
+              isPlanRequest(request) else {
+            return nil
+        }
+        return request
+    }
+
+    private var currentPermissionRequest: RequestPermissionRequest? {
+        guard viewModel.showingPermissionAlert,
+              let request = viewModel.currentPermissionRequest else {
+            return nil
+        }
+        return request
     }
 
     private var shouldShowScrollToBottom: Bool {
@@ -398,6 +391,11 @@ struct ChatSessionView: View {
         let keyCodeReturn: UInt16 = 36
         let keyCodeC: UInt16 = 8
 
+        if event.keyCode == keyCodeEscape, let permissionRequest = currentPermissionRequest {
+            handlePermissionPickerEscape(request: permissionRequest)
+            return nil
+        }
+
         if showingVoiceRecording {
             if event.keyCode == keyCodeEscape {
                 cancelChatVoiceRecording()
@@ -437,6 +435,42 @@ struct ChatSessionView: View {
         }
 
         return event
+    }
+
+    private func handlePermissionPickerEscape(request: RequestPermissionRequest) {
+        // For plan permission, ESC closes picker but keeps plan visible in timeline.
+        if isPlanRequest(request) {
+            viewModel.showingPermissionAlert = false
+        } else {
+            if viewModel.isProcessing {
+                viewModel.cancelCurrentPrompt()
+            }
+
+            if let optionId = preferredPermissionDismissOptionId(for: request),
+               let agentSession = viewModel.currentAgentSession {
+                agentSession.respondToPermission(optionId: optionId)
+            } else {
+                viewModel.showingPermissionAlert = false
+            }
+        }
+    }
+
+    private func preferredPermissionDismissOptionId(for request: RequestPermissionRequest) -> String? {
+        guard let options = request.options, !options.isEmpty else {
+            return nil
+        }
+        if let dismissOption = options.first(where: { isPermissionDismissOptionKind($0.kind) }) {
+            return dismissOption.optionId
+        }
+        return options.last?.optionId
+    }
+
+    private func isPermissionDismissOptionKind(_ kind: String) -> Bool {
+        let normalized = kind.lowercased()
+        return normalized.contains("reject")
+            || normalized.contains("deny")
+            || normalized.contains("cancel")
+            || normalized.contains("decline")
     }
 
     private func toggleChatVoiceRecording() {
