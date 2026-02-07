@@ -24,6 +24,8 @@ struct WorkspaceSidebarView: View {
     @State private var showingWorkspaceSheet = false
     @State private var showingWorkspaceSwitcher = false
     @State private var showingSupportSheet = false
+    @State private var showingRepositorySearch = false
+    @State private var showingRepositoryFilters = false
     @State private var workspaceToEdit: Workspace?
     @State private var refreshTask: Task<Void, Never>?
     @State private var missingRepository: RepositoryManager.MissingRepository?
@@ -31,13 +33,6 @@ struct WorkspaceSidebarView: View {
 
     private var selectedStatusFilters: Set<ItemStatus> {
         ItemStatus.decode(storedStatusFilters)
-    }
-
-    private var selectedStatusFiltersBinding: Binding<Set<ItemStatus>> {
-        Binding(
-            get: { ItemStatus.decode(storedStatusFilters) },
-            set: { storedStatusFilters = ItemStatus.encode($0) }
-        )
     }
 
     private var isLicenseActive: Bool {
@@ -87,6 +82,202 @@ struct WorkspaceSidebarView: View {
                 .filter { ($0.name ?? "").localizedCaseInsensitiveContains(searchText) }
                 .sorted { ($0.name ?? "") < ($1.name ?? "") }
         }
+    }
+
+    private var workspaceRowFill: Color {
+        Color.primary.opacity(0.05)
+    }
+
+    private var inlineSearchStroke: Color {
+        Color.primary.opacity(0.08)
+    }
+
+    private var repositorySearchVisible: Bool {
+        showingRepositorySearch || !searchText.isEmpty
+    }
+
+    private var isRepositoryFiltering: Bool {
+        !selectedStatusFilters.isEmpty && selectedStatusFilters.count < ItemStatus.allCases.count
+    }
+
+    private var repositoryFiltersVisible: Bool {
+        showingRepositoryFilters
+    }
+
+    private func updateRepositoryFilters(_ filters: Set<ItemStatus>) {
+        storedStatusFilters = ItemStatus.encode(filters)
+    }
+
+    private func toggleRepositoryStatus(_ status: ItemStatus) {
+        var filters = selectedStatusFilters
+        if filters.contains(status) {
+            filters.remove(status)
+        } else {
+            filters.insert(status)
+        }
+        updateRepositoryFilters(filters)
+    }
+
+    @ViewBuilder
+    private var repositoryFiltersInline: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Button {
+                    updateRepositoryFilters(Set(ItemStatus.allCases))
+                } label: {
+                    Label("filter.all", systemImage: "checkmark.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    storedStatusFilters = ""
+                } label: {
+                    Label("filter.clear", systemImage: "xmark.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
+            .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(ItemStatus.allCases) { status in
+                    Button {
+                        toggleRepositoryStatus(status)
+                    } label: {
+                        HStack(spacing: 7) {
+                            Circle()
+                                .fill(status.color)
+                                .frame(width: 9, height: 9)
+                            Text(status.title)
+                                .font(.caption)
+                                .lineLimit(1)
+                            Spacer(minLength: 8)
+                            if selectedStatusFilters.contains(status) {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(selectedStatusFilters.contains(status) ? Color.primary.opacity(0.12) : Color.clear)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.primary)
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(inlineSearchStroke, lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder
+    private var repositorySearchInline: some View {
+        SearchField(
+            placeholder: "workspace.search.placeholder",
+            text: $searchText,
+            spacing: 8,
+            iconSize: 15,
+            iconWeight: .regular,
+            iconColor: .secondary,
+            textFont: .system(size: 14, weight: .medium),
+            clearButtonSize: 13,
+            clearButtonWeight: .semibold,
+            trailing: {
+                EmptyView()
+            }
+        )
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(inlineSearchStroke, lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder
+    private var repositoryControls: some View {
+        HStack(spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    showingRepositoryFilters.toggle()
+                }
+            } label: {
+                Image(systemName: (repositoryFiltersVisible || isRepositoryFiltering)
+                      ? "line.3.horizontal.decrease.circle.fill"
+                      : "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle((repositoryFiltersVisible || isRepositoryFiltering) ? .primary : .secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Filter repositories")
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    if repositorySearchVisible {
+                        showingRepositorySearch = false
+                        searchText = ""
+                    } else {
+                        showingRepositorySearch = true
+                    }
+                }
+            } label: {
+                Image(systemName: repositorySearchVisible ? "xmark.circle.fill" : "magnifyingglass")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(repositorySearchVisible ? "Hide search" : "Search repositories")
+        }
+    }
+
+    @ViewBuilder
+    private var workspacePicker: some View {
+        Button {
+            showingWorkspaceSwitcher = true
+        } label: {
+            HStack(spacing: 12) {
+                if let workspace = selectedWorkspace {
+                    Circle()
+                        .fill(colorFromHex(workspace.colorHex ?? "#0000FF"))
+                        .frame(width: 10, height: 10)
+
+                    Text(workspace.name ?? String(localized: "workspace.untitled"))
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.primary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .imageScale(.small)
+                } else {
+                    Text(String(localized: "workspace.untitled"))
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.primary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 9)
+            .background(workspaceRowFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private func startPeriodicRefresh() {
@@ -162,73 +353,41 @@ struct WorkspaceSidebarView: View {
         VStack(spacing: 0) {
             // Workspace section
             VStack(alignment: .leading, spacing: 8) {
-                Text("workspace.sidebar.title")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
+                HStack(spacing: 8) {
+                    Text("workspace.sidebar.title")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+
+                    Spacer(minLength: 8)
+
+                    repositoryControls
+                }
                     .padding(.horizontal, 12)
 
                 // Current workspace button
-                Button {
-                    showingWorkspaceSwitcher = true
-                } label: {
-                    HStack(spacing: 12) {
-                        if let workspace = selectedWorkspace {
-                            Circle()
-                                .fill(colorFromHex(workspace.colorHex ?? "#0000FF"))
-                                .frame(width: 8, height: 8)
-
-                            Text(workspace.name ?? String(localized: "workspace.untitled"))
-                                .font(.body)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(Color.primary)
-                                .lineLimit(1)
-
-                            Spacer(minLength: 8)
-
-                            let repoCount = (workspace.repositories as? Set<Repository>)?.count ?? 0
-                            PillBadge(
-                                text: "\(repoCount)",
-                                color: .secondary,
-                                textColor: .secondary,
-                                font: .caption,
-                                horizontalPadding: 6,
-                                verticalPadding: 2,
-                                backgroundOpacity: 0.2
-                            )
-
-                            Image(systemName: "chevron.up.chevron.down")
-                                .foregroundStyle(.secondary)
-                                .imageScale(.small)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                workspacePicker
                 .padding(.horizontal, 12)
             }
             .padding(.top, 12)
-            .padding(.bottom, 8)
+            .padding(.bottom, 4)
 
-            Divider()
+            if repositoryFiltersVisible {
+                repositoryFiltersInline
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
-            // Search field
-            SearchField(
-                placeholder: "workspace.search.placeholder",
-                text: $searchText,
-                iconColor: .secondary,
-                trailing: {
-                    StatusFilterDropdown(selectedStatuses: selectedStatusFiltersBinding)
-                }
-            )
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            Divider()
+            if repositorySearchVisible {
+                repositorySearchInline
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             // Repository list
             if filteredRepositories.isEmpty {
@@ -272,34 +431,35 @@ struct WorkspaceSidebarView: View {
                 }
                 .frame(maxWidth: .infinity)
             } else {
-                List {
-                    ForEach(filteredRepositories, id: \.id) { repository in
-                        RepositoryRow(
-                            repository: repository,
-                            isSelected: selectedRepository?.id == repository.id,
-                            repositoryManager: repositoryManager,
-                            onSelect: {
-                                selectedRepository = repository
-                                // Auto-select primary worktree if no worktree is selected
-                                if selectedWorktree == nil {
-                                    let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-                                    selectedWorktree = worktrees.first(where: { $0.isPrimary })
+                ScrollView {
+                    LazyVStack(spacing: 4) {
+                        ForEach(filteredRepositories, id: \.id) { repository in
+                            RepositoryRow(
+                                repository: repository,
+                                isSelected: selectedRepository?.id == repository.id,
+                                repositoryManager: repositoryManager,
+                                onSelect: {
+                                    selectedRepository = repository
+                                    // Auto-select primary worktree if no worktree is selected
+                                    if selectedWorktree == nil {
+                                        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
+                                        selectedWorktree = worktrees.first(where: { $0.isPrimary })
+                                    }
+                                },
+                                onRemove: {
+                                    if selectedRepository?.id == repository.id {
+                                        selectedRepository = nil
+                                        selectedWorktree = nil
+                                    }
                                 }
-                            },
-                            onRemove: {
-                                if selectedRepository?.id == repository.id {
-                                    selectedRepository = nil
-                                    selectedWorktree = nil
-                                }
-                            }
-                        )
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 4)
+                    .padding(.bottom, 2)
                 }
-                .listStyle(.sidebar)
-                .scrollContentBackground(.hidden)
-                .padding(.top, 12)
             }
 
             Divider()
@@ -523,6 +683,7 @@ struct RepositoryRow: View {
     @ObservedObject var repositoryManager: RepositoryManager
     let onSelect: () -> Void
     let onRemove: () -> Void
+    @Environment(\.controlActiveState) private var controlActiveState
 
     @State private var showingRemoveConfirmation = false
     @State private var alsoDeleteFromFilesystem = false
@@ -746,41 +907,78 @@ struct RepositoryRow: View {
         ItemStatus(rawValue: repository.status ?? "active") ?? .active
     }
 
+    private var activeSessionCount: Int {
+        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
+        return worktrees.reduce(0) { total, worktree in
+            guard !worktree.isDeleted else { return total }
+
+            let chatCount = ((worktree.chatSessions as? Set<ChatSession>) ?? [])
+                .filter { !$0.isDeleted }
+                .count
+            let terminalCount = ((worktree.terminalSessions as? Set<TerminalSession>) ?? [])
+                .filter { !$0.isDeleted }
+                .count
+            let browserCount = ((worktree.browserSessions as? Set<BrowserSession>) ?? [])
+                .filter { !$0.isDeleted }
+                .count
+
+            return total + chatCount + terminalCount + browserCount
+        }
+    }
+
+    private var sessionIndicatorColor: Color {
+        isSelected ? selectedForegroundColor.opacity(0.9) : .secondary
+    }
+
+    private var selectedForegroundColor: Color {
+        controlActiveState == .key ? .accentColor : .accentColor.opacity(0.78)
+    }
+
+    private var selectionFillColor: Color {
+        let base = NSColor.unemphasizedSelectedContentBackgroundColor
+        let alpha: Double = controlActiveState == .key ? 0.26 : 0.18
+        return Color(nsColor: base).opacity(alpha)
+    }
+
     private var repositoryLabel: some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: "folder.badge.gearshape")
-                .symbolRenderingMode(.palette)
-                .foregroundStyle(
-                    repositoryStatus.color,
-                    isSelected ? Color.accentColor : .secondary
-                )
+                .symbolRenderingMode(isSelected ? .monochrome : .palette)
+                .foregroundStyle(isSelected ? selectedForegroundColor : repositoryStatus.color, .secondary)
                 .imageScale(.medium)
                 .frame(width: 18, height: 18)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(repository.name ?? String(localized: "workspace.repository.unknown"))
                     .font(.body)
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                    .foregroundStyle(isSelected ? selectedForegroundColor : Color.primary)
                     .lineLimit(1)
-
-                if let path = repository.path {
-                    Text(path)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
 
                 if let note = repository.note, !note.isEmpty {
                     Text(note)
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(
+                            isSelected
+                                ? selectedForegroundColor.opacity(0.75)
+                                : Color.secondary.opacity(0.7)
+                        )
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
             }
 
             Spacer(minLength: 8)
+
+            if activeSessionCount > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("\(activeSessionCount)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                }
+                .foregroundStyle(sessionIndicatorColor)
+            }
         }
         .padding(.leading, 8)
         .padding(.trailing, 12)
@@ -791,11 +989,12 @@ struct RepositoryRow: View {
         }
     }
 
-    @ViewBuilder
     private var selectionBackground: some View {
-        if isSelected {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.accentColor.opacity(0.15))
+        Group {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(selectionFillColor)
+            }
         }
     }
 
@@ -831,6 +1030,13 @@ struct WorkspaceRow: View {
     let colorFromHex: (String) -> Color
     let onSelect: () -> Void
     let onEdit: () -> Void
+    @Environment(\.controlActiveState) private var controlActiveState
+
+    private var selectionFillColor: Color {
+        let base = NSColor.unemphasizedSelectedContentBackgroundColor
+        let alpha: Double = controlActiveState == .key ? 0.26 : 0.18
+        return Color(nsColor: base).opacity(alpha)
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -840,29 +1046,18 @@ struct WorkspaceRow: View {
 
             Text(workspace.name ?? String(localized: "workspace.untitled"))
                 .font(.body)
-                .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                .fontWeight(.semibold)
+                .foregroundStyle(isSelected ? Color(nsColor: .selectedTextColor) : Color.primary)
                 .lineLimit(1)
 
             Spacer(minLength: 8)
-
-            let repoCount = (workspace.repositories as? Set<Repository>)?.count ?? 0
-            PillBadge(
-                text: "\(repoCount)",
-                color: .secondary,
-                textColor: .secondary,
-                font: .caption,
-                horizontalPadding: 6,
-                verticalPadding: 2,
-                backgroundOpacity: 0.2
-            )
 
             if isHovered || isSelected {
                 Button {
                     onEdit()
                 } label: {
                     Image(systemName: "pencil.circle.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isSelected ? Color(nsColor: .selectedTextColor).opacity(0.9) : .secondary)
                         .imageScale(.medium)
                 }
                 .buttonStyle(.plain)
@@ -871,7 +1066,12 @@ struct WorkspaceRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+        .background(
+            isSelected
+                ? RoundedRectangle(cornerRadius: 6)
+                    .fill(selectionFillColor)
+                : nil
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             onSelect()

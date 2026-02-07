@@ -10,6 +10,7 @@ import SwiftUI
 
 struct ModeSelectorView: View {
     @ObservedObject var session: AgentSession
+    var showsBackground: Bool = true
 
     var body: some View {
         Menu {
@@ -37,16 +38,28 @@ struct ModeSelectorView: View {
                 if let currentModeId = session.currentModeId,
                    let mode = SessionMode(rawValue: currentModeId) {
                     modeIcon(for: mode)
+                } else {
+                    Image(systemName: "checklist")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
                 }
                 if let currentModeId = session.currentModeId,
                    let currentMode = session.availableModes.first(where: { $0.id == currentModeId }) {
                     Text(currentMode.name)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: showsBackground ? 12 : 13, weight: .medium))
+                }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: showsBackground ? 8 : 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, showsBackground ? 10 : 0)
+            .padding(.vertical, showsBackground ? 5 : 0)
+            .background {
+                if showsBackground {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.ultraThinMaterial)
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)

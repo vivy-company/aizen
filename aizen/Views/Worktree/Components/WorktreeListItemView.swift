@@ -15,6 +15,7 @@ struct WorktreeListItemView: View {
     let allWorktrees: [Worktree]
     @Binding var selectedWorktree: Worktree?
     @ObservedObject var tabStateManager: WorktreeTabStateManager
+    @Environment(\.controlActiveState) private var controlActiveState
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "WorktreeListItemView")
 
@@ -66,66 +67,128 @@ struct WorktreeListItemView: View {
         ItemStatus(rawValue: worktree.status ?? "active") ?? .active
     }
 
+    private var activeViewType: String {
+        guard let worktreeId = worktree.id else { return "" }
+        return tabStateManager.getState(for: worktreeId).viewType
+    }
+
+    private var chatSessionCount: Int {
+        let sessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
+        return sessions.filter { !$0.isDeleted }.count
+    }
+
+    private var terminalSessionCount: Int {
+        let sessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
+        return sessions.filter { !$0.isDeleted }.count
+    }
+
+    private var browserSessionCount: Int {
+        let sessions = (worktree.browserSessions as? Set<BrowserSession>) ?? []
+        return sessions.filter { !$0.isDeleted }.count
+    }
+
+    private var fileSessionCount: Int {
+        guard let session = worktree.fileBrowserSession, !session.isDeleted else { return 0 }
+        return 1
+    }
+
+    private var primaryTextColor: Color {
+        isSelected ? selectedForegroundColor : .primary
+    }
+
+    private var secondaryTextColor: Color {
+        isSelected ? selectedForegroundColor.opacity(0.78) : .secondary
+    }
+
+    private var selectedForegroundColor: Color {
+        controlActiveState == .key ? .accentColor : .accentColor.opacity(0.78)
+    }
+
+    private var selectionFillColor: Color {
+        let base = NSColor.unemphasizedSelectedContentBackgroundColor
+        let alpha: Double = controlActiveState == .key ? 0.26 : 0.18
+        return Color(nsColor: base).opacity(alpha)
+    }
+
+    private func sessionIconColor(for viewType: String) -> Color {
+        let isActive = activeViewType == viewType
+        if isSelected {
+            return selectedForegroundColor.opacity(isActive ? 1.0 : 0.75)
+        }
+        return isActive ? .primary : .secondary
+    }
+
+    @ViewBuilder
+    private var sessionIcons: some View {
+        HStack(spacing: 8) {
+            if chatSessionCount > 0 {
+                Image(systemName: "message")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(sessionIconColor(for: "chat"))
+                    .help("Chat")
+            }
+            if terminalSessionCount > 0 {
+                Image(systemName: "terminal")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(sessionIconColor(for: "terminal"))
+                    .help("Terminal")
+            }
+            if browserSessionCount > 0 {
+                Image(systemName: "globe")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(sessionIconColor(for: "browser"))
+                    .help("Browser")
+            }
+            if fileSessionCount > 0 {
+                Image(systemName: "folder")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(sessionIconColor(for: "files"))
+                    .help("Files")
+            }
+        }
+    }
+
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: worktree.isPrimary ? "arrow.triangle.branch" : "arrow.triangle.2.circlepath")
-                .foregroundStyle(isSelected ? Color.accentColor : worktreeStatus.color)
-                .imageScale(.medium)
-                .frame(width: 20, height: 20)
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(worktree.branch ?? String(localized: "worktree.list.unknown"))
-                        .font(.headline)
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-
-                    if worktree.isPrimary {
-                        PillBadge(
-                            text: String(localized: "worktree.detail.main"),
-                            color: .blue,
-                            textColor: .white,
-                            font: .caption2,
-                            fontWeight: .semibold,
-                            horizontalPadding: 6,
-                            verticalPadding: 2,
-                            backgroundOpacity: 1.0
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 8) {
+                if worktree.isPrimary {
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .frame(width: 14, height: 14)
+                        .foregroundStyle(
+                            isSelected
+                                ? selectedForegroundColor
+                                : Color(nsColor: .systemOrange).opacity(0.88)
                         )
-                    }
+                        .help(String(localized: "worktree.detail.main"))
                 }
 
-                Text(worktree.path ?? "")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(worktree.branch ?? String(localized: "worktree.list.unknown"))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(primaryTextColor)
                     .lineLimit(1)
 
-                if let note = worktree.note, !note.isEmpty {
-                    Text(note)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
+                Spacer(minLength: 8)
 
-                if let lastAccessed = worktree.lastAccessed {
-                    Text(String(localized: "worktree.list.lastAccessed \(lastAccessed.formatted(.relative(presentation: .named)))"))
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-
-                ActiveTabIndicatorView(
-                    worktree: worktree,
-                    tabStateManager: tabStateManager
-                )
+                sessionIcons
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer()
+            if let note = worktree.note, !note.isEmpty {
+                Text(note)
+                    .font(.subheadline)
+                    .foregroundStyle(secondaryTextColor)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             isSelected
                 ? RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.accentColor.opacity(0.15))
+                    .fill(selectionFillColor)
                 : nil
         )
         .contentShape(Rectangle())

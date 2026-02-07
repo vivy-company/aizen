@@ -10,6 +10,7 @@ import SwiftUI
 
 struct AgentConfigMenu: View {
     @ObservedObject var session: AgentSession
+    var showsBackground: Bool = true
     
     var body: some View {
         if !session.availableConfigOptions.isEmpty {
@@ -43,12 +44,23 @@ struct AgentConfigMenu: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(currentOptionName(for: option))
+                Image(systemName: iconName(for: option))
                     .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(currentOptionName(for: option))
+                    .font(.system(size: showsBackground ? 12 : 13, weight: .medium))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: showsBackground ? 8 : 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, showsBackground ? 10 : 0)
+            .padding(.vertical, showsBackground ? 5 : 0)
+            .background {
+                if showsBackground {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                }
+            }
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
@@ -88,5 +100,19 @@ struct AgentConfigMenu: View {
             }
         }
         return currentId
+    }
+
+    private func iconName(for option: SessionConfigOption) -> String {
+        let name = option.name.lowercased()
+        if name.contains("permission") || name.contains("access") || name.contains("sandbox") {
+            return "lock.shield"
+        }
+        if name.contains("model") {
+            return "cpu"
+        }
+        if name.contains("effort") || name.contains("reason") || name.contains("thinking") {
+            return "gauge.with.dots.needle.33percent"
+        }
+        return "slider.horizontal.3"
     }
 }

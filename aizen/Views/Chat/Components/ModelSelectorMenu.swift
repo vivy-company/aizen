@@ -11,6 +11,8 @@ struct ModelSelectorMenu: View {
     @ObservedObject var session: AgentSession
     let selectedAgent: String
     let onAgentSelect: (String) -> Void
+    var showsBackground: Bool = true
+    var showsIcon: Bool = true
 
     @State private var enabledAgents: [AgentMetadata] = []
 
@@ -72,7 +74,12 @@ struct ModelSelectorMenu: View {
         } label: {
             AgentMenuLabel(
                 agentId: selectedAgent,
-                title: currentModelName
+                title: currentModelName,
+                showsIcon: showsIcon,
+                showsBackground: showsBackground,
+                titleFontSize: showsBackground ? 11 : 13,
+                iconSize: showsBackground ? 12 : 13,
+                chevronSize: showsBackground ? 8 : 10
             )
         }
         .menuStyle(.borderlessButton)

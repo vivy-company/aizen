@@ -11,19 +11,31 @@ struct AgentMenuLabel: View {
     let agentId: String
     let title: String
     var showsChevron: Bool = true
+    var showsIcon: Bool = true
+    var showsBackground: Bool = true
+    var titleFontSize: CGFloat = 11
+    var iconSize: CGFloat = 12
+    var chevronSize: CGFloat = 8
 
     var body: some View {
         HStack(spacing: 6) {
-            AgentIconView(agent: agentId, size: 12)
+            if showsIcon {
+                AgentIconView(agent: agentId, size: iconSize)
+            }
             Text(title)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: titleFontSize, weight: .medium))
             if showsChevron {
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 8))
+                    .font(.system(size: chevronSize))
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, showsBackground ? 8 : 0)
+        .padding(.vertical, showsBackground ? 4 : 0)
+        .background {
+            if showsBackground {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            }
+        }
     }
 }

@@ -12,6 +12,7 @@ struct WorktreeListView: View {
     @Binding var selectedWorktree: Worktree?
     @ObservedObject var repositoryManager: RepositoryManager
     @ObservedObject var tabStateManager: WorktreeTabStateManager
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var showingCreateWorktree = false
     @State private var searchText = ""
@@ -61,21 +62,62 @@ struct WorktreeListView: View {
         return result
     }
 
+    private var searchFieldStroke: Color {
+        colorScheme == .dark ? .white.opacity(0.08) : .black.opacity(0.06)
+    }
+
+    private var searchFieldFillFallback: Color {
+        colorScheme == .dark ? Color(nsColor: .windowBackgroundColor).opacity(0.58) : .white.opacity(0.78)
+    }
+
+    @ViewBuilder
+    private var searchFieldBackground: some View {
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer {
+                Capsule()
+                    .fill(.white.opacity(0.001))
+                    .glassEffect(.regular, in: Capsule())
+            }
+            .allowsHitTesting(false)
+        } else {
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .background(searchFieldFillFallback, in: Capsule())
+        }
+    }
+
+    @ViewBuilder
+    private var searchBar: some View {
+        SearchField(
+            placeholder: "worktree.list.search",
+            text: $searchText,
+            spacing: 10,
+            iconSize: 18,
+            iconWeight: .medium,
+            iconColor: .secondary,
+            textFont: .system(size: 14, weight: .medium),
+            clearButtonSize: 13,
+            clearButtonWeight: .semibold,
+            trailing: {
+                StatusFilterDropdown(selectedStatuses: selectedStatusFiltersBinding)
+            }
+        )
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(searchFieldBackground)
+        .overlay {
+            Capsule()
+                .strokeBorder(searchFieldStroke, lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Search field
-            SearchField(
-                placeholder: "worktree.list.search",
-                text: $searchText,
-                iconColor: .secondary,
-                trailing: {
-                    StatusFilterDropdown(selectedStatuses: selectedStatusFiltersBinding)
-                }
-            )
+            searchBar
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-
-            Divider()
 
             if worktrees.isEmpty {
                 VStack(spacing: 12) {
@@ -118,25 +160,26 @@ struct WorktreeListView: View {
                 }
                 .frame(maxWidth: .infinity)
             } else {
-                List {
-                    ForEach(worktrees, id: \.id) { worktree in
-                        WorktreeListItemView(
-                            worktree: worktree,
-                            isSelected: selectedWorktree?.id == worktree.id,
-                            repositoryManager: repositoryManager,
-                            allWorktrees: worktrees,
-                            selectedWorktree: $selectedWorktree,
-                            tabStateManager: tabStateManager
-                        )
-                        .onTapGesture {
-                            selectedWorktree = worktree
+                ScrollView {
+                    LazyVStack(spacing: 4) {
+                        ForEach(worktrees, id: \.id) { worktree in
+                            WorktreeListItemView(
+                                worktree: worktree,
+                                isSelected: selectedWorktree?.id == worktree.id,
+                                repositoryManager: repositoryManager,
+                                allWorktrees: worktrees,
+                                selectedWorktree: $selectedWorktree,
+                                tabStateManager: tabStateManager
+                            )
+                            .onTapGesture {
+                                selectedWorktree = worktree
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                 }
-                .listStyle(.sidebar)
-                .scrollContentBackground(.hidden)
             }
         }
         .navigationTitle(repository.name ?? "Unknown")

@@ -122,7 +122,7 @@ struct ChatSessionView: View {
 
                 Spacer(minLength: 0)
 
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     // Permission Requests (excluding plan requests)
                     if let agentSession = viewModel.currentAgentSession,
                        viewModel.showingPermissionAlert,
@@ -135,20 +135,6 @@ struct ChatSessionView: View {
                         }
                         .padding(.horizontal, 20)
                     }
-
-                    ChatControlsBar(
-                        selectedAgent: viewModel.selectedAgent,
-                        currentAgentSession: viewModel.currentAgentSession,
-                        hasModes: viewModel.hasModes,
-                        attachments: viewModel.attachments,
-                        onRemoveAttachment: viewModel.removeAttachment,
-                        plan: viewModel.currentAgentPlan,
-                        onShowUsage: { showingUsageSheet = true },
-                        onNewSession: viewModel.restartSession,
-                        showsUsage: supportsUsageMetrics,
-                        worktreeId: worktree.id
-                    )
-                    .padding(.horizontal, 20)
 
                     ChatInputBar(
                         inputText: $inputText,
@@ -176,11 +162,25 @@ struct ChatSessionView: View {
                         onAgentSelect: viewModel.requestAgentSwitch
                     )
                     .padding(.horizontal, 20)
+
+                    ChatControlsBar(
+                        currentAgentSession: viewModel.currentAgentSession,
+                        hasModes: viewModel.hasModes,
+                        attachments: viewModel.attachments,
+                        onRemoveAttachment: viewModel.removeAttachment,
+                        plan: viewModel.currentAgentPlan,
+                        onShowUsage: { showingUsageSheet = true },
+                        onShowHistory: {
+                            SessionsWindowManager.shared.show(context: viewContext, worktreeId: worktree.id)
+                        },
+                        showsUsage: supportsUsageMetrics
+                    )
+                    .padding(.horizontal, 20)
                 }
-                .padding(.top, 16)
+                .padding(.top, 12)
                 .padding(.bottom, 20)
             }
-            .frame(maxWidth: 1100)
+            .frame(maxWidth: 940)
             .frame(maxWidth: .infinity)
         }
         .background(WindowResizeObserver(isResizing: $isWindowResizing))

@@ -11,6 +11,23 @@ import UniformTypeIdentifiers
 import os.log
 
 struct ChatInputBar: View {
+    private enum Layout {
+        static let outerHorizontalPadding: CGFloat = 12
+        static let outerVerticalPadding: CGFloat = 8
+        static let rowTopPadding: CGFloat = 0
+        static let rowSpacing: CGFloat = 10
+        static let trailingControlsSpacing: CGFloat = 8
+        static let compactIconSize: CGFloat = 15
+        static let actionControlSize: CGFloat = 36
+        static let placeholderTopPadding: CGFloat = 6
+        static let minHeightNormal: CGFloat = 48
+        static let minHeightVoice: CGFloat = 50
+        static let cornerRadiusNormal: CGFloat = 22
+        static let cornerRadiusVoice: CGFloat = 20
+        static let textMinHeight: CGFloat = 42
+        static let textMaxHeight: CGFloat = 140
+    }
+
     private let logger = Logger.chat
     @Binding var inputText: String
     @Binding var pendingCursorPosition: Int?
@@ -47,27 +64,15 @@ struct ChatInputBar: View {
         .accentColor.opacity(0.7), .accentColor.opacity(0.4), .accentColor.opacity(0.7)
     ]
 
-    private var placeholderKey: LocalizedStringKey {
+    private var placeholderText: LocalizedStringKey {
         if isSessionReady {
-            return "chat.input.placeholder"
+            return "Ask anything, @ to add files, / for commands"
         }
         return isRestoringSession ? "chat.session.restoring" : "chat.session.starting"
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            if !showingVoiceRecording {
-                Button(action: { showingAttachmentPicker.toggle() }) {
-                    Image(systemName: "paperclip")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(!isSessionReady ? .tertiary : .secondary)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(!isSessionReady)
-                .transition(.opacity)
-            }
-
+        VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topLeading) {
                 if showingVoiceRecording {
                     VoiceRecordingView(
@@ -88,10 +93,10 @@ struct ChatInputBar: View {
                     .transition(.opacity)
                 } else {
                     if inputText.isEmpty {
-                        Text(placeholderKey)
-                            .font(.system(size: 14))
+                        Text(placeholderText)
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.tertiary)
-                            .padding(.top, 6)
+                            .padding(.top, Layout.placeholderTopPadding)
                             .allowsHitTesting(false)
                     }
 
@@ -128,69 +133,112 @@ struct ChatInputBar: View {
                     .disabled(!isSessionReady)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 40)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: showingVoiceRecording ? Layout.minHeightVoice : Layout.minHeightNormal,
+                alignment: .leading
+            )
 
             if !showingVoiceRecording {
-                if let agentSession = session, !agentSession.availableModels.isEmpty {
-                    ModelSelectorMenu(session: agentSession, selectedAgent: selectedAgent, onAgentSelect: onAgentSelect)
+                HStack(spacing: Layout.rowSpacing) {
+                    Button(action: { showingAttachmentPicker.toggle() }) {
+                        Image(systemName: "paperclip")
+                            .font(.system(size: Layout.compactIconSize, weight: .medium))
+                            .foregroundStyle(!isSessionReady ? .tertiary : .secondary)
+                            .frame(width: Layout.actionControlSize, height: Layout.actionControlSize)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isSessionReady)
+                    .transition(.opacity)
+
+                    if let agentSession = session, !agentSession.availableModels.isEmpty {
+                        ModelSelectorMenu(
+                            session: agentSession,
+                            selectedAgent: selectedAgent,
+                            onAgentSelect: onAgentSelect,
+                            showsBackground: false
+                        )
+                            .transition(.opacity)
+                    }
+
+                    if currentModeId == "plan" {
+                        Label("Plan", systemImage: "checklist")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.blue)
+                    }
+
+                    Spacer(minLength: Layout.trailingControlsSpacing)
+
+                    HStack(spacing: Layout.trailingControlsSpacing) {
+                        Button(action: {
+                            Task {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    showingVoiceRecording = true
+                                }
+                                do {
+                                    try await audioService.startRecording()
+                                } catch {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        showingVoiceRecording = false
+                                    }
+                                    if let recordingError = error as? AudioService.RecordingError {
+                                        permissionErrorMessage = recordingError.localizedDescription + "\n\nPlease enable Microphone and Speech Recognition permissions in System Settings."
+                                        showingPermissionError = true
+                                    }
+                                    logger.error("Failed to start recording: \(error.localizedDescription)")
+                                }
+                            }
+                        }) {
+                            Image(systemName: "mic.fill")
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(!isSessionReady ? .tertiary : .secondary)
+                                .frame(width: Layout.actionControlSize, height: Layout.actionControlSize)
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!isSessionReady)
+                        .help(String(localized: "chat.voice.record"))
                         .transition(.opacity)
-                }
 
-                Button(action: {
-                    Task {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            showingVoiceRecording = true
-                        }
-                        do {
-                            try await audioService.startRecording()
-                        } catch {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                showingVoiceRecording = false
+                        if isProcessing {
+                            Button(action: onCancel) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white)
+                                    Image(systemName: "stop.fill")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(Color.black.opacity(0.9))
+                                }
+                                .frame(width: Layout.actionControlSize, height: Layout.actionControlSize)
                             }
-                            if let recordingError = error as? AudioService.RecordingError {
-                                permissionErrorMessage = recordingError.localizedDescription + "\n\nPlease enable Microphone and Speech Recognition permissions in System Settings."
-                                showingPermissionError = true
+                            .buttonStyle(.plain)
+                            .transition(.opacity)
+                        } else {
+                            Button(action: onSend) {
+                                ZStack {
+                                    Circle()
+                                        .fill(canSend ? Color.white : Color.white.opacity(0.3))
+                                    Image(systemName: "arrow.up")
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundStyle(canSend ? Color.black.opacity(0.9) : Color.secondary)
+                                }
+                                .frame(width: Layout.actionControlSize, height: Layout.actionControlSize)
                             }
-                            logger.error("Failed to start recording: \(error.localizedDescription)")
+                            .buttonStyle(.plain)
+                            .disabled(!canSend)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: canSend)
+                            .transition(.opacity)
                         }
                     }
-                }) {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(!isSessionReady ? .tertiary : .secondary)
-                        .contentShape(Rectangle())
+                    .frame(height: Layout.actionControlSize)
                 }
-                .buttonStyle(.plain)
-                .disabled(!isSessionReady)
-                .help(String(localized: "chat.voice.record"))
-                .transition(.opacity)
-
-                if isProcessing {
-                    Button(action: onCancel) {
-                        Image(systemName: "stop.circle.fill")
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundStyle(Color.red)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .transition(.opacity)
-                } else {
-                    Button(action: onSend) {
-                        Image(systemName: canSend ? "arrow.up.circle.fill" : "arrow.up.circle")
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundStyle(canSend ? Color.blue : Color.secondary.opacity(0.5))
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!canSend)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: canSend)
-                    .transition(.opacity)
-                }
+                .padding(.top, Layout.rowTopPadding)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: inputCornerRadius, style: .continuous))
+        .padding(.horizontal, Layout.outerHorizontalPadding)
+        .padding(.vertical, Layout.outerVerticalPadding)
+        .background { composerBackground }
         .overlay {
             if isProcessing {
                 AnimatedGradientBorder(
@@ -247,6 +295,22 @@ struct ChatInputBar: View {
         }
     }
 
+    @ViewBuilder
+    private var composerBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: inputCornerRadius, style: .continuous)
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer {
+                shape
+                    .fill(.white.opacity(0.001))
+                    .glassEffect(.regular, in: shape)
+                shape
+                    .fill(.white.opacity(0.035))
+            }
+        } else {
+            shape.fill(.ultraThinMaterial)
+        }
+    }
+
     private func handleAutocompleteNavigation(_ action: AutocompleteNavigationAction) -> Bool {
         guard autocompleteHandler.state.isActive else { return false }
 
@@ -275,17 +339,14 @@ struct ChatInputBar: View {
 
     private var inputCornerRadius: CGFloat {
         if showingVoiceRecording {
-            return 28
+            return Layout.cornerRadiusVoice
         }
-        let lineCount = inputText.components(separatedBy: .newlines).count
-        return lineCount > 1 ? 20 : 28
+        return Layout.cornerRadiusNormal
     }
 
     private var textEditorHeight: CGFloat {
-        let minHeight: CGFloat = 30
-        let maxHeight: CGFloat = 120
-        let measured = measuredTextHeight > 0 ? measuredTextHeight : minHeight
-        return min(max(measured, minHeight), maxHeight)
+        let measured = measuredTextHeight > 0 ? measuredTextHeight : Layout.textMinHeight
+        return min(max(measured, Layout.textMinHeight), Layout.textMaxHeight)
     }
 
     private var shouldAnimateBorder: Bool {

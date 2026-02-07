@@ -50,7 +50,7 @@ struct WorkspaceSwitcherSheet: View {
 
             // Workspace list
             ScrollView {
-                VStack(spacing: 4) {
+                VStack(spacing: 2) {
                     ForEach(workspaces, id: \.id) { workspace in
                         WorkspaceRow(
                             workspace: workspace,
@@ -70,8 +70,8 @@ struct WorkspaceSwitcherSheet: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             }
 
             Divider()
