@@ -13,6 +13,10 @@ struct SessionsListView: View {
     @StateObject private var viewModel: SessionsListViewModel
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
+    
+    private var surfaceColor: Color {
+        Color(nsColor: .windowBackgroundColor)
+    }
 
     init(worktreeId: UUID? = nil) {
         let vm = SessionsListViewModel(worktreeId: worktreeId)
@@ -26,7 +30,9 @@ struct SessionsListView: View {
             contentView
         }
         .frame(minWidth: 700, idealWidth: 900, maxWidth: .infinity, minHeight: 500, idealHeight: 650, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(surfaceColor)
+        .toolbarBackground(surfaceColor, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Picker("", selection: $viewModel.selectedFilter) {
@@ -92,7 +98,7 @@ struct SessionsListView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(surfaceColor)
     }
 
     private var agentFilterMenu: some View {

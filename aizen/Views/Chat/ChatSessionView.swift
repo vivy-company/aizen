@@ -77,7 +77,7 @@ struct ChatSessionView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                ZStack(alignment: .bottomTrailing) {
+                ZStack(alignment: .bottom) {
                     ChatMessageList(
                         timelineItems: viewModel.timelineItems,
                         isProcessing: viewModel.isProcessing,
@@ -114,7 +114,6 @@ struct ChatSessionView: View {
 
                     if shouldShowScrollToBottom {
                         scrollToBottomButton
-                            .padding(.trailing, 16)
                             .padding(.bottom, 16)
                             .transition(.opacity.combined(with: .scale(scale: 0.9)))
                     }

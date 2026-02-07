@@ -167,6 +167,7 @@ struct SessionTabsScrollView: View {
                     sessionToClose = nil
                 }
             }
+            .keyboardShortcut(.defaultAction)
         } message: {
             Text("A process is still running in this terminal. Are you sure you want to close it?")
         }

@@ -123,6 +123,7 @@ struct SplitTerminalView: View {
                 Button(String(localized: "terminal.close.confirm", defaultValue: "Close"), role: .destructive) {
                     executeCloseAction()
                 }
+                .keyboardShortcut(.defaultAction)
             } message: {
                 Text(String(localized: "terminal.close.confirmMessage", defaultValue: "A process is still running in this terminal. Are you sure you want to close it?"))
             }

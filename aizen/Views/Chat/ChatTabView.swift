@@ -6,6 +6,7 @@
 //
 
 import ACP
+import AppKit
 import CoreData
 import os.log
 import SwiftUI
@@ -18,6 +19,7 @@ struct ChatTabView: View {
     @Binding var selectedBrowserSessionId: UUID?
 
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.colorScheme) private var colorScheme
     private let sessionManager = ChatSessionManager.shared
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ChatTabView")
     @State private var enabledAgents: [AgentMetadata] = []
@@ -128,6 +130,7 @@ struct ChatTabView: View {
     @ViewBuilder
     private var chatContentWithCompanion: some View {
         GeometryReader { geometry in
+            let toolbarInset = resolvedToolbarInset(from: geometry)
             HStack(spacing: 0) {
                 // LEFT PANEL
                 if let panel = leftPanel {
@@ -145,6 +148,7 @@ struct ChatTabView: View {
                         terminalSessionId: $selectedTerminalSessionId,
                         browserSessionId: $selectedBrowserSessionId
                     )
+                    .padding(.top, toolbarInset)
                     .frame(width: CGFloat(leftPanelWidth))
                     .animation(nil, value: leftPanelWidth)
                     .transition(.move(edge: .leading).combined(with: .opacity))
@@ -182,6 +186,7 @@ struct ChatTabView: View {
                             )
                         }
                     }
+                    .padding(.top, toolbarInset)
 
                 // RIGHT PANEL
                 if let panel = rightPanel {
@@ -210,6 +215,7 @@ struct ChatTabView: View {
                         terminalSessionId: $selectedTerminalSessionId,
                         browserSessionId: $selectedBrowserSessionId
                     )
+                    .padding(.top, toolbarInset)
                     .frame(width: CGFloat(rightPanelWidth))
                     .animation(nil, value: rightPanelWidth)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -224,6 +230,7 @@ struct ChatTabView: View {
                     transaction.disablesAnimations = true
                 }
             }
+            .ignoresSafeArea(.container, edges: .top)
             .coordinateSpace(name: companionCoordinateSpace)
             .onAppear {
                 if !didLoadWidths {
@@ -243,6 +250,22 @@ struct ChatTabView: View {
                 clampPanelWidths(containerWidth: geometry.size.width)
             }
         }
+    }
+
+    private func resolvedToolbarInset(from geometry: GeometryProxy) -> CGFloat {
+        let safeInset = geometry.safeAreaInsets.top
+        if safeInset > 0 {
+            return safeInset
+        }
+
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+            let estimatedInset = max(window.frame.height - window.contentLayoutRect.height, 0)
+            if estimatedInset > 0 {
+                return estimatedInset
+            }
+        }
+
+        return 0
     }
 
     private var chatSessionsStack: some View {
@@ -462,11 +485,13 @@ struct ChatTabView: View {
         } label: {
             AgentIconView(metadata: agentMetadata, size: 14)
                 .frame(width: 54, height: 54)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(.separator.opacity(0.3), lineWidth: 1)
-            }
+                .background {
+                    emptyStateItemBackground(cornerRadius: 12)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(emptyStateItemStrokeColor, lineWidth: 1)
+                }
         }
         .buttonStyle(.plain)
         .help(agentMetadata.name)
@@ -508,11 +533,29 @@ struct ChatTabView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background {
+            emptyStateItemBackground(cornerRadius: 10)
+        }
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(.separator.opacity(0.3), lineWidth: 1)
+                .strokeBorder(emptyStateItemStrokeColor, lineWidth: 1)
         }
+    }
+
+    @ViewBuilder
+    private func emptyStateItemBackground(cornerRadius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(macOS 26.0, *) {
+            shape
+                .fill(.white.opacity(0.001))
+                .glassEffect(.regular.interactive(), in: shape)
+        } else {
+            shape.fill(.thinMaterial)
+        }
+    }
+
+    private var emptyStateItemStrokeColor: Color {
+        colorScheme == .dark ? .white.opacity(0.10) : .black.opacity(0.08)
     }
 
     private func sessionSummary(_ session: ChatSession) -> String {

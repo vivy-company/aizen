@@ -24,21 +24,24 @@ final class SessionsWindowManager {
 
         if let existing = window {
             existing.contentView = NSHostingView(rootView: contentView)
+            existing.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            existing.titlebarAppearsTransparent = true
+            existing.toolbarStyle = .unified
+            existing.backgroundColor = .windowBackgroundColor
             existing.makeKeyAndOrderFront(nil)
             return
         }
 
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.contentView = NSHostingView(rootView: contentView)
+        let hostingController = NSHostingController(rootView: contentView)
+        let window = NSWindow(contentViewController: hostingController)
         window.title = "Sessions"
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
+        window.backgroundColor = .windowBackgroundColor
         window.minSize = NSSize(width: 600, height: 400)
         window.isReleasedWhenClosed = false
+        window.setContentSize(NSSize(width: 800, height: 600))
         window.center()
 
         self.window = window

@@ -20,6 +20,7 @@ struct WorkflowSidebarView: View {
         VStack(spacing: 0) {
             // Header
             sidebarHeader
+            GitWindowDivider()
 
             if service.isInitializing {
                 initializingView
@@ -34,10 +35,6 @@ struct WorkflowSidebarView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         workflowsSection
-                        if !service.workflows.isEmpty && !service.runs.isEmpty {
-                            GitWindowDivider()
-                                .padding(.vertical, 8)
-                        }
                         runsSection
                     }
                     .padding(.horizontal, 8)
@@ -378,7 +375,7 @@ struct WorkflowSidebarRow: View {
                     isButtonHovered = hovering
                 }
                 .help(String(localized: "git.workflow.run"))
-                .padding(.trailing, 4)
+                .padding(.trailing, 10)
             }
         }
         .background(
@@ -504,8 +501,11 @@ struct RunSidebarRow: View {
                             .lineLimit(1)
                     }
 
+                    Text("•")
+                        .foregroundStyle(Color.secondary.opacity(0.45))
+
                     Text(run.displayStatus)
-                        .font(.system(size: 11))
+                        .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(statusColor)
                 }
             }

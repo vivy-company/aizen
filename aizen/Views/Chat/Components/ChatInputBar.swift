@@ -59,8 +59,11 @@ struct ChatInputBar: View {
     @Environment(\.scenePhase) private var scenePhase
     private let disableAnimatedBordersForPerfProbe = false
 
-    private let gradientColors: [Color] = [
+    private let processingGradientColors: [Color] = [
         .accentColor.opacity(0.7), .accentColor.opacity(0.4), .accentColor.opacity(0.7)
+    ]
+    private let planGradientColors: [Color] = [
+        Color.blue.opacity(0.9), Color.blue.opacity(0.5), Color.blue.opacity(0.9)
     ]
 
     private var placeholderText: LocalizedStringKey {
@@ -243,7 +246,7 @@ struct ChatInputBar: View {
             if isProcessing {
                 AnimatedGradientBorder(
                     cornerRadius: inputCornerRadius,
-                    colors: gradientColors,
+                    colors: currentModeId == "plan" ? planGradientColors : processingGradientColors,
                     dashed: false,
                     reduceMotion: reduceMotion,
                     isActive: shouldAnimateBorder
@@ -258,7 +261,7 @@ struct ChatInputBar: View {
             if currentModeId == "plan" && !isProcessing {
                 AnimatedGradientBorder(
                     cornerRadius: inputCornerRadius,
-                    colors: gradientColors,
+                    colors: planGradientColors,
                     dashed: true,
                     reduceMotion: reduceMotion,
                     isActive: shouldAnimateBorder

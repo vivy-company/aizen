@@ -28,12 +28,6 @@ struct CompanionPanelView: View {
             content
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(alignment: side == .left ? .trailing : .leading) {
-            Rectangle()
-                .fill(Color(nsColor: .separatorColor).opacity(0.55))
-                .frame(width: 1)
-                .allowsHitTesting(false)
-        }
         .transaction { transaction in
             if isResizing {
                 transaction.disablesAnimations = true
