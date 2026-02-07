@@ -12,19 +12,18 @@ import os.log
 
 struct ChatInputBar: View {
     private enum Layout {
-        static let outerHorizontalPadding: CGFloat = 12
-        static let outerVerticalPadding: CGFloat = 8
-        static let rowTopPadding: CGFloat = 0
-        static let rowSpacing: CGFloat = 10
-        static let trailingControlsSpacing: CGFloat = 8
-        static let compactIconSize: CGFloat = 15
-        static let actionControlSize: CGFloat = 36
-        static let placeholderTopPadding: CGFloat = 6
-        static let minHeightNormal: CGFloat = 48
+        static let containerPadding: CGFloat = 10
+        static let rowSpacing: CGFloat = 8
+        static let controlSize: CGFloat = 34
+        static let attachmentControlSize: CGFloat = 30
+        static let iconSize: CGFloat = 15
+        static let placeholderTopPadding: CGFloat = 4
+        static let textLeadingInset: CGFloat = 10
+        static let minHeightNormal: CGFloat = 50
         static let minHeightVoice: CGFloat = 50
         static let cornerRadiusNormal: CGFloat = 22
         static let cornerRadiusVoice: CGFloat = 20
-        static let textMinHeight: CGFloat = 42
+        static let textMinHeight: CGFloat = 44
         static let textMaxHeight: CGFloat = 140
     }
 
@@ -97,6 +96,7 @@ struct ChatInputBar: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.tertiary)
                             .padding(.top, Layout.placeholderTopPadding)
+                            .padding(.leading, Layout.textLeadingInset)
                             .allowsHitTesting(false)
                     }
 
@@ -104,6 +104,7 @@ struct ChatInputBar: View {
                         text: $inputText,
                         measuredHeight: $measuredTextHeight,
                         isFocused: $isTextEditorFocused,
+                        textInset: Layout.textLeadingInset,
                         onSubmit: {
                             if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 onSend()
@@ -143,9 +144,9 @@ struct ChatInputBar: View {
                 HStack(spacing: Layout.rowSpacing) {
                     Button(action: { showingAttachmentPicker.toggle() }) {
                         Image(systemName: "paperclip")
-                            .font(.system(size: Layout.compactIconSize, weight: .medium))
+                            .font(.system(size: Layout.iconSize, weight: .medium))
                             .foregroundStyle(!isSessionReady ? .tertiary : .secondary)
-                            .frame(width: Layout.actionControlSize, height: Layout.actionControlSize)
+                            .frame(width: Layout.attachmentControlSize, height: Layout.attachmentControlSize)
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
@@ -168,9 +169,9 @@ struct ChatInputBar: View {
                             .foregroundStyle(Color.blue)
                     }
 
-                    Spacer(minLength: Layout.trailingControlsSpacing)
+                    Spacer(minLength: Layout.rowSpacing)
 
-                    HStack(spacing: Layout.trailingControlsSpacing) {
+                    HStack(spacing: Layout.rowSpacing) {
                         Button(action: {
                             Task {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -193,7 +194,7 @@ struct ChatInputBar: View {
                             Image(systemName: "mic.fill")
                                 .font(.system(size: 16, weight: .regular))
                                 .foregroundStyle(!isSessionReady ? .tertiary : .secondary)
-                                .frame(width: Layout.actionControlSize, height: Layout.actionControlSize)
+                                .frame(width: Layout.controlSize, height: Layout.controlSize)
                                 .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
@@ -210,7 +211,7 @@ struct ChatInputBar: View {
                                         .font(.system(size: 13, weight: .bold))
                                         .foregroundStyle(Color.black.opacity(0.9))
                                 }
-                                .frame(width: Layout.actionControlSize, height: Layout.actionControlSize)
+                                .frame(width: Layout.controlSize, height: Layout.controlSize)
                             }
                             .buttonStyle(.plain)
                             .transition(.opacity)
@@ -223,7 +224,7 @@ struct ChatInputBar: View {
                                         .font(.system(size: 15, weight: .bold))
                                         .foregroundStyle(canSend ? Color.black.opacity(0.9) : Color.secondary)
                                 }
-                                .frame(width: Layout.actionControlSize, height: Layout.actionControlSize)
+                                .frame(width: Layout.controlSize, height: Layout.controlSize)
                             }
                             .buttonStyle(.plain)
                             .disabled(!canSend)
@@ -231,13 +232,12 @@ struct ChatInputBar: View {
                             .transition(.opacity)
                         }
                     }
-                    .frame(height: Layout.actionControlSize)
+                    .frame(height: Layout.controlSize)
                 }
-                .padding(.top, Layout.rowTopPadding)
+                .padding(.top, 4)
             }
         }
-        .padding(.horizontal, Layout.outerHorizontalPadding)
-        .padding(.vertical, Layout.outerVerticalPadding)
+        .padding(Layout.containerPadding)
         .background { composerBackground }
         .overlay {
             if isProcessing {

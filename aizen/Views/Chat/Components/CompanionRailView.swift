@@ -22,16 +22,16 @@ struct CompanionRailView: View {
     @State private var isHovered = false
 
     private var collapsedSize: CGSize {
-        CGSize(width: 16, height: 34)
+        CGSize(width: 10, height: 24)
     }
 
     private var expandedSize: CGSize {
-        let buttonHeight: CGFloat = 36
-        let spacing: CGFloat = 6
+        let buttonHeight: CGFloat = 34
+        let spacing: CGFloat = 4
         let verticalPadding: CGFloat = 16
         let rows = CGFloat(availablePanels.count)
         let totalSpacing = spacing * CGFloat(max(availablePanels.count - 1, 0))
-        return CGSize(width: 52, height: rows * buttonHeight + totalSpacing + verticalPadding)
+        return CGSize(width: 50, height: rows * buttonHeight + totalSpacing + verticalPadding)
     }
 
     private var triggerStrokeColor: Color {
@@ -39,11 +39,11 @@ struct CompanionRailView: View {
     }
 
     private var pickerStrokeColor: Color {
-        colorScheme == .dark ? .white.opacity(0.12) : .black.opacity(0.08)
+        colorScheme == .dark ? .white.opacity(0.16) : .black.opacity(0.09)
     }
 
     private var railShadowOpacity: Double {
-        isHovered ? (colorScheme == .dark ? 0.10 : 0.06) : 0
+        isHovered ? (colorScheme == .dark ? 0.08 : 0.05) : 0
     }
 
     private var railAnimation: Animation {
@@ -74,21 +74,21 @@ struct CompanionRailView: View {
 
     private var edgeHint: some View {
         VStack(spacing: 3) {
-            ForEach(0..<3, id: \.self) { _ in
+            ForEach(0..<4, id: \.self) { _ in
                 Circle()
                     .fill(Color.primary.opacity(0.26))
-                    .frame(width: 4, height: 4)
+                    .frame(width: 5, height: 5)
             }
         }
     }
 
     private var pickerOverlay: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             ForEach(availablePanels) { panel in
                 PanelPickerButton(panel: panel, onTap: { onSelect(panel) })
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 7)
         .padding(.horizontal, 8)
     }
 
@@ -100,22 +100,25 @@ struct CompanionRailView: View {
             if #available(macOS 26.0, *) {
                 shape
                     .fill(.white.opacity(0.001))
-                    .glassEffect(.clear, in: shape)
+                    .glassEffect(.regular, in: shape)
             } else {
                 shape
                     .fill(.ultraThinMaterial)
             }
         }
+        .opacity(isHovered ? 1 : 0)
         .overlay {
             Capsule()
-                .strokeBorder(isHovered ? pickerStrokeColor : triggerStrokeColor, lineWidth: 0.55)
+                .strokeBorder(isHovered ? pickerStrokeColor : triggerStrokeColor, lineWidth: isHovered ? 0.7 : 0)
         }
-        .shadow(color: .black.opacity(railShadowOpacity), radius: isHovered ? 8 : 0, x: 0, y: isHovered ? 3 : 0)
+        .shadow(color: .black.opacity(railShadowOpacity), radius: isHovered ? 6 : 0, x: 0, y: isHovered ? 2 : 0)
         .animation(railAnimation, value: isHovered)
     }
 }
 
 private struct PanelPickerButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let panel: CompanionPanel
     let onTap: () -> Void
 
@@ -125,12 +128,12 @@ private struct PanelPickerButton: View {
         Button(action: onTap) {
             Image(systemName: panel.icon)
                 .font(.system(size: 14, weight: .medium))
-                .frame(width: 36, height: 36)
+                .frame(width: 34, height: 34)
                 .background {
                     buttonBackground
                 }
                 .foregroundStyle(.primary)
-                .scaleEffect(isHovered ? 1.02 : 1.0)
+                .scaleEffect(isHovered ? 1.015 : 1.0)
         }
         .buttonStyle(.plain)
         .help(panel.label)
@@ -145,14 +148,12 @@ private struct PanelPickerButton: View {
     private var buttonBackground: some View {
         let shape = Circle()
 
-        if #available(macOS 26.0, *) {
-            shape
-                .fill(.clear)
-                .glassEffect(isHovered ? .clear.interactive() : .clear, in: shape)
-        } else {
-            shape
-                .fill(isHovered ? Color.primary.opacity(0.06) : .clear)
-        }
+        shape
+            .fill(isHovered ? Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.08) : .clear)
+            .overlay {
+                shape
+                    .strokeBorder(Color.primary.opacity(isHovered ? 0.10 : 0), lineWidth: 0.6)
+            }
     }
 }
 

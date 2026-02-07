@@ -11,6 +11,7 @@ struct CustomTextEditor: NSViewRepresentable {
     @Binding var text: String
     @Binding var measuredHeight: CGFloat
     @Binding var isFocused: Bool
+    var textInset: CGFloat = 10
     let onSubmit: () -> Void
 
     // Autocomplete callbacks - passes (text, cursorPosition, cursorRect)
@@ -61,7 +62,7 @@ struct CustomTextEditor: NSViewRepresentable {
         textView.isHorizontallyResizable = false
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.textContainerInset = NSSize(width: 0, height: 6)
+        textView.textContainerInset = NSSize(width: textInset, height: 6)
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.heightTracksTextView = false

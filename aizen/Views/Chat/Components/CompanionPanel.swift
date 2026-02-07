@@ -11,6 +11,7 @@ enum CompanionPanel: String, CaseIterable, Identifiable {
     case terminal
     case files
     case browser
+    case gitDiff
 
     var id: String { rawValue }
 
@@ -19,6 +20,7 @@ enum CompanionPanel: String, CaseIterable, Identifiable {
         case .terminal: return "terminal"
         case .files: return "folder"
         case .browser: return "globe"
+        case .gitDiff: return "arrow.triangle.branch"
         }
     }
 
@@ -27,6 +29,7 @@ enum CompanionPanel: String, CaseIterable, Identifiable {
         case .terminal: return "Terminal"
         case .files: return "Files"
         case .browser: return "Browser"
+        case .gitDiff: return "Git Diff"
         }
     }
 }

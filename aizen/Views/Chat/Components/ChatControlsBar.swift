@@ -15,7 +15,7 @@ struct ChatControlsBar: View {
         static let iconTextSpacing: CGFloat = 6
         static let controlHeight: CGFloat = 22
         static let iconSize: CGFloat = 15
-        static let horizontalPadding: CGFloat = 8
+        static let horizontalPadding: CGFloat = 10
     }
 
     let currentAgentSession: AgentSession?

@@ -20,6 +20,7 @@ struct CompanionPanelView: View {
     @Binding var browserSessionId: UUID?
     @State private var fileToOpen: String?
     @State private var isHoveringClose = false
+    @State private var gitDiffSubtitle: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -87,6 +88,8 @@ struct CompanionPanelView: View {
             return worktreePathSubtitle
         case .browser:
             return browserSubtitle
+        case .gitDiff:
+            return gitDiffSubtitle.isEmpty ? worktreeNameFallback : gitDiffSubtitle
         }
     }
 
@@ -166,6 +169,16 @@ struct CompanionPanelView: View {
             BrowserTabView(
                 worktree: worktree,
                 selectedSessionId: $browserSessionId
+            )
+
+        case .gitDiff:
+            CompanionGitDiffView(
+                worktree: worktree,
+                onSummaryChange: { summary in
+                    if gitDiffSubtitle != summary {
+                        gitDiffSubtitle = summary
+                    }
+                }
             )
         }
     }
