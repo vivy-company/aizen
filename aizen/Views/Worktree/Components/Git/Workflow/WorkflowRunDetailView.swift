@@ -52,7 +52,7 @@ struct WorkflowRunDetailView: View {
                 // Run header
                 runHeader(run)
 
-                Divider()
+                GitWindowDivider()
 
                 // Jobs and logs
                 HSplitView {
@@ -195,7 +195,7 @@ struct WorkflowRunDetailView: View {
             .frame(height: 32)
             .padding(.horizontal, 12)
 
-            Divider()
+            GitWindowDivider()
 
             if jobs.isEmpty {
                 VStack(spacing: 8) {
@@ -225,7 +225,6 @@ struct WorkflowRunDetailView: View {
                 }
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     // MARK: - Logs Panel
@@ -280,7 +279,7 @@ struct WorkflowRunDetailView: View {
             .frame(height: 32)
             .padding(.horizontal, 12)
 
-            Divider()
+            GitWindowDivider()
 
             // Logs content
             if service.isLoadingLogs && service.runLogs.isEmpty {
@@ -417,7 +416,7 @@ struct StepRow: View {
         HStack(spacing: 6) {
             // Connector line
             Rectangle()
-                .fill(Color(nsColor: .separatorColor))
+                .fill(GitWindowDividerStyle.color(opacity: 1))
                 .frame(width: 1)
                 .padding(.vertical, 2)
 

@@ -23,7 +23,7 @@ struct WorkflowFileView: View {
             // Header
             header
 
-            Divider()
+            GitWindowDivider()
 
             // Content
             if isLoading {

@@ -56,9 +56,9 @@ struct SendToAgentSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
+            GitWindowDivider()
             content
-            Divider()
+            GitWindowDivider()
             footer
         }
         .frame(width: 340, height: 400)

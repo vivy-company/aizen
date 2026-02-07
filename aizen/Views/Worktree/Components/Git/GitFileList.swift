@@ -1,6 +1,16 @@
 import SwiftUI
 
 struct GitFileList: View {
+    private enum Layout {
+        static let rowCornerRadius: CGFloat = 8
+        static let rowHorizontalPadding: CGFloat = 6
+        static let rowVerticalPadding: CGFloat = 5
+        static let rowContentSpacing: CGFloat = 8
+        static let checkboxSize: CGFloat = 14
+        static let listHorizontalPadding: CGFloat = 8
+        static let listVerticalPadding: CGFloat = 8
+    }
+
     let gitStatus: GitStatus
     let isOperationPending: Bool
     let selectedFile: String?
@@ -16,8 +26,8 @@ struct GitFileList: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     fileListContent
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, Layout.listHorizontalPadding)
+                .padding(.vertical, Layout.listVerticalPadding)
             }
         }
     }
@@ -48,7 +58,7 @@ struct GitFileList: View {
         // Get all unique files
         let allFiles = Set(gitStatus.stagedFiles + gitStatus.modifiedFiles + gitStatus.untrackedFiles)
 
-        ForEach(Array(allFiles).sorted(), id: \.self) { file in
+        ForEach(Array(allFiles).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }, id: \.self) { file in
             let isStaged = gitStatus.stagedFiles.contains(file)
             let isModified = gitStatus.modifiedFiles.contains(file)
             let isUntracked = gitStatus.untrackedFiles.contains(file)
@@ -90,8 +100,8 @@ struct GitFileList: View {
     }
 
     private func fileRow(file: String, isStaged: Bool?, statusColor: Color, statusIcon: String) -> some View {
-        rowContainer(file: file) {
-            HStack(spacing: 8) {
+        rowContainer(file: file) { isSelected in
+            HStack(spacing: Layout.rowContentSpacing) {
                 if let staged = isStaged {
                     // Normal checkbox for fully staged or unstaged files
                     Toggle(isOn: Binding(
@@ -108,7 +118,9 @@ struct GitFileList: View {
                         EmptyView()
                     }
                     .toggleStyle(.checkbox)
+                    .controlSize(.small)
                     .labelsHidden()
+                    .frame(width: Layout.checkboxSize, height: Layout.checkboxSize)
                     .disabled(isOperationPending)
                 } else {
                     // Mixed state checkbox (shows dash/minus)
@@ -118,19 +130,20 @@ struct GitFileList: View {
                     } label: {
                         Image(systemName: "minus.square")
                             .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(isSelected ? Color(nsColor: .controlAccentColor) : .secondary)
                     }
                     .buttonStyle(.plain)
+                    .frame(width: Layout.checkboxSize, height: Layout.checkboxSize)
                     .disabled(isOperationPending)
                 }
 
                 Image(systemName: statusIcon)
                     .font(.system(size: 8))
-                    .foregroundStyle(statusColor)
+                    .foregroundStyle(isSelected ? Color(nsColor: .controlAccentColor) : statusColor)
 
                 Text(file)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(isSelected ? Color(nsColor: .controlAccentColor) : .primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -138,16 +151,16 @@ struct GitFileList: View {
     }
 
     private func conflictRow(file: String) -> some View {
-        rowContainer(file: file, leadingPadding: 8) {
-            HStack(spacing: 8) {
+        rowContainer(file: file, leadingPadding: 8) { isSelected in
+            HStack(spacing: Layout.rowContentSpacing) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 12))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(isSelected ? Color(nsColor: .controlAccentColor) : .red)
                     .frame(width: 14)
 
                 Text(file)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(isSelected ? Color(nsColor: .controlAccentColor) : .primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -157,16 +170,21 @@ struct GitFileList: View {
     private func rowContainer<Content: View>(
         file: String,
         leadingPadding: CGFloat = 0,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: (_ isSelected: Bool) -> Content
     ) -> some View {
-        content()
+        let isSelected = selectedFile == file
+
+        return content(isSelected)
             .contentShape(Rectangle())
             .onTapGesture {
                 onFileClick(file)
             }
-            .padding(.vertical, 2)
+            .padding(.horizontal, Layout.rowHorizontalPadding)
+            .padding(.vertical, Layout.rowVerticalPadding)
             .padding(.leading, leadingPadding)
-            .background(selectedFile == file ? Color.accentColor.opacity(0.2) : Color.clear)
-            .cornerRadius(4)
+            .background(
+                RoundedRectangle(cornerRadius: Layout.rowCornerRadius, style: .continuous)
+                    .fill(isSelected ? Color(nsColor: .unemphasizedSelectedContentBackgroundColor).opacity(0.65) : .clear)
+            )
     }
 }

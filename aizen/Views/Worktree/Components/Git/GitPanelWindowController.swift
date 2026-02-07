@@ -35,6 +35,13 @@ class GitPanelWindowController: NSWindowController {
         let worktreePath = context.worktree.path ?? ""
         window.title = repoName
         window.minSize = NSSize(width: 900, height: 600)
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .unified
+        window.titlebarSeparatorStyle = .none
+
+        let toolbar = NSToolbar(identifier: "GitPanelToolbar")
+        toolbar.showsBaselineSeparator = false
+        window.toolbar = toolbar
 
         self.init(window: window)
 

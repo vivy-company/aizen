@@ -25,7 +25,7 @@ struct WorkflowTriggerFormView: View {
             // Header
             header
 
-            Divider()
+            GitWindowDivider()
 
             if isLoading {
                 loadingView
@@ -44,7 +44,7 @@ struct WorkflowTriggerFormView: View {
                     .padding()
                 }
 
-                Divider()
+                GitWindowDivider()
 
                 // Footer with actions
                 footer

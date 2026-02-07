@@ -5,8 +5,101 @@
 //  Main content view for the git panel window with toolbar tabs
 //
 
+import AppKit
 import SwiftUI
 import os.log
+
+enum GitWindowDividerStyle {
+    static func color(opacity: CGFloat = 1.0) -> Color {
+        let base = contrastedBackgroundColor(strength: 0.06)
+        return Color(nsColor: base.withAlphaComponent(0.5 * opacity))
+    }
+
+    static func splitterColor(opacity: CGFloat = 1.0) -> Color {
+        Color(nsColor: .separatorColor).opacity(0.85 * opacity)
+    }
+
+    private static func contrastedBackgroundColor(strength: CGFloat) -> NSColor {
+        let background = NSColor.windowBackgroundColor.usingColorSpace(.extendedSRGB) ?? NSColor.windowBackgroundColor
+
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        background.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+
+        let luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+        let delta = luminance < 0.5 ? strength : -strength
+
+        let adjustedRed = min(max(red + delta, 0), 1)
+        let adjustedGreen = min(max(green + delta, 0), 1)
+        let adjustedBlue = min(max(blue + delta, 0), 1)
+
+        return NSColor(
+            red: adjustedRed,
+            green: adjustedGreen,
+            blue: adjustedBlue,
+            alpha: 1
+        )
+    }
+}
+
+struct GitWindowDivider: View {
+    var opacity: CGFloat = 1.0
+
+    var body: some View {
+        Rectangle()
+            .fill(GitWindowDividerStyle.color(opacity: opacity))
+            .frame(height: 0.5)
+            .accessibilityHidden(true)
+    }
+}
+
+struct GitResizableDivider: View {
+    let onDragChanged: (DragGesture.Value) -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
+    @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
+    @AppStorage("usePerAppearanceTheme") private var usePerAppearanceTheme = false
+
+    @State private var didPushCursor = false
+    private let lineWidth: CGFloat = 1
+    private let hitWidth: CGFloat = 14
+
+    private var effectiveThemeName: String {
+        guard usePerAppearanceTheme else { return terminalThemeName }
+        return colorScheme == .dark ? terminalThemeName : terminalThemeNameLight
+    }
+
+    var body: some View {
+        Rectangle()
+            .fill(Color(nsColor: GhosttyThemeParser.loadDividerColor(named: effectiveThemeName)))
+            .frame(width: lineWidth)
+            .frame(width: hitWidth)
+        .contentShape(Rectangle())
+        .padding(.horizontal, -(hitWidth - lineWidth) / 2)
+        .gesture(
+            DragGesture()
+                .onChanged(onDragChanged)
+        )
+        .onHover { hovering in
+            if hovering && !didPushCursor {
+                NSCursor.resizeLeftRight.push()
+                didPushCursor = true
+            } else if !hovering && didPushCursor {
+                NSCursor.pop()
+                didPushCursor = false
+            }
+        }
+        .onDisappear {
+            if didPushCursor {
+                NSCursor.pop()
+                didPushCursor = false
+            }
+        }
+    }
+}
 
 enum GitPanelTab: String, CaseIterable {
     case git
@@ -318,49 +411,28 @@ struct GitPanelWindowContent: View {
 
     // MARK: - Diff Panel
 
-    private var diffPanelHeader: some View {
+    private func diffPanelHeader(for commit: GitCommit) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "arrow.triangle.branch")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
-            if let commit = selectedHistoryCommit {
-                // Viewing a specific commit
-                Text(commit.shortHash)
-                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+            Text(commit.shortHash)
+                .font(.system(size: 13, weight: .medium, design: .monospaced))
 
-                Text(commit.message)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            Text(commit.message)
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
 
-                Spacer()
+            Spacer()
 
-                Button(String(localized: "git.panel.backToChanges")) {
-                    selectedHistoryCommit = nil
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            } else {
-                // Viewing working changes
-                Text(gitStatus.currentBranch.isEmpty ? "HEAD" : gitStatus.currentBranch)
-                    .font(.system(size: 13, weight: .medium))
-
-                CopyButton(text: gitStatus.currentBranch, iconSize: 11)
-
-                Spacer()
-
-                HStack(spacing: 8) {
-                    Text("+\(gitStatus.additions)")
-                        .foregroundStyle(.green)
-                    Text("-\(gitStatus.deletions)")
-                        .foregroundStyle(.red)
-                    Text("\(allChangedFiles.count) files")
-                        .foregroundStyle(.secondary)
-                }
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
+            Button(String(localized: "git.panel.backToChanges")) {
+                selectedHistoryCommit = nil
             }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
         .padding(.horizontal, 12)
         .frame(height: 44)
@@ -368,8 +440,9 @@ struct GitPanelWindowContent: View {
 
     private var diffPanel: some View {
         VStack(spacing: 0) {
-            diffPanelHeader
-            Divider()
+            if let commit = selectedHistoryCommit {
+                diffPanelHeader(for: commit)
+            }
 
             if selectedHistoryCommit == nil && allChangedFiles.isEmpty {
                 AllFilesDiffEmptyView()
@@ -469,29 +542,10 @@ struct GitPanelWindowContent: View {
     // MARK: - Divider
 
     private var resizableDivider: some View {
-        Rectangle()
-            .fill(Color(nsColor: .separatorColor))
-            .frame(width: 1)
-            .overlay(
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: 8)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                let newWidth = leftPanelWidth + value.translation.width
-                                leftPanelWidth = min(max(newWidth, minLeftPanelWidth), maxLeftPanelWidth)
-                            }
-                    )
-                    .onHover { hovering in
-                        if hovering {
-                            NSCursor.resizeLeftRight.push()
-                        } else {
-                            NSCursor.pop()
-                        }
-                    }
-            )
+        GitResizableDivider { value in
+            let newWidth = leftPanelWidth + value.translation.width
+            leftPanelWidth = min(max(newWidth, minLeftPanelWidth), maxLeftPanelWidth)
+        }
     }
 
     // MARK: - Helper Methods

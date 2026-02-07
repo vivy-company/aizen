@@ -12,19 +12,32 @@ struct GitHistoryView: View {
     let selectedCommit: GitCommit?
     let onSelectCommit: (GitCommit?) -> Void
 
+    @Environment(\.controlActiveState) private var controlActiveState
     @State private var commits: [GitCommit] = []
     @State private var isLoading = true
     @State private var isLoadingMore = false
     @State private var hasMoreCommits = true
     @State private var errorMessage: String?
+    @State private var hoveredCommitID: String?
 
     private let logService = GitLogService()
     private let pageSize = 30
+    private let dividerOpacity: CGFloat = 1.4
+
+    private var selectedForegroundColor: Color {
+        controlActiveState == .key ? .accentColor : .accentColor.opacity(0.78)
+    }
+
+    private var selectionFillColor: Color {
+        let base = NSColor.unemphasizedSelectedContentBackgroundColor
+        let alpha: Double = controlActiveState == .key ? 0.26 : 0.18
+        return Color(nsColor: base).opacity(alpha)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
+            GitWindowDivider(opacity: dividerOpacity)
 
             if isLoading && commits.isEmpty {
                 loadingView
@@ -42,23 +55,19 @@ struct GitHistoryView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             Text(String(localized: "git.history.title"))
-                .font(.system(size: 13, weight: .medium))
-
-            Spacer()
+                .font(.headline)
 
             if !commits.isEmpty {
-                PillBadge(
+                TagBadge(
                     text: "\(commits.count)\(hasMoreCommits ? "+" : "")",
-                    color: Color(NSColor.controlBackgroundColor),
-                    textColor: .secondary,
-                    font: .system(size: 11, weight: .medium, design: .monospaced),
-                    horizontalPadding: 6,
-                    verticalPadding: 2,
-                    backgroundOpacity: 1
+                    color: .secondary,
+                    cornerRadius: 6
                 )
             }
+
+            Spacer()
 
             Button {
                 Task { await refresh() }
@@ -71,7 +80,7 @@ struct GitHistoryView: View {
             .disabled(isLoading)
         }
         .padding(.horizontal, 12)
-        .frame(height: 44)
+        .padding(.vertical, 8)
     }
 
     private var loadingView: some View {
@@ -127,7 +136,7 @@ struct GitHistoryView: View {
                 // Show "Working Changes" option at top if there's a selected commit
                 if selectedCommit != nil {
                     workingChangesRow
-                    Divider()
+                    GitWindowDivider(opacity: dividerOpacity)
                 }
 
                 ForEach(commits) { commit in
@@ -138,7 +147,7 @@ struct GitHistoryView: View {
                                 Task { await loadMoreCommits() }
                             }
                         }
-                    Divider()
+                    GitWindowDivider(opacity: dividerOpacity)
                 }
 
                 // Loading more indicator
@@ -202,66 +211,87 @@ struct GitHistoryView: View {
 
     private func commitRow(_ commit: GitCommit) -> some View {
         let isSelected = selectedCommit?.id == commit.id
+        let isHovered = hoveredCommitID == commit.id
 
-        return HStack(spacing: 10) {
-            // Hash
-            Text(commit.shortHash)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(isSelected ? .white : .secondary)
-                .frame(width: 60, alignment: .leading)
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.system(size: 13))
+                .foregroundStyle(isSelected ? selectedForegroundColor : .secondary)
+                .frame(width: 22, height: 22)
 
-            // Message and details
-            VStack(alignment: .leading, spacing: 2) {
-                Text(commit.message)
-                    .font(.system(size: 12))
-                    .foregroundStyle(isSelected ? .white : .primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text(commit.message)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(isSelected ? selectedForegroundColor : .primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    Spacer()
+
+                    Text(commit.relativeDate)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.secondary.opacity(0.75))
+                }
 
                 HStack(spacing: 8) {
                     Text(commit.author)
-                        .font(.system(size: 10))
-                        .foregroundStyle(isSelected ? .white.opacity(0.7) : .secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
 
-                    Text(commit.relativeDate)
-                        .font(.system(size: 10))
-                        .foregroundStyle(isSelected ? Color.white.opacity(0.7) : Color.secondary.opacity(0.7))
-                }
-            }
+                    Text("•")
+                        .foregroundStyle(Color.secondary.opacity(0.45))
 
-            Spacer()
+                    Text(commit.shortHash)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
 
-            // Stats
-            HStack(spacing: 6) {
-                if commit.filesChanged > 0 {
-                    Text("\(commit.filesChanged)")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(isSelected ? .white.opacity(0.7) : .secondary)
+                    if commit.filesChanged > 0 {
+                        Text("•")
+                            .foregroundStyle(Color.secondary.opacity(0.45))
 
-                    Image(systemName: "doc")
-                        .font(.system(size: 9))
-                        .foregroundStyle(isSelected ? .white.opacity(0.7) : .secondary)
-                }
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc")
+                                .font(.system(size: 10))
+                            Text("\(commit.filesChanged)")
+                                .font(.system(size: 11, design: .monospaced))
+                        }
+                        .foregroundStyle(.secondary)
+                    }
 
-                if commit.additions > 0 {
-                    Text("+\(commit.additions)")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(isSelected ? .white : .green)
-                }
+                    if commit.additions > 0 {
+                        Text("+\(commit.additions)")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.green)
+                    }
 
-                if commit.deletions > 0 {
-                    Text("-\(commit.deletions)")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(isSelected ? .white : .red)
+                    if commit.deletions > 0 {
+                        Text("-\(commit.deletions)")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.red)
+                    }
                 }
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 8)
         .padding(.vertical, 8)
-        .background(isSelected ? Color.accentColor : Color.clear)
+        .background(
+            Group {
+                if isSelected {
+                    Rectangle().fill(selectionFillColor)
+                } else if isHovered {
+                    Rectangle().fill(Color.white.opacity(0.06))
+                } else {
+                    Color.clear
+                }
+            }
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             onSelectCommit(commit)
+        }
+        .onHover { hovering in
+            hoveredCommitID = hovering ? commit.id : (hoveredCommitID == commit.id ? nil : hoveredCommitID)
         }
     }
 

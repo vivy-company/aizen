@@ -8,45 +8,107 @@
 import SwiftUI
 
 struct PullRequestListPane: View {
+    private enum Layout {
+        static let headerHorizontalPadding: CGFloat = 12
+        static let headerVerticalPadding: CGFloat = 8
+        static let chipCornerRadius: CGFloat = 9
+        static let listBottomPadding: CGFloat = 8
+    }
+
+    @Environment(\.controlActiveState) private var controlActiveState
     @ObservedObject var viewModel: PullRequestsViewModel
+    @State private var hoveredPullRequestID: Int?
+
+    private var selectedForegroundColor: Color {
+        controlActiveState == .key ? .accentColor : .accentColor.opacity(0.78)
+    }
+
+    private var selectionFillColor: Color {
+        let base = NSColor.unemphasizedSelectedContentBackgroundColor
+        let alpha: Double = controlActiveState == .key ? 0.26 : 0.18
+        return Color(nsColor: base).opacity(alpha)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
+            GitWindowDivider()
             listContent
         }
-        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private var header: some View {
-        HStack {
-            Text(viewModel.prTerminology + "s")
-                .font(.headline)
+        HStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Text(viewModel.prTerminology + "s")
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
-            Spacer()
-
-            Picker("Filter", selection: Binding(
-                get: { viewModel.filter },
-                set: { viewModel.changeFilter(to: $0) }
-            )) {
-                ForEach(PRFilter.allCases, id: \.self) { filter in
-                    Text(filter.displayName).tag(filter)
+                if !viewModel.pullRequests.isEmpty {
+                    TagBadge(
+                        text: "\(viewModel.pullRequests.count)\(viewModel.hasMore ? "+" : "")",
+                        color: .secondary,
+                        cornerRadius: 6
+                    )
                 }
             }
-            .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
+
+            Menu {
+                ForEach(PRFilter.allCases, id: \.self) { filter in
+                    Button {
+                        viewModel.changeFilter(to: filter)
+                    } label: {
+                        if filter == viewModel.filter {
+                            Label(filter.displayName, systemImage: "checkmark")
+                        } else {
+                            Text(filter.displayName)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Text(viewModel.filter.displayName)
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+
+                    Spacer(minLength: 6)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .frame(minWidth: 110)
+                .background(chipBackground)
+                .clipShape(RoundedRectangle(cornerRadius: Layout.chipCornerRadius, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: Layout.chipCornerRadius, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .disabled(viewModel.isLoadingList)
 
             Button {
                 Task { await viewModel.refresh() }
             } label: {
                 Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 28, height: 28)
+                    .background(chipBackground)
+                    .clipShape(Circle())
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .disabled(viewModel.isLoadingList)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Layout.headerHorizontalPadding)
+        .padding(.vertical, Layout.headerVerticalPadding)
     }
 
     @ViewBuilder
@@ -127,15 +189,19 @@ struct PullRequestListPane: View {
                     PRRowView(
                         pr: pr,
                         isSelected: viewModel.selectedPR?.id == pr.id,
-                        terminology: viewModel.prTerminology
+                        isHovered: hoveredPullRequestID == pr.id,
+                        selectedForegroundColor: selectedForegroundColor,
+                        selectionFillColor: selectionFillColor
                     )
                     .contentShape(Rectangle())
                     .onTapGesture {
                         viewModel.selectPR(pr)
                     }
-
-                    Divider()
-                        .padding(.leading, 12)
+                    .onHover { hovering in
+                        hoveredPullRequestID = hovering ? pr.id :
+                            (hoveredPullRequestID == pr.id ? nil : hoveredPullRequestID)
+                    }
+                    GitWindowDivider()
                 }
 
                 // Pagination trigger
@@ -157,7 +223,12 @@ struct PullRequestListPane: View {
                     }
                 }
             }
+            .padding(.bottom, Layout.listBottomPadding)
         }
+    }
+
+    private var chipBackground: some ShapeStyle {
+        Color.white.opacity(0.08)
     }
 }
 
@@ -166,79 +237,113 @@ struct PullRequestListPane: View {
 struct PRRowView: View {
     let pr: PullRequest
     let isSelected: Bool
-    let terminology: String
+    let isHovered: Bool
+    let selectedForegroundColor: Color
+    let selectionFillColor: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text("#\(pr.number)")
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.system(size: 13))
+                .foregroundStyle(isSelected ? selectedForegroundColor : .secondary)
+                .frame(width: 22, height: 22)
 
-                Text(pr.title)
-                    .font(.system(size: 13, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text("#\(pr.number)")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(isSelected ? selectedForegroundColor : .secondary)
 
-                Spacer()
+                    Text(pr.title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(isSelected ? selectedForegroundColor : .primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
 
-                PRStateBadge(state: pr.state, isDraft: pr.isDraft)
-            }
+                    Spacer()
 
-            HStack(spacing: 8) {
-                Label(pr.author, systemImage: "person")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    if showsStateBadge {
+                        PRStateBadge(
+                            state: pr.state,
+                            isDraft: pr.isDraft
+                        )
+                    }
 
-                Text("•")
-                    .foregroundStyle(.quaternary)
-
-                HStack(spacing: 2) {
-                    Text(pr.sourceBranch)
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 8))
-                    Text(pr.targetBranch)
+                    Text(pr.relativeCreatedAt)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.secondary.opacity(0.75))
                 }
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
 
-                Spacer()
-
-                Text(pr.relativeCreatedAt)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-            }
-
-            // Status indicators
-            if pr.state == .open {
                 HStack(spacing: 8) {
-                    if let checks = pr.checksStatus {
-                        PRChecksBadge(status: checks)
-                    }
+                    Label(pr.author, systemImage: "person")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
 
-                    if let review = pr.reviewDecision {
-                        PRReviewBadge(decision: review)
-                    }
+                    Text("•")
+                        .foregroundStyle(Color.secondary.opacity(0.45))
 
-                    if pr.changedFiles > 0 {
-                        HStack(spacing: 4) {
-                            Text("+\(pr.additions)")
-                                .foregroundStyle(.green)
-                            Text("-\(pr.deletions)")
-                                .foregroundStyle(.red)
-                        }
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    HStack(spacing: 2) {
+                        Text(pr.sourceBranch)
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 8))
+                        Text(pr.targetBranch)
                     }
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
 
                     Spacer()
                 }
+
+                if hasStatusDetails {
+                    HStack(spacing: 8) {
+                        if let checks = pr.checksStatus {
+                            PRChecksBadge(status: checks)
+                        }
+
+                        if let review = pr.reviewDecision {
+                            PRReviewBadge(decision: review)
+                        }
+
+                        if pr.changedFiles > 0 {
+                            HStack(spacing: 4) {
+                                Text("\(pr.changedFiles)f")
+                                    .foregroundStyle(Color.secondary.opacity(0.75))
+                                Text("+\(pr.additions)")
+                                    .foregroundStyle(.green)
+                                Text("-\(pr.deletions)")
+                                    .foregroundStyle(.red)
+                            }
+                            .font(.system(size: 11, design: .monospaced))
+                        }
+
+                        Spacer()
+                    }
+                }
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 8)
         .padding(.vertical, 8)
-        .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+        .background(
+            Group {
+                if isSelected {
+                    Rectangle().fill(selectionFillColor)
+                } else if isHovered {
+                    Rectangle().fill(Color.white.opacity(0.06))
+                } else {
+                    Color.clear
+                }
+            }
+        )
         .contentShape(Rectangle())
+    }
+
+    private var showsStateBadge: Bool {
+        pr.isDraft || pr.state != .open
+    }
+
+    private var hasStatusDetails: Bool {
+        pr.state == .open && (pr.checksStatus != nil || pr.reviewDecision != nil || pr.changedFiles > 0)
     }
 }
 
@@ -247,9 +352,16 @@ struct PRRowView: View {
 struct PRStateBadge: View {
     let state: PullRequest.State
     let isDraft: Bool
+    let colorOverride: Color?
+
+    init(state: PullRequest.State, isDraft: Bool, colorOverride: Color? = nil) {
+        self.state = state
+        self.isDraft = isDraft
+        self.colorOverride = colorOverride
+    }
 
     var body: some View {
-        let color = foregroundColor
+        let color = colorOverride ?? foregroundColor
         return TagBadge(
             text: isDraft ? "Draft" : state.displayName,
             color: color,
@@ -276,11 +388,17 @@ struct PRStateBadge: View {
 
 struct PRChecksBadge: View {
     let status: PullRequest.ChecksStatus
+    let colorOverride: Color?
+
+    init(status: PullRequest.ChecksStatus, colorOverride: Color? = nil) {
+        self.status = status
+        self.colorOverride = colorOverride
+    }
 
     var body: some View {
         PRStatusBadge(
             text: status.displayName,
-            color: color,
+            color: colorOverride ?? color,
             iconSystemName: status.iconName
         )
     }
@@ -296,11 +414,17 @@ struct PRChecksBadge: View {
 
 struct PRReviewBadge: View {
     let decision: PullRequest.ReviewDecision
+    let colorOverride: Color?
+
+    init(decision: PullRequest.ReviewDecision, colorOverride: Color? = nil) {
+        self.decision = decision
+        self.colorOverride = colorOverride
+    }
 
     var body: some View {
         PRStatusBadge(
             text: decision.displayName,
-            color: color,
+            color: colorOverride ?? color,
             iconSystemName: decision.iconName
         )
     }

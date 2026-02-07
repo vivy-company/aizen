@@ -75,7 +75,7 @@ struct CommentPopover: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                        .stroke(GitWindowDividerStyle.color(opacity: 0.9), lineWidth: 1)
                 )
                 .focused($isFocused)
 

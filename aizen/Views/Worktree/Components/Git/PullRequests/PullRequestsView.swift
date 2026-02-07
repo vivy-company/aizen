@@ -43,29 +43,10 @@ struct PullRequestsView: View {
     }
 
     private var resizableDivider: some View {
-        Rectangle()
-            .fill(Color(nsColor: .separatorColor))
-            .frame(width: 1)
-            .overlay(
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: 8)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                let newWidth = listWidth + value.translation.width
-                                listWidth = min(max(newWidth, minListWidth), maxListWidth)
-                            }
-                    )
-                    .onHover { hovering in
-                        if hovering {
-                            NSCursor.resizeLeftRight.push()
-                        } else {
-                            NSCursor.pop()
-                        }
-                    }
-            )
+        GitResizableDivider { value in
+            let newWidth = listWidth + value.translation.width
+            listWidth = min(max(newWidth, minListWidth), maxListWidth)
+        }
     }
 
     private var emptyState: some View {

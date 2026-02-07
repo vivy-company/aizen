@@ -1,6 +1,14 @@
 import SwiftUI
 
 struct GitSidebarHeader: View {
+    private enum Layout {
+        static let horizontalPadding: CGFloat = 10
+        static let verticalPadding: CGFloat = 6
+        static let chipHeight: CGFloat = 28
+        static let menuSize: CGFloat = 28
+        static let spacing: CGFloat = 8
+    }
+
     let gitStatus: GitStatus
     let isOperationPending: Bool
     let hasUnstagedChanges: Bool
@@ -13,9 +21,10 @@ struct GitSidebarHeader: View {
     @State private var showCleanConfirmation = false
 
     var body: some View {
-        HStack {
+        HStack(spacing: Layout.spacing) {
             Text(headerTitle)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.primary)
 
             if isOperationPending {
                 ProgressView()
@@ -25,16 +34,23 @@ struct GitSidebarHeader: View {
 
             Spacer()
 
-            Button(hasUnstagedChanges ? String(localized: "git.sidebar.stageAll") : String(localized: "git.sidebar.unstageAll")) {
+            Button {
                 if hasUnstagedChanges {
                     onStageAll({})
                 } else {
                     onUnstageAll()
                 }
+            } label: {
+                Text(hasUnstagedChanges ? String(localized: "git.sidebar.stageAll") : String(localized: "git.sidebar.unstageAll"))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(canPerformBulkAction ? .primary : .tertiary)
+                    .padding(.horizontal, 12)
+                    .frame(height: Layout.chipHeight)
+                    .background(chipBackground)
+                    .clipShape(Capsule())
             }
-            .buttonStyle(.borderless)
-            .font(.system(size: 11))
-            .disabled(isOperationPending || (gitStatus.stagedFiles.isEmpty && gitStatus.modifiedFiles.isEmpty && gitStatus.untrackedFiles.isEmpty))
+            .buttonStyle(.plain)
+            .disabled(!canPerformBulkAction)
 
             Menu {
                 Button {
@@ -51,17 +67,22 @@ struct GitSidebarHeader: View {
                 }
                 .disabled(gitStatus.untrackedFiles.isEmpty)
             } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isOperationPending ? .tertiary : .secondary)
+                    .frame(width: Layout.menuSize, height: Layout.menuSize)
+                    .background(chipBackground)
+                    .clipShape(Circle())
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .frame(width: 20)
             .disabled(isOperationPending)
         }
-        .padding(.horizontal, 12)
-        .frame(height: 44)
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Layout.verticalPadding)
+        .padding(.horizontal, 8)
+        .padding(.top, 4)
+        .padding(.bottom, 2)
         .alert(String(localized: "git.sidebar.discardAllTitle"), isPresented: $showDiscardConfirmation) {
             Button(String(localized: "general.cancel"), role: .cancel) {}
             Button(String(localized: "git.sidebar.discard"), role: .destructive) {
@@ -78,6 +99,18 @@ struct GitSidebarHeader: View {
         } message: {
             Text(String(localized: "git.sidebar.removeUntrackedMessage \(gitStatus.untrackedFiles.count)"))
         }
+    }
+
+    private var chipBackground: some ShapeStyle {
+        Color.white.opacity(0.08)
+    }
+
+    private var canPerformBulkAction: Bool {
+        !isOperationPending && hasAnyChanges
+    }
+
+    private var hasAnyChanges: Bool {
+        !(gitStatus.stagedFiles.isEmpty && gitStatus.modifiedFiles.isEmpty && gitStatus.untrackedFiles.isEmpty)
     }
 
     private var headerTitle: String {

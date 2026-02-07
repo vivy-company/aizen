@@ -36,8 +36,6 @@ struct GitSidebarView: View {
                 onCleanUntracked: onCleanUntracked
             )
 
-            Divider()
-
             // File list
             GitFileList(
                 gitStatus: gitStatus,
@@ -47,8 +45,6 @@ struct GitSidebarView: View {
                 onUnstageFile: onUnstageFile,
                 onFileClick: onFileClick
             )
-
-            Divider()
 
             // Commit section
             GitCommitSection(

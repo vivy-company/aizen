@@ -14,13 +14,15 @@ import os.log
 
 @MainActor
 final class SessionsListViewModel: ObservableObject {
+    private static let pageSize = 10
+
     @Published var selectedFilter: SessionFilter = .active
     @Published var searchText: String = ""
     @Published var selectedWorktreeId: UUID?
     @Published var selectedAgentName: String?
     @Published var availableAgents: [String] = []
     @Published var errorMessage: String?
-    @Published var fetchLimit: Int = 10
+    @Published var fetchLimit: Int = SessionsListViewModel.pageSize
     @Published var sessions: [ChatSession] = []
     @Published var isLoading: Bool = false
     
@@ -32,7 +34,14 @@ final class SessionsListViewModel: ObservableObject {
     }
     
     func loadMore() {
-        fetchLimit += 10
+        fetchLimit += Self.pageSize
+    }
+
+    func loadMoreIfNeeded(for session: ChatSession) {
+        guard !isLoading else { return }
+        guard sessions.count >= fetchLimit else { return }
+        guard session.objectID == sessions.last?.objectID else { return }
+        loadMore()
     }
 
     func reloadSessions(in context: NSManagedObjectContext) async {

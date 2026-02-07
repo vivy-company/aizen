@@ -185,32 +185,16 @@ struct SessionsListView: View {
                             viewModel.resumeSession(session)
                             dismiss()
                         }
+                        .onAppear {
+                            viewModel.loadMoreIfNeeded(for: session)
+                        }
                         .contextMenu {
                             sessionContextMenu(for: session)
                         }
 
                     Divider()
-                        .padding(.leading, 12)
-                }
-
-                if viewModel.sessions.count >= viewModel.fetchLimit {
-                    Button {
-                        viewModel.loadMore()
-                    } label: {
-                        if viewModel.isLoading {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                        } else {
-                            Text("Load More")
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundColor(.accentColor)
-                    .padding(.vertical, 12)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
         }
     }
     
@@ -284,7 +268,7 @@ struct SessionRowView: View {
         }
         return "Untitled Session"
     }
-    
+
     private func computeSessionSummary() -> String {
         // Use most recent user message for summary
         guard let messages = session.messages as? Set<ChatMessage> else {
@@ -399,7 +383,12 @@ struct SessionRowView: View {
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .modifier(SelectableRowModifier(isSelected: false, isHovered: isHovered))
+        .modifier(SelectableRowModifier(
+            isSelected: false,
+            isHovered: isHovered,
+            showsIdleBackground: false,
+            cornerRadius: 0
+        ))
         .onHover { hovering in
             isHovered = hovering
         }

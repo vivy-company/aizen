@@ -17,6 +17,7 @@ struct WorkflowRunStatusIconView: View {
     var iconSize: CGFloat = 12
     var progressFrame: CGFloat = 14
     var progressStyle: WorkflowRunProgressStyle = .mini
+    var colorOverride: Color? = nil
 
     var body: some View {
         if run.isInProgress {
@@ -24,7 +25,7 @@ struct WorkflowRunStatusIconView: View {
         } else {
             Image(systemName: WorkflowStatusIcon.iconName(status: run.status, conclusion: run.conclusion, fillStyle: .fill))
                 .font(.system(size: iconSize))
-                .foregroundStyle(statusColor)
+                .foregroundStyle(colorOverride ?? statusColor)
         }
     }
 
@@ -34,9 +35,11 @@ struct WorkflowRunStatusIconView: View {
         case .mini:
             ProgressView()
                 .controlSize(.mini)
+                .tint(colorOverride ?? statusColor)
                 .frame(width: progressFrame, height: progressFrame)
         case .scaled(let scale):
             ScaledProgressView(size: progressFrame, scale: scale)
+                .tint(colorOverride ?? statusColor)
         }
     }
 

@@ -8,58 +8,44 @@
 import SwiftUI
 
 struct ReviewCommentsPanel: View {
+    private enum Layout {
+        static let panelPadding: CGFloat = 8
+        static let sectionSpacing: CGFloat = 8
+        static let cardCornerRadius: CGFloat = 10
+        static let footerButtonCornerRadius: CGFloat = 12
+        static let contentPadding: CGFloat = 10
+        static let rowSpacing: CGFloat = 6
+        static let footerButtonHeight: CGFloat = 30
+        static let footerButtonSpacing: CGFloat = 10
+        static let footerTopPadding: CGFloat = 6
+        static let footerBottomPadding: CGFloat = 12
+    }
+
     @ObservedObject var reviewManager: ReviewSessionManager
     let onScrollToLine: ((String, Int) -> Void)?
     let onCopyAll: () -> Void
     let onSendToAgent: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-
+        VStack(spacing: Layout.sectionSpacing) {
             if reviewManager.comments.isEmpty {
                 emptyState
             } else {
                 commentsList
-
-                Divider()
                 footerButtons
             }
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            Text("Comments")
-                .font(.system(size: 13, weight: .medium))
-
-            Spacer()
-
-            if !reviewManager.comments.isEmpty {
-                PillBadge(
-                    text: "\(reviewManager.comments.count)",
-                    color: Color(NSColor.controlBackgroundColor),
-                    textColor: .secondary,
-                    font: .system(size: 11, weight: .medium, design: .monospaced),
-                    horizontalPadding: 6,
-                    verticalPadding: 2,
-                    backgroundOpacity: 1
-                )
-            }
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 44)
+        .padding(.horizontal, Layout.panelPadding)
+        .padding(.vertical, Layout.panelPadding)
     }
 
     private var footerButtons: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Layout.footerButtonSpacing) {
             footerButton(
                 title: "Copy All",
                 systemImage: "doc.on.doc",
                 iconSize: 12,
-                background: Color(NSColor.controlBackgroundColor),
-                foreground: .primary,
+                prominent: false,
                 action: onCopyAll
             )
 
@@ -67,21 +53,20 @@ struct ReviewCommentsPanel: View {
                 title: "Send to Agent",
                 systemImage: "paperplane.fill",
                 iconSize: 11,
-                background: .blue,
-                foreground: .white,
+                prominent: true,
                 action: onSendToAgent
             )
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, Layout.contentPadding)
+        .padding(.top, Layout.footerTopPadding)
+        .padding(.bottom, Layout.footerBottomPadding)
     }
 
     private func footerButton(
         title: String,
         systemImage: String,
         iconSize: CGFloat,
-        background: Color,
-        foreground: Color,
+        prominent: Bool,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -89,15 +74,18 @@ struct ReviewCommentsPanel: View {
                 Image(systemName: systemImage)
                     .font(.system(size: iconSize))
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 12, weight: .semibold))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .frame(height: Layout.footerButtonHeight)
+            .background(
+                RoundedRectangle(cornerRadius: Layout.footerButtonCornerRadius, style: .continuous)
+                    .fill(prominent ? Color.accentColor : Color.white.opacity(0.08))
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(foreground)
+        .foregroundStyle(prominent ? Color.white : Color.primary)
     }
 
     private var emptyState: some View {
@@ -121,11 +109,12 @@ struct ReviewCommentsPanel: View {
 
     private var commentsList: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: Layout.sectionSpacing) {
                 ForEach(groupedComments, id: \.file) { group in
                     fileSection(group)
                 }
             }
+            .padding(.vertical, 2)
         }
     }
 
@@ -154,72 +143,77 @@ struct ReviewCommentsPanel: View {
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+            .padding(.horizontal, Layout.contentPadding)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
 
             // Comments for this file
-            ForEach(group.comments) { comment in
-                commentRow(comment, filePath: group.file)
+            VStack(spacing: Layout.rowSpacing) {
+                ForEach(group.comments) { comment in
+                    commentRow(comment, filePath: group.file)
+                }
             }
+            .padding(.horizontal, Layout.contentPadding)
+            .padding(.bottom, 10)
         }
+        .background { cardBackground(cornerRadius: Layout.cardCornerRadius) }
+        .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
     }
 
     private func commentRow(_ comment: ReviewComment, filePath: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 6) {
-                // Line info
-                HStack(spacing: 4) {
-                    Text("Line \(comment.displayLineNumber)")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+        VStack(alignment: .leading, spacing: 6) {
+            // Line info
+            HStack(spacing: 4) {
+                Text("Line \(comment.displayLineNumber)")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+
+                lineTypeBadge(comment.lineType)
+
+                Spacer()
+
+                CopyButton(text: formatSingleComment(comment, filePath: filePath), iconSize: 10)
+
+                Button {
+                    reviewManager.deleteComment(id: comment.id)
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 10))
                         .foregroundStyle(.secondary)
-
-                    lineTypeBadge(comment.lineType)
-
-                    Spacer()
-
-                    CopyButton(text: formatSingleComment(comment, filePath: filePath), iconSize: 10)
-
-                    Button {
-                        reviewManager.deleteComment(id: comment.id)
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(0.6)
-                    .help("Delete comment")
                 }
-
-                // Code context
-                CodePill(
-                    text: comment.codeContext,
-                    font: .system(size: 10, design: .monospaced),
-                    textColor: .secondary,
-                    backgroundColor: Color(NSColor.textBackgroundColor).opacity(0.5),
-                    horizontalPadding: 8,
-                    verticalPadding: 4,
-                    lineLimit: 2,
-                    truncationMode: .tail
-                )
-
-                // Comment text
-                Text(comment.comment)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.primary)
-                    .lineLimit(4)
-                    .truncationMode(.tail)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onScrollToLine?(filePath, comment.lineNumber)
+                .buttonStyle(.plain)
+                .opacity(0.6)
+                .help("Delete comment")
             }
 
-            Divider()
-                .padding(.leading, 12)
+            // Code context
+            CodePill(
+                text: comment.codeContext,
+                font: .system(size: 10, design: .monospaced),
+                textColor: .secondary,
+                backgroundColor: Color(NSColor.textBackgroundColor).opacity(0.35),
+                horizontalPadding: 8,
+                verticalPadding: 4,
+                lineLimit: 2,
+                truncationMode: .tail
+            )
+
+            // Comment text
+            Text(comment.comment)
+                .font(.system(size: 12))
+                .foregroundStyle(.primary)
+                .lineLimit(4)
+                .truncationMode(.tail)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color.white.opacity(0.05))
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onScrollToLine?(filePath, comment.lineNumber)
         }
     }
 
@@ -243,5 +237,21 @@ struct ReviewCommentsPanel: View {
             }
         }
         .font(.system(size: 10, weight: .bold, design: .monospaced))
+    }
+
+    @ViewBuilder
+    private func cardBackground(cornerRadius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer {
+                shape
+                    .fill(.white.opacity(0.001))
+                    .glassEffect(.regular, in: shape)
+                shape
+                    .fill(.white.opacity(0.03))
+            }
+        } else {
+            shape.fill(.ultraThinMaterial)
+        }
     }
 }

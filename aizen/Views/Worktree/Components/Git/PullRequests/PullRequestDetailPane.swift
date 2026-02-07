@@ -29,11 +29,11 @@ struct PullRequestDetailPane: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
+            GitWindowDivider()
             tabBar
-            Divider()
+            GitWindowDivider()
             tabContent
-            Divider()
+            GitWindowDivider()
             actionBar
         }
         .sheet(isPresented: $showRequestChangesSheet) {
@@ -295,7 +295,7 @@ struct PullRequestDetailPane: View {
                 }
             }
 
-            Divider()
+            GitWindowDivider()
 
             // Comment input
             if pr.state == .open {
@@ -509,7 +509,10 @@ struct PullRequestDetailPane: View {
             TextEditor(text: $requestChangesText)
                 .font(.system(size: 13))
                 .frame(minHeight: 100)
-                .border(Color(nsColor: .separatorColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .stroke(GitWindowDividerStyle.color(opacity: 0.9), lineWidth: 1)
+                )
 
             HStack {
                 Button("Cancel") {
@@ -591,7 +594,7 @@ struct PRCommentView: View {
             .background(.ultraThinMaterial)
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(.separator.opacity(0.3), lineWidth: 0.5)
+                    .strokeBorder(GitWindowDividerStyle.color(opacity: 0.3), lineWidth: 0.5)
             }
     }
 
@@ -617,7 +620,7 @@ struct PRCommentView: View {
         .clipShape(Circle())
         .overlay(
             Circle()
-                .strokeBorder(.separator.opacity(0.3), lineWidth: 0.5)
+                .strokeBorder(GitWindowDividerStyle.color(opacity: 0.3), lineWidth: 0.5)
         )
     }
 
@@ -718,7 +721,7 @@ struct PRDetailTabButton: View {
             )
             .overlay(
                 Rectangle()
-                    .fill(Color(NSColor.separatorColor))
+                    .fill(GitWindowDividerStyle.color(opacity: 1))
                     .frame(width: 1),
                 alignment: .trailing
             )
