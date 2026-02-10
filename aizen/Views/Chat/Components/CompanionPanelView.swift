@@ -115,12 +115,12 @@ struct CompanionPanelView: View {
     }
 
     private var worktreePathSubtitle: String {
-        guard let path = worktree.path, !path.isEmpty else { return "No worktree path" }
+        guard let path = worktree.path, !path.isEmpty else { return "No environment path" }
         return path
     }
 
     private var worktreeNameFallback: String {
-        guard let path = worktree.path, !path.isEmpty else { return "Worktree" }
+        guard let path = worktree.path, !path.isEmpty else { return "Environment" }
         return URL(fileURLWithPath: path).lastPathComponent
     }
 

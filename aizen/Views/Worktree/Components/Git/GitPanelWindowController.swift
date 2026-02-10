@@ -31,7 +31,7 @@ class GitPanelWindowController: NSWindowController {
         window.isExcludedFromWindowsMenu = false
 
         // Set title to repository name, subtitle to worktree path
-        let repoName = context.worktree.repository?.name ?? "Repository"
+        let repoName = context.worktree.repository?.name ?? "Project"
         let worktreePath = context.worktree.path ?? ""
         window.title = repoName
         window.minSize = NSSize(width: 900, height: 600)
@@ -109,6 +109,7 @@ struct GitPanelWindowContentWithToolbar: View {
     private var worktree: Worktree { context.worktree }
     private var gitStatus: GitStatus { gitRepositoryService.currentStatus }
     private var isOperationPending: Bool { gitRepositoryService.isOperationPending }
+    private var gitFeaturesAvailable: Bool { gitRepositoryService.repositoryState == .ready }
 
     init(context: GitChangesContext, repositoryManager: RepositoryManager, onClose: @escaping () -> Void) {
         self.context = context
@@ -175,12 +176,16 @@ struct GitPanelWindowContentWithToolbar: View {
             }
 
             ToolbarItem(placement: .navigation) {
-                branchSelector
+                if gitFeaturesAvailable {
+                    branchSelector
+                }
             }
             
 
             ToolbarItem(placement: .primaryAction) {
-                prActionButton
+                if gitFeaturesAvailable {
+                    prActionButton
+                }
             }
 
             ToolbarItem(placement: .primaryAction) {
@@ -188,7 +193,9 @@ struct GitPanelWindowContentWithToolbar: View {
             }
 
             ToolbarItem(placement: .primaryAction) {
-                gitActionsToolbar
+                if gitFeaturesAvailable {
+                    gitActionsToolbar
+                }
             }
         }
         .onChange(of: selectedTab) { _, newTab in

@@ -222,7 +222,7 @@ struct WorkspaceSidebarView: View {
                     .foregroundStyle((repositoryFiltersVisible || isRepositoryFiltering) ? .primary : .secondary)
             }
             .buttonStyle(.plain)
-            .help("Filter repositories")
+            .help("Filter projects")
 
             Button {
                 withAnimation(.easeInOut(duration: 0.18)) {
@@ -239,7 +239,7 @@ struct WorkspaceSidebarView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help(repositorySearchVisible ? "Hide search" : "Search repositories")
+            .help(repositorySearchVisible ? "Hide search" : "Search projects")
         }
     }
 
@@ -574,11 +574,11 @@ struct MissingRepositorySheet: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
 
-            Text("Repository Not Found")
+            Text("Project Not Found")
                 .font(.headline)
 
             VStack(spacing: 8) {
-                Text("The repository \"\(missing.repository.name ?? "Unknown")\" could not be found at:")
+                Text("The project \"\(missing.repository.name ?? "Unknown")\" could not be found at:")
                     .multilineTextAlignment(.center)
 
                 Text(missing.lastKnownPath)
@@ -615,7 +615,7 @@ struct MissingRepositorySheet: View {
                             .scaleEffect(0.7)
                             .frame(maxWidth: .infinity)
                     } else {
-                        Text("Locate Repository...")
+                        Text("Locate Project...")
                             .frame(maxWidth: .infinity)
                     }
                 }
@@ -662,7 +662,7 @@ struct MissingRepositorySheet: View {
                     onDismiss()
                 } catch {
                     isRelocating = false
-                    errorMessage = "Invalid repository: \(error.localizedDescription)"
+                    errorMessage = "Invalid project: \(error.localizedDescription)"
                 }
             }
 

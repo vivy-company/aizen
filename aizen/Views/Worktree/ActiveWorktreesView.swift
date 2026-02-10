@@ -102,11 +102,11 @@ struct ActiveWorktreesView: View {
     private var selectionTitle: String {
         switch resolvedSelection {
         case .all:
-            return "All Active Worktrees"
+            return "All Active Environments"
         case .workspace(let id):
             return workspaceGroups.first { $0.workspaceId == id }?.name ?? "Workspace"
         case .other:
-            return "Unassigned Worktrees"
+            return "Unassigned Environments"
         }
     }
 
@@ -115,7 +115,7 @@ struct ActiveWorktreesView: View {
         if selectedWorktrees.isEmpty {
             return "No active sessions"
         }
-        return "\(selectedWorktrees.count) worktrees • \(counts.total) sessions"
+        return "\(selectedWorktrees.count) environments • \(counts.total) sessions"
     }
 
     private var worktreeSections: [WorktreeSection] {
@@ -127,7 +127,7 @@ struct ActiveWorktreesView: View {
                 WorktreeSection(
                     id: group.id,
                     title: group.name,
-                    subtitle: "\(group.worktrees.count) worktrees",
+                    subtitle: "\(group.worktrees.count) environments",
                     worktrees: group.worktrees.sorted(by: worktreeSort)
                 )
             }
@@ -174,7 +174,7 @@ struct ActiveWorktreesView: View {
                 terminateAll()
             }
         } message: {
-            Text("This will close all chat, terminal, browser, and file sessions in active worktrees.")
+            Text("This will close all chat, terminal, browser, and file sessions in active environments.")
         }
     }
 
@@ -182,7 +182,7 @@ struct ActiveWorktreesView: View {
         List(selection: $sidebarSelection) {
             Section("Overview") {
                 SidebarRow(
-                    title: "All Worktrees",
+                    title: "All Environments",
                     subtitle: "\(activeWorktrees.count) active",
                     color: .secondary,
                     worktreeCount: activeWorktrees.count,
@@ -196,7 +196,7 @@ struct ActiveWorktreesView: View {
                     if group.isOther {
                         SidebarRow(
                             title: group.name,
-                            subtitle: "\(group.worktrees.count) worktrees",
+                            subtitle: "\(group.worktrees.count) environments",
                             color: colorFromHex(group.colorHex) ?? .secondary,
                             worktreeCount: group.worktrees.count,
                             counts: sessionCounts(for: group.worktrees)
@@ -205,7 +205,7 @@ struct ActiveWorktreesView: View {
                     } else if let workspaceId = group.workspaceId {
                         SidebarRow(
                             title: group.name,
-                            subtitle: "\(group.worktrees.count) worktrees",
+                            subtitle: "\(group.worktrees.count) environments",
                             color: colorFromHex(group.colorHex) ?? .secondary,
                             worktreeCount: group.worktrees.count,
                             counts: sessionCounts(for: group.worktrees)
@@ -259,7 +259,7 @@ struct ActiveWorktreesView: View {
         }
         .padding(.top, 8)
         .padding(.horizontal, 16)
-        .navigationTitle("Active Worktrees")
+        .navigationTitle("Active Environments")
         .navigationSubtitle("\(selectionTitle) • \(selectionSubtitle)")
     }
 
@@ -318,7 +318,7 @@ struct ActiveWorktreesView: View {
         Group {
             if #available(macOS 14.0, *) {
                 ContentUnavailableView(
-                    "No active worktrees",
+                    "No active environments",
                     systemImage: "checkmark.seal",
                     description: Text("Open a chat, terminal, or browser session to see it here.")
                 )
@@ -327,7 +327,7 @@ struct ActiveWorktreesView: View {
                     Image(systemName: "checkmark.seal")
                         .font(.system(size: 28))
                         .foregroundStyle(.secondary)
-                    Text("No active worktrees")
+                    Text("No active environments")
                         .font(.headline)
                     Text("Open a chat, terminal, or browser session to see it here.")
                         .font(.subheadline)
@@ -342,7 +342,7 @@ struct ActiveWorktreesView: View {
         var buckets: [String: (title: String, worktrees: [Worktree])] = [:]
 
         for worktree in worktrees {
-            let repoName = worktree.repository?.name ?? "Repository"
+            let repoName = worktree.repository?.name ?? "Project"
             let key = worktree.repository?.objectID.uriRepresentation().absoluteString ?? repoName
             if var bucket = buckets[key] {
                 bucket.worktrees.append(worktree)
@@ -358,7 +358,7 @@ struct ActiveWorktreesView: View {
                 WorktreeSection(
                     id: bucket.title,
                     title: bucket.title,
-                    subtitle: "\(bucket.worktrees.count) worktrees",
+                    subtitle: "\(bucket.worktrees.count) environments",
                     worktrees: bucket.worktrees.sorted(by: worktreeSort)
                 )
             }
@@ -605,7 +605,7 @@ private struct SummaryPills: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            summaryBadge(label: "Worktrees", count: worktreeCount, color: .secondary)
+            summaryBadge(label: "Environments", count: worktreeCount, color: .secondary)
             if counts.chats > 0 { summaryBadge(label: "Chat", count: counts.chats, color: .blue) }
             if counts.terminals > 0 { summaryBadge(label: "Terminal", count: counts.terminals, color: .green) }
             if counts.browsers > 0 { summaryBadge(label: "Browser", count: counts.browsers, color: .orange) }
@@ -687,7 +687,7 @@ private struct ActiveWorktreeRow: View {
     }
 
     private var worktreeTitle: String {
-        let repoName = worktree.repository?.name ?? "Worktree"
+        let repoName = worktree.repository?.name ?? "Environment"
         if let branch = worktree.branch, !branch.isEmpty {
             return "\(repoName) • \(branch)"
         }

@@ -4093,7 +4093,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose which terminal application to use when opening worktrees"
+            "value" : "Choose which terminal application to use when opening environments"
           }
         },
         "zh-Hans" : {
@@ -4539,7 +4539,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select a Repository"
+            "value" : "Select a Project"
           }
         },
         "zh-Hans" : {
@@ -4556,7 +4556,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a repository to view its worktrees"
+            "value" : "Choose a project to view its environments"
           }
         },
         "zh-Hans" : {
@@ -4573,7 +4573,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select a Worktree"
+            "value" : "Select an Environment"
           }
         },
         "zh-Hans" : {
@@ -4590,7 +4590,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a worktree to view details and actions"
+            "value" : "Choose an environment to view details and actions"
           }
         },
         "zh-Hans" : {
@@ -5643,7 +5643,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Invalid repository path"
+            "value" : "Invalid project path"
           }
         },
         "zh-Hans" : {
@@ -5660,7 +5660,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not a git repository"
+            "value" : "Not a git project"
           }
         },
         "zh-Hans" : {
@@ -5713,7 +5713,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Worktree not found"
+            "value" : "Environment not found"
           }
         },
         "zh-Hans" : {
@@ -7567,7 +7567,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hide the 'Open in...' button for opening worktree in third-party apps like Finder"
+            "value" : "Hide the 'Open in...' button for opening environment in third-party apps like Finder"
           }
         },
         "zh-Hans" : {
@@ -7586,7 +7586,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hide the Browser tab in worktree views"
+            "value" : "Hide the Browser tab in environment views"
           }
         },
         "zh-Hans" : {
@@ -7605,7 +7605,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hide the Chat tab in worktree views"
+            "value" : "Hide the Chat tab in environment views"
           }
         },
         "zh-Hans" : {
@@ -7624,7 +7624,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hide the Files tab in worktree views"
+            "value" : "Hide the Files tab in environment views"
           }
         },
         "zh-Hans" : {
@@ -7662,7 +7662,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hide the Terminal tab in worktree views"
+            "value" : "Hide the Terminal tab in environment views"
           }
         },
         "zh-Hans" : {
@@ -7680,7 +7680,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hide Worktree List (Zen Mode)"
+            "value" : "Hide Environment List (Zen Mode)"
           }
         },
         "zh-Hans" : {
@@ -8476,7 +8476,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Locate Repository..."
+            "value" : "Locate Project..."
           }
         },
         "zh-Hans" : {
@@ -9228,7 +9228,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Each worktree has its own terminal, file browser, web browser, and chat."
+            "value" : "Each environment has its own terminal, file browser, web browser, and chat."
           }
         },
         "zh-Hans" : {
@@ -9245,7 +9245,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Per-Worktree Sessions"
+            "value" : "Per-Environment Sessions"
           }
         },
         "zh-Hans" : {
@@ -9262,7 +9262,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add your first repository from the sidebar, configure agents in Settings, and start managing worktrees."
+            "value" : "Add your first project from the sidebar, configure agents in Settings, and start managing environments."
           }
         },
         "zh-Hans" : {
@@ -9296,7 +9296,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Built-in terminal with split pane support. Execute commands directly within your worktree context."
+            "value" : "Built-in terminal with split pane support. Execute commands directly within your environment context."
           }
         },
         "zh-Hans" : {
@@ -9330,7 +9330,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Organize repositories into workspaces. Create worktrees to work on multiple branches in parallel."
+            "value" : "Organize projects into workspaces. Create environments to work on multiple branches in parallel."
           }
         },
         "zh-Hans" : {
@@ -9347,7 +9347,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Workspaces & Worktrees"
+            "value" : "Workspaces & Environments"
           }
         },
         "zh-Hans" : {
@@ -9364,7 +9364,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Manage multiple worktrees per repository. Switch between branches without losing work or stashing changes."
+            "value" : "Manage multiple environments per project. Switch between branches without losing work or stashing changes."
           }
         },
         "zh-Hans" : {
@@ -9381,7 +9381,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Git Worktree Management"
+            "value" : "Git Environment Management"
           }
         },
         "zh-Hans" : {
@@ -9432,7 +9432,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your developer tool for Git worktrees with integrated terminal and AI agents"
+            "value" : "Your developer tool for Git environments with integrated terminal and AI agents"
           }
         },
         "zh-Hans" : {
@@ -9449,7 +9449,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Switch worktrees, not windows."
+            "value" : "Switch environments, not windows."
           }
         },
         "zh-Hans" : {
@@ -10383,7 +10383,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Repository Not Found"
+            "value" : "Project Not Found"
           }
         },
         "zh-Hans" : {
@@ -10400,7 +10400,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Repository path no longer exists: %@"
+            "value" : "Project path no longer exists: %@"
           }
         },
         "zh-Hans" : {
@@ -10451,13 +10451,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add Repository"
+            "value" : "Add Project"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "添加仓库"
+            "value" : "添加项目"
           }
         }
       }
@@ -10468,7 +10468,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Repository URL"
+            "value" : "Project URL"
           }
         },
         "zh-Hans" : {
@@ -10502,7 +10502,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The repository will be cloned to the selected location"
+            "value" : "The project will be cloned to the selected location"
           }
         },
         "zh-Hans" : {
@@ -10553,7 +10553,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A new Git repository will be created in the selected folder"
+            "value" : "A new Git project will be created in the selected folder"
           }
         },
         "zh-Hans" : {
@@ -10570,7 +10570,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Repository Name"
+            "value" : "Project Name"
           }
         },
         "zh-Hans" : {
@@ -10689,13 +10689,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Existing"
+            "value" : "Open Folder"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开现有"
+            "value" : "打开文件夹"
           }
         }
       }
@@ -10706,7 +10706,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select where to clone the repository"
+            "value" : "Select where to clone the project"
           }
         },
         "zh-Hans" : {
@@ -10723,7 +10723,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select parent folder for new repository"
+            "value" : "Select parent folder for new project"
           }
         },
         "zh-Hans" : {
@@ -10740,13 +10740,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select a git repository folder"
+            "value" : "Select a project folder"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择 git 仓库文件夹"
+            "value" : "选择项目文件夹"
           }
         }
       }
@@ -10774,7 +10774,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select repository folder"
+            "value" : "Select project folder"
           }
         },
         "zh-Hans" : {
@@ -10791,13 +10791,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select a folder containing a git repository"
+            "value" : "Select any project folder (Git optional)"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择包含 git 仓库的文件夹"
+            "value" : "选择任意项目文件夹（可选 Git）"
           }
         }
       }
@@ -10808,7 +10808,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Repository Location"
+            "value" : "Project Location"
           }
         },
         "zh-Hans" : {
@@ -11460,7 +11460,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This will permanently delete all your data including workspaces, repositories, worktrees, and chat sessions. The app will quit after reset."
+            "value" : "This will permanently delete all your data including workspaces, projects, environments, and chat sessions. The app will quit after reset."
           }
         },
         "zh-Hans" : {
@@ -11511,7 +11511,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This will delete all workspaces, repositories, worktrees, and chat sessions. This action cannot be undone."
+            "value" : "This will delete all workspaces, projects, environments, and chat sessions. This action cannot be undone."
           }
         },
         "zh-Hans" : {
@@ -12211,7 +12211,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Show Worktree List"
+            "value" : "Show Environment List"
           }
         },
         "zh-Hans" : {
@@ -12238,7 +12238,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No repositories match the current filter"
+            "value" : "No projects match the current filter"
           }
         },
         "zh-Hans" : {
@@ -12255,7 +12255,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No repositories in this workspace"
+            "value" : "No projects in this workspace"
           }
         },
         "zh-Hans" : {
@@ -12272,7 +12272,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No repositories match your search"
+            "value" : "No projects match your search"
           }
         },
         "zh-Hans" : {
@@ -12722,7 +12722,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Switch to worktree..."
+            "value" : "Switch to environment..."
           }
         },
         "zh-Hans" : {
@@ -13065,7 +13065,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open a terminal in this worktree"
+            "value" : "Open a terminal in this environment"
           }
         },
         "zh-Hans" : {
@@ -13234,7 +13234,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The repository \"%@\" could not be found at:\n%@\n\nIt may have been moved or deleted."
+            "value" : "The project \"%@\" could not be found at:\n%@\n\nIt may have been moved or deleted."
           }
         },
         "zh-Hans" : {
@@ -14098,13 +14098,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add Repository"
+            "value" : "Add Project"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "添加仓库"
+            "value" : "添加项目"
           }
         }
       }
@@ -14285,7 +14285,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Repositories"
+            "value" : "Projects"
           }
         },
         "zh-Hans" : {
@@ -14302,7 +14302,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Also delete repository from filesystem"
+            "value" : "Also delete project from filesystem"
           }
         },
         "zh-Hans" : {
@@ -14387,7 +14387,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remove Repository"
+            "value" : "Remove Project"
           }
         },
         "zh-Hans" : {
@@ -14421,7 +14421,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This will unlink the repository from Aizen. The repository files will remain on disk unless you check the option below."
+            "value" : "This will unlink the project from Aizen. The project files will remain on disk unless you check the option below."
           }
         },
         "zh-Hans" : {
@@ -14438,7 +14438,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remove Repository?"
+            "value" : "Remove Project?"
           }
         },
         "zh-Hans" : {
@@ -14472,7 +14472,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search repositories"
+            "value" : "Search projects"
           }
         },
         "zh-Hans" : {
@@ -14604,7 +14604,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Worktree path not available"
+            "value" : "Environment path not available"
           }
         },
         "zh-Hans" : {
@@ -14623,7 +14623,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Worktree Tabs"
+            "value" : "Environment Tabs"
           }
         },
         "zh-Hans" : {
@@ -14862,7 +14862,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Worktree Creation Failed"
+            "value" : "Environment Creation Failed"
           }
         },
         "zh-Hans" : {
@@ -14913,7 +14913,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Invalid repository path"
+            "value" : "Invalid project path"
           }
         },
         "zh-Hans" : {
@@ -14947,13 +14947,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Worktree"
+            "value" : "Create Environment"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "创建工作树"
+            "value" : "创建环境"
           }
         }
       }
@@ -15102,7 +15102,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete Worktree"
+            "value" : "Delete Environment"
           }
         },
         "zh-Hans" : {
@@ -15119,7 +15119,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Are you sure you want to delete this worktree? This action cannot be undone."
+            "value" : "Are you sure you want to delete this environment? This action cannot be undone."
           }
         },
         "zh-Hans" : {
@@ -15136,7 +15136,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Are you sure you want to delete the worktree '%@'? This action cannot be undone."
+            "value" : "Are you sure you want to delete the environment '%@'? This action cannot be undone."
           }
         },
         "zh-Hans" : {
@@ -15171,7 +15171,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete Worktree"
+            "value" : "Delete Environment"
           }
         },
         "zh-Hans" : {
@@ -15375,7 +15375,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The worktree '%@' contains modified or untracked files. Delete anyway?"
+            "value" : "The environment '%@' contains modified or untracked files. Delete anyway?"
           }
         },
         "zh-Hans" : {
@@ -15393,7 +15393,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You have unsaved changes in '%@'. Deleting this worktree will lose these changes."
+            "value" : "You have unsaved changes in '%@'. Deleting this environment will lose these changes."
           }
         },
         "zh-Hans" : {
@@ -15461,13 +15461,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add Worktree"
+            "value" : "New Environment"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "添加工作树"
+            "value" : "新建环境"
           }
         }
       }
@@ -15478,7 +15478,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No worktrees match your filters"
+            "value" : "No environments match your filters"
           }
         },
         "zh-Hans" : {
@@ -15495,7 +15495,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No worktrees yet"
+            "value" : "No environments yet"
           }
         },
         "zh-Hans" : {
@@ -15512,7 +15512,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No worktrees match your search"
+            "value" : "No environments match your search"
           }
         },
         "zh-Hans" : {
@@ -15598,7 +15598,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search worktrees"
+            "value" : "Search environments"
           }
         },
         "zh-Hans" : {
@@ -15615,7 +15615,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Worktree Details"
+            "value" : "Environment Details"
           }
         },
         "zh-Hans" : {
@@ -15973,7 +15973,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Worktree"
+            "value" : "Environment"
           }
         },
         "zh-Hans" : {

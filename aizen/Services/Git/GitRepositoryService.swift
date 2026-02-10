@@ -9,10 +9,19 @@ import Foundation
 import Combine
 import os.log
 
+enum GitRepositoryState: Equatable {
+    case unknown
+    case ready
+    case notRepository
+    case missingPath
+    case error(String)
+}
+
 class GitRepositoryService: ObservableObject {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "GitRepository")
     @Published private(set) var currentStatus: GitStatus = .empty
     @Published private(set) var isOperationPending = false
+    @Published private(set) var repositoryState: GitRepositoryState = .unknown
 
     private(set) var worktreePath: String
 
@@ -341,6 +350,7 @@ class GitRepositoryService: ObservableObject {
             guard newPath != self.worktreePath else { return }
             self.worktreePath = newPath
             self.currentStatus = .empty
+            self.repositoryState = .unknown
             self.reloadStatusDebouncedOnMain(lightweight: true)
         }
     }
@@ -426,8 +436,26 @@ class GitRepositoryService: ObservableObject {
                         // Guard against path changes while loading (e.g. worktree switch).
                         guard self.worktreePath == path else { return }
                         self.currentStatus = status
+                        self.repositoryState = .ready
                     }
                 } catch {
+                    await MainActor.run {
+                        guard self.worktreePath == path else { return }
+                        self.currentStatus = .empty
+
+                        if let gitError = error as? Libgit2Error {
+                            switch gitError {
+                            case .notARepository:
+                                self.repositoryState = .notRepository
+                            case .repositoryPathMissing:
+                                self.repositoryState = .missingPath
+                            default:
+                                self.repositoryState = .error(gitError.localizedDescription)
+                            }
+                        } else {
+                            self.repositoryState = .error(error.localizedDescription)
+                        }
+                    }
                     self.logger.error("Failed to reload Git status for \(path): \(error)")
                 }
             }

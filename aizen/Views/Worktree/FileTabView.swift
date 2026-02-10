@@ -27,7 +27,7 @@ struct FileTabView: View {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.largeTitle)
                     .foregroundColor(.orange)
-                Text("Worktree path not available")
+                Text("Environment path not available")
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

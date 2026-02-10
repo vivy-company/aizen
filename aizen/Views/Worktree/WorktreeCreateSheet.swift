@@ -7,12 +7,27 @@
 
 import SwiftUI
 
+private enum EnvironmentCreationMode: String, CaseIterable {
+    case linked
+    case independent
+
+    var title: String {
+        switch self {
+        case .linked:
+            return "Linked (Git Environment)"
+        case .independent:
+            return "Independent (Clone/Copy)"
+        }
+    }
+}
+
 struct WorktreeCreateSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var repository: Repository
     @ObservedObject var repositoryManager: RepositoryManager
 
-    @State private var folderName = ""
+    @State private var mode: EnvironmentCreationMode = .linked
+    @State private var environmentName = ""
     @State private var branchName = ""
     @State private var selectedBranch: BranchInfo?
     @State private var isProcessing = false
@@ -21,11 +36,41 @@ struct WorktreeCreateSheet: View {
     @State private var showingBranchSelector = false
     @State private var selectedTemplateIndex: Int?
     @State private var showingPostCreateActions = false
+    @State private var independentMethod: RepositoryManager.IndependentEnvironmentMethod = .clone
 
     @AppStorage("branchNameTemplates") private var branchNameTemplatesData: Data = Data()
 
     private var branchNameTemplates: [String] {
         (try? JSONDecoder().decode([String].self, from: branchNameTemplatesData)) ?? []
+    }
+
+    private var isGitProject: Bool {
+        guard let repoPath = repository.path else { return false }
+        return GitUtils.isGitRepository(at: repoPath)
+    }
+
+    private var sourcePath: String? {
+        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
+        if let primary = worktrees.first(where: { $0.isPrimary }),
+           let path = primary.path {
+            return path
+        }
+        return repository.path
+    }
+
+    private var environmentRootDirectory: URL? {
+        guard let repoPath = repository.path else { return nil }
+        let repoName = URL(fileURLWithPath: repoPath).lastPathComponent
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("aizen/worktrees")
+            .appendingPathComponent(repoName)
+    }
+
+    private var targetPath: String? {
+        guard let root = environmentRootDirectory else { return nil }
+        let trimmedName = environmentName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return nil }
+        return root.appendingPathComponent(trimmedName).path
     }
 
     private var currentPlaceholder: String {
@@ -41,7 +86,6 @@ struct WorktreeCreateSheet: View {
     }
 
     private var defaultBaseBranch: String {
-        // Try to find main or master branch
         let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
         if let mainWorktree = worktrees.first(where: { $0.isPrimary }) {
             return mainWorktree.branch ?? "main"
@@ -49,129 +93,98 @@ struct WorktreeCreateSheet: View {
         return "main"
     }
 
+    private var environmentNameWarning: String? {
+        let trimmedName = environmentName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedName.isEmpty {
+            return "Environment name is required."
+        }
+        if trimmedName.contains("/") {
+            return "Environment name cannot contain '/'."
+        }
+        if let destination = targetPath, FileManager.default.fileExists(atPath: destination) {
+            return "Destination already exists."
+        }
+        return nil
+    }
+
+    private var isValid: Bool {
+        if environmentNameWarning != nil {
+            return false
+        }
+
+        switch mode {
+        case .linked:
+            return isGitProject && !branchName.isEmpty && validationWarning == nil
+        case .independent:
+            return sourcePath != nil
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             DetailHeaderBar(showsBackground: false) {
-                Text("worktree.create.title", bundle: .main)
+                Text("Create Environment")
                     .font(.title2)
                     .fontWeight(.semibold)
             }
 
             Divider()
 
-            // Content
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("worktree.create.branchName", bundle: .main)
-                            .font(.headline)
-
-                        Spacer()
-
-                        Button {
-                            generateRandomName()
-                        } label: {
-                            Image(systemName: "shuffle")
-                                .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Picker("Environment Type", selection: $mode) {
+                        Text(EnvironmentCreationMode.linked.title)
+                            .tag(EnvironmentCreationMode.linked)
+                            .disabled(!isGitProject)
+                        Text(EnvironmentCreationMode.independent.title)
+                            .tag(EnvironmentCreationMode.independent)
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: mode) { _, newMode in
+                        if newMode == .independent && !isGitProject {
+                            independentMethod = .copy
                         }
-                        .buttonStyle(.plain)
-                        .help(String(localized: "worktree.create.generateRandom"))
                     }
 
-                    TextField(currentPlaceholder, text: $branchName)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: branchName) { _, _ in
-                            validateBranchName()
-                        }
-                        .onSubmit {
-                            if !branchName.isEmpty && validationWarning == nil {
-                                createWorktree()
+                    if !isGitProject && mode == .linked {
+                        Text("Linked environments require a git project. Use Independent mode instead.")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+
+                    environmentNameSection
+
+                    if mode == .linked {
+                        linkedModeSection
+                    } else {
+                        independentModeSection
+                    }
+
+                    postCreateActionsSection
+
+                    if let error = errorMessage {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .font(.callout)
+                                Text("Environment creation failed")
+                                    .font(.callout)
+                                    .fontWeight(.semibold)
                             }
+                            Text(error)
+                                .font(.system(.caption, design: .monospaced))
                         }
-
-                    if !branchNameTemplates.isEmpty {
-                        HStack(spacing: 6) {
-                            ForEach(Array(branchNameTemplates.enumerated()), id: \.offset) { index, template in
-                                Button {
-                                    if selectedTemplateIndex == index {
-                                        selectedTemplateIndex = nil
-                                    } else {
-                                        selectedTemplateIndex = index
-                                        branchName = template
-                                    }
-                                    validateBranchName()
-                                } label: {
-                                    Text(template)
-                                        .font(.caption)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(
-                                            selectedTemplateIndex == index
-                                                ? Color.accentColor.opacity(0.3)
-                                                : Color.secondary.opacity(0.2),
-                                            in: Capsule()
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    if let warning = validationWarning {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.caption)
-                            Text(warning)
-                                .font(.caption)
-                        }
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.red)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("worktree.create.baseBranch", bundle: .main)
-                        .font(.headline)
-
-                    BranchSelectorButton(
-                        selectedBranch: selectedBranch,
-                        defaultBranch: defaultBaseBranch,
-                        isPresented: $showingBranchSelector
-                    )
-
-                    Text("worktree.create.baseBranchHelp", bundle: .main)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                // Post-create actions section
-                postCreateActionsSection
-
-                if let error = errorMessage {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(.callout)
-                            Text("worktree.create.failed", bundle: .main)
-                                .font(.callout)
-                                .fontWeight(.semibold)
-                        }
-                        Text(error)
-                            .font(.system(.caption, design: .monospaced))
-                    }
-                    .foregroundStyle(.red)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-                }
+                .padding()
             }
-            .padding()
-
-            Spacer()
 
             Divider()
 
-            // Footer
             HStack {
                 Spacer()
 
@@ -180,17 +193,17 @@ struct WorktreeCreateSheet: View {
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button(String(localized: "worktree.create.create")) {
-                    createWorktree()
+                Button("Create Environment") {
+                    createEnvironment()
                 }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
-                .disabled(isProcessing || branchName.isEmpty || validationWarning != nil)
+                .disabled(isProcessing || !isValid)
             }
             .padding()
         }
-        .frame(width: 450)
-        .frame(minHeight: 380, maxHeight: 480)
+        .frame(width: 520)
+        .frame(minHeight: 420, maxHeight: 560)
         .sheet(isPresented: $showingBranchSelector) {
             BranchSelectorView(
                 repository: repository,
@@ -202,7 +215,153 @@ struct WorktreeCreateSheet: View {
             PostCreateActionsSheet(repository: repository)
         }
         .onAppear {
-            suggestWorktreeName()
+            suggestEnvironmentName()
+            if !isGitProject {
+                mode = .independent
+                independentMethod = .copy
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var environmentNameSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Environment Name")
+                .font(.headline)
+
+            TextField("feature-landing-redesign", text: $environmentName)
+                .textFieldStyle(.roundedBorder)
+
+            if let warning = environmentNameWarning {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                    Text(warning)
+                        .font(.caption)
+                }
+                .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var linkedModeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("worktree.create.branchName", bundle: .main)
+                        .font(.headline)
+
+                    Spacer()
+
+                    Button {
+                        generateRandomName()
+                    } label: {
+                        Image(systemName: "shuffle")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(String(localized: "worktree.create.generateRandom"))
+                }
+
+                TextField(currentPlaceholder, text: $branchName)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: branchName) { _, _ in
+                        validateBranchName()
+                    }
+                    .onSubmit {
+                        if !branchName.isEmpty && validationWarning == nil {
+                            createEnvironment()
+                        }
+                    }
+
+                if !branchNameTemplates.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(Array(branchNameTemplates.enumerated()), id: \.offset) { index, template in
+                            Button {
+                                if selectedTemplateIndex == index {
+                                    selectedTemplateIndex = nil
+                                } else {
+                                    selectedTemplateIndex = index
+                                    branchName = template
+                                }
+                                validateBranchName()
+                            } label: {
+                                Text(template)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        selectedTemplateIndex == index
+                                            ? Color.accentColor.opacity(0.3)
+                                            : Color.secondary.opacity(0.2),
+                                        in: Capsule()
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if let warning = validationWarning {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                        Text(warning)
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.orange)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("worktree.create.baseBranch", bundle: .main)
+                    .font(.headline)
+
+                BranchSelectorButton(
+                    selectedBranch: selectedBranch,
+                    defaultBranch: defaultBaseBranch,
+                    isPresented: $showingBranchSelector
+                )
+
+                Text("worktree.create.baseBranchHelp", bundle: .main)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var independentModeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Source")
+                .font(.headline)
+
+            Text(sourcePath ?? "No source path available")
+                .font(.caption)
+                .fontDesign(.monospaced)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+
+            if isGitProject {
+                Text("Method")
+                    .font(.headline)
+
+                Picker("Method", selection: $independentMethod) {
+                    Text("Clone")
+                        .tag(RepositoryManager.IndependentEnvironmentMethod.clone)
+                    Text("Copy")
+                        .tag(RepositoryManager.IndependentEnvironmentMethod.copy)
+                }
+                .pickerStyle(.segmented)
+            } else {
+                Text("Files will be copied into a separate environment.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -227,7 +386,7 @@ struct WorktreeCreateSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("No actions configured")
                                 .font(.subheadline)
-                            Text("Tap to add actions that run after worktree creation")
+                            Text("Tap to add actions that run after environment creation")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -290,7 +449,7 @@ struct WorktreeCreateSheet: View {
         }
     }
 
-    private func suggestWorktreeName() {
+    private func suggestEnvironmentName() {
         generateRandomName()
     }
 
@@ -300,18 +459,22 @@ struct WorktreeCreateSheet: View {
             .lowercased()
             .replacingOccurrences(of: " ", with: "-")
             .replacingOccurrences(of: "'", with: "")
-        folderName = generated
+        environmentName = generated
         branchName = generated
         validateBranchName()
     }
 
     private func validateBranchName() {
+        guard mode == .linked else {
+            validationWarning = nil
+            return
+        }
+
         guard !branchName.isEmpty else {
             validationWarning = nil
             return
         }
 
-        // Check against existing branch names
         if existingWorktreeNames.contains(branchName) {
             validationWarning = String(localized: "worktree.create.branchExists \(branchName)")
         } else {
@@ -319,42 +482,39 @@ struct WorktreeCreateSheet: View {
         }
     }
 
-    private func createWorktree() {
-        guard !isProcessing, !branchName.isEmpty else { return }
+    private func createEnvironment() {
+        guard !isProcessing, isValid else { return }
+        guard let destinationPath = targetPath else { return }
 
-        // Use selectedBranch if available, otherwise use default branch
-        let baseBranchName: String
-        if let selected = selectedBranch {
-            baseBranchName = selected.name
-        } else {
-            baseBranchName = defaultBaseBranch
-        }
-
-        guard let repoPath = repository.path else {
-            errorMessage = String(localized: "worktree.create.invalidRepoPath")
-            return
-        }
+        let baseBranchName = selectedBranch?.name ?? defaultBaseBranch
+        let source = sourcePath
 
         isProcessing = true
         errorMessage = nil
 
         Task {
             do {
-                // Build path: ~/aizen/worktrees/{repoName}/{folderName}
-                let repoName = URL(fileURLWithPath: repoPath).lastPathComponent
-                let worktreesDir = FileManager.default.homeDirectoryForCurrentUser
-                    .appendingPathComponent("aizen/worktrees")
-                    .appendingPathComponent(repoName)
-                let worktreePath = worktreesDir.appendingPathComponent(folderName).path
-
-                // Create new branch from selected base branch and create worktree
-                _ = try await repositoryManager.addWorktree(
-                    to: repository,
-                    path: worktreePath,
-                    branch: branchName,
-                    createBranch: true,
-                    baseBranch: baseBranchName
-                )
+                switch mode {
+                case .linked:
+                    _ = try await repositoryManager.addLinkedEnvironment(
+                        to: repository,
+                        path: destinationPath,
+                        branch: branchName,
+                        createBranch: true,
+                        baseBranch: baseBranchName
+                    )
+                case .independent:
+                    guard let source else {
+                        throw Libgit2Error.invalidPath("Source path is unavailable")
+                    }
+                    let method: RepositoryManager.IndependentEnvironmentMethod = isGitProject ? independentMethod : .copy
+                    _ = try await repositoryManager.addIndependentEnvironment(
+                        to: repository,
+                        path: destinationPath,
+                        sourcePath: source,
+                        method: method
+                    )
+                }
 
                 await MainActor.run {
                     dismiss()

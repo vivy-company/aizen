@@ -106,7 +106,7 @@ enum GitHostingError: LocalizedError {
         case .unsupportedProvider:
             return "This Git hosting provider is not supported"
         case .noRemoteFound:
-            return "No remote repository found"
+            return "No remote project found"
         }
     }
 }

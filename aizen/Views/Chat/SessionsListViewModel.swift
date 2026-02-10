@@ -281,7 +281,7 @@ final class SessionsListViewModel: ObservableObject {
         // If session is closed (worktree == nil), reattach to current worktree
         if chatSession.worktree == nil {
             guard let currentWorktreeId = selectedWorktreeId else {
-                errorMessage = "Open session history from a worktree to resume closed sessions"
+                errorMessage = "Open session history from an environment to resume closed sessions"
                 logger.error("Cannot resume closed session without worktree context")
                 return
             }
@@ -290,7 +290,7 @@ final class SessionsListViewModel: ObservableObject {
             fetchRequest.predicate = NSPredicate(format: "id == %@", currentWorktreeId as CVarArg)
             
             guard let worktree = try? chatSession.managedObjectContext?.fetch(fetchRequest).first else {
-                errorMessage = "Cannot find worktree"
+                errorMessage = "Cannot find environment"
                 logger.error("Worktree not found for id: \(currentWorktreeId)")
                 return
             }
@@ -300,7 +300,7 @@ final class SessionsListViewModel: ObservableObject {
             do {
                 try chatSession.managedObjectContext?.save()
                 chatSession.managedObjectContext?.refresh(chatSession, mergeChanges: false)
-                logger.info("Reattached closed session \(chatSessionId.uuidString) to worktree \(worktree.id?.uuidString ?? "nil")")
+                logger.info("Reattached closed session \(chatSessionId.uuidString) to environment \(worktree.id?.uuidString ?? "nil")")
             } catch {
                 errorMessage = "Failed to reattach session: \(error.localizedDescription)"
                 logger.error("Failed to save after reattaching: \(error.localizedDescription)")
@@ -309,25 +309,25 @@ final class SessionsListViewModel: ObservableObject {
         }
         
         guard let worktree = chatSession.worktree, !worktree.isDeleted else {
-            errorMessage = "Cannot resume session: worktree has been deleted"
+            errorMessage = "Cannot resume session: environment has been deleted"
             logger.error("Worktree is deleted")
             return
         }
         
         guard let worktreeId = worktree.id else {
-            errorMessage = "Invalid worktree"
+            errorMessage = "Invalid environment"
             logger.error("Worktree has no ID")
             return
         }
         
         guard let worktreePath = worktree.path else {
-            errorMessage = "Cannot resume session: worktree has no path"
+            errorMessage = "Cannot resume session: environment has no path"
             logger.error("Worktree has no path")
             return
         }
         
         guard FileManager.default.fileExists(atPath: worktreePath) else {
-            errorMessage = "Cannot resume session: worktree path no longer exists"
+            errorMessage = "Cannot resume session: environment path no longer exists"
             logger.error("Worktree path does not exist: \(worktreePath)")
             return
         }

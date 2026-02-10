@@ -19,14 +19,14 @@ struct AgentLoadingView: View {
 
     private let tips = [
         "⌘D to split terminal right, ⇧⌘D to split down",
-        "⇧⌘A to switch between active worktrees",
+        "⇧⌘A to switch between active environments",
         "⇧⌘Z to toggle Zen Mode for distraction-free coding",
         "Type @ to mention files or folders in chat",
         "Drag files into the chat to attach them",
         "Use / to access slash commands",
-        "Each worktree has its own terminal, chat, and browser",
+        "Each environment has its own terminal, chat, and browser",
         "Right-click files to send them to the agent",
-        "Git worktrees let you work on multiple branches at once",
+        "Git linked environments let you work on multiple branches at once",
         "⌘P to open command palette for quick navigation",
     ]
 

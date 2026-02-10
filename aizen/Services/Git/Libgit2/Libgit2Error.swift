@@ -24,17 +24,17 @@ nonisolated enum Libgit2Error: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notARepository(let path):
-            return "Not a git repository: \(path)"
+            return "Not a git project: \(path)"
         case .repositoryPathMissing(let path):
-            return "Repository path no longer exists: \(path)"
+            return "Project path no longer exists: \(path)"
         case .repositoryCorrupted(let message):
-            return "Repository corrupted: \(message)"
+            return "Project corrupted: \(message)"
         case .worktreeNotFound(let name):
-            return "Worktree not found: \(name)"
+            return "Environment not found: \(name)"
         case .worktreeAlreadyExists(let name):
-            return "Worktree already exists: \(name)"
+            return "Environment already exists: \(name)"
         case .worktreeLocked(let name):
-            return "Worktree is locked: \(name)"
+            return "Environment is locked: \(name)"
         case .branchNotFound(let name):
             return "Branch not found: \(name)"
         case .branchAlreadyExists(let name):

@@ -152,6 +152,8 @@ struct GitPanelWindowContent: View {
     @StateObject private var workflowService = WorkflowService()
     @State private var selectedWorkflowForTrigger: Workflow?
     @State private var workflowServiceInitialized: Bool = false
+    @State private var isInitializingGit = false
+    @State private var gitInitializationError: String?
 
     @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
     @AppStorage("diffFontSize") private var diffFontSize: Double = 11.0
@@ -176,13 +178,23 @@ struct GitPanelWindowContent: View {
         gitRepositoryService.currentStatus
     }
 
+    private var repositoryState: GitRepositoryState {
+        gitRepositoryService.repositoryState
+    }
+
+    private var shouldShowInitializeGitView: Bool {
+        repositoryState == .notRepository
+    }
+
     private var allChangedFiles: [String] {
         cachedChangedFiles
     }
 
     var body: some View {
         Group {
-            if selectedTab == .prs {
+            if shouldShowInitializeGitView {
+                initializeGitView
+            } else if selectedTab == .prs {
                 // PRs tab has its own split view layout
                 PullRequestsView(repoPath: worktreePath)
             } else {
@@ -284,6 +296,54 @@ struct GitPanelWindowContent: View {
                 }
             )
         }
+    }
+
+    private var initializeGitView: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "externaldrive.badge.plus")
+                .font(.system(size: 36))
+                .foregroundStyle(.secondary)
+
+            Text("This folder is not a Git project.")
+                .font(.headline)
+
+            Text("Initialize Git to enable commits, branches, history, and pull requests.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+
+            if let error = gitInitializationError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+            }
+
+            HStack(spacing: 10) {
+                Button("Close") {
+                    onClose()
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    initializeGit()
+                } label: {
+                    if isInitializingGit {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(width: 80)
+                    } else {
+                        Text("Initialize Git")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isInitializingGit || worktreePath.isEmpty)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(24)
     }
 
     // MARK: - Left Panel (Tab Content)
@@ -559,6 +619,33 @@ struct GitPanelWindowContent: View {
             }
             await MainActor.run {
                 gitIndexWatchToken = token
+            }
+        }
+    }
+
+    private func initializeGit() {
+        guard !isInitializingGit else { return }
+        guard !worktreePath.isEmpty else { return }
+
+        isInitializingGit = true
+        gitInitializationError = nil
+
+        Task {
+            do {
+                try await repositoryManager.initializeGit(at: worktreePath)
+                if let repository = worktree.repository {
+                    try await repositoryManager.refreshRepository(repository)
+                }
+
+                await MainActor.run {
+                    gitRepositoryService.reloadStatus(lightweight: false)
+                    isInitializingGit = false
+                }
+            } catch {
+                await MainActor.run {
+                    gitInitializationError = error.localizedDescription
+                    isInitializingGit = false
+                }
             }
         }
     }

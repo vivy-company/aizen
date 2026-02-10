@@ -23,6 +23,7 @@
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="path" attributeType="String"/>
         <attribute name="branch" attributeType="String"/>
+        <attribute name="checkoutType" optional="YES" attributeType="String"/>
         <attribute name="isPrimary" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="lastAccessed" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="selectedTab" optional="YES" attributeType="String"/>

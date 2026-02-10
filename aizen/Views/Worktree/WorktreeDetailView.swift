@@ -191,7 +191,7 @@ struct WorktreeDetailView: View {
             Label("Zen Mode", systemImage: zenModeEnabled ? "pip.enter" : "pip.exit")
         }
         .labelStyle(.iconOnly)
-        .help(zenModeEnabled ? "Show Worktree List" : "Hide Worktree List (Zen Mode)")
+        .help(zenModeEnabled ? "Show Environment List" : "Hide Environment List (Zen Mode)")
         
         if #available(macOS 14.0, *) {
             button.symbolEffect(.bounce, value: zenModeEnabled)
@@ -269,6 +269,9 @@ struct WorktreeDetailView: View {
     }
 
     private var gitStatusIcon: String {
+        if gitRepositoryService.repositoryState == .notRepository {
+            return "square.and.arrow.up.on.square"
+        }
         let status = gitRepositoryService.currentStatus
         if !status.conflictedFiles.isEmpty {
             // Has conflicts - warning state
@@ -283,6 +286,9 @@ struct WorktreeDetailView: View {
     }
 
     private var gitStatusHelp: String {
+        if gitRepositoryService.repositoryState == .notRepository {
+            return "Git is not initialized for this environment"
+        }
         let status = gitRepositoryService.currentStatus
         if !status.conflictedFiles.isEmpty {
             return "Git Changes - \(status.conflictedFiles.count) conflict(s)"
@@ -294,6 +300,9 @@ struct WorktreeDetailView: View {
     }
 
     private var gitStatusColor: Color {
+        if gitRepositoryService.repositoryState == .notRepository {
+            return .secondary
+        }
         let status = gitRepositoryService.currentStatus
         if !status.conflictedFiles.isEmpty {
             return .red

@@ -42,6 +42,7 @@ struct PersistenceController {
         mainWorktree.path = "/Users/sample/projects/sample-project"
         mainWorktree.branch = "main"
         mainWorktree.isPrimary = true
+        mainWorktree.checkoutType = WorktreeCheckoutType.primary.rawValue
         mainWorktree.repository = sampleRepo
 
         let featureWorktree = Worktree(context: viewContext)
@@ -49,6 +50,7 @@ struct PersistenceController {
         featureWorktree.path = "/Users/sample/projects/sample-project-feature"
         featureWorktree.branch = "feature/new-ui"
         featureWorktree.isPrimary = false
+        featureWorktree.checkoutType = WorktreeCheckoutType.linked.rawValue
         featureWorktree.repository = sampleRepo
 
         do {

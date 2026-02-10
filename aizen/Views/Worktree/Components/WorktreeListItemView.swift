@@ -67,6 +67,19 @@ struct WorktreeListItemView: View {
         ItemStatus(rawValue: worktree.status ?? "active") ?? .active
     }
 
+    private var isGitEnvironment: Bool {
+        guard let path = worktree.path else { return false }
+        return GitUtils.isGitRepository(at: path)
+    }
+
+    private var supportsBranchOperations: Bool {
+        isGitEnvironment && !worktree.isIndependentEnvironment
+    }
+
+    private var supportsMergeOperations: Bool {
+        isGitEnvironment && (worktree.isLinkedEnvironment || worktree.isPrimary)
+    }
+
     private var activeViewType: String {
         guard let worktreeId = worktree.id else { return "" }
         return tabStateManager.getState(for: worktreeId).viewType
@@ -293,12 +306,14 @@ struct WorktreeListItemView: View {
                 Label(String(localized: "worktree.openIn.title"), systemImage: "arrow.up.forward.app")
             }
 
-            Button {
-                if let branch = worktree.branch {
-                    Clipboard.copy(branch)
+            if isGitEnvironment {
+                Button {
+                    if let branch = worktree.branch {
+                        Clipboard.copy(branch)
+                    }
+                } label: {
+                    Label(String(localized: "worktree.detail.copyBranchName"), systemImage: "doc.on.doc")
                 }
-            } label: {
-                Label(String(localized: "worktree.detail.copyBranchName"), systemImage: "doc.on.doc")
             }
 
             Button {
@@ -311,53 +326,39 @@ struct WorktreeListItemView: View {
 
             Divider()
 
-            Menu {
-                ForEach(worktreeStatuses.filter { $0.worktree.id != worktree.id }, id: \.worktree.id) { statusInfo in
-                    Button {
-                        performMerge(from: statusInfo.worktree, to: worktree)
-                    } label: {
-                        HStack {
-                            Text(statusInfo.branch)
-                            if statusInfo.hasUncommittedChanges {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundStyle(.orange)
-                            }
-                        }
-                    }
-                }
-            } label: {
-                Label(String(localized: "worktree.merge.pullFrom"), systemImage: "arrow.down.circle")
-            }
-
-            Divider()
-
-            Menu {
-                if availableBranches.isEmpty && !isLoadingBranches {
-                    Text(String(localized: "general.loading"))
-                        .foregroundStyle(.secondary)
-                        .onAppear { loadAvailableBranches() }
-                } else if isLoadingBranches {
-                    Text(String(localized: "general.loading"))
-                        .foregroundStyle(.secondary)
-                } else {
-                    // Show top local branches (excluding current)
-                    ForEach(availableBranches.filter { !$0.isRemote && $0.name != worktree.branch }) { branch in
+            if supportsMergeOperations {
+                Menu {
+                    ForEach(worktreeStatuses.filter { $0.worktree.id != worktree.id }, id: \.worktree.id) { statusInfo in
                         Button {
-                            switchToBranch(branch)
+                            performMerge(from: statusInfo.worktree, to: worktree)
                         } label: {
                             HStack {
-                                Image(systemName: "arrow.triangle.branch")
-                                    .font(.caption)
-                                Text(branch.name)
+                                Text(statusInfo.branch)
+                                if statusInfo.hasUncommittedChanges {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .foregroundStyle(.orange)
+                                }
                             }
                         }
                     }
+                } label: {
+                    Label(String(localized: "worktree.merge.pullFrom"), systemImage: "arrow.down.circle")
+                }
 
-                    // Show remote branches that can be tracked
-                    if !availableBranches.filter({ $0.isRemote }).isEmpty {
-                        Divider()
+                Divider()
+            }
 
-                        ForEach(availableBranches.filter { $0.isRemote }) { branch in
+            if supportsBranchOperations {
+                Menu {
+                    if availableBranches.isEmpty && !isLoadingBranches {
+                        Text(String(localized: "general.loading"))
+                            .foregroundStyle(.secondary)
+                            .onAppear { loadAvailableBranches() }
+                    } else if isLoadingBranches {
+                        Text(String(localized: "general.loading"))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(availableBranches.filter { !$0.isRemote && $0.name != worktree.branch }) { branch in
                             Button {
                                 switchToBranch(branch)
                             } label: {
@@ -365,27 +366,43 @@ struct WorktreeListItemView: View {
                                     Image(systemName: "arrow.triangle.branch")
                                         .font(.caption)
                                     Text(branch.name)
-                                    Text(String(localized: "worktree.branch.remote"))
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
                                 }
                             }
                         }
-                    }
 
-                    Divider()
+                        if !availableBranches.filter({ $0.isRemote }).isEmpty {
+                            Divider()
 
-                    Button {
-                        showingBranchSelector = true
-                    } label: {
-                        Label(String(localized: "worktree.branch.browseOrCreate"), systemImage: "ellipsis.circle")
+                            ForEach(availableBranches.filter { $0.isRemote }) { branch in
+                                Button {
+                                    switchToBranch(branch)
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "arrow.triangle.branch")
+                                            .font(.caption)
+                                        Text(branch.name)
+                                        Text(String(localized: "worktree.branch.remote"))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        Button {
+                            showingBranchSelector = true
+                        } label: {
+                            Label(String(localized: "worktree.branch.browseOrCreate"), systemImage: "ellipsis.circle")
+                        }
                     }
+                } label: {
+                    Label(String(localized: "worktree.branch.switch"), systemImage: "arrow.triangle.swap")
                 }
-            } label: {
-                Label(String(localized: "worktree.branch.switch"), systemImage: "arrow.triangle.swap")
-            }
 
-            Divider()
+                Divider()
+            }
 
             // Status submenu
             Menu {
@@ -532,6 +549,12 @@ struct WorktreeListItemView: View {
     }
 
     private func checkUnsavedChanges() {
+        guard isGitEnvironment else {
+            hasUnsavedChanges = false
+            showingDeleteConfirmation = true
+            return
+        }
+
         Task {
             do {
                 let changes = try await repositoryManager.hasUnsavedChanges(worktree)
@@ -580,6 +603,10 @@ struct WorktreeListItemView: View {
     }
 
     private func loadWorktreeStatuses() {
+        guard supportsMergeOperations else {
+            worktreeStatuses = []
+            return
+        }
         guard !isLoadingStatuses else { return }
 
         Task {
@@ -590,6 +617,12 @@ struct WorktreeListItemView: View {
             var statuses: [WorktreeStatusInfo] = []
 
             for wt in allWorktrees {
+                if wt.isIndependentEnvironment {
+                    continue
+                }
+                guard let path = wt.path, GitUtils.isGitRepository(at: path) else {
+                    continue
+                }
                 do {
                     let hasChanges = try await repositoryManager.hasUnsavedChanges(wt)
                     let branch = wt.branch ?? "unknown"
@@ -612,6 +645,7 @@ struct WorktreeListItemView: View {
     }
 
     private func performMerge(from source: Worktree, to target: Worktree) {
+        guard supportsMergeOperations else { return }
         Task {
             do {
                 let result = try await repositoryManager.mergeFromWorktree(target: target, source: source)
@@ -643,6 +677,10 @@ struct WorktreeListItemView: View {
     }
 
     private func loadAvailableBranches() {
+        guard supportsBranchOperations else {
+            availableBranches = []
+            return
+        }
         guard !isLoadingBranches else { return }
 
         Task {
@@ -679,6 +717,7 @@ struct WorktreeListItemView: View {
     }
 
     private func switchToBranch(_ branch: BranchInfo) {
+        guard supportsBranchOperations else { return }
         Task {
             do {
                 // Handle remote branches by creating local tracking branch
@@ -709,6 +748,7 @@ struct WorktreeListItemView: View {
     }
 
     private func createNewBranch(name: String) {
+        guard supportsBranchOperations else { return }
         Task {
             do {
                 // Create new branch from current branch

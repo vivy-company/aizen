@@ -162,7 +162,7 @@ struct aizenApp: App {
             }
 
             CommandGroup(after: .newItem) {
-                Button("Active Worktrees...") {
+                Button("Active Environments...") {
                     ActiveWorktreesWindowManager.shared.show(context: persistenceController.container.viewContext)
                 }
                 .keyboardShortcut("a", modifiers: [.command, .shift])

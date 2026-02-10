@@ -135,7 +135,7 @@ struct MCPInstallConfigSheet: View {
                                 .foregroundColor(.blue)
                         }
                         .buttonStyle(.plain)
-                        .help("Open Repository")
+                        .help("Open Project")
                     }
                 }
             }

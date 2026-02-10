@@ -276,7 +276,7 @@ struct GeneralSettingsView: View {
                         }
                     }
                 }
-                .help("Choose which terminal application to use when opening worktrees")
+                .help("Choose which terminal application to use when opening environments")
 
                 Picker("Editor", selection: $defaultEditorBundleId) {
                     Text("System Default")
@@ -314,7 +314,7 @@ struct GeneralSettingsView: View {
 
             // MARK: - Repositories
 
-            Section("Repositories") {
+            Section("Projects") {
                 HStack(spacing: 12) {
                     TextField("Default Clone Location", text: $defaultCloneLocation)
                         .textFieldStyle(.roundedBorder)
@@ -322,7 +322,7 @@ struct GeneralSettingsView: View {
                         selectDefaultCloneLocation()
                     }
                 }
-                .help("Used by the CLI when cloning repositories without --destination")
+                .help("Used by the CLI when cloning projects without --destination")
 
                 Picker("Default Workspace", selection: $defaultWorkspaceId) {
                     Text("None")
@@ -332,7 +332,7 @@ struct GeneralSettingsView: View {
                             .tag(workspace.id?.uuidString ?? "")
                     }
                 }
-                .help("Used by the CLI when adding repositories without --workspace")
+                .help("Used by the CLI when adding projects without --workspace")
             }
 
             // MARK: - Layout
@@ -374,7 +374,7 @@ struct GeneralSettingsView: View {
                             .tag(tab.id)
                     }
                 }
-                .help("Tab shown when opening a worktree for the first time")
+                .help("Tab shown when opening an environment for the first time")
 
                 Button("Reset Tab Order") {
                     tabConfig.resetToDefaults()
@@ -391,7 +391,7 @@ struct GeneralSettingsView: View {
 
             Section("Toolbar") {
                 Toggle("Open in External App", isOn: $showOpenInApp)
-                    .help("Show the 'Open in...' button for opening worktree in third-party apps")
+                    .help("Show the 'Open in...' button for opening environment in third-party apps")
 
                 Toggle("Git Status", isOn: $showGitStatus)
                     .help("Show the Git status indicator")

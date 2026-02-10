@@ -50,7 +50,7 @@ extension ChatSessionViewModel {
                 }
 
                 guard let worktreePath = self.worktree.path, !worktreePath.isEmpty else {
-                    throw NSError(domain: "ChatSessionView", code: -4, userInfo: [NSLocalizedDescriptionKey: "Missing worktree path"])
+                    throw NSError(domain: "ChatSessionView", code: -4, userInfo: [NSLocalizedDescriptionKey: "Missing environment path"])
                 }
 
                 // Start session if not active

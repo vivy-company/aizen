@@ -219,7 +219,7 @@ struct CommandPaletteContent: View {
         ) {
             VStack(spacing: 0) {
                 SpotlightSearchField(
-                    placeholder: "Switch to worktree…",
+                    placeholder: "Switch to environment…",
                     text: $viewModel.searchQuery,
                     isFocused: $isSearchFocused,
                     onSubmit: {
@@ -439,7 +439,7 @@ struct CommandPaletteContent: View {
             Image(systemName: "rectangle.stack")
                 .font(.system(size: 30, weight: .semibold))
                 .foregroundStyle(.secondary.opacity(0.5))
-            Text("No worktrees found")
+            Text("No environments found")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
         }
