@@ -285,7 +285,7 @@ struct MCPInstallConfigSheet: View {
 
                         if let runtimeArgs = package.runtimeArguments, !runtimeArgs.isEmpty {
                             CodePill(
-                                text: runtimeArgs.joined(separator: " "),
+                                text: runtimeArgs.map { $0.displayValue }.joined(separator: " "),
                                 font: .system(.caption, design: .monospaced),
                                 textColor: .secondary,
                                 backgroundColor: Color(NSColor.textBackgroundColor),

@@ -157,14 +157,14 @@ class MCPManager: ObservableObject {
             args.append("-y")
             args.append(package.identifier)
             if let runtimeArgs = package.runtimeArguments {
-                args.append(contentsOf: runtimeArgs)
+                args.append(contentsOf: runtimeArgs.flatMap { $0.toCommandLineArgs() })
             }
             return (package.runtimeHint, args)  // npx
 
         case "pypi":
             args.append(package.identifier)
             if let runtimeArgs = package.runtimeArguments {
-                args.append(contentsOf: runtimeArgs)
+                args.append(contentsOf: runtimeArgs.flatMap { $0.toCommandLineArgs() })
             }
             return (package.runtimeHint, args)  // uvx
 
@@ -172,16 +172,16 @@ class MCPManager: ObservableObject {
             args.append("run")
             args.append("-i")
             args.append("--rm")
-            args.append(package.identifier)
             if let runtimeArgs = package.runtimeArguments {
-                args.append(contentsOf: runtimeArgs)
+                args.append(contentsOf: runtimeArgs.flatMap { $0.toCommandLineArgs() })
             }
+            args.append(package.identifier)
             return ("docker", args)
 
         default:
             args.append(package.identifier)
             if let runtimeArgs = package.runtimeArguments {
-                args.append(contentsOf: runtimeArgs)
+                args.append(contentsOf: runtimeArgs.flatMap { $0.toCommandLineArgs() })
             }
             return (package.runtimeHint, args)
         }

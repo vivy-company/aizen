@@ -241,13 +241,21 @@ struct ChatTabView: View {
                 }
             }
             .onChange(of: geometry.size.width) { _, newWidth in
-                clampPanelWidths(containerWidth: newWidth)
+                // Defer to next run loop to break synchronous layout feedback cycle.
+                // Writing @State during layout can re-trigger the same layout pass.
+                DispatchQueue.main.async {
+                    clampPanelWidths(containerWidth: newWidth)
+                }
             }
             .onChange(of: leftPanelType) { _, _ in
-                clampPanelWidths(containerWidth: geometry.size.width)
+                DispatchQueue.main.async {
+                    clampPanelWidths(containerWidth: geometry.size.width)
+                }
             }
             .onChange(of: rightPanelType) { _, _ in
-                clampPanelWidths(containerWidth: geometry.size.width)
+                DispatchQueue.main.async {
+                    clampPanelWidths(containerWidth: geometry.size.width)
+                }
             }
         }
     }
@@ -345,27 +353,28 @@ struct ChatTabView: View {
     }
 
     private func clampPanelWidths(containerWidth: CGFloat) {
+        guard containerWidth > 0 else { return }
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             if leftPanel != nil {
                 let maxWidth = maxLeftWidth(containerWidth: containerWidth, rightWidth: CGFloat(rightPanelWidth))
                 let clamped = min(max(CGFloat(leftPanelWidth), minPanelWidth), maxWidth)
-                if clamped != CGFloat(leftPanelWidth) {
+                if abs(clamped - CGFloat(leftPanelWidth)) > 0.5 {
                     leftPanelWidth = Double(clamped)
                 }
             }
             if rightPanel != nil {
                 let maxWidth = maxRightWidth(containerWidth: containerWidth, leftWidth: CGFloat(leftPanelWidth))
                 let clamped = min(max(CGFloat(rightPanelWidth), minPanelWidth), maxWidth)
-                if clamped != CGFloat(rightPanelWidth) {
+                if abs(clamped - CGFloat(rightPanelWidth)) > 0.5 {
                     rightPanelWidth = Double(clamped)
                 }
             }
             if leftPanel != nil {
                 let maxWidth = maxLeftWidth(containerWidth: containerWidth, rightWidth: CGFloat(rightPanelWidth))
                 let clamped = min(max(CGFloat(leftPanelWidth), minPanelWidth), maxWidth)
-                if clamped != CGFloat(leftPanelWidth) {
+                if abs(clamped - CGFloat(leftPanelWidth)) > 0.5 {
                     leftPanelWidth = Double(clamped)
                 }
             }

@@ -82,7 +82,7 @@ nonisolated struct MCPPackage: Codable, Identifiable, Sendable {
     let identifier: String
     let transport: MCPTransport?
     let runtime: String?
-    let runtimeArguments: [String]?
+    let runtimeArguments: [MCPArgument]?
     let packageArguments: [MCPArgument]?
     let environmentVariables: [MCPEnvVar]?
 
@@ -162,6 +162,25 @@ nonisolated struct MCPArgument: Codable, Identifiable, Sendable {
 
     var required: Bool {
         isRequired ?? false
+    }
+
+    func toCommandLineArgs() -> [String] {
+        let val = value ?? `default`
+        if let name = name, let val = val {
+            return [name, val]
+        } else if let name = name {
+            return [name]
+        } else if let val = val {
+            return [val]
+        }
+        return []
+    }
+
+    var displayValue: String {
+        if let name = name, let val = value ?? `default` {
+            return "\(name) \(val)"
+        }
+        return name ?? value ?? `default` ?? ""
     }
 }
 

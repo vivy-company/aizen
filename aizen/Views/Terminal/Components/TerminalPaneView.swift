@@ -106,7 +106,11 @@ struct TerminalPaneView: View {
                 }
             }
             .onChange(of: geo.size) { _, _ in
-                handleSizeChange()
+                // Defer state mutation to next run loop to avoid layout feedback.
+                // Writing @State during a layout pass re-triggers the same pass.
+                DispatchQueue.main.async {
+                    handleSizeChange()
+                }
             }
         }
         .ignoresSafeArea(.container, edges: .bottom)

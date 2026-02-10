@@ -146,9 +146,10 @@ struct TerminalViewWrapper: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        // Always update frame size to match allocated space
-        // This matches Ghostty's SurfaceRepresentable approach
-        if nsView.frame.size != size || nsView.frame.origin != .zero {
+        // Update frame only when size changed meaningfully (>0.5pt) to prevent
+        // layout feedback loops between SwiftUI and AppKit.
+        let currentSize = nsView.frame.size
+        if abs(currentSize.width - size.width) > 0.5 || abs(currentSize.height - size.height) > 0.5 || nsView.frame.origin != .zero {
             nsView.frame = CGRect(origin: .zero, size: size)
             nsView.needsLayout = true
             nsView.layoutSubtreeIfNeeded()
