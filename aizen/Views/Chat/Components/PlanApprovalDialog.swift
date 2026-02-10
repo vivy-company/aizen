@@ -193,12 +193,17 @@ struct PlanRequestInlineView: View {
                     .buttonStyle(.plain)
                 }
 
-                ScrollView {
+                if isExpanded {
                     PlanContentView(content: planContent)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.trailing, 6)
+                } else {
+                    ScrollView {
+                        PlanContentView(content: planContent)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.trailing, 6)
+                    }
+                    .frame(maxHeight: 300)
                 }
-                .frame(maxHeight: isExpanded ? 560 : 300)
             }
             .padding(16)
             .background { cardBackground }

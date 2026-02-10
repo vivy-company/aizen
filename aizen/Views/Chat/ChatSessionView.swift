@@ -83,7 +83,6 @@ struct ChatSessionView: View {
                         isProcessing: viewModel.isProcessing,
                         isSessionInitializing: viewModel.isSessionInitializing,
                         pendingPlanRequest: pendingPlanTimelineRequest,
-                        currentPlan: pendingPlanTimelineRequest == nil ? viewModel.currentAgentPlan : nil,
                         selectedAgent: viewModel.selectedAgent,
                         currentThought: viewModel.currentAgentSession?.currentThought,
                         currentIterationId: viewModel.currentAgentSession?.currentIterationId,
@@ -134,6 +133,13 @@ struct ChatSessionView: View {
                         .transition(.opacity)
                         .padding(.horizontal, 20)
                     } else {
+                        if pendingPlanTimelineRequest == nil,
+                           let plan = viewModel.currentAgentPlan {
+                            AgentPlanInlineView(plan: plan)
+                                .padding(.horizontal, 20)
+                                .transition(.opacity)
+                        }
+
                         if !viewModel.attachments.isEmpty {
                             ChatAttachmentsBar(
                                 attachments: viewModel.attachments,

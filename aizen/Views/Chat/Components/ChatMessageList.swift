@@ -13,7 +13,6 @@ struct ChatMessageList: View {
     let isProcessing: Bool
     let isSessionInitializing: Bool
     let pendingPlanRequest: RequestPermissionRequest?
-    let currentPlan: Plan?
     let selectedAgent: String
     let currentThought: String?
     let currentIterationId: String?
@@ -56,18 +55,11 @@ struct ChatMessageList: View {
         }
     }
 
-    private var planTimelineIdentity: String {
-        if let request = pendingPlanRequest {
-            let optionIds = (request.options ?? []).map(\.optionId).joined(separator: "|")
-            let toolId = request.toolCall?.toolCallId ?? "none"
-            return "req-\(toolId)-\(optionIds)-\(request.message ?? "")"
-        }
-        if let currentPlan {
-            let entries = currentPlan.entries.map { "\($0.status)-\($0.content)-\($0.activeForm ?? "")" }
-                .joined(separator: "|")
-            return "plan-\(entries)"
-        }
-        return "none"
+    private var planRequestIdentity: String {
+        guard let request = pendingPlanRequest else { return "none" }
+        let optionIds = (request.options ?? []).map(\.optionId).joined(separator: "|")
+        let toolId = request.toolCall?.toolCallId ?? "none"
+        return "req-\(toolId)-\(optionIds)-\(request.message ?? "")"
     }
 
     // MARK: - Body
@@ -115,13 +107,7 @@ struct ChatMessageList: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 20)
                             .padding(.vertical, 4)
-                            .id("plan-request-\(planTimelineIdentity)")
-                    } else if let currentPlan = currentPlan {
-                        AgentPlanInlineView(plan: currentPlan)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 4)
-                            .id("plan-progress-\(planTimelineIdentity)")
+                            .id("plan-request-\(planRequestIdentity)")
                     }
 
                     if isProcessing {
@@ -172,7 +158,7 @@ struct ChatMessageList: View {
                     scrollToBottomIfNeeded(proxy: proxy, animated: false)
                 }
             }
-            .onChange(of: planTimelineIdentity) { _, _ in
+            .onChange(of: planRequestIdentity) { _, _ in
                 if isNearBottom {
                     scrollToBottomIfNeeded(proxy: proxy, animated: false)
                 }
