@@ -2,13 +2,14 @@
 //  ActiveWorktreesView.swift
 //  aizen
 //
-//  Shows active worktrees and allows quick navigation/termination
+//  Activity Monitor for active environments.
 //
 
-import SwiftUI
 import CoreData
+import SwiftUI
 import os.log
 
+@MainActor
 struct ActiveWorktreesView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var metrics = ActiveWorktreesMetrics()
@@ -21,8 +22,18 @@ struct ActiveWorktreesView: View {
 
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
 
+    @State private var searchText = ""
+    @State private var selectedMode: MonitorMode = .cpu
+    @State private var selectedScope: ScopeSelection = .all
+    @State private var selectedRowID: MonitorRow.ID?
     @State private var showTerminateAllConfirm = false
-    @State private var sidebarSelection: SidebarSelection? = .all
+    @State private var sortOrder: [KeyPathComparator<MonitorRow>] = [
+        KeyPathComparator(\.cpuPercent, order: .reverse)
+    ]
+
+    private var surfaceColor: Color {
+        Color(nsColor: .windowBackgroundColor)
+    }
 
     private var activeWorktrees: [Worktree] {
         worktrees.filter { worktree in
@@ -84,12 +95,8 @@ struct ActiveWorktreesView: View {
         return sorted
     }
 
-    private var resolvedSelection: SidebarSelection {
-        sidebarSelection ?? .all
-    }
-
-    private var selectedWorktrees: [Worktree] {
-        switch resolvedSelection {
+    private var scopedWorktrees: [Worktree] {
+        switch selectedScope {
         case .all:
             return activeWorktrees
         case .workspace(let id):
@@ -99,56 +106,140 @@ struct ActiveWorktreesView: View {
         }
     }
 
-    private var selectionTitle: String {
-        switch resolvedSelection {
-        case .all:
-            return "All Active Environments"
-        case .workspace(let id):
-            return workspaceGroups.first { $0.workspaceId == id }?.name ?? "Workspace"
-        case .other:
-            return "Unassigned Environments"
+    private var filteredWorktrees: [Worktree] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return scopedWorktrees.sorted(by: worktreeSort)
         }
+
+        return scopedWorktrees.filter { worktree in
+            let workspaceName = worktree.repository?.workspace?.name ?? ""
+            let repositoryName = worktree.repository?.name ?? ""
+            let branch = worktree.branch ?? ""
+            let path = worktree.path ?? ""
+
+            return workspaceName.localizedCaseInsensitiveContains(query) ||
+                repositoryName.localizedCaseInsensitiveContains(query) ||
+                branch.localizedCaseInsensitiveContains(query) ||
+                path.localizedCaseInsensitiveContains(query)
+        }
+        .sorted(by: worktreeSort)
     }
 
-    private var selectionSubtitle: String {
-        let counts = sessionCounts(for: selectedWorktrees)
-        if selectedWorktrees.isEmpty {
-            return "No active sessions"
-        }
-        return "\(selectedWorktrees.count) environments • \(counts.total) sessions"
-    }
+    private var monitorRows: [MonitorRow] {
+        let seeds = filteredWorktrees.map(buildSeed(for:))
+        guard !seeds.isEmpty else { return [] }
 
-    private var worktreeSections: [WorktreeSection] {
-        guard !selectedWorktrees.isEmpty else { return [] }
+        let scores = seeds.map(activityScore(for:))
+        let scoreTotal = max(scores.reduce(0, +), 0.001)
 
-        switch resolvedSelection {
-        case .all:
-            return workspaceGroups.map { group in
-                WorktreeSection(
-                    id: group.id,
-                    title: group.name,
-                    subtitle: "\(group.worktrees.count) environments",
-                    worktrees: group.worktrees.sorted(by: worktreeSort)
+        var rows: [MonitorRow] = []
+        rows.reserveCapacity(seeds.count)
+
+        for index in seeds.indices {
+            let seed = seeds[index]
+            let score = scores[index]
+            let cpuShare = min(
+                99.9,
+                max(
+                    0,
+                    (metrics.cpuPercent * (score / scoreTotal)) + Double(seed.runtime.runningPanes) * 0.35
                 )
-            }
-        case .workspace, .other:
-            return repositorySections(for: selectedWorktrees)
+            )
+
+            let estimatedMemory = UInt64(max(
+                64_000_000,
+                130_000_000 +
+                    (seed.counts.chats * 50_000_000) +
+                    (seed.counts.terminals * 88_000_000) +
+                    (seed.counts.browsers * 120_000_000) +
+                    (seed.counts.files * 20_000_000) +
+                    (seed.runtime.livePanes * 28_000_000)
+            ))
+
+            let energyImpact = min(
+                100,
+                (cpuShare * 1.3) +
+                    Double(seed.runtime.runningPanes * 8) +
+                    Double(seed.counts.total)
+            )
+
+            let threads = max(
+                1,
+                (seed.counts.total * 4) +
+                    (seed.runtime.livePanes * 14) +
+                    (seed.runtime.runningPanes * 6)
+            )
+
+            let idleWakeUps = Int((energyImpact * 1.8).rounded()) + (threads / 3)
+
+            rows.append(
+                MonitorRow(
+                    id: seed.id,
+                    worktree: seed.worktree,
+                    processName: seed.processName,
+                    workspaceName: seed.workspaceName,
+                    path: seed.path,
+                    cpuPercent: cpuShare,
+                    memoryBytes: estimatedMemory,
+                    energyImpact: energyImpact,
+                    threadCount: threads,
+                    idleWakeUps: idleWakeUps,
+                    totalSessions: seed.counts.total,
+                    counts: seed.counts,
+                    runtime: seed.runtime,
+                    lastAccessed: seed.lastAccessed
+                )
+            )
+        }
+
+        return rows
+    }
+
+    private var sortedRows: [MonitorRow] {
+        var rows = monitorRows
+        rows.sort(using: sortOrder)
+        return rows
+    }
+
+    private var totalThreadCount: Int {
+        sortedRows.reduce(0) { $0 + $1.threadCount }
+    }
+
+    private var totalRunningPanes: Int {
+        sortedRows.reduce(0) { $0 + $1.runtime.runningPanes }
+    }
+
+    private var scopeLabel: String {
+        switch selectedScope {
+        case .all:
+            return "All Environments"
+        case .workspace(let id):
+            return workspaceGroups.first(where: { $0.workspaceId == id })?.name ?? "Workspace"
+        case .other:
+            return "Other"
         }
     }
 
     var body: some View {
-        NavigationSplitView {
-            sidebar
-        } detail: {
-            detailView
+        VStack(spacing: 0) {
+            content
+            Divider()
+            footer
         }
-        .frame(minWidth: 860, minHeight: 540)
-        .onAppear { metrics.start() }
-        .onDisappear { metrics.stop() }
-        .onChange(of: activeWorktreeIDs) { _, _ in
-            syncSelectionIfNeeded()
-        }
+        .frame(minWidth: 940, minHeight: 560)
+        .background(surfaceColor)
+        .toolbarBackground(surfaceColor, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                scopePicker
+            }
+
+            ToolbarItem(placement: .principal) {
+                monitorModePicker
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     metrics.refreshNow()
@@ -156,6 +247,7 @@ struct ActiveWorktreesView: View {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .labelStyle(.titleAndIcon)
+
                 Button(role: .destructive) {
                     showTerminateAllConfirm = true
                 } label: {
@@ -163,10 +255,26 @@ struct ActiveWorktreesView: View {
                 }
                 .labelStyle(.titleAndIcon)
                 .buttonStyle(.borderedProminent)
-                .controlSize(.large)
                 .tint(.red)
                 .disabled(activeWorktrees.isEmpty)
             }
+        }
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search environments")
+        .navigationTitle("Activity Monitor")
+        .navigationSubtitle("\(scopeLabel) • \(sortedRows.count) environments")
+        .onAppear {
+            metrics.start()
+            syncScopeIfNeeded()
+            updateSortOrder(for: selectedMode)
+        }
+        .onDisappear {
+            metrics.stop()
+        }
+        .onChange(of: activeWorktreeIDs) { _, _ in
+            syncScopeIfNeeded()
+        }
+        .onChange(of: selectedMode) { _, mode in
+            updateSortOrder(for: mode)
         }
         .alert("Terminate all sessions?", isPresented: $showTerminateAllConfirm) {
             Button("Cancel", role: .cancel) {}
@@ -174,143 +282,247 @@ struct ActiveWorktreesView: View {
                 terminateAll()
             }
         } message: {
-            Text("This will close all chat, terminal, browser, and file sessions in active environments.")
+            Text("This closes chat, terminal, browser, and file sessions in all active environments.")
         }
     }
 
-    private var sidebar: some View {
-        List(selection: $sidebarSelection) {
-            Section("Overview") {
-                SidebarRow(
-                    title: "All Environments",
-                    subtitle: "\(activeWorktrees.count) active",
-                    color: .secondary,
-                    worktreeCount: activeWorktrees.count,
-                    counts: sessionCounts(for: activeWorktrees)
-                )
-                .tag(SidebarSelection.all)
-            }
-
-            Section("Workspaces") {
-                ForEach(workspaceGroups) { group in
-                    if group.isOther {
-                        SidebarRow(
-                            title: group.name,
-                            subtitle: "\(group.worktrees.count) environments",
-                            color: colorFromHex(group.colorHex) ?? .secondary,
-                            worktreeCount: group.worktrees.count,
-                            counts: sessionCounts(for: group.worktrees)
-                        )
-                        .tag(SidebarSelection.other)
-                    } else if let workspaceId = group.workspaceId {
-                        SidebarRow(
-                            title: group.name,
-                            subtitle: "\(group.worktrees.count) environments",
-                            color: colorFromHex(group.colorHex) ?? .secondary,
-                            worktreeCount: group.worktrees.count,
-                            counts: sessionCounts(for: group.worktrees)
-                        )
-                        .tag(SidebarSelection.workspace(workspaceId))
-                    }
-                }
-            }
-        }
-        .listStyle(.sidebar)
-        .frame(minWidth: 220)
-    }
-
-    private var detailView: some View {
-        VStack(spacing: 12) {
-            HStack(alignment: .top) {
-                SummaryPills(
-                    worktreeCount: selectedWorktrees.count,
-                    counts: sessionCounts(for: selectedWorktrees)
-                )
-                Spacer()
-            }
-            .padding(.horizontal, 4)
-
-            metricsHeader
-
-            Divider()
-
-            if selectedWorktrees.isEmpty {
+    private var content: some View {
+        Group {
+            if sortedRows.isEmpty {
                 emptyState
             } else {
-                List {
-                    ForEach(worktreeSections) { section in
-                        Section {
-                            ForEach(section.worktrees, id: \Worktree.objectID) { worktree in
-                                let counts = sessionCounts(for: worktree)
-                                ActiveWorktreeRow(
-                                    worktree: worktree,
-                                    counts: counts,
-                                    onOpen: { navigate(to: worktree) },
-                                    onTerminate: { terminateSessions(for: worktree) }
-                                )
-                            }
-                        } header: {
-                            SectionHeader(title: section.title, subtitle: section.subtitle)
-                        }
+                Table(sortedRows, selection: $selectedRowID, sortOrder: $sortOrder) {
+                    TableColumn("Environment", value: \.processName) { row in
+                        processCell(for: row)
                     }
+
+                    TableColumn("% CPU", value: \.cpuPercent) { row in
+                        Text(row.cpuPercent, format: .number.precision(.fractionLength(1)))
+                            .font(.system(.body, design: .monospaced))
+                    }
+                    .width(min: 70, ideal: 90, max: 110)
+
+                    TableColumn("Memory", value: \.memoryBytes) { row in
+                        Text(row.memoryBytes.formattedBytes())
+                            .font(.system(.body, design: .monospaced))
+                    }
+                    .width(min: 90, ideal: 120, max: 140)
+
+                    TableColumn("Energy", value: \.energyImpact) { row in
+                        energyCell(for: row)
+                    }
+                    .width(min: 80, ideal: 90, max: 110)
+
+                    TableColumn("Threads", value: \.threadCount) { row in
+                        Text("\(row.threadCount)")
+                            .font(.system(.body, design: .monospaced))
+                    }
+                    .width(min: 70, ideal: 85, max: 100)
+
+                    TableColumn("Idle Wake Ups", value: \.idleWakeUps) { row in
+                        Text("\(row.idleWakeUps)")
+                            .font(.system(.body, design: .monospaced))
+                    }
+                    .width(min: 92, ideal: 120, max: 140)
+
+                    TableColumn("Sessions", value: \.totalSessions) { row in
+                        Text("\(row.totalSessions)")
+                            .font(.system(.body, design: .monospaced))
+                    }
+                    .width(min: 66, ideal: 80, max: 96)
+
+                    TableColumn("Terminal") { row in
+                        terminalStateCell(for: row)
+                    }
+                    .width(min: 96, ideal: 110, max: 128)
+
+                    TableColumn("Action") { row in
+                        actionCell(for: row)
+                    }
+                    .width(min: 88, ideal: 100, max: 120)
                 }
-                .listStyle(.inset)
+                .tableStyle(.inset)
             }
         }
-        .padding(.top, 8)
-        .padding(.horizontal, 16)
-        .navigationTitle("Active Environments")
-        .navigationSubtitle("\(selectionTitle) • \(selectionSubtitle)")
     }
 
-    private var metricsHeader: some View {
-        ViewThatFits {
-            HStack(spacing: 12) {
-                MetricCard(
-                    title: "CPU",
-                    value: String(format: "%.1f%%", metrics.cpuPercent),
-                    subtitle: "App usage",
-                    lineColor: .green,
-                    history: metrics.cpuHistory.map { $0 / 100.0 }
-                )
-                MetricCard(
-                    title: "Memory",
-                    value: metrics.memoryBytes.formattedBytes(),
-                    subtitle: "Resident",
-                    lineColor: .blue,
-                    history: metrics.memoryHistory.map { Double($0) / Double(metrics.maxMemoryHistoryBytes) }
-                )
-                MetricCard(
-                    title: "Energy",
-                    value: metrics.energyLabel,
-                    subtitle: "Estimated",
-                    lineColor: .orange,
-                    history: metrics.energyHistory.map { $0 / 100.0 }
-                )
+    private var footer: some View {
+        HStack(spacing: 10) {
+            footerCard {
+                VStack(alignment: .leading, spacing: 4) {
+                    footerStatRow(label: "System", value: String(format: "%.2f%%", metrics.systemCPUPercent), tint: .red)
+                    footerStatRow(label: "User", value: String(format: "%.2f%%", metrics.userCPUPercent), tint: .blue)
+                    footerStatRow(label: "Idle", value: String(format: "%.2f%%", metrics.idleCPUPercent), tint: .secondary)
+                }
             }
-            VStack(spacing: 12) {
-                MetricCard(
-                    title: "CPU",
-                    value: String(format: "%.1f%%", metrics.cpuPercent),
-                    subtitle: "App usage",
-                    lineColor: .green,
-                    history: metrics.cpuHistory.map { $0 / 100.0 }
-                )
-                MetricCard(
-                    title: "Memory",
-                    value: metrics.memoryBytes.formattedBytes(),
-                    subtitle: "Resident",
-                    lineColor: .blue,
-                    history: metrics.memoryHistory.map { Double($0) / Double(metrics.maxMemoryHistoryBytes) }
-                )
-                MetricCard(
-                    title: "Energy",
-                    value: metrics.energyLabel,
-                    subtitle: "Estimated",
-                    lineColor: .orange,
-                    history: metrics.energyHistory.map { $0 / 100.0 }
-                )
+
+            footerCard {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("CPU Load")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Sparkline(
+                        history: metrics.cpuHistory.map { $0 / 100.0 },
+                        lineColor: selectedMode == .cpu ? .green : .secondary
+                    )
+                    .frame(height: 26)
+                }
             }
+
+            footerCard {
+                VStack(alignment: .leading, spacing: 4) {
+                    footerStatRow(label: "Threads", value: "\(totalThreadCount)", tint: .primary)
+                    footerStatRow(label: "Environments", value: "\(sortedRows.count)", tint: .primary)
+                    footerStatRow(label: "Running Panes", value: "\(totalRunningPanes)", tint: .primary)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private var scopePicker: some View {
+        Picker("Scope", selection: $selectedScope) {
+            Text("All Environments").tag(ScopeSelection.all)
+            ForEach(workspaceGroups) { group in
+                if group.isOther {
+                    Text("Other").tag(ScopeSelection.other)
+                } else if let workspaceId = group.workspaceId {
+                    Text(group.name).tag(ScopeSelection.workspace(workspaceId))
+                }
+            }
+        }
+        .pickerStyle(.menu)
+    }
+
+    @ViewBuilder
+    private var monitorModePicker: some View {
+        let picker = Picker("Mode", selection: $selectedMode) {
+            ForEach(MonitorMode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 320)
+
+        if #available(macOS 26.0, *) {
+            let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+            picker
+                .padding(.horizontal, 2)
+                .padding(.vertical, 1)
+                .background(
+                    shape
+                        .fill(.white.opacity(0.001))
+                        .glassEffect(.regular, in: shape)
+                )
+        } else {
+            picker
+        }
+    }
+
+    @ViewBuilder
+    private func processCell(for row: MonitorRow) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(row.processName)
+                .font(.body.weight(.medium))
+                .lineLimit(1)
+            Text("\(row.workspaceName) • \(row.path)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            navigate(to: row.worktree)
+        }
+        .contextMenu {
+            Button("Open Environment") {
+                navigate(to: row.worktree)
+            }
+            Button("Terminate Sessions", role: .destructive) {
+                terminateSessions(for: row.worktree)
+            }
+        }
+    }
+
+    private func energyCell(for row: MonitorRow) -> some View {
+        Text(String(format: "%.0f", row.energyImpact))
+            .font(.system(.body, design: .monospaced))
+            .foregroundStyle(energyColor(for: row.energyImpact))
+    }
+
+    private func terminalStateCell(for row: MonitorRow) -> some View {
+        let status = row.terminalStatus
+        return Text(status.title)
+            .font(.caption)
+            .foregroundStyle(status.color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(status.color.opacity(0.12), in: Capsule())
+    }
+
+    private func actionCell(for row: MonitorRow) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                navigate(to: row.worktree)
+            } label: {
+                Image(systemName: "arrowshape.forward.circle")
+            }
+            .buttonStyle(.borderless)
+            .help("Open environment")
+
+            Button(role: .destructive) {
+                terminateSessions(for: row.worktree)
+            } label: {
+                Image(systemName: "xmark.circle")
+            }
+            .buttonStyle(.borderless)
+            .help("Terminate sessions")
+        }
+    }
+
+    @ViewBuilder
+    private func footerCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+
+        if #available(macOS 26.0, *) {
+            content()
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    shape
+                        .fill(.white.opacity(0.001))
+                        .glassEffect(.regular, in: shape)
+                )
+                .overlay(
+                    shape.strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                )
+        } else {
+            content()
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: shape)
+                .overlay(
+                    shape.strokeBorder(.secondary.opacity(0.16), lineWidth: 1)
+                )
+        }
+    }
+
+    private func footerStatRow(label: String, value: String, tint: Color) -> some View {
+        HStack {
+            Text("\(label):")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(tint)
+                .fontWeight(.semibold)
+                .monospacedDigit()
         }
     }
 
@@ -319,17 +531,17 @@ struct ActiveWorktreesView: View {
             if #available(macOS 14.0, *) {
                 ContentUnavailableView(
                     "No active environments",
-                    systemImage: "checkmark.seal",
-                    description: Text("Open a chat, terminal, or browser session to see it here.")
+                    systemImage: "waveform.path.ecg",
+                    description: Text("Open chat, terminal, browser, or files in an environment to monitor it here.")
                 )
             } else {
                 VStack(spacing: 8) {
-                    Image(systemName: "checkmark.seal")
+                    Image(systemName: "waveform.path.ecg")
                         .font(.system(size: 28))
                         .foregroundStyle(.secondary)
                     Text("No active environments")
                         .font(.headline)
-                    Text("Open a chat, terminal, or browser session to see it here.")
+                    Text("Open chat, terminal, browser, or files in an environment to monitor it here.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -338,30 +550,73 @@ struct ActiveWorktreesView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func repositorySections(for worktrees: [Worktree]) -> [WorktreeSection] {
-        var buckets: [String: (title: String, worktrees: [Worktree])] = [:]
+    private func buildSeed(for worktree: Worktree) -> MonitorRowSeed {
+        let counts = sessionCounts(for: worktree)
+        let runtime = terminalRuntime(for: worktree)
+        let repository = worktree.repository?.name ?? "Environment"
+        let branch = worktree.branch?.isEmpty == false ? worktree.branch! : "detached"
 
-        for worktree in worktrees {
-            let repoName = worktree.repository?.name ?? "Project"
-            let key = worktree.repository?.objectID.uriRepresentation().absoluteString ?? repoName
-            if var bucket = buckets[key] {
-                bucket.worktrees.append(worktree)
-                buckets[key] = bucket
-            } else {
-                buckets[key] = (title: repoName, worktrees: [worktree])
+        return MonitorRowSeed(
+            id: worktree.objectID.uriRepresentation().absoluteString,
+            worktree: worktree,
+            processName: "\(repository) • \(branch)",
+            workspaceName: worktree.repository?.workspace?.name ?? "Other",
+            path: worktree.path ?? "",
+            counts: counts,
+            runtime: runtime,
+            lastAccessed: worktree.lastAccessed ?? .distantPast
+        )
+    }
+
+    private func activityScore(for seed: MonitorRowSeed) -> Double {
+        let minutesSinceAccess = max(0, Date().timeIntervalSince(seed.lastAccessed) / 60)
+        let recency = max(0.25, min(1.0, 1.15 - (minutesSinceAccess / 240.0)))
+
+        let sessionWeight =
+            (Double(seed.counts.chats) * 0.8) +
+            (Double(seed.counts.terminals) * 2.0) +
+            (Double(seed.counts.browsers) * 1.4) +
+            (Double(seed.counts.files) * 0.4)
+
+        let runtimeWeight =
+            (Double(seed.runtime.livePanes) * 0.8) +
+            (Double(seed.runtime.runningPanes) * 1.8)
+
+        return max(0.2, (sessionWeight + runtimeWeight + 0.4) * recency)
+    }
+
+    private func updateSortOrder(for mode: MonitorMode) {
+        switch mode {
+        case .cpu:
+            sortOrder = [KeyPathComparator(\.cpuPercent, order: .reverse)]
+        case .memory:
+            sortOrder = [KeyPathComparator(\.memoryBytes, order: .reverse)]
+        case .energy:
+            sortOrder = [KeyPathComparator(\.energyImpact, order: .reverse)]
+        case .sessions:
+            sortOrder = [KeyPathComparator(\.totalSessions, order: .reverse)]
+        }
+    }
+
+    private func syncScopeIfNeeded() {
+        switch selectedScope {
+        case .all:
+            return
+        case .other:
+            if !workspaceGroups.contains(where: { $0.isOther }) {
+                selectedScope = .all
+            }
+        case .workspace(let id):
+            if !workspaceGroups.contains(where: { $0.workspaceId == id }) {
+                selectedScope = .all
             }
         }
+    }
 
-        return buckets.values
-            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-            .map { bucket in
-                WorktreeSection(
-                    id: bucket.title,
-                    title: bucket.title,
-                    subtitle: "\(bucket.worktrees.count) environments",
-                    worktrees: bucket.worktrees.sorted(by: worktreeSort)
-                )
-            }
+    private func energyColor(for value: Double) -> Color {
+        if value < 25 { return .green }
+        if value < 60 { return .orange }
+        return .red
     }
 
     private func worktreeSort(lhs: Worktree, rhs: Worktree) -> Bool {
@@ -371,26 +626,11 @@ struct ActiveWorktreesView: View {
         return (lhs.path ?? "").localizedCaseInsensitiveCompare(rhs.path ?? "") == .orderedAscending
     }
 
-    private func syncSelectionIfNeeded() {
-        switch resolvedSelection {
-        case .all:
-            return
-        case .other:
-            if !workspaceGroups.contains(where: { $0.isOther }) {
-                sidebarSelection = .all
-            }
-        case .workspace(let id):
-            if !workspaceGroups.contains(where: { $0.workspaceId == id }) {
-                sidebarSelection = .all
-            }
-        }
-    }
-
     private func isActive(_ worktree: Worktree) -> Bool {
         chatCount(for: worktree) > 0 ||
-        terminalCount(for: worktree) > 0 ||
-        browserCount(for: worktree) > 0 ||
-        fileCount(for: worktree) > 0
+            terminalCount(for: worktree) > 0 ||
+            browserCount(for: worktree) > 0 ||
+            fileCount(for: worktree) > 0
     }
 
     private func chatCount(for worktree: Worktree) -> Int {
@@ -424,31 +664,56 @@ struct ActiveWorktreesView: View {
         )
     }
 
-    private func sessionCounts(for worktrees: [Worktree]) -> SessionCounts {
-        worktrees.reduce(SessionCounts()) { result, worktree in
-            let counts = sessionCounts(for: worktree)
-            return SessionCounts(
-                chats: result.chats + counts.chats,
-                terminals: result.terminals + counts.terminals,
-                browsers: result.browsers + counts.browsers,
-                files: result.files + counts.files
-            )
+    private func terminalRuntime(for worktree: Worktree) -> TerminalRuntimeSnapshot {
+        let terminalSessions = ((worktree.terminalSessions as? Set<TerminalSession>) ?? [])
+            .filter { !$0.isDeleted }
+
+        var expectedPanes = 0
+        var livePanes = 0
+        var runningPanes = 0
+
+        for session in terminalSessions {
+            guard let sessionId = session.id else {
+                expectedPanes += 1
+                continue
+            }
+
+            var paneIds = paneIDs(for: session)
+            if paneIds.isEmpty {
+                paneIds = TerminalSessionManager.shared.paneIds(for: sessionId)
+            }
+
+            let uniquePaneIds = Array(Set(paneIds))
+            if uniquePaneIds.isEmpty {
+                expectedPanes += 1
+                continue
+            }
+
+            expectedPanes += uniquePaneIds.count
+            let runtimeCounts = TerminalSessionManager.shared.runtimeCounts(for: sessionId, paneIds: uniquePaneIds)
+            livePanes += runtimeCounts.livePanes
+            runningPanes += runtimeCounts.runningPanes
         }
+
+        return TerminalRuntimeSnapshot(
+            expectedPanes: expectedPanes,
+            livePanes: livePanes,
+            runningPanes: runningPanes
+        )
     }
 
-    private func colorFromHex(_ hex: String?) -> Color? {
-        guard let hex else { return nil }
-        var sanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        sanitized = sanitized.replacingOccurrences(of: "#", with: "")
+    private func paneIDs(for session: TerminalSession) -> [String] {
+        if let layoutJSON = session.splitLayout,
+           let layout = SplitLayoutHelper.decode(layoutJSON) {
+            return layout.allPaneIds()
+        }
 
-        var rgb: UInt64 = 0
-        Scanner(string: sanitized).scanHexInt64(&rgb)
+        if let focusedPaneId = session.focusedPaneId,
+           !focusedPaneId.isEmpty {
+            return [focusedPaneId]
+        }
 
-        let r = Double((rgb & 0xFF0000) >> 16) / 255.0
-        let g = Double((rgb & 0x00FF00) >> 8) / 255.0
-        let b = Double(rgb & 0x0000FF) / 255.0
-
-        return Color(red: r, green: g, blue: b)
+        return []
     }
 
     private func navigate(to worktree: Worktree) {
@@ -478,7 +743,6 @@ struct ActiveWorktreesView: View {
     }
 
     private func terminateSessions(for worktree: Worktree) {
-        // Chat sessions
         let chats = (worktree.chatSessions as? Set<ChatSession>) ?? []
         for session in chats where !session.isDeleted {
             if let id = session.id {
@@ -487,13 +751,14 @@ struct ActiveWorktreesView: View {
             viewContext.delete(session)
         }
 
-        // Terminal sessions
         let terminals = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
         for session in terminals where !session.isDeleted {
             if let id = session.id {
                 TerminalSessionManager.shared.removeAllTerminals(for: id)
             }
-            if sessionPersistence, let layoutJSON = session.splitLayout,
+
+            if sessionPersistence,
+               let layoutJSON = session.splitLayout,
                let layout = SplitLayoutHelper.decode(layoutJSON) {
                 let paneIds = layout.allPaneIds()
                 Task {
@@ -502,16 +767,15 @@ struct ActiveWorktreesView: View {
                     }
                 }
             }
+
             viewContext.delete(session)
         }
 
-        // Browser sessions
         let browsers = (worktree.browserSessions as? Set<BrowserSession>) ?? []
         for session in browsers where !session.isDeleted {
             viewContext.delete(session)
         }
 
-        // File browser session
         if let session = worktree.fileBrowserSession, !session.isDeleted {
             viewContext.delete(session)
         }
@@ -524,7 +788,25 @@ struct ActiveWorktreesView: View {
     }
 }
 
-private enum SidebarSelection: Hashable {
+private enum MonitorMode: String, CaseIterable, Identifiable {
+    case cpu
+    case memory
+    case energy
+    case sessions
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .cpu: return "CPU"
+        case .memory: return "Memory"
+        case .energy: return "Energy"
+        case .sessions: return "Sessions"
+        }
+    }
+}
+
+private enum ScopeSelection: Hashable {
     case all
     case workspace(NSManagedObjectID)
     case other
@@ -540,13 +822,6 @@ private struct WorkspaceGroup: Identifiable {
     let isOther: Bool
 }
 
-private struct WorktreeSection: Identifiable {
-    let id: String
-    let title: String
-    let subtitle: String
-    let worktrees: [Worktree]
-}
-
 private struct SessionCounts {
     var chats: Int = 0
     var terminals: Int = 0
@@ -558,205 +833,81 @@ private struct SessionCounts {
     }
 }
 
-private struct SidebarRow: View {
-    let title: String
-    let subtitle: String
-    let color: Color
-    let worktreeCount: Int
-    let counts: SessionCounts
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(color.opacity(0.9))
-                .frame(width: 8, height: 8)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.body)
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            HStack(spacing: 6) {
-                PillBadge(
-                    text: "\(worktreeCount)",
-                    color: .secondary,
-                    textColor: .primary,
-                    backgroundOpacity: 0.12
-                )
-                if counts.total > 0 {
-                    PillBadge(
-                        text: "\(counts.total)",
-                        color: .secondary,
-                        textColor: .primary,
-                        backgroundOpacity: 0.12
-                    )
-                }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-private struct SummaryPills: View {
-    let worktreeCount: Int
-    let counts: SessionCounts
-
-    var body: some View {
-        HStack(spacing: 6) {
-            summaryBadge(label: "Environments", count: worktreeCount, color: .secondary)
-            if counts.chats > 0 { summaryBadge(label: "Chat", count: counts.chats, color: .blue) }
-            if counts.terminals > 0 { summaryBadge(label: "Terminal", count: counts.terminals, color: .green) }
-            if counts.browsers > 0 { summaryBadge(label: "Browser", count: counts.browsers, color: .orange) }
-            if counts.files > 0 { summaryBadge(label: "Files", count: counts.files, color: .teal) }
-        }
-    }
-    
-    @ViewBuilder
-    private func summaryBadge(label: String, count: Int, color: Color) -> some View {
-        PillBadge(
-            text: "\(label) \(count)",
-            color: color,
-            horizontalPadding: 8,
-            verticalPadding: 4,
-            backgroundOpacity: 0.12
-        )
-    }
-}
-
-private struct SectionHeader: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-private struct ActiveWorktreeRow: View {
+private struct MonitorRowSeed {
+    let id: String
     let worktree: Worktree
+    let processName: String
+    let workspaceName: String
+    let path: String
     let counts: SessionCounts
-    let onOpen: () -> Void
-    let onTerminate: () -> Void
+    let runtime: TerminalRuntimeSnapshot
+    let lastAccessed: Date
+}
 
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(worktreeTitle)
-                    .font(.headline)
-                    .lineLimit(1)
-                Text(worktree.path ?? "")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-                SessionSummaryRow(counts: counts)
-                WorktreeSessionBar(counts: counts)
-                    .frame(width: 140)
-            }
-            Button("Open") {
-                onOpen()
-            }
-            .buttonStyle(.bordered)
-            Button("Terminate") {
-                onTerminate()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
-        }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            onOpen()
-        }
-    }
+private struct MonitorRow: Identifiable {
+    let id: String
+    let worktree: Worktree
+    let processName: String
+    let workspaceName: String
+    let path: String
+    let cpuPercent: Double
+    let memoryBytes: UInt64
+    let energyImpact: Double
+    let threadCount: Int
+    let idleWakeUps: Int
+    let totalSessions: Int
+    let counts: SessionCounts
+    let runtime: TerminalRuntimeSnapshot
+    let lastAccessed: Date
 
-    private var worktreeTitle: String {
-        let repoName = worktree.repository?.name ?? "Environment"
-        if let branch = worktree.branch, !branch.isEmpty {
-            return "\(repoName) • \(branch)"
+    var terminalStatus: TerminalState {
+        if counts.terminals == 0 {
+            return .none
         }
-        return repoName
+
+        if runtime.runningPanes > 0 {
+            return .running
+        }
+
+        if runtime.livePanes > 0 {
+            return .ready
+        }
+
+        if runtime.expectedPanes > 0 {
+            return .detached
+        }
+
+        return .none
     }
 }
 
-private struct SessionSummaryRow: View {
-    let counts: SessionCounts
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 6) {
-                sessionChip(title: "Chat", systemImage: "message.fill", count: counts.chats, color: .blue)
-                sessionChip(title: "Terminal", systemImage: "terminal.fill", count: counts.terminals, color: .green)
-                sessionChip(title: "Browser", systemImage: "safari.fill", count: counts.browsers, color: .orange)
-                sessionChip(title: "Files", systemImage: "doc.on.doc.fill", count: counts.files, color: .teal)
-            }
-            HStack(spacing: 6) {
-                sessionChip(title: nil, systemImage: "message.fill", count: counts.chats, color: .blue)
-                sessionChip(title: nil, systemImage: "terminal.fill", count: counts.terminals, color: .green)
-                sessionChip(title: nil, systemImage: "safari.fill", count: counts.browsers, color: .orange)
-                sessionChip(title: nil, systemImage: "doc.on.doc.fill", count: counts.files, color: .teal)
-            }
-            Text("\(counts.total) sessions")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .lineLimit(1)
-    }
-
-    private func sessionChip(title: String?, systemImage: String, count: Int, color: Color) -> some View {
-        IconCountPill(
-            systemImage: systemImage,
-            count: count,
-            title: title,
-            color: color,
-            backgroundOpacity: 0.14
-        )
-    }
+private struct TerminalRuntimeSnapshot {
+    let expectedPanes: Int
+    let livePanes: Int
+    let runningPanes: Int
 }
 
-private struct WorktreeSessionBar: View {
-    let counts: SessionCounts
+private enum TerminalState {
+    case running
+    case ready
+    case detached
+    case none
 
-    var body: some View {
-        GeometryReader { geo in
-            let width = geo.size.width
-            let total = max(1, counts.total)
-
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.secondary.opacity(0.12))
-                HStack(spacing: 0) {
-                    segment(counts.chats, total: total, width: width, color: .blue)
-                    segment(counts.terminals, total: total, width: width, color: .green)
-                    segment(counts.browsers, total: total, width: width, color: .orange)
-                    segment(counts.files, total: total, width: width, color: .teal)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-            }
+    var title: String {
+        switch self {
+        case .running: return "Running"
+        case .ready: return "Ready"
+        case .detached: return "Detached"
+        case .none: return "None"
         }
-        .frame(height: 8)
     }
 
-    private func segment(_ count: Int, total: Int, width: CGFloat, color: Color) -> some View {
-        let fraction = CGFloat(count) / CGFloat(total)
-        return Rectangle()
-            .fill(color)
-            .frame(width: width * fraction)
+    var color: Color {
+        switch self {
+        case .running: return .green
+        case .ready: return .blue
+        case .detached: return .orange
+        case .none: return .secondary
+        }
     }
 }

@@ -7,6 +7,11 @@
 
 import Foundation
 
+struct TerminalRuntimeCounts {
+    let livePanes: Int
+    let runningPanes: Int
+}
+
 class TerminalSessionManager {
     static let shared = TerminalSessionManager()
 
@@ -17,8 +22,16 @@ class TerminalSessionManager {
 
     private init() {}
 
+    private func key(for sessionId: UUID, paneId: String) -> String {
+        "\(sessionId.uuidString)-\(paneId)"
+    }
+
+    private func keyPrefix(for sessionId: UUID) -> String {
+        "\(sessionId.uuidString)-"
+    }
+
     func getTerminal(for sessionId: UUID, paneId: String) -> GhosttyTerminalView? {
-        let key = "\(sessionId.uuidString)-\(paneId)"
+        let key = key(for: sessionId, paneId: paneId)
         if let terminal = terminals[key] {
             touch(key)
             return terminal
@@ -27,14 +40,14 @@ class TerminalSessionManager {
     }
 
     func setTerminal(_ terminal: GhosttyTerminalView, for sessionId: UUID, paneId: String) {
-        let key = "\(sessionId.uuidString)-\(paneId)"
+        let key = key(for: sessionId, paneId: paneId)
         terminals[key] = terminal
         touch(key)
         evictIfNeeded()
     }
 
     func removeTerminal(for sessionId: UUID, paneId: String) {
-        let key = "\(sessionId.uuidString)-\(paneId)"
+        let key = key(for: sessionId, paneId: paneId)
         if let terminal = terminals.removeValue(forKey: key) {
             cleanupTerminal(terminal)
         }
@@ -43,7 +56,7 @@ class TerminalSessionManager {
     }
 
     func removeAllTerminals(for sessionId: UUID) {
-        let prefix = sessionId.uuidString
+        let prefix = keyPrefix(for: sessionId)
         for (key, terminal) in terminals where key.hasPrefix(prefix) {
             cleanupTerminal(terminal)
             terminals.removeValue(forKey: key)
@@ -55,7 +68,7 @@ class TerminalSessionManager {
     // MARK: - Scroll View Management
 
     func getScrollView(for sessionId: UUID, paneId: String) -> TerminalScrollView? {
-        let key = "\(sessionId.uuidString)-\(paneId)"
+        let key = key(for: sessionId, paneId: paneId)
         if let scrollView = scrollViews[key] {
             touch(key)
             return scrollView
@@ -64,15 +77,41 @@ class TerminalSessionManager {
     }
 
     func setScrollView(_ scrollView: TerminalScrollView, for sessionId: UUID, paneId: String) {
-        let key = "\(sessionId.uuidString)-\(paneId)"
+        let key = key(for: sessionId, paneId: paneId)
         scrollViews[key] = scrollView
         touch(key)
         evictIfNeeded()
     }
 
     func getTerminalCount(for sessionId: UUID) -> Int {
-        let prefix = sessionId.uuidString
+        let prefix = keyPrefix(for: sessionId)
         return terminals.keys.filter { $0.hasPrefix(prefix) }.count
+    }
+
+    @MainActor
+    func paneIds(for sessionId: UUID) -> [String] {
+        let prefix = keyPrefix(for: sessionId)
+        return terminals.keys
+            .filter { $0.hasPrefix(prefix) }
+            .map { key in
+                String(key.dropFirst(prefix.count))
+            }
+    }
+
+    @MainActor
+    func runtimeCounts(for sessionId: UUID, paneIds: [String]) -> TerminalRuntimeCounts {
+        var livePanes = 0
+        var runningPanes = 0
+
+        for paneId in paneIds {
+            guard let terminal = getTerminal(for: sessionId, paneId: paneId) else { continue }
+            livePanes += 1
+            if !terminal.processExited {
+                runningPanes += 1
+            }
+        }
+
+        return TerminalRuntimeCounts(livePanes: livePanes, runningPanes: runningPanes)
     }
 
     private func touch(_ key: String) {

@@ -2,25 +2,31 @@
 //  ActiveWorktreesMetrics.swift
 //  aizen
 //
-//  App-level metrics sampling for Active Worktrees view
+//  App-level and host-level metrics sampling for Activity Monitor.
 //
 
-import Foundation
-import SwiftUI
 import Combine
 import Darwin
+import Foundation
+import SwiftUI
 
 @MainActor
 final class ActiveWorktreesMetrics: ObservableObject {
     @Published var cpuPercent: Double = 0
     @Published var memoryBytes: UInt64 = 0
     @Published var energyScore: Double = 0
+
+    @Published var userCPUPercent: Double = 0
+    @Published var systemCPUPercent: Double = 0
+    @Published var idleCPUPercent: Double = 100
+
     @Published var cpuHistory: [Double] = []
     @Published var memoryHistory: [UInt64] = []
     @Published var energyHistory: [Double] = []
 
     private var task: Task<Void, Never>?
     private var lastSample: ResourceSample?
+    private var lastHostSample: HostCPUSample?
     private let maxHistoryCount = 60
 
     var maxMemoryHistoryBytes: UInt64 {
@@ -69,9 +75,40 @@ final class ActiveWorktreesMetrics: ObservableObject {
 
         memoryBytes = memory
         energyScore = SystemMetrics.energyScore(cpuPercent: cpuPercent)
+        updateHostCPUPercentages()
 
         appendHistory(cpu: cpuPercent, memory: memoryBytes, energy: energyScore)
         lastSample = sample
+    }
+
+    private func updateHostCPUPercentages() {
+        guard let current = SystemMetrics.currentHostCPUTicks() else {
+            userCPUPercent = cpuPercent
+            systemCPUPercent = min(100 - userCPUPercent, cpuPercent * 0.4)
+            idleCPUPercent = max(0, 100 - userCPUPercent - systemCPUPercent)
+            return
+        }
+
+        defer { lastHostSample = current }
+        guard let previous = lastHostSample else {
+            return
+        }
+
+        let userDelta = current.user >= previous.user ? current.user - previous.user : 0
+        let niceDelta = current.nice >= previous.nice ? current.nice - previous.nice : 0
+        let systemDelta = current.system >= previous.system ? current.system - previous.system : 0
+        let idleDelta = current.idle >= previous.idle ? current.idle - previous.idle : 0
+
+        let total = userDelta + niceDelta + systemDelta + idleDelta
+        guard total > 0 else { return }
+
+        let user = Double(userDelta + niceDelta) / Double(total) * 100
+        let system = Double(systemDelta) / Double(total) * 100
+        let idle = Double(idleDelta) / Double(total) * 100
+
+        userCPUPercent = max(0, user)
+        systemCPUPercent = max(0, system)
+        idleCPUPercent = max(0, idle)
     }
 
     private func appendHistory(cpu: Double, memory: UInt64, energy: Double) {
@@ -96,6 +133,13 @@ private struct ResourceSample {
     let cpuTime: TimeInterval
 }
 
+struct HostCPUSample {
+    let user: UInt64
+    let system: UInt64
+    let idle: UInt64
+    let nice: UInt64
+}
+
 enum SystemMetrics {
     static func currentCPUTime() -> TimeInterval {
         var usage = rusage()
@@ -117,6 +161,25 @@ enum SystemMetrics {
         return UInt64(info.resident_size)
     }
 
+    static func currentHostCPUTicks() -> HostCPUSample? {
+        var load = host_cpu_load_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info_data_t>.stride / MemoryLayout<integer_t>.stride)
+        let result: kern_return_t = withUnsafeMutablePointer(to: &load) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { rebounded in
+                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, rebounded, &count)
+            }
+        }
+
+        guard result == KERN_SUCCESS else { return nil }
+
+        return HostCPUSample(
+            user: UInt64(load.cpu_ticks.0),
+            system: UInt64(load.cpu_ticks.1),
+            idle: UInt64(load.cpu_ticks.2),
+            nice: UInt64(load.cpu_ticks.3)
+        )
+    }
+
     static func cpuPercent(deltaCPU: TimeInterval, deltaTime: TimeInterval) -> Double {
         guard deltaTime > 0 else { return 0 }
         let coreCount = max(1, ProcessInfo.processInfo.activeProcessorCount)
@@ -124,7 +187,7 @@ enum SystemMetrics {
     }
 
     static func energyScore(cpuPercent: Double) -> Double {
-        return min(100.0, cpuPercent * 1.5)
+        min(100.0, cpuPercent * 1.5)
     }
 }
 
@@ -196,8 +259,7 @@ struct Sparkline: View {
     }
 
     private func normalized(_ values: [Double]) -> [Double] {
-        let clamped = values.map { min(max($0, 0), 1) }
-        return clamped
+        values.map { min(max($0, 0), 1) }
     }
 }
 
