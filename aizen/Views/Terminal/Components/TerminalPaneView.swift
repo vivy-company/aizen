@@ -25,6 +25,7 @@ struct TerminalPaneView: View {
     let isFocused: Bool
     let sessionManager: TerminalSessionManager
     @Binding var voiceAction: VoiceAction?
+    let focusRequestVersion: Int
     let onFocus: () -> Void
     let onProcessExit: () -> Void
     let onTitleChange: (String) -> Void
@@ -127,11 +128,7 @@ struct TerminalPaneView: View {
         )
         .onChange(of: isFocused) { _, newValue in
             if newValue {
-                shouldFocus = true
-                focusVersion += 1
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    shouldFocus = false
-                }
+                requestFocus()
             } else {
                 focusVersion += 1
                 if showingVoiceRecording {
@@ -143,12 +140,13 @@ struct TerminalPaneView: View {
         .onAppear {
             if isFocused {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    shouldFocus = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        shouldFocus = false
-                    }
+                    requestFocus()
                 }
             }
+        }
+        .onChange(of: focusRequestVersion) { _, _ in
+            guard isFocused else { return }
+            requestFocus()
         }
         .onDisappear {
             hideWorkItem?.cancel()
@@ -171,6 +169,14 @@ struct TerminalPaneView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(permissionErrorMessage)
+        }
+    }
+
+    private func requestFocus() {
+        shouldFocus = true
+        focusVersion += 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            shouldFocus = false
         }
     }
 

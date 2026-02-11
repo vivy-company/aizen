@@ -38,6 +38,7 @@ struct SplitTerminalView: View {
     @State private var keyMonitor: Any?
     @State private var focusedPaneVoiceRecording = false
     @State private var voiceAction: (paneId: String, action: VoiceAction)?
+    @State private var focusRequestVersion: Int = 0
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
 
     private enum CloseAction {
@@ -73,31 +74,30 @@ struct SplitTerminalView: View {
             // Persist focused pane changes separately
             .onChange(of: focusedPaneId) { _, _ in
                 guard isSelected else { return }
+                guard !focusedPaneId.isEmpty else { return }
                 scheduleFocusSave()
                 applyTitleForFocusedPane()
             }
             // Initial persistence to store default layout/pane (only for selected session)
             .onAppear {
-                if isSelected {
-                    persistLayout()
-                    persistFocus()
-                    applyTitleForFocusedPane()
-                }
-                if keyMonitor == nil {
-                    keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                        handleVoiceShortcut(event)
+                DispatchQueue.main.async {
+                    if isSelected {
+                        persistLayout()
+                        persistFocus()
+                        applyTitleForFocusedPane()
+                        focusRequestVersion += 1
+                    }
+                    if keyMonitor == nil {
+                        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                            handleVoiceShortcut(event)
+                        }
                     }
                 }
             }
             // Trigger focus when tab becomes selected (views are kept alive via opacity)
             .onChange(of: isSelected) { _, newValue in
                 if newValue {
-                    // Force focus update by toggling focusedPaneId
-                    let currentFocus = focusedPaneId
-                    focusedPaneId = ""
-                    DispatchQueue.main.async {
-                        focusedPaneId = currentFocus
-                    }
+                    focusRequestVersion += 1
                 }
             }
             // Only set split actions for the currently selected/visible session
@@ -144,6 +144,7 @@ struct SplitTerminalView: View {
                     isFocused: focusedPaneId == paneId,
                     sessionManager: sessionManager,
                     voiceAction: voiceActionBinding,
+                    focusRequestVersion: focusRequestVersion,
                     onFocus: {
                         focusedPaneId = paneId
                         applyTitleForFocusedPane()
@@ -391,7 +392,7 @@ struct SplitTerminalView: View {
     private func persistLayout(_ layoutToSave: SplitNode? = nil) {
         guard !session.isDeleted else { return }
         let node = layoutToSave ?? layout
-        if let json = SplitLayoutHelper.encode(node) {
+        if let json = SplitLayoutHelper.encode(node), session.splitLayout != json {
             session.splitLayout = json
             saveContext()
         }
@@ -400,6 +401,8 @@ struct SplitTerminalView: View {
     private func persistFocus(_ paneId: String? = nil) {
         guard !session.isDeleted else { return }
         let id = paneId ?? focusedPaneId
+        guard !id.isEmpty else { return }
+        guard session.focusedPaneId != id else { return }
         session.focusedPaneId = id
         saveContext()
     }
@@ -408,7 +411,7 @@ struct SplitTerminalView: View {
 
     private func handleTitleChange(for paneId: String, title: String) {
         paneTitles[paneId] = title
-        if paneId == focusedPaneId {
+        if paneId == focusedPaneId, session.title != title {
             session.title = title
             saveContext()
         }
@@ -416,7 +419,7 @@ struct SplitTerminalView: View {
 
     private func applyTitleForFocusedPane() {
         guard !session.isDeleted else { return }
-        if let title = paneTitles[focusedPaneId] {
+        if let title = paneTitles[focusedPaneId], session.title != title {
             session.title = title
             saveContext()
         }

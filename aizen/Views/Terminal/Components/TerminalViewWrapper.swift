@@ -84,8 +84,6 @@ struct TerminalViewWrapper: NSViewRepresentable {
                 existingTerminal.onProcessExit = onProcessExit
                 existingTerminal.onProgressReport = onProgress
                 existingTerminal.onTitleChange = onTitleChange
-                existingTerminal.needsLayout = true
-                existingTerminal.layoutSubtreeIfNeeded()
                 onReady()
             }
 
@@ -146,13 +144,12 @@ struct TerminalViewWrapper: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        // Update frame only when size changed meaningfully (>0.5pt) to prevent
-        // layout feedback loops between SwiftUI and AppKit.
+        // SwiftUI owns placement/origin; only sync size to avoid layout feedback loops.
         let currentSize = nsView.frame.size
-        if abs(currentSize.width - size.width) > 0.5 || abs(currentSize.height - size.height) > 0.5 || nsView.frame.origin != .zero {
-            nsView.frame = CGRect(origin: .zero, size: size)
-            nsView.needsLayout = true
-            nsView.layoutSubtreeIfNeeded()
+        if abs(currentSize.width - size.width) > 0.5 || abs(currentSize.height - size.height) > 0.5 {
+            var frame = nsView.frame
+            frame.size = size
+            nsView.frame = frame
         }
 
         // Get the terminal view (either directly or from scroll view)

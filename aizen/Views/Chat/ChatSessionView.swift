@@ -194,7 +194,10 @@ struct ChatSessionView: View {
             .frame(maxWidth: .infinity)
         }
         .background(WindowResizeObserver(isResizing: $isWindowResizing))
-        .focusedSceneValue(\.chatActions, ChatActions(cycleModeForward: viewModel.cycleModeForward))
+        .focusedSceneValue(
+            \.chatActions,
+            isSelected ? ChatActions(cycleModeForward: viewModel.cycleModeForward) : nil
+        )
         .onChange(of: isLayoutResizing) { _, resizing in
             if resizing {
                 wasNearBottomBeforeResize = viewModel.isNearBottom
