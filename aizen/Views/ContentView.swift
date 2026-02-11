@@ -41,6 +41,7 @@ struct ContentView: View {
     @AppStorage("selectedWorkspaceId") private var selectedWorkspaceId: String?
     @AppStorage("selectedRepositoryId") private var selectedRepositoryId: String?
     @AppStorage("selectedWorktreeId") private var selectedWorktreeId: String?
+    @AppStorage("selectedWorktreeByRepository") private var selectedWorktreeByRepositoryData: String = "{}"
 
     init(context: NSManagedObjectContext, repositoryManager: RepositoryManager, gitChangesContext: Binding<GitChangesContext?>) {
         self.repositoryManager = repositoryManager
@@ -98,6 +99,7 @@ struct ContentView: View {
                         selectedWorktree = nextWorktree
                     }
                 )
+                .id(worktree.id)
             } else {
                 placeholderView(
                     titleKey: "contentView.selectWorktree",
@@ -142,13 +144,24 @@ struct ContentView: View {
                 selectedRepository = repositories.first(where: { $0.id == uuid })
             }
 
-            // Restore selected worktree from persistent storage
-            if selectedWorktree == nil,
-               let worktreeId = selectedWorktreeId,
-               let uuid = UUID(uuidString: worktreeId),
-               let repository = selectedRepository {
+            // Restore selected worktree from repository-specific storage first.
+            if selectedWorktree == nil, let repository = selectedRepository {
                 let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-                selectedWorktree = worktrees.first(where: { $0.id == uuid })
+                if let restoredWorktreeId = getStoredWorktreeId(for: repository) {
+                    selectedWorktree = worktrees.first(where: { $0.id == restoredWorktreeId && !$0.isDeleted })
+                }
+
+                // Fallback to global selection if repository-specific value is missing.
+                if selectedWorktree == nil,
+                   let worktreeId = selectedWorktreeId,
+                   let uuid = UUID(uuidString: worktreeId) {
+                    selectedWorktree = worktrees.first(where: { $0.id == uuid && !$0.isDeleted })
+                }
+
+                if selectedWorktree == nil {
+                    let candidates = worktrees.filter { !$0.isDeleted }
+                    selectedWorktree = candidates.first(where: { $0.isPrimary }) ?? candidates.first
+                }
             }
 
             if !hasShownOnboarding {
@@ -191,9 +204,15 @@ struct ContentView: View {
                     }
                 }
 
-                // Auto-select primary worktree when repository changes
+                // Restore previously selected worktree for this repository.
                 let worktrees = (repo.worktrees as? Set<Worktree>) ?? []
-                selectedWorktree = worktrees.first(where: { $0.isPrimary })
+                if let restoredWorktreeId = getStoredWorktreeId(for: repo),
+                   let restoredWorktree = worktrees.first(where: { $0.id == restoredWorktreeId && !$0.isDeleted }) {
+                    selectedWorktree = restoredWorktree
+                } else {
+                    let candidates = worktrees.filter { !$0.isDeleted }
+                    selectedWorktree = candidates.first(where: { $0.isPrimary }) ?? candidates.first
+                }
             }
         }
         .onChange(of: selectedWorktree) { _, newValue in
@@ -201,6 +220,9 @@ struct ContentView: View {
 
             if let newWorktree = newValue, !newWorktree.isDeleted {
                 previousWorktree = newWorktree
+                if let repository = selectedRepository {
+                    storeWorktreeSelection(newWorktree.id, for: repository)
+                }
                 // Update worktree access asynchronously to avoid blocking UI
                 Task { @MainActor in
                     try? repositoryManager.updateWorktreeAccess(newWorktree)
@@ -281,6 +303,40 @@ struct ContentView: View {
         )
         commandPaletteController = controller
         controller.showWindow(nil)
+    }
+
+    private func decodeSelectedWorktreeByRepository() -> [String: String] {
+        guard let data = selectedWorktreeByRepositoryData.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+        return decoded
+    }
+
+    private func encodeSelectedWorktreeByRepository(_ map: [String: String]) {
+        guard let encoded = try? JSONEncoder().encode(map),
+              let json = String(data: encoded, encoding: .utf8) else {
+            return
+        }
+        selectedWorktreeByRepositoryData = json
+    }
+
+    private func getStoredWorktreeId(for repository: Repository) -> UUID? {
+        guard let repositoryId = repository.id?.uuidString else { return nil }
+        let map = decodeSelectedWorktreeByRepository()
+        guard let worktreeIdString = map[repositoryId] else { return nil }
+        return UUID(uuidString: worktreeIdString)
+    }
+
+    private func storeWorktreeSelection(_ worktreeId: UUID?, for repository: Repository) {
+        guard let repositoryId = repository.id?.uuidString else { return }
+        var map = decodeSelectedWorktreeByRepository()
+        if let worktreeId {
+            map[repositoryId] = worktreeId.uuidString
+        } else {
+            map.removeValue(forKey: repositoryId)
+        }
+        encodeSelectedWorktreeByRepository(map)
     }
 
     private func quickSwitchToPreviousWorktree() {

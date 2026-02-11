@@ -41,6 +41,7 @@ struct WorktreeDetailView: View {
     @State private var fileSearchWindowController: FileSearchWindowController?
     @State private var fileToOpenFromSearch: String?
     @State private var cachedTerminalBackgroundColor: Color?
+    @State private var hasLoadedTabState = false
 
     init(worktree: Worktree, repositoryManager: RepositoryManager, tabStateManager: WorktreeTabStateManager, gitChangesContext: Binding<GitChangesContext?>, onWorktreeDeleted: ((Worktree?) -> Void)? = nil) {
         self.worktree = worktree
@@ -418,10 +419,11 @@ struct WorktreeDetailView: View {
     }
 
     private func navigateToChatSession(_ sessionId: UUID) {
+        guard let worktreeId = worktree.id else { return }
         // Fetch session directly to check if it belongs to this worktree
         // (avoids stale relationship cache after reattachment)
         let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktree.id! as CVarArg)
+        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktreeId as CVarArg)
         request.fetchLimit = 1
 
         if let _ = try? worktree.managedObjectContext?.fetch(request).first {
@@ -440,10 +442,11 @@ struct WorktreeDetailView: View {
         guard let sessionId = notification.userInfo?["chatSessionId"] as? UUID else {
             return
         }
+        guard let worktreeId = worktree.id else { return }
         // Fetch session directly to verify it belongs to this worktree
         // (avoids stale relationship cache after reattachment)
         let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktree.id! as CVarArg)
+        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktreeId as CVarArg)
         request.fetchLimit = 1
 
         if let _ = try? worktree.managedObjectContext?.fetch(request).first {
@@ -471,9 +474,16 @@ struct WorktreeDetailView: View {
         // Store attachment (user can add context before sending)
         ChatSessionManager.shared.setPendingAttachments([attachment], for: sessionId)
 
-        // Switch to chat tab and select the session
-        selectedTab = "chat"
-        viewModel.selectedChatSessionId = sessionId
+        if doesChatSessionBelongToCurrentWorktree(sessionId) {
+            selectedTab = "chat"
+            viewModel.selectedChatSessionId = sessionId
+        } else {
+            NotificationCenter.default.post(
+                name: .navigateToChatSession,
+                object: nil,
+                userInfo: ["chatSessionId": sessionId]
+            )
+        }
     }
 
     private func handleSwitchToChat(_ notification: Notification) {
@@ -482,9 +492,28 @@ struct WorktreeDetailView: View {
             return
         }
 
-        // Switch to chat tab and select the session
-        selectedTab = "chat"
-        viewModel.selectedChatSessionId = sessionId
+        if doesChatSessionBelongToCurrentWorktree(sessionId) {
+            selectedTab = "chat"
+            viewModel.selectedChatSessionId = sessionId
+        } else {
+            NotificationCenter.default.post(
+                name: .navigateToChatSession,
+                object: nil,
+                userInfo: ["chatSessionId": sessionId]
+            )
+        }
+    }
+
+    private func doesChatSessionBelongToCurrentWorktree(_ sessionId: UUID) -> Bool {
+        guard let worktreeId = worktree.id else { return false }
+        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
+        request.predicate = NSPredicate(
+            format: "id == %@ AND worktree.id == %@",
+            sessionId as CVarArg,
+            worktreeId as CVarArg
+        )
+        request.fetchLimit = 1
+        return ((try? worktree.managedObjectContext?.fetch(request).first) != nil)
     }
 
     var body: some View {
@@ -501,7 +530,6 @@ struct WorktreeDetailView: View {
             .toolbarBackground(.visible, for: .windowToolbar)
             .toast()
             .onAppear {
-                validateSelectedTab()
                 cachedTerminalBackgroundColor = getTerminalBackgroundColor()
             }
             .onChange(of: terminalThemeName) { _, _ in
@@ -527,10 +555,12 @@ struct WorktreeDetailView: View {
                 trailingToolbarItems
             }
             .task(id: worktree.id) {
-                await setupGitMonitoring()
-                xcodeBuildManager.detectProject(at: worktree.path ?? "")
+                hasLoadedTabState = false
                 loadTabState()
                 validateSelectedTab()
+                hasLoadedTabState = true
+                await setupGitMonitoring()
+                xcodeBuildManager.detectProject(at: worktree.path ?? "")
             }
     }
 
@@ -538,6 +568,7 @@ struct WorktreeDetailView: View {
     private var navigationContent: some View {
         contentWithBasicModifiers
             .onChange(of: selectedTab) { _, _ in
+                guard hasLoadedTabState else { return }
                 saveTabState()
             }
             .onChange(of: viewModel.selectedChatSessionId) { _, newValue in

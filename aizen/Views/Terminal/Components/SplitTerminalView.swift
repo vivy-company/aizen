@@ -39,6 +39,7 @@ struct SplitTerminalView: View {
     @State private var focusedPaneVoiceRecording = false
     @State private var voiceAction: (paneId: String, action: VoiceAction)?
     @State private var focusRequestVersion: Int = 0
+    @State private var splitActions = TerminalSplitActions()
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
 
     private enum CloseAction {
@@ -87,6 +88,11 @@ struct SplitTerminalView: View {
                         applyTitleForFocusedPane()
                         focusRequestVersion += 1
                     }
+                    splitActions.configure(
+                        splitHorizontal: splitHorizontal,
+                        splitVertical: splitVertical,
+                        closePane: closePane
+                    )
                     if keyMonitor == nil {
                         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                             handleVoiceShortcut(event)
@@ -101,15 +107,12 @@ struct SplitTerminalView: View {
                 }
             }
             // Only set split actions for the currently selected/visible session
-            .focusedSceneValue(\.terminalSplitActions, isSelected ? TerminalSplitActions(
-                splitHorizontal: splitHorizontal,
-                splitVertical: splitVertical,
-                closePane: closePane
-            ) : nil)
+            .focusedSceneValue(\.terminalSplitActions, isSelected ? splitActions : nil)
             .onDisappear {
                 layoutSaveTask?.cancel()
                 focusSaveTask?.cancel()
                 contextSaveTask?.cancel()
+                splitActions.clear()
                 if let monitor = keyMonitor {
                     NSEvent.removeMonitor(monitor)
                     keyMonitor = nil

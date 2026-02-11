@@ -30,6 +30,7 @@ struct ChatSessionView: View {
     @State private var fileToOpenInEditor: String?
     @State private var autocompleteWindow: AutocompleteWindowController?
     @State private var keyMonitor: Any?
+    @State private var chatActions = ChatActions()
     @State private var isWindowResizing = false
     @State private var wasNearBottomBeforeResize = true
 
@@ -196,7 +197,7 @@ struct ChatSessionView: View {
         .background(WindowResizeObserver(isResizing: $isWindowResizing))
         .focusedSceneValue(
             \.chatActions,
-            isSelected ? ChatActions(cycleModeForward: viewModel.cycleModeForward) : nil
+            isSelected ? chatActions : nil
         )
         .onChange(of: isLayoutResizing) { _, resizing in
             if resizing {
@@ -215,6 +216,7 @@ struct ChatSessionView: View {
                 inputText = draft
             }
             if isSelected {
+                chatActions.configure(cycleModeForward: viewModel.cycleModeForward)
                 viewModel.setupAgentSession()
                 setupAutocompleteWindow()
                 NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
@@ -228,6 +230,7 @@ struct ChatSessionView: View {
             autocompleteWindow?.dismiss()
             NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
             stopKeyMonitorIfNeeded()
+            chatActions.clear()
             if showingVoiceRecording {
                 viewModel.audioService.cancelRecording()
                 showingVoiceRecording = false
@@ -235,6 +238,7 @@ struct ChatSessionView: View {
         }
         .onChange(of: isSelected) { _, selected in
             if selected {
+                chatActions.configure(cycleModeForward: viewModel.cycleModeForward)
                 viewModel.setupAgentSession()
                 setupAutocompleteWindow()
                 NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
@@ -245,6 +249,7 @@ struct ChatSessionView: View {
                 autocompleteWindow?.dismiss()
                 NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
                 stopKeyMonitorIfNeeded()
+                chatActions.clear()
                 if showingVoiceRecording {
                     viewModel.audioService.cancelRecording()
                     showingVoiceRecording = false

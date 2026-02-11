@@ -7,8 +7,20 @@
 
 import SwiftUI
 
-struct ChatActions {
-    let cycleModeForward: () -> Void
+final class ChatActions {
+    private var cycleModeForwardHandler: (() -> Void)?
+
+    func configure(cycleModeForward: @escaping () -> Void) {
+        cycleModeForwardHandler = cycleModeForward
+    }
+
+    func clear() {
+        cycleModeForwardHandler = nil
+    }
+
+    func cycleModeForward() {
+        cycleModeForwardHandler?()
+    }
 }
 
 struct ChatActionsKey: FocusedValueKey {

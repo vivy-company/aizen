@@ -9,10 +9,38 @@ import SwiftUI
 
 // MARK: - Terminal Split Actions (for keyboard shortcuts)
 
-struct TerminalSplitActions {
-    let splitHorizontal: () -> Void
-    let splitVertical: () -> Void
-    let closePane: () -> Void
+final class TerminalSplitActions {
+    private var splitHorizontalHandler: (() -> Void)?
+    private var splitVerticalHandler: (() -> Void)?
+    private var closePaneHandler: (() -> Void)?
+
+    func configure(
+        splitHorizontal: @escaping () -> Void,
+        splitVertical: @escaping () -> Void,
+        closePane: @escaping () -> Void
+    ) {
+        splitHorizontalHandler = splitHorizontal
+        splitVerticalHandler = splitVertical
+        closePaneHandler = closePane
+    }
+
+    func clear() {
+        splitHorizontalHandler = nil
+        splitVerticalHandler = nil
+        closePaneHandler = nil
+    }
+
+    func splitHorizontal() {
+        splitHorizontalHandler?()
+    }
+
+    func splitVertical() {
+        splitVerticalHandler?()
+    }
+
+    func closePane() {
+        closePaneHandler?()
+    }
 }
 
 private struct TerminalSplitActionsKey: FocusedValueKey {
