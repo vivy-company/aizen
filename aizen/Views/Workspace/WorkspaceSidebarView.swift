@@ -351,7 +351,7 @@ struct WorkspaceSidebarView: View {
                 Spacer(minLength: 8)
             }
             .padding(.horizontal, 12)
-            .padding(.top, 10)
+            .padding(.top, 8)
             .padding(.bottom, 2)
         }
     }
@@ -466,7 +466,7 @@ struct WorkspaceSidebarView: View {
 
             crossProjectRow
                 .padding(.horizontal, 12)
-                .padding(.top, 4)
+                .padding(.top, 8)
                 .padding(.bottom, 4)
 
             projectsSectionTitle
