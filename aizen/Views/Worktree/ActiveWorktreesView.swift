@@ -23,12 +23,13 @@ struct ActiveWorktreesView: View {
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
 
     @State private var searchText = ""
-    @State private var selectedMode: MonitorMode = .cpu
+    @State private var selectedMode: MonitorMode = .chats
     @State private var selectedScope: ScopeSelection = .all
     @State private var selectedRowID: MonitorRow.ID?
     @State private var showTerminateAllConfirm = false
     @State private var sortOrder: [KeyPathComparator<MonitorRow>] = [
-        KeyPathComparator(\.cpuPercent, order: .reverse)
+        KeyPathComparator(\.chatSessions, order: .reverse),
+        KeyPathComparator(\.lastAccessed, order: .reverse)
     ]
 
     private var surfaceColor: Color {
@@ -196,8 +197,12 @@ struct ActiveWorktreesView: View {
         return rows
     }
 
+    private var visibleRows: [MonitorRow] {
+        monitorRows.filter(rowMatchesSelectedMode)
+    }
+
     private var sortedRows: [MonitorRow] {
-        var rows = monitorRows
+        var rows = visibleRows
         rows.sort(using: sortOrder)
         return rows
     }
@@ -274,6 +279,7 @@ struct ActiveWorktreesView: View {
             syncScopeIfNeeded()
         }
         .onChange(of: selectedMode) { _, mode in
+            selectedRowID = nil
             updateSortOrder(for: mode)
         }
         .alert("Terminate all sessions?", isPresented: $showTerminateAllConfirm) {
@@ -291,59 +297,168 @@ struct ActiveWorktreesView: View {
             if sortedRows.isEmpty {
                 emptyState
             } else {
-                Table(sortedRows, selection: $selectedRowID, sortOrder: $sortOrder) {
-                    TableColumn("Environment", value: \.processName) { row in
-                        processCell(for: row)
-                    }
-
-                    TableColumn("% CPU", value: \.cpuPercent) { row in
-                        Text(row.cpuPercent, format: .number.precision(.fractionLength(1)))
-                            .font(.system(.body, design: .monospaced))
-                    }
-                    .width(min: 70, ideal: 90, max: 110)
-
-                    TableColumn("Memory", value: \.memoryBytes) { row in
-                        Text(row.memoryBytes.formattedBytes())
-                            .font(.system(.body, design: .monospaced))
-                    }
-                    .width(min: 90, ideal: 120, max: 140)
-
-                    TableColumn("Energy", value: \.energyImpact) { row in
-                        energyCell(for: row)
-                    }
-                    .width(min: 80, ideal: 90, max: 110)
-
-                    TableColumn("Threads", value: \.threadCount) { row in
-                        Text("\(row.threadCount)")
-                            .font(.system(.body, design: .monospaced))
-                    }
-                    .width(min: 70, ideal: 85, max: 100)
-
-                    TableColumn("Idle Wake Ups", value: \.idleWakeUps) { row in
-                        Text("\(row.idleWakeUps)")
-                            .font(.system(.body, design: .monospaced))
-                    }
-                    .width(min: 92, ideal: 120, max: 140)
-
-                    TableColumn("Sessions", value: \.totalSessions) { row in
-                        Text("\(row.totalSessions)")
-                            .font(.system(.body, design: .monospaced))
-                    }
-                    .width(min: 66, ideal: 80, max: 96)
-
-                    TableColumn("Terminal") { row in
-                        terminalStateCell(for: row)
-                    }
-                    .width(min: 96, ideal: 110, max: 128)
-
-                    TableColumn("Action") { row in
-                        actionCell(for: row)
-                    }
-                    .width(min: 88, ideal: 100, max: 120)
+                switch selectedMode {
+                case .chats:
+                    chatsTable
+                case .terminals:
+                    terminalsTable
+                case .files:
+                    filesTable
+                case .browsers:
+                    browsersTable
                 }
-                .tableStyle(.inset)
             }
         }
+    }
+
+    private var chatsTable: some View {
+        Table(sortedRows, selection: $selectedRowID, sortOrder: $sortOrder) {
+            TableColumn("Environment", value: \.processName) { row in
+                processCell(for: row)
+            }
+
+            TableColumn("Chats", value: \.chatSessions) { row in
+                Text("\(row.chatSessions)")
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 64, ideal: 80, max: 96)
+
+            TableColumn("% CPU", value: \.cpuPercent) { row in
+                Text(row.cpuPercent, format: .number.precision(.fractionLength(1)))
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 70, ideal: 90, max: 110)
+
+            TableColumn("Memory", value: \.memoryBytes) { row in
+                Text(row.memoryBytes.formattedBytes())
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 90, ideal: 120, max: 140)
+
+            TableColumn("Last Active", value: \.lastAccessed) { row in
+                lastAccessedCell(for: row)
+            }
+            .width(min: 112, ideal: 140, max: 170)
+
+            TableColumn("Action") { row in
+                actionCell(for: row)
+            }
+            .width(min: 88, ideal: 100, max: 120)
+        }
+        .tableStyle(.inset)
+    }
+
+    private var terminalsTable: some View {
+        Table(sortedRows, selection: $selectedRowID, sortOrder: $sortOrder) {
+            TableColumn("Environment", value: \.processName) { row in
+                processCell(for: row)
+            }
+
+            TableColumn("Terminals", value: \.terminalSessions) { row in
+                Text("\(row.terminalSessions)")
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 74, ideal: 96, max: 116)
+
+            TableColumn("Running Panes", value: \.runningPanes) { row in
+                Text("\(row.runningPanes)")
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 96, ideal: 120, max: 138)
+
+            TableColumn("Live Panes", value: \.livePanes) { row in
+                Text("\(row.livePanes)")
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 84, ideal: 106, max: 126)
+
+            TableColumn("State", value: \.terminalStateSortOrder) { row in
+                terminalStateCell(for: row)
+            }
+            .width(min: 96, ideal: 110, max: 128)
+
+            TableColumn("% CPU", value: \.cpuPercent) { row in
+                Text(row.cpuPercent, format: .number.precision(.fractionLength(1)))
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 70, ideal: 90, max: 110)
+
+            TableColumn("Action") { row in
+                actionCell(for: row)
+            }
+            .width(min: 88, ideal: 100, max: 120)
+        }
+        .tableStyle(.inset)
+    }
+
+    private var filesTable: some View {
+        Table(sortedRows, selection: $selectedRowID, sortOrder: $sortOrder) {
+            TableColumn("Environment", value: \.processName) { row in
+                processCell(for: row)
+            }
+
+            TableColumn("Files", value: \.fileSessions) { row in
+                Text("\(row.fileSessions)")
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 56, ideal: 72, max: 88)
+
+            TableColumn("Path", value: \.path) { row in
+                Text(row.path)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .width(min: 200, ideal: 320, max: 460)
+
+            TableColumn("Last Active", value: \.lastAccessed) { row in
+                lastAccessedCell(for: row)
+            }
+            .width(min: 112, ideal: 140, max: 170)
+
+            TableColumn("Action") { row in
+                actionCell(for: row)
+            }
+            .width(min: 88, ideal: 100, max: 120)
+        }
+        .tableStyle(.inset)
+    }
+
+    private var browsersTable: some View {
+        Table(sortedRows, selection: $selectedRowID, sortOrder: $sortOrder) {
+            TableColumn("Environment", value: \.processName) { row in
+                processCell(for: row)
+            }
+
+            TableColumn("Browsers", value: \.browserSessions) { row in
+                Text("\(row.browserSessions)")
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 74, ideal: 96, max: 116)
+
+            TableColumn("% CPU", value: \.cpuPercent) { row in
+                Text(row.cpuPercent, format: .number.precision(.fractionLength(1)))
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 70, ideal: 90, max: 110)
+
+            TableColumn("Memory", value: \.memoryBytes) { row in
+                Text(row.memoryBytes.formattedBytes())
+                    .font(.system(.body, design: .monospaced))
+            }
+            .width(min: 90, ideal: 120, max: 140)
+
+            TableColumn("Energy", value: \.energyImpact) { row in
+                energyCell(for: row)
+            }
+            .width(min: 80, ideal: 90, max: 110)
+
+            TableColumn("Action") { row in
+                actionCell(for: row)
+            }
+            .width(min: 88, ideal: 100, max: 120)
+        }
+        .tableStyle(.inset)
     }
 
     private var footer: some View {
@@ -363,7 +478,7 @@ struct ActiveWorktreesView: View {
                         .foregroundStyle(.secondary)
                     Sparkline(
                         history: metrics.cpuHistory.map { $0 / 100.0 },
-                        lineColor: selectedMode == .cpu ? .green : .secondary
+                        lineColor: selectedMode.tintColor
                     )
                     .frame(height: 26)
                 }
@@ -395,30 +510,15 @@ struct ActiveWorktreesView: View {
         .pickerStyle(.menu)
     }
 
-    @ViewBuilder
     private var monitorModePicker: some View {
-        let picker = Picker("Mode", selection: $selectedMode) {
+        Picker("Mode", selection: $selectedMode) {
             ForEach(MonitorMode.allCases) { mode in
                 Text(mode.title).tag(mode)
             }
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .frame(width: 320)
-
-        if #available(macOS 26.0, *) {
-            let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
-            picker
-                .padding(.horizontal, 2)
-                .padding(.vertical, 1)
-                .background(
-                    shape
-                        .fill(.white.opacity(0.001))
-                        .glassEffect(.regular, in: shape)
-                )
-        } else {
-            picker
-        }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     @ViewBuilder
@@ -451,6 +551,13 @@ struct ActiveWorktreesView: View {
         Text(String(format: "%.0f", row.energyImpact))
             .font(.system(.body, design: .monospaced))
             .foregroundStyle(energyColor(for: row.energyImpact))
+    }
+
+    private func lastAccessedCell(for row: MonitorRow) -> some View {
+        Text(row.lastAccessed, format: .dateTime.month(.abbreviated).day().hour().minute())
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
     }
 
     private func terminalStateCell(for row: MonitorRow) -> some View {
@@ -527,25 +634,15 @@ struct ActiveWorktreesView: View {
     }
 
     private var emptyState: some View {
-        Group {
-            if #available(macOS 14.0, *) {
-                ContentUnavailableView(
-                    "No active environments",
-                    systemImage: "waveform.path.ecg",
-                    description: Text("Open chat, terminal, browser, or files in an environment to monitor it here.")
-                )
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "waveform.path.ecg")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.secondary)
-                    Text("No active environments")
-                        .font(.headline)
-                    Text("Open chat, terminal, browser, or files in an environment to monitor it here.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
+        VStack(spacing: 10) {
+            Image(systemName: "tray")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+            Text("Nothing to show")
+                .font(.title3.weight(.semibold))
+            Text("\(selectedMode.title) has no active environments.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -587,14 +684,40 @@ struct ActiveWorktreesView: View {
 
     private func updateSortOrder(for mode: MonitorMode) {
         switch mode {
-        case .cpu:
-            sortOrder = [KeyPathComparator(\.cpuPercent, order: .reverse)]
-        case .memory:
-            sortOrder = [KeyPathComparator(\.memoryBytes, order: .reverse)]
-        case .energy:
-            sortOrder = [KeyPathComparator(\.energyImpact, order: .reverse)]
-        case .sessions:
-            sortOrder = [KeyPathComparator(\.totalSessions, order: .reverse)]
+        case .chats:
+            sortOrder = [
+                KeyPathComparator(\.chatSessions, order: .reverse),
+                KeyPathComparator(\.lastAccessed, order: .reverse)
+            ]
+        case .terminals:
+            sortOrder = [
+                KeyPathComparator(\.terminalSessions, order: .reverse),
+                KeyPathComparator(\.runningPanes, order: .reverse),
+                KeyPathComparator(\.cpuPercent, order: .reverse)
+            ]
+        case .files:
+            sortOrder = [
+                KeyPathComparator(\.fileSessions, order: .reverse),
+                KeyPathComparator(\.lastAccessed, order: .reverse)
+            ]
+        case .browsers:
+            sortOrder = [
+                KeyPathComparator(\.browserSessions, order: .reverse),
+                KeyPathComparator(\.energyImpact, order: .reverse)
+            ]
+        }
+    }
+
+    private func rowMatchesSelectedMode(_ row: MonitorRow) -> Bool {
+        switch selectedMode {
+        case .chats:
+            return row.chatSessions > 0
+        case .terminals:
+            return row.terminalSessions > 0
+        case .files:
+            return row.fileSessions > 0
+        case .browsers:
+            return row.browserSessions > 0
         }
     }
 
@@ -789,19 +912,28 @@ struct ActiveWorktreesView: View {
 }
 
 private enum MonitorMode: String, CaseIterable, Identifiable {
-    case cpu
-    case memory
-    case energy
-    case sessions
+    case chats
+    case terminals
+    case files
+    case browsers
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .cpu: return "CPU"
-        case .memory: return "Memory"
-        case .energy: return "Energy"
-        case .sessions: return "Sessions"
+        case .chats: return "Chats"
+        case .terminals: return "Terminals"
+        case .files: return "Files"
+        case .browsers: return "Browsers"
+        }
+    }
+
+    var tintColor: Color {
+        switch self {
+        case .chats: return .blue
+        case .terminals: return .green
+        case .files: return .orange
+        case .browsers: return .teal
         }
     }
 }
@@ -859,6 +991,21 @@ private struct MonitorRow: Identifiable {
     let counts: SessionCounts
     let runtime: TerminalRuntimeSnapshot
     let lastAccessed: Date
+
+    var chatSessions: Int { counts.chats }
+    var terminalSessions: Int { counts.terminals }
+    var fileSessions: Int { counts.files }
+    var browserSessions: Int { counts.browsers }
+    var runningPanes: Int { runtime.runningPanes }
+    var livePanes: Int { runtime.livePanes }
+    var terminalStateSortOrder: Int {
+        switch terminalStatus {
+        case .running: return 3
+        case .ready: return 2
+        case .detached: return 1
+        case .none: return 0
+        }
+    }
 
     var terminalStatus: TerminalState {
         if counts.terminals == 0 {
