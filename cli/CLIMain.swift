@@ -477,77 +477,105 @@ private extension AizenCLI {
         let context = store.container.viewContext
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
 
-        let sessions = try fetchActiveSessions(in: context, workspaceFilter: parsed.options["workspace"])
-
-        guard !sessions.isEmpty else {
-            throw CLIError.noActiveSessions
-        }
-
         let selectedSession: SessionInfo
 
-        if parsed.positionals.isEmpty {
-            // Interactive picker mode
-            guard isTTY() else {
-                throw CLIError.invalidArguments("Interactive mode requires a terminal. Specify a project name.")
+        if parsed.flags.contains("cross-project") {
+            guard parsed.positionals.isEmpty else {
+                throw CLIError.invalidArguments("attach --cross-project does not accept a project argument")
             }
 
-            let picker = InteractivePicker(items: sessions, style: style)
-            guard let selected = try picker.run() else {
-                throw CLIError.cancelled
-            }
-            selectedSession = selected
-        } else {
-            // Direct attach by project name
-            let projectName = parsed.positionals[0].lowercased()
-            let worktreeFilter = parsed.options["worktree"]?.lowercased()
+            let workspace = try selectWorkspace(
+                in: context,
+                preferredName: parsed.options["workspace"],
+                defaultWorkspaceId: readDefaultSetting(key: "defaultWorkspaceId")
+            )
+            let workspaceName = workspace.name ?? ""
+            let sessions = try fetchActiveSessions(
+                in: context,
+                workspaceFilter: workspaceName,
+                crossProjectOnly: true
+            )
 
-            var matches = sessions.filter { $0.repositoryName.lowercased() == projectName }
-
-            if matches.isEmpty {
-                // Try partial match
-                matches = sessions.filter { $0.repositoryName.lowercased().contains(projectName) }
-            }
-
-            if matches.isEmpty {
-                throw CLIError.sessionNotFound(parsed.positionals[0])
+            guard !sessions.isEmpty else {
+                throw CLIError.sessionNotFound("Cross-Project in workspace '\(workspaceName)'")
             }
 
-            if let worktreeFilter = worktreeFilter {
-                matches = matches.filter { $0.worktreeBranch.lowercased() == worktreeFilter }
-                if matches.isEmpty {
-                    throw CLIError.sessionNotFound("\(parsed.positionals[0]) / \(worktreeFilter)")
-                }
-            }
-
-            if matches.count > 1 {
-                // Multiple matches - use interactive picker
+            if sessions.count == 1 {
+                selectedSession = sessions[0]
+            } else {
                 guard isTTY() else {
-                    let names = matches.map { $0.displayName }.joined(separator: ", ")
-                    throw CLIError.invalidArguments("Multiple sessions match '\(projectName)': \(names). Use --workspace or --worktree to filter.")
+                    throw CLIError.invalidArguments("Multiple cross-project sessions found. Run in a terminal to pick one.")
+                }
+                let picker = InteractivePicker(items: sessions, style: style)
+                guard let selected = try picker.run() else {
+                    throw CLIError.cancelled
+                }
+                selectedSession = selected
+            }
+        } else {
+            let sessions = try fetchActiveSessions(in: context, workspaceFilter: parsed.options["workspace"])
+
+            guard !sessions.isEmpty else {
+                throw CLIError.noActiveSessions
+            }
+
+            if parsed.positionals.isEmpty {
+                guard isTTY() else {
+                    throw CLIError.invalidArguments("Interactive mode requires a terminal. Specify a project name.")
                 }
 
-                print(style.warning("Multiple sessions match '\(projectName)':"))
-                let picker = InteractivePicker(items: matches, style: style)
+                let picker = InteractivePicker(items: sessions, style: style)
                 guard let selected = try picker.run() else {
                     throw CLIError.cancelled
                 }
                 selectedSession = selected
             } else {
-                selectedSession = matches[0]
+                let projectName = parsed.positionals[0].lowercased()
+                let worktreeFilter = parsed.options["worktree"]?.lowercased()
+
+                var matches = sessions.filter { $0.repositoryName.lowercased() == projectName }
+
+                if matches.isEmpty {
+                    matches = sessions.filter { $0.repositoryName.lowercased().contains(projectName) }
+                }
+
+                if matches.isEmpty {
+                    throw CLIError.sessionNotFound(parsed.positionals[0])
+                }
+
+                if let worktreeFilter = worktreeFilter {
+                    matches = matches.filter { $0.worktreeBranch.lowercased() == worktreeFilter }
+                    if matches.isEmpty {
+                        throw CLIError.sessionNotFound("\(parsed.positionals[0]) / \(worktreeFilter)")
+                    }
+                }
+
+                if matches.count > 1 {
+                    guard isTTY() else {
+                        let names = matches.map { $0.displayName }.joined(separator: ", ")
+                        throw CLIError.invalidArguments("Multiple sessions match '\(projectName)': \(names). Use --workspace or --worktree to filter.")
+                    }
+
+                    print(style.warning("Multiple sessions match '\(projectName)':"))
+                    let picker = InteractivePicker(items: matches, style: style)
+                    guard let selected = try picker.run() else {
+                        throw CLIError.cancelled
+                    }
+                    selectedSession = selected
+                } else {
+                    selectedSession = matches[0]
+                }
             }
         }
 
-        // Determine which pane to attach to
         let paneId: String
 
         if let paneOption = parsed.options["pane"] {
-            // User specified a pane by index (1-based)
             guard let paneIndex = Int(paneOption), paneIndex >= 1, paneIndex <= selectedSession.activePaneIds.count else {
                 throw CLIError.invalidArguments("Invalid pane index '\(paneOption)'. Valid range: 1-\(selectedSession.activePaneIds.count)")
             }
             paneId = selectedSession.activePaneIds[paneIndex - 1]
         } else if selectedSession.paneCount > 1 {
-            // Multiple panes - show picker
             guard isTTY() else {
                 throw CLIError.invalidArguments("Multiple panes available. Use --pane <n> to specify which pane (1-\(selectedSession.paneCount))")
             }
@@ -563,7 +591,6 @@ private extension AizenCLI {
             }
             paneId = selected
         } else {
-            // Single pane - use it directly
             guard let focused = selectedSession.focusedPaneId else {
                 throw CLIError.sessionNotFound(selectedSession.displayName)
             }
@@ -574,7 +601,6 @@ private extension AizenCLI {
             throw CLIError.sessionNotFound(selectedSession.displayName)
         }
 
-        // Verify we have a terminal before attempting attach
         guard isTTY() else {
             throw CLIError.invalidArguments("tmux attach requires a terminal")
         }
@@ -582,6 +608,7 @@ private extension AizenCLI {
         print(style.success("Attaching to: \(selectedSession.displayName)"))
         try tmuxAttach(paneId: paneId)
     }
+
 
     static func handleSessions(_ args: [String]) throws {
         let parsed = try parseArguments(args)
@@ -594,7 +621,11 @@ private extension AizenCLI {
         let context = store.container.viewContext
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
 
-        let sessions = try fetchActiveSessions(in: context, workspaceFilter: parsed.options["workspace"])
+        let sessions = try fetchActiveSessions(
+            in: context,
+            workspaceFilter: parsed.options["workspace"],
+            crossProjectOnly: parsed.flags.contains("cross-project")
+        )
 
         if parsed.flags.contains("json") {
             let payload = SessionListPayload(
@@ -620,7 +651,10 @@ private extension AizenCLI {
             return
         }
 
-        printSectionTitle("Active Sessions (\(sessions.count))", style: style)
+        let sessionTitle = parsed.flags.contains("cross-project")
+            ? "Active Cross-Project Sessions (\(sessions.count))"
+            : "Active Sessions (\(sessions.count))"
+        printSectionTitle(sessionTitle, style: style)
         let headers = ["Workspace", "Repository", "Worktree", "Panes"]
         var rows: [[String]] = []
         for session in sessions {
@@ -648,63 +682,73 @@ private extension AizenCLI {
         let store = try CLIStore()
         let context = store.container.viewContext
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
+        let manager = CLIRepositoryManager(context: context)
 
-        // Resolve path
-        let targetPath: String
-        if let pathArg = parsed.positionals.first {
-            targetPath = normalizePath(pathArg)
-        } else {
-            targetPath = FileManager.default.currentDirectoryPath
-        }
-
-        guard FileManager.default.fileExists(atPath: targetPath) else {
-            throw CLIError.pathNotFound(targetPath)
-        }
-
-        // Find or create worktree
         let worktree: Worktree
-        if let existingWorktree = findWorktree(for: targetPath, in: context) {
-            worktree = existingWorktree
-        } else {
-            // Path not tracked - need to add it
-            guard await GitUtils.isGitRepository(at: targetPath) else {
-                throw CLIError.notGitRepository(targetPath)
-            }
+        var fallbackPath = FileManager.default.currentDirectoryPath
 
-            guard isTTY() else {
-                throw CLIError.invalidArguments("Repository not tracked. Run 'aizen add \(targetPath)' first.")
+        if parsed.flags.contains("cross-project") {
+            guard parsed.positionals.isEmpty else {
+                throw CLIError.invalidArguments("terminal --cross-project does not accept a path argument")
             }
-
-            print(style.warning("Repository not tracked in any workspace."))
 
             let workspace = try selectWorkspace(
                 in: context,
                 preferredName: parsed.options["workspace"],
                 defaultWorkspaceId: readDefaultSetting(key: "defaultWorkspaceId")
             )
-
-            let manager = CLIRepositoryManager(context: context)
-            let repository = try await manager.addExistingRepository(path: targetPath, workspace: workspace)
-            print(style.success("Added repository: \(repository.name ?? "")"))
-
-            // Get the primary worktree
-            guard let primaryWorktree = (repository.worktrees as? Set<Worktree>)?.first(where: { $0.isPrimary })
-                    ?? (repository.worktrees as? Set<Worktree>)?.first else {
-                throw CLIError.ioError("Failed to find worktree for repository")
+            worktree = try manager.ensureCrossProjectWorktree(for: workspace)
+            fallbackPath = worktree.path ?? fallbackPath
+        } else {
+            let targetPath: String
+            if let pathArg = parsed.positionals.first {
+                targetPath = normalizePath(pathArg)
+            } else {
+                targetPath = FileManager.default.currentDirectoryPath
             }
-            worktree = primaryWorktree
+            fallbackPath = targetPath
+
+            guard FileManager.default.fileExists(atPath: targetPath) else {
+                throw CLIError.pathNotFound(targetPath)
+            }
+
+            if let existingWorktree = findWorktree(for: targetPath, in: context) {
+                worktree = existingWorktree
+            } else {
+                guard await GitUtils.isGitRepository(at: targetPath) else {
+                    throw CLIError.notGitRepository(targetPath)
+                }
+
+                guard isTTY() else {
+                    throw CLIError.invalidArguments("Repository not tracked. Run 'aizen add \(targetPath)' first.")
+                }
+
+                print(style.warning("Repository not tracked in any workspace."))
+
+                let workspace = try selectWorkspace(
+                    in: context,
+                    preferredName: parsed.options["workspace"],
+                    defaultWorkspaceId: readDefaultSetting(key: "defaultWorkspaceId")
+                )
+
+                let repository = try await manager.addExistingRepository(path: targetPath, workspace: workspace)
+                print(style.success("Added repository: \(repository.name ?? "")"))
+
+                guard let primaryWorktree = (repository.worktrees as? Set<Worktree>)?.first(where: { $0.isPrimary })
+                        ?? (repository.worktrees as? Set<Worktree>)?.first else {
+                    throw CLIError.ioError("Failed to find worktree for repository")
+                }
+                worktree = primaryWorktree
+            }
         }
 
-        // Create terminal session
         let paneId = UUID().uuidString
-        let worktreePath = worktree.path ?? targetPath
+        let worktreePath = worktree.path ?? fallbackPath
         let command = parsed.options["command"]
         let sessionName = parsed.options["name"]
 
-        // Create tmux session
         try tmuxCreateSession(paneId: paneId, workingDirectory: worktreePath, command: command)
 
-        // Create Core Data record
         let terminalSession = TerminalSession(context: context)
         terminalSession.id = UUID()
         terminalSession.title = sessionName
@@ -726,10 +770,19 @@ private extension AizenCLI {
             print(style.success("Created terminal: \(repoName) / \(branch)"))
             print(style.label("Session: aizen-\(paneId)"))
             print("")
-            print("To attach: \(style.header("aizen attach \(repoName)"))")
+            if parsed.flags.contains("cross-project"),
+               let workspaceName = worktree.repository?.workspace?.name,
+               !workspaceName.isEmpty {
+                print("To attach: \(style.header("aizen attach --cross-project --workspace \(workspaceName)"))")
+            } else if parsed.flags.contains("cross-project") {
+                print("To attach: \(style.header("aizen attach --cross-project"))")
+            } else {
+                print("To attach: \(style.header("aizen attach \(repoName)"))")
+            }
             print("Or open Aizen to see the terminal tab.")
         }
     }
+
 }
 
 private extension AizenCLI {
@@ -767,7 +820,7 @@ private extension AizenCLI {
 }
 
 private extension AizenCLI {
-    static func fetchActiveSessions(in context: NSManagedObjectContext, workspaceFilter: String?) throws -> [SessionInfo] {
+    static func fetchActiveSessions(in context: NSManagedObjectContext, workspaceFilter: String?, crossProjectOnly: Bool = false) throws -> [SessionInfo] {
         let request: NSFetchRequest<TerminalSession> = TerminalSession.fetchRequest()
         request.sortDescriptors = [NSSortDescriptor(keyPath: \TerminalSession.createdAt, ascending: false)]
 
@@ -788,10 +841,14 @@ private extension AizenCLI {
             let workspaceName = workspace.name ?? "Unknown"
             let repositoryName = repository.name ?? "Unknown"
             let worktreeBranch = worktree.branch ?? "unknown"
-
             // Apply workspace filter
             if let filter = workspaceFilter?.lowercased(),
                workspaceName.lowercased() != filter {
+                continue
+            }
+
+            let isCrossProject = isCrossProjectRepository(repository)
+            if crossProjectOnly && !isCrossProject {
                 continue
             }
 
@@ -819,7 +876,8 @@ private extension AizenCLI {
                 sessionId: sessionId,
                 worktreeId: worktreeId,
                 repositoryId: repositoryId,
-                workspaceId: workspaceId
+                workspaceId: workspaceId,
+                isCrossProject: isCrossProject
             ))
         }
 
@@ -993,6 +1051,10 @@ private extension AizenCLI {
         throw CLIError.invalidArguments("Invalid workspace selection")
     }
 
+    static func isCrossProjectRepository(_ repository: Repository) -> Bool {
+        repository.note == CLIRepositoryManager.crossProjectRepositoryMarker
+    }
+
     static func fetchRepositories(in context: NSManagedObjectContext, filters: RepositoryFilters) throws -> [Repository] {
         let request: NSFetchRequest<Repository> = Repository.fetchRequest()
         request.sortDescriptors = [NSSortDescriptor(keyPath: \Repository.name, ascending: true)]
@@ -1016,6 +1078,10 @@ private extension AizenCLI {
         }
 
         return all.filter { repo in
+            if isCrossProjectRepository(repo) {
+                return false
+            }
+
             let workspaceName = repo.workspace?.name?.lowercased() ?? ""
             if !include.isEmpty && !include.contains(workspaceName) {
                 return false
@@ -1046,14 +1112,16 @@ private extension AizenCLI {
         worktreeRequest.predicate = NSPredicate(format: "path == %@", normalized)
         worktreeRequest.fetchLimit = 1
         if let worktree = try? context.fetch(worktreeRequest).first,
-           let repository = worktree.repository {
+           let repository = worktree.repository,
+           !isCrossProjectRepository(repository) {
             return repository
         }
 
         let repoRequest: NSFetchRequest<Repository> = Repository.fetchRequest()
         repoRequest.predicate = NSPredicate(format: "path == %@", normalized)
         repoRequest.fetchLimit = 1
-        if let repo = try? context.fetch(repoRequest).first {
+        if let repo = try? context.fetch(repoRequest).first,
+           !isCrossProjectRepository(repo) {
             return repo
         }
 
@@ -1065,6 +1133,10 @@ private extension AizenCLI {
         var bestMatch: Repository?
         var bestLength = 0
         for repo in allRepos {
+            if isCrossProjectRepository(repo) {
+                continue
+            }
+
             guard let repoPath = repo.path else { continue }
             if normalized == repoPath || normalized.hasPrefix(repoPath + "/") {
                 if repoPath.count > bestLength {
@@ -1137,6 +1209,7 @@ private extension AizenCLI {
 
         for worktree in worktrees {
             guard let repo = worktree.repository else { continue }
+            if isCrossProjectRepository(repo) { continue }
             let id = repo.objectID
             if seen.contains(id) { continue }
             seen.insert(id)
@@ -1228,7 +1301,7 @@ private extension AizenCLI {
         for workspace in workspaces {
             let name = workspace.name ?? ""
             let color = workspace.colorHex ?? "-"
-            let repoCount = String((workspace.repositories as? Set<Repository>)?.count ?? 0)
+            let repoCount = String(((workspace.repositories as? Set<Repository>)?.filter { !isCrossProjectRepository($0) }.count) ?? 0)
             let order = String(workspace.order)
             rows.append([name, color, repoCount, order])
         }
@@ -1288,7 +1361,7 @@ private extension AizenCLI {
         WorkspaceOutput(
             name: workspace.name ?? "",
             color: workspace.colorHex,
-            repositories: (workspace.repositories as? Set<Repository>)?.count ?? 0,
+            repositories: ((workspace.repositories as? Set<Repository>)?.filter { !isCrossProjectRepository($0) }.count) ?? 0,
             order: Int(workspace.order)
         )
     }
@@ -1491,15 +1564,17 @@ Usage:
     static func attachHelpText() -> String {
         return """
 Usage:
-  aizen attach                              Interactive session picker
-  aizen attach <project>                    Attach to project's terminal
-  aizen attach <project> --workspace <ws>   Filter by workspace
-  aizen attach <project> --worktree <branch>  Filter by worktree
-  aizen attach <project> --pane <n>         Attach to specific pane (1-based)
+  aizen attach                                  Interactive session picker
+  aizen attach <project>                        Attach to project's terminal
+  aizen attach <project> --workspace <ws>       Filter by workspace
+  aizen attach <project> --worktree <branch>    Filter by worktree
+  aizen attach <project> --pane <n>             Attach to specific pane (1-based)
+  aizen attach --cross-project --workspace <ws> Attach to workspace cross-project session
 
 Options:
   -w, --workspace <name>    Filter sessions by workspace
   --worktree <branch>       Filter sessions by worktree branch
+  --cross-project           Target cross-project sessions only
   --pane <n>                Attach to pane number n (1-based index)
   --no-color                Disable colored output
 
@@ -1509,13 +1584,15 @@ Use arrow keys or j/k to navigate, Enter to select, Esc to cancel.
 """
     }
 
+
     static func sessionsHelpText() -> String {
         return """
 Usage:
-  aizen sessions [--workspace <name>] [--json]
+  aizen sessions [--workspace <name>] [--cross-project] [--json]
 
 Options:
   -w, --workspace <name>    Filter sessions by workspace
+  --cross-project           Show only cross-project sessions
   --json                    Output JSON
   --no-color                Disable colored output
 
@@ -1523,23 +1600,27 @@ List all active terminal sessions with their tmux panes.
 """
     }
 
+
     static func terminalHelpText() -> String {
         return """
 Usage:
-  aizen terminal [path]                     Create detached terminal session
-  aizen terminal . --attach                 Create and attach
-  aizen terminal . -c "npm run dev"         Run command in session
-  aizen terminal . --name "Dev Server"      Custom tab name
+  aizen terminal [path]                                Create detached terminal session
+  aizen terminal . --attach                            Create and attach
+  aizen terminal . -c "npm run dev"                   Run command in session
+  aizen terminal . --name "Dev Server"                Custom tab name
+  aizen terminal --cross-project --workspace <name>    Create workspace cross-project session
 
 Options:
   -a, --attach              Attach to session after creating
   -c, --command <cmd>       Run command in the terminal
   --name <name>             Custom name for the terminal tab
-  -w, --workspace <name>    Workspace for untracked repos
+  -w, --workspace <name>    Workspace for untracked repos or cross-project
+  --cross-project           Create terminal in workspace cross-project root
   --no-color                Disable colored output
 
 Create a new terminal session that persists via tmux.
 The session will appear in Aizen when you open the app.
 """
     }
+
 }

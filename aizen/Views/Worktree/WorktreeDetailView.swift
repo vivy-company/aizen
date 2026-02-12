@@ -29,7 +29,6 @@ struct WorktreeDetailView: View {
     @AppStorage("showOpenInApp") private var showOpenInApp = true
     @AppStorage("showGitStatus") private var showGitStatus = true
     @AppStorage("showXcodeBuild") private var showXcodeBuild = true
-    @AppStorage("zenModeEnabled") private var zenModeEnabled = false
     @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
     @State private var selectedTab = "chat"
     @State private var lastOpenedApp: DetectedApp?
@@ -173,34 +172,7 @@ struct WorktreeDetailView: View {
         }
     }
 
-    @ToolbarContentBuilder
-    var leadingToolbarItems: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            HStack(spacing: 12) {
-                zenModeButton
-            }
-        }
-    }
     
-    @ViewBuilder
-    private var zenModeButton: some View {
-        let button = Button(action: {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                zenModeEnabled.toggle()
-            }
-        }) {
-            Label("Zen Mode", systemImage: zenModeEnabled ? "pip.enter" : "pip.exit")
-        }
-        .labelStyle(.iconOnly)
-        .help(zenModeEnabled ? "Show Environment List" : "Hide Environment List (Zen Mode)")
-        
-        if #available(macOS 14.0, *) {
-            button.symbolEffect(.bounce, value: zenModeEnabled)
-        } else {
-            button
-        }
-    }
-
     @ToolbarContentBuilder
     var trailingToolbarItems: some ToolbarContent {
         // Xcode build button (only if fully loaded and ready)
@@ -535,9 +507,7 @@ struct WorktreeDetailView: View {
             .onChange(of: terminalThemeName) { _, _ in
                 cachedTerminalBackgroundColor = getTerminalBackgroundColor()
             }
-            .toolbar {
-                leadingToolbarItems
-                
+            .toolbar {                
                 tabPickerToolbarItem
 
                 if shouldShowSessionToolbar {

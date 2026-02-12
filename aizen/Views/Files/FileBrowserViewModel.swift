@@ -160,15 +160,9 @@ class FileBrowserViewModel: ObservableObject {
     }
 
     func listDirectory(path: String) throws -> [FileItem] {
-        let url = URL(fileURLWithPath: path)
-        let contents = try FileManager.default.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: []  // Don't skip hidden files - we filter based on settings
-        )
+        let contents = try FileManager.default.contentsOfDirectory(atPath: path)
 
-        return contents.compactMap { fileURL -> FileItem? in
-            let name = fileURL.lastPathComponent
+        return contents.compactMap { name -> FileItem? in
             let isHidden = name.hasPrefix(".")
 
             // Skip hidden files if setting is off
@@ -176,8 +170,9 @@ class FileBrowserViewModel: ObservableObject {
                 return nil
             }
 
-            let isDir = (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-            let filePath = fileURL.path
+            let filePath = (path as NSString).appendingPathComponent(name)
+            let fileURL = URL(fileURLWithPath: filePath)
+            let isDir = isBrowsableDirectory(fileURL)
 
             // Get relative path for git status lookup
             let relativePath = getRelativePath(for: filePath)
@@ -202,6 +197,26 @@ class FileBrowserViewModel: ObservableObject {
             }
             return item1.name.localizedCaseInsensitiveCompare(item2.name) == .orderedAscending
         }
+    }
+
+    private func isBrowsableDirectory(_ url: URL) -> Bool {
+        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]) else {
+            return false
+        }
+
+        if values.isDirectory == true {
+            return true
+        }
+
+        // URL.isDirectoryKey is false for symlinked directories; resolve via fileExists.
+        if values.isSymbolicLink == true {
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) {
+                return isDirectory.boolValue
+            }
+        }
+
+        return false
     }
 
     private func getRelativePath(for absolutePath: String) -> String {

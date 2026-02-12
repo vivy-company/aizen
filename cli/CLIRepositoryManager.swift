@@ -2,6 +2,8 @@ import Foundation
 import CoreData
 
 final class CLIRepositoryManager {
+    static let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
+
     private let context: NSManagedObjectContext
     private let statusService = GitStatusService()
     private let branchService = GitBranchService()
@@ -11,6 +13,121 @@ final class CLIRepositoryManager {
 
     init(context: NSManagedObjectContext) {
         self.context = context
+    }
+
+    private func isCrossProjectRepository(_ repository: Repository) -> Bool {
+        repository.note == Self.crossProjectRepositoryMarker
+    }
+
+    private func visibleRepositories(in workspace: Workspace) -> [Repository] {
+        let repositories = (workspace.repositories as? Set<Repository>) ?? []
+        return repositories
+            .filter { !isCrossProjectRepository($0) }
+            .sorted { ($0.name ?? "") < ($1.name ?? "") }
+    }
+
+    private func crossProjectRootURL(for workspace: Workspace) throws -> URL {
+        guard let workspaceId = workspace.id else {
+            throw CLIError.invalidArguments("Workspace identifier is missing")
+        }
+
+        let workspaceRequest: NSFetchRequest<Workspace> = Workspace.fetchRequest()
+        let allWorkspaces = try context.fetch(workspaceRequest)
+        let candidates = allWorkspaces.compactMap { candidate -> WorkspacePathCandidate? in
+            guard let candidateID = candidate.id else {
+                return nil
+            }
+            return WorkspacePathCandidate(id: candidateID, name: candidate.name)
+        }
+
+        return CrossProjectWorkspacePath.rootURL(
+            for: workspaceId,
+            workspaceName: workspace.name,
+            allWorkspaces: candidates
+        )
+    }
+
+    private func prepareCrossProjectDirectory(for workspace: Workspace) throws -> URL {
+        let fileManager = FileManager.default
+        let rootURL = try crossProjectRootURL(for: workspace)
+
+        try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        let existingItems = try fileManager.contentsOfDirectory(at: rootURL, includingPropertiesForKeys: nil)
+        for itemURL in existingItems {
+            try? fileManager.removeItem(at: itemURL)
+        }
+
+        var usedNames = Set<String>()
+        for repository in visibleRepositories(in: workspace) {
+            guard let sourcePath = repository.path, fileManager.fileExists(atPath: sourcePath) else {
+                continue
+            }
+
+            let fallbackName = URL(fileURLWithPath: sourcePath).lastPathComponent
+            let rawName = (repository.name?.isEmpty == false ? repository.name! : fallbackName)
+            let sanitizedName = rawName
+                .replacingOccurrences(of: "/", with: "-")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let baseName = sanitizedName.isEmpty ? "project" : sanitizedName
+
+            var linkName = baseName
+            var suffix = 2
+            while usedNames.contains(linkName) {
+                linkName = "\(baseName)-\(suffix)"
+                suffix += 1
+            }
+            usedNames.insert(linkName)
+
+            let linkURL = rootURL.appendingPathComponent(linkName)
+            if fileManager.fileExists(atPath: linkURL.path) {
+                try? fileManager.removeItem(at: linkURL)
+            }
+
+            try fileManager.createSymbolicLink(atPath: linkURL.path, withDestinationPath: sourcePath)
+        }
+
+        return rootURL
+    }
+
+    func ensureCrossProjectWorktree(for workspace: Workspace) throws -> Worktree {
+        let rootURL = try prepareCrossProjectDirectory(for: workspace)
+
+        let repositoryRequest: NSFetchRequest<Repository> = Repository.fetchRequest()
+        repositoryRequest.fetchLimit = 1
+        repositoryRequest.predicate = NSPredicate(
+            format: "workspace == %@ AND note == %@",
+            workspace,
+            Self.crossProjectRepositoryMarker
+        )
+
+        let repository = try context.fetch(repositoryRequest).first ?? Repository(context: context)
+        if repository.id == nil {
+            repository.id = UUID()
+        }
+        repository.name = "Cross-Project"
+        repository.path = rootURL.path
+        repository.note = Self.crossProjectRepositoryMarker
+        repository.status = "active"
+        repository.workspace = workspace
+        repository.lastUpdated = Date()
+
+        let existingWorktrees = (repository.worktrees as? Set<Worktree>) ?? []
+        let worktree = existingWorktrees.first(where: { $0.isPrimary }) ?? existingWorktrees.first ?? Worktree(context: context)
+        if worktree.id == nil {
+            worktree.id = UUID()
+        }
+        worktree.path = rootURL.path
+        worktree.branch = "workspace"
+        worktree.isPrimary = true
+        worktree.repository = repository
+        worktree.lastAccessed = Date()
+
+        if context.hasChanges {
+            try context.save()
+        }
+
+        return worktree
     }
 
     func createWorkspace(name: String, colorHex: String? = nil) throws -> Workspace {

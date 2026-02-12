@@ -14,12 +14,14 @@ struct WorkspaceSidebarView: View {
     private let logger = Logger.workspace
     let workspaces: [Workspace]
     @Binding var selectedWorkspace: Workspace?
+    @Binding var isCrossProjectSelected: Bool
     @Binding var selectedRepository: Repository?
     @Binding var selectedWorktree: Worktree?
     @Binding var searchText: String
     @Binding var showingAddRepository: Bool
 
     @ObservedObject var repositoryManager: RepositoryManager
+    @Environment(\.controlActiveState) private var controlActiveState
     @StateObject private var licenseManager = LicenseManager.shared
     @State private var showingWorkspaceSheet = false
     @State private var showingWorkspaceSwitcher = false
@@ -45,6 +47,11 @@ struct WorkspaceSidebarView: View {
     }
 
     private let refreshInterval: TimeInterval = 30.0
+    private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
+
+    private func isCrossProjectRepository(_ repository: Repository) -> Bool {
+        repository.note == crossProjectRepositoryMarker
+    }
 
     private func colorFromHex(_ hex: String) -> Color {
         var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -65,7 +72,7 @@ struct WorkspaceSidebarView: View {
         let repos = (workspace.repositories as? Set<Repository>) ?? []
 
         // Filter out deleted Core Data objects
-        var validRepos = repos.filter { !$0.isDeleted }
+        var validRepos = repos.filter { !$0.isDeleted && !isCrossProjectRepository($0) }
 
         // Apply status filter
         if !selectedStatusFilters.isEmpty && selectedStatusFilters.count < ItemStatus.allCases.count {
@@ -102,6 +109,16 @@ struct WorkspaceSidebarView: View {
 
     private var repositoryFiltersVisible: Bool {
         showingRepositoryFilters
+    }
+
+    private var selectedForegroundColor: Color {
+        controlActiveState == .key ? .accentColor : .accentColor.opacity(0.78)
+    }
+
+    private var selectionFillColor: Color {
+        let base = NSColor.unemphasizedSelectedContentBackgroundColor
+        let alpha: Double = controlActiveState == .key ? 0.26 : 0.18
+        return Color(nsColor: base).opacity(alpha)
     }
 
     private func updateRepositoryFilters(_ filters: Set<ItemStatus>) {
@@ -280,6 +297,65 @@ struct WorkspaceSidebarView: View {
         .buttonStyle(.plain)
     }
 
+    
+    
+    @ViewBuilder
+    private var crossProjectRow: some View {
+        Button {
+            isCrossProjectSelected = true
+            selectedRepository = nil
+            selectedWorktree = nil
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "square.stack.3d.up.fill")
+                    .foregroundStyle(isCrossProjectSelected ? selectedForegroundColor : .secondary)
+                    .imageScale(.medium)
+                    .frame(width: 18, height: 18)
+
+                Text("Cross-Project")
+                    .font(.body)
+                    .foregroundStyle(isCrossProjectSelected ? selectedForegroundColor : Color.primary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+            }
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
+            .padding(.vertical, 8)
+            .background(
+                Group {
+                    if isCrossProjectSelected {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(selectionFillColor)
+                    }
+                }
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(selectedWorkspace == nil)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    
+    
+    @ViewBuilder
+    private var projectsSectionTitle: some View {
+        if selectedWorkspace != nil {
+            HStack(spacing: 8) {
+                Text("Projects")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                Spacer(minLength: 8)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 2)
+        }
+    }
+
     private func startPeriodicRefresh() {
         // Cancel any existing refresh task
         refreshTask?.cancel()
@@ -361,7 +437,6 @@ struct WorkspaceSidebarView: View {
                         .textCase(.uppercase)
 
                     Spacer(minLength: 8)
-
                     repositoryControls
                 }
                     .padding(.horizontal, 12)
@@ -388,6 +463,13 @@ struct WorkspaceSidebarView: View {
                     .padding(.bottom, 6)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
+
+            crossProjectRow
+                .padding(.horizontal, 12)
+                .padding(.top, 4)
+                .padding(.bottom, 4)
+
+            projectsSectionTitle
 
             // Repository list
             if filteredRepositories.isEmpty {
@@ -439,6 +521,7 @@ struct WorkspaceSidebarView: View {
                                 isSelected: selectedRepository?.id == repository.id,
                                 repositoryManager: repositoryManager,
                                 onSelect: {
+                                    isCrossProjectSelected = false
                                     selectedRepository = repository
                                     // Auto-select primary worktree if no worktree is selected
                                     if selectedWorktree == nil {
@@ -1252,6 +1335,7 @@ struct SupportSheet: View {
     WorkspaceSidebarView(
         workspaces: [],
         selectedWorkspace: .constant(nil),
+        isCrossProjectSelected: .constant(false),
         selectedRepository: .constant(nil),
         selectedWorktree: .constant(nil),
         searchText: .constant(""),

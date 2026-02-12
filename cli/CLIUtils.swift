@@ -68,8 +68,16 @@ func parseArguments(_ args: [String]) throws -> ParsedArguments {
                     throw CLIError.invalidArguments("Missing value for --worktree")
                 }
                 options["worktree"] = args[index]
+            case "--pane":
+                index += 1
+                guard index < args.count else {
+                    throw CLIError.invalidArguments("Missing value for --pane")
+                }
+                options["pane"] = args[index]
             case "-a", "--attach":
                 flags.insert("attach")
+            case "--cross-project":
+                flags.insert("cross-project")
             case "-c", "--command":
                 index += 1
                 guard index < args.count else {
@@ -212,6 +220,7 @@ struct SessionInfo {
     let worktreeId: UUID
     let repositoryId: UUID
     let workspaceId: UUID
+    let isCrossProject: Bool
 
     var displayName: String {
         "\(workspaceName) / \(repositoryName) / \(worktreeBranch)"
