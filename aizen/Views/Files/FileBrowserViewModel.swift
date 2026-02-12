@@ -232,6 +232,15 @@ class FileBrowserViewModel: ObservableObject {
     }
 
     func openFile(path: String) async {
+        let fileURL = URL(fileURLWithPath: path)
+
+        // Gracefully handle directory selections (e.g. symlinked repo folders in Cross-Project).
+        if isBrowsableDirectory(fileURL) {
+            currentPath = path
+            saveSession()
+            return
+        }
+
         // Check if already open
         if let existing = openFiles.first(where: { $0.path == path }) {
             selectedFileId = existing.id
@@ -239,7 +248,6 @@ class FileBrowserViewModel: ObservableObject {
         }
 
         // Load file content
-        let fileURL = URL(fileURLWithPath: path)
         let maxOpenFileBytes = 5 * 1024 * 1024
         if let size = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize,
            size > maxOpenFileBytes {

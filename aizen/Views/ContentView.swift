@@ -28,6 +28,7 @@ struct ContentView: View {
     @State private var showingAddRepository = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var previousWorktree: Worktree?
+    @State private var zenModeBeforeCrossProjectSelection: Bool?
     @AppStorage("hasShownOnboarding") private var hasShownOnboarding = false
     @State private var showingOnboarding = false
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
@@ -104,7 +105,8 @@ struct ContentView: View {
                     onWorktreeDeleted: { _ in
                         crossProjectWorktree = nil
                         prepareCrossProjectWorkspaceIfNeeded()
-                    }
+                    },
+                    showZenModeButton: false
                 )
                 .id(worktree.id)
             } else if isCrossProjectSelected {
@@ -120,7 +122,8 @@ struct ContentView: View {
                     gitChangesContext: $gitChangesContext,
                     onWorktreeDeleted: { nextWorktree in
                         selectedWorktree = nextWorktree
-                    }
+                    },
+                    showZenModeButton: true
                 )
                 .id(worktree.id)
             } else {
@@ -148,6 +151,10 @@ struct ContentView: View {
             OnboardingView()
         }
         .onAppear {
+            if isCrossProjectSelected && crossProjectWorktree == nil {
+                isCrossProjectSelected = false
+            }
+
             // Restore selected workspace from persistent storage
             if selectedWorkspace == nil {
                 if let workspaceId = selectedWorkspaceId,
@@ -197,10 +204,9 @@ struct ContentView: View {
             selectedWorkspaceId = newValue?.id?.uuidString
 
             if isCrossProjectSelected {
+                isCrossProjectSelected = false
                 selectedRepository = nil
                 selectedWorktree = nil
-                prepareCrossProjectWorkspaceIfNeeded()
-                return
             }
 
             // Restore last selected repository for this workspace
@@ -221,9 +227,9 @@ struct ContentView: View {
             selectedRepositoryId = newValue?.id?.uuidString
 
             if let repo = newValue, isCrossProjectRepository(repo) {
-                if !isCrossProjectSelected {
-                    selectedRepository = nil
-                }
+                selectedRepository = nil
+                isCrossProjectSelected = true
+                prepareCrossProjectWorkspaceIfNeeded()
                 return
             }
 
@@ -278,11 +284,24 @@ struct ContentView: View {
         }
         .onChange(of: isCrossProjectSelected) { _, newValue in
             if newValue {
+                if zenModeBeforeCrossProjectSelection == nil {
+                    zenModeBeforeCrossProjectSelection = zenModeEnabled
+                }
+                zenModeEnabled = true
                 selectedRepository = nil
                 selectedWorktree = nil
                 prepareCrossProjectWorkspaceIfNeeded()
             } else {
+                if let previousZenMode = zenModeBeforeCrossProjectSelection {
+                    zenModeEnabled = previousZenMode
+                    zenModeBeforeCrossProjectSelection = nil
+                }
                 crossProjectWorktree = nil
+            }
+        }
+        .onChange(of: zenModeEnabled) { _, newValue in
+            if isCrossProjectSelected && !newValue {
+                zenModeEnabled = true
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .commandPaletteShortcut)) { _ in
@@ -309,7 +328,7 @@ struct ContentView: View {
     }
 
     private func isCrossProjectRepository(_ repository: Repository) -> Bool {
-        repository.note == crossProjectRepositoryMarker
+        repository.isCrossProject || repository.note == crossProjectRepositoryMarker
     }
 
     private func visibleRepositories(in workspace: Workspace) -> [Repository] {
@@ -388,7 +407,11 @@ struct ContentView: View {
 
         let repositoryRequest: NSFetchRequest<Repository> = Repository.fetchRequest()
         repositoryRequest.fetchLimit = 1
-        repositoryRequest.predicate = NSPredicate(format: "workspace == %@ AND note == %@", workspace, crossProjectRepositoryMarker)
+        repositoryRequest.predicate = NSPredicate(
+            format: "workspace == %@ AND (isCrossProject == YES OR note == %@)",
+            workspace,
+            crossProjectRepositoryMarker
+        )
 
         let repository = try viewContext.fetch(repositoryRequest).first ?? Repository(context: viewContext)
         if repository.id == nil {
@@ -397,6 +420,7 @@ struct ContentView: View {
         repository.name = "Cross-Project"
         repository.path = rootURL.path
         repository.note = crossProjectRepositoryMarker
+        repository.isCrossProject = true
         repository.status = "active"
         repository.workspace = workspace
         repository.lastUpdated = Date()
@@ -466,8 +490,12 @@ struct ContentView: View {
             return
         }
 
+        let currentRepositoryId = selectedRepository?.id?.uuidString
+            ?? selectedWorktree?.repository?.id?.uuidString
+
         let controller = CommandPaletteWindowController(
             managedObjectContext: viewContext,
+            currentRepositoryId: currentRepositoryId,
             onNavigate: { workspaceId, repoId, worktreeId in
                 navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
             }

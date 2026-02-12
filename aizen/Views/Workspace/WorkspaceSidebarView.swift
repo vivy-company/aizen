@@ -50,7 +50,7 @@ struct WorkspaceSidebarView: View {
     private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
     private func isCrossProjectRepository(_ repository: Repository) -> Bool {
-        repository.note == crossProjectRepositoryMarker
+        repository.isCrossProject || repository.note == crossProjectRepositoryMarker
     }
 
     private func colorFromHex(_ hex: String) -> Color {
@@ -351,7 +351,7 @@ struct WorkspaceSidebarView: View {
                 Spacer(minLength: 8)
             }
             .padding(.horizontal, 12)
-            .padding(.top, 8)
+            .padding(.top, 6)
             .padding(.bottom, 2)
         }
     }
@@ -451,7 +451,7 @@ struct WorkspaceSidebarView: View {
             if repositoryFiltersVisible {
                 repositoryFiltersInline
                     .padding(.horizontal, 12)
-                    .padding(.top, 8)
+                    .padding(.top, 6)
                     .padding(.bottom, 6)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -459,15 +459,15 @@ struct WorkspaceSidebarView: View {
             if repositorySearchVisible {
                 repositorySearchInline
                     .padding(.horizontal, 12)
-                    .padding(.top, 8)
+                    .padding(.top, 6)
                     .padding(.bottom, 6)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             crossProjectRow
                 .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
+                .padding(.top, 6)
+                .padding(.bottom, 6)
 
             projectsSectionTitle
 
@@ -1184,7 +1184,7 @@ struct RepositoryRemoveSheet: View {
                     .foregroundStyle(alsoDeleteFromFilesystem ? .red : .primary)
             }
             .toggleStyle(.checkbox)
-            .padding(.top, 8)
+            .padding(.top, 6)
 
             HStack(spacing: 12) {
                 Button(String(localized: "worktree.create.cancel")) {
@@ -1197,7 +1197,7 @@ struct RepositoryRemoveSheet: View {
                 }
                 .keyboardShortcut(.defaultAction)
             }
-            .padding(.top, 8)
+            .padding(.top, 6)
         }
         .padding(24)
         .frame(width: 340)

@@ -1052,7 +1052,7 @@ private extension AizenCLI {
     }
 
     static func isCrossProjectRepository(_ repository: Repository) -> Bool {
-        repository.note == CLIRepositoryManager.crossProjectRepositoryMarker
+        repository.isCrossProject || repository.note == CLIRepositoryManager.crossProjectRepositoryMarker
     }
 
     static func fetchRepositories(in context: NSManagedObjectContext, filters: RepositoryFilters) throws -> [Repository] {

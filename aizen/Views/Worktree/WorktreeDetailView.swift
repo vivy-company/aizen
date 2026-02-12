@@ -16,6 +16,7 @@ struct WorktreeDetailView: View {
     @ObservedObject var appDetector = AppDetector.shared
     @Binding var gitChangesContext: GitChangesContext?
     var onWorktreeDeleted: ((Worktree?) -> Void)?
+    let showZenModeButton: Bool
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "WorktreeDetailView")
 
@@ -29,6 +30,7 @@ struct WorktreeDetailView: View {
     @AppStorage("showOpenInApp") private var showOpenInApp = true
     @AppStorage("showGitStatus") private var showGitStatus = true
     @AppStorage("showXcodeBuild") private var showXcodeBuild = true
+    @AppStorage("zenModeEnabled") private var zenModeEnabled = false
     @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
     @State private var selectedTab = "chat"
     @State private var lastOpenedApp: DetectedApp?
@@ -42,12 +44,20 @@ struct WorktreeDetailView: View {
     @State private var cachedTerminalBackgroundColor: Color?
     @State private var hasLoadedTabState = false
 
-    init(worktree: Worktree, repositoryManager: RepositoryManager, tabStateManager: WorktreeTabStateManager, gitChangesContext: Binding<GitChangesContext?>, onWorktreeDeleted: ((Worktree?) -> Void)? = nil) {
+    init(
+        worktree: Worktree,
+        repositoryManager: RepositoryManager,
+        tabStateManager: WorktreeTabStateManager,
+        gitChangesContext: Binding<GitChangesContext?>,
+        onWorktreeDeleted: ((Worktree?) -> Void)? = nil,
+        showZenModeButton: Bool = true
+    ) {
         self.worktree = worktree
         self.repositoryManager = repositoryManager
         self.tabStateManager = tabStateManager
         _gitChangesContext = gitChangesContext
         self.onWorktreeDeleted = onWorktreeDeleted
+        self.showZenModeButton = showZenModeButton
         _viewModel = StateObject(wrappedValue: WorktreeViewModel(worktree: worktree, repositoryManager: repositoryManager))
         _gitRepositoryService = StateObject(wrappedValue: GitRepositoryService(worktreePath: worktree.path ?? ""))
     }
@@ -169,6 +179,36 @@ struct WorktreeDetailView: View {
                     sessionManager.createNewTerminalSession(withPreset: preset)
                 }
             )
+        }
+    }
+
+    @ToolbarContentBuilder
+    var leadingToolbarItems: some ToolbarContent {
+        if showZenModeButton {
+            ToolbarItem(placement: .navigation) {
+                HStack(spacing: 12) {
+                    zenModeButton
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var zenModeButton: some View {
+        let button = Button(action: {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                zenModeEnabled.toggle()
+            }
+        }) {
+            Label("Zen Mode", systemImage: zenModeEnabled ? "pip.enter" : "pip.exit")
+        }
+        .labelStyle(.iconOnly)
+        .help(zenModeEnabled ? "Show Environment List" : "Hide Environment List (Zen Mode)")
+
+        if #available(macOS 14.0, *) {
+            button.symbolEffect(.bounce, value: zenModeEnabled)
+        } else {
+            button
         }
     }
 
@@ -507,7 +547,9 @@ struct WorktreeDetailView: View {
             .onChange(of: terminalThemeName) { _, _ in
                 cachedTerminalBackgroundColor = getTerminalBackgroundColor()
             }
-            .toolbar {                
+            .toolbar {
+                leadingToolbarItems
+
                 tabPickerToolbarItem
 
                 if shouldShowSessionToolbar {

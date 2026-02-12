@@ -16,7 +16,7 @@ final class CLIRepositoryManager {
     }
 
     private func isCrossProjectRepository(_ repository: Repository) -> Bool {
-        repository.note == Self.crossProjectRepositoryMarker
+        repository.isCrossProject || repository.note == Self.crossProjectRepositoryMarker
     }
 
     private func visibleRepositories(in workspace: Workspace) -> [Repository] {
@@ -96,7 +96,7 @@ final class CLIRepositoryManager {
         let repositoryRequest: NSFetchRequest<Repository> = Repository.fetchRequest()
         repositoryRequest.fetchLimit = 1
         repositoryRequest.predicate = NSPredicate(
-            format: "workspace == %@ AND note == %@",
+            format: "workspace == %@ AND (isCrossProject == YES OR note == %@)",
             workspace,
             Self.crossProjectRepositoryMarker
         )
@@ -108,6 +108,7 @@ final class CLIRepositoryManager {
         repository.name = "Cross-Project"
         repository.path = rootURL.path
         repository.note = Self.crossProjectRepositoryMarker
+        repository.isCrossProject = true
         repository.status = "active"
         repository.workspace = workspace
         repository.lastUpdated = Date()

@@ -121,12 +121,22 @@ class FileSearchViewModel: ObservableObject {
     // MARK: - Helpers
 
     private func mapToDisplayResults(_ entries: [FileSearchIndexResult]) -> [FileSearchResult] {
-        entries.map {
-            FileSearchResult(
-                path: $0.path,
-                relativePath: $0.relativePath,
-                isDirectory: $0.isDirectory,
-                matchScore: $0.matchScore
+        entries.compactMap { entry in
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: entry.path, isDirectory: &isDirectory) else {
+                return nil
+            }
+
+            // Cmd+P is file search; hide directory/symlink-directory entries.
+            guard !isDirectory.boolValue else {
+                return nil
+            }
+
+            return FileSearchResult(
+                path: entry.path,
+                relativePath: entry.relativePath,
+                isDirectory: false,
+                matchScore: entry.matchScore
             )
         }
     }

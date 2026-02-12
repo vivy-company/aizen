@@ -25,6 +25,7 @@ public class Repository: NSManagedObject {
     @NSManaged public var lastUpdated: Date?
     @NSManaged public var status: String?
     @NSManaged public var note: String?
+    @NSManaged public var isCrossProject: Bool
     @NSManaged public var postCreateActionsData: Data?
     @NSManaged public var workspace: Workspace?
     @NSManaged public var worktrees: NSSet?

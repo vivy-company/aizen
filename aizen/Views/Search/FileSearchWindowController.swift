@@ -410,7 +410,11 @@ struct FileSearchWindowContent: View {
 
 
     private func selectFile(_ result: FileSearchResult) {
-        viewModel.trackFileOpen(result.path)
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: result.path, isDirectory: &isDirectory)
+        if exists && !isDirectory.boolValue {
+            viewModel.trackFileOpen(result.path)
+        }
         onFileSelected(result.path)
         onClose()
     }

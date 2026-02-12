@@ -45,6 +45,8 @@ actor FileSearchService {
         if FileManager.default.fileExists(atPath: (path as NSString).appendingPathComponent(".git")),
            let gitResults = await indexDirectoryWithGitLsFiles(path) {
             results = gitResults
+        } else if let nestedGitResults = await indexDirectoryFromNestedGitRepositories(path) {
+            results = nestedGitResults
         } else {
             results = await indexDirectoryManually(path)
         }
@@ -54,6 +56,73 @@ actor FileSearchService {
         touchCacheKey(path)
         evictCacheIfNeeded()
         return results
+    }
+
+    // Cross-project roots are directories of repo symlinks.
+    // Index each linked repo with git-aware search and remap paths under the root.
+    private func indexDirectoryFromNestedGitRepositories(_ path: String) async -> [FileSearchIndexResult]? {
+        let fileManager = FileManager.default
+        let rootURL = URL(fileURLWithPath: path)
+
+        guard let children = try? fileManager.contentsOfDirectory(
+            at: rootURL,
+            includingPropertiesForKeys: [.isHiddenKey],
+            options: [.skipsPackageDescendants]
+        ) else {
+            return nil
+        }
+
+        var indexedAnyRepository = false
+        var merged: [FileSearchIndexResult] = []
+        var seenRelativePaths = Set<String>()
+
+        for childURL in children {
+            if let values = try? childURL.resourceValues(forKeys: [.isHiddenKey]),
+               values.isHidden == true {
+                continue
+            }
+
+            var isDirectory: ObjCBool = false
+            guard fileManager.fileExists(atPath: childURL.path, isDirectory: &isDirectory),
+                  isDirectory.boolValue else {
+                continue
+            }
+
+            let childPath = childURL.path
+            let childGitPath = (childPath as NSString).appendingPathComponent(".git")
+            guard fileManager.fileExists(atPath: childGitPath) else {
+                continue
+            }
+
+            let childRelativePrefix = childURL.lastPathComponent
+            let childEntries: [FileSearchIndexResult]
+            if let gitEntries = await indexDirectoryWithGitLsFiles(childPath) {
+                childEntries = gitEntries
+            } else {
+                childEntries = await indexDirectoryManually(childPath)
+            }
+
+            indexedAnyRepository = true
+
+            for entry in childEntries {
+                let mappedRelativePath = "\(childRelativePrefix)/\(entry.relativePath)"
+                if seenRelativePaths.insert(mappedRelativePath).inserted {
+                    merged.append(
+                        FileSearchIndexResult(
+                            basePath: path,
+                            relativePath: mappedRelativePath,
+                            isDirectory: false
+                        )
+                    )
+                }
+            }
+        }
+
+        guard indexedAnyRepository else {
+            return nil
+        }
+
+        return merged
     }
 
     // Directory indexing with gitignore patterns
