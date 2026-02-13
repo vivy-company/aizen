@@ -54,51 +54,55 @@ final class SessionsListViewModel: ObservableObject {
         let agentName = selectedAgentName
         let limit = fetchLimit
         let unknownAgentLabel = Self.unknownAgentLabel
+        let scopeSnapshot = ChatSessionScopeStore.shared.snapshot()
         isLoading = true
         defer { isLoading = false }
         do {
+            let needsDetachedScopeFiltering = Self.requiresDetachedScopeFiltering(
+                worktreeId: worktreeId,
+                workspaceId: workspaceId
+            )
+
             let results = try await context.perform {
                 let request = Self.buildFetchRequest(
                     filter: filter,
                     searchText: search,
                     worktreeId: worktreeId,
                     workspaceId: workspaceId,
-                    fetchLimit: limit,
+                    fetchLimit: needsDetachedScopeFiltering ? 0 : limit,
                     agentName: agentName
                 )
                 return try context.fetch(request)
             }
-            sessions = results
-            let agents = try await context.perform {
-                let request = Self.buildAgentNamesRequest(
-                    filter: filter,
+            sessions = Array(
+                Self.applyDetachedScopeFilter(
+                    to: results,
                     worktreeId: worktreeId,
-                    workspaceId: workspaceId
+                    workspaceId: workspaceId,
+                    scopeSnapshot: scopeSnapshot
+                ).prefix(limit)
+            )
+
+            let agents = try await context.perform {
+                let request = Self.buildFetchRequest(
+                    filter: filter,
+                    searchText: "",
+                    worktreeId: worktreeId,
+                    workspaceId: workspaceId,
+                    fetchLimit: 0,
+                    agentName: nil
                 )
-                let results = try context.fetch(request)
-                var names = Set<String>()
-                var hasUnknown = false
-
-                for item in results {
-                    if let name = item["agentName"] as? String {
-                        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if trimmed.isEmpty {
-                            hasUnknown = true
-                        } else {
-                            names.insert(trimmed)
-                        }
-                    } else {
-                        hasUnknown = true
-                    }
-                }
-
-                var ordered = Array(names).sorted(by: { $0.localizedStandardCompare($1) == .orderedAscending })
-                if hasUnknown {
-                    ordered.append(unknownAgentLabel)
-                }
-                return ordered
+                return try context.fetch(request)
             }
-            availableAgents = agents
+            availableAgents = Self.extractAgentNames(
+                from: Self.applyDetachedScopeFilter(
+                    to: agents,
+                    worktreeId: worktreeId,
+                    workspaceId: workspaceId,
+                    scopeSnapshot: scopeSnapshot
+                ),
+                unknownAgentLabel: unknownAgentLabel
+            )
 
             if let selected = selectedAgentName, selected == unknownAgentLabel {
                 if !availableAgents.contains(unknownAgentLabel) {
@@ -120,12 +124,17 @@ final class SessionsListViewModel: ObservableObject {
     }
     
     func buildFetchRequest() -> NSFetchRequest<ChatSession> {
-        Self.buildFetchRequest(
+        let requestLimit = Self.requiresDetachedScopeFiltering(
+            worktreeId: selectedWorktreeId,
+            workspaceId: selectedWorkspaceId
+        ) ? 0 : fetchLimit
+
+        return Self.buildFetchRequest(
             filter: selectedFilter,
             searchText: searchText,
             worktreeId: selectedWorktreeId,
             workspaceId: selectedWorkspaceId,
-            fetchLimit: fetchLimit,
+            fetchLimit: requestLimit,
             agentName: selectedAgentName
         )
     }
@@ -155,7 +164,10 @@ final class SessionsListViewModel: ObservableObject {
         }
         
         if let workspaceId = workspaceId {
-            let workspacePredicate = NSPredicate(format: "worktree.repository.workspace.id == %@", workspaceId as CVarArg)
+            let workspacePredicate = NSPredicate(
+                format: "worktree.repository.workspace.id == %@ OR worktree == nil",
+                workspaceId as CVarArg
+            )
             predicates.append(workspacePredicate)
         } else if let worktreeId = worktreeId {
             // Show sessions for this worktree AND closed sessions (worktree == nil)
@@ -194,47 +206,67 @@ final class SessionsListViewModel: ObservableObject {
         return request
     }
 
-    nonisolated static func buildAgentNamesRequest(
-        filter: SessionFilter,
+    static func requiresDetachedScopeFiltering(worktreeId: UUID?, workspaceId: UUID?) -> Bool {
+        workspaceId != nil || worktreeId != nil
+    }
+
+    static func applyDetachedScopeFilter(
+        to sessions: [ChatSession],
         worktreeId: UUID?,
-        workspaceId: UUID?
-    ) -> NSFetchRequest<NSDictionary> {
-        let request = NSFetchRequest<NSDictionary>(entityName: "ChatSession")
-        request.resultType = .dictionaryResultType
-        request.propertiesToFetch = ["agentName"]
-        request.returnsDistinctResults = true
-
-        var predicates: [NSPredicate] = []
-
-        // Only include sessions with at least one user message
-        predicates.append(NSPredicate(format: "SUBQUERY(messages, $m, $m.role == 'user').@count > 0"))
-
-        switch filter {
-        case .all:
-            break
-        case .active:
-            predicates.append(NSPredicate(format: "archived == NO"))
-        case .archived:
-            predicates.append(NSPredicate(format: "archived == YES"))
+        workspaceId: UUID?,
+        scopeSnapshot: ChatSessionScopeStore.Snapshot
+    ) -> [ChatSession] {
+        guard requiresDetachedScopeFiltering(worktreeId: worktreeId, workspaceId: workspaceId) else {
+            return sessions
         }
 
-        if let workspaceId = workspaceId {
-            let workspacePredicate = NSPredicate(format: "worktree.repository.workspace.id == %@", workspaceId as CVarArg)
-            predicates.append(workspacePredicate)
-        } else if let worktreeId = worktreeId {
-            let worktreePredicate = NSPredicate(format: "worktree.id == %@ OR worktree == nil", worktreeId as CVarArg)
-            predicates.append(worktreePredicate)
+        return sessions.filter { session in
+            if let sessionWorktree = session.worktree, !sessionWorktree.isDeleted {
+                if let workspaceId {
+                    return sessionWorktree.repository?.workspace?.id == workspaceId
+                }
+                if let worktreeId {
+                    return sessionWorktree.id == worktreeId
+                }
+                return true
+            }
+
+            guard let sessionId = session.id else { return false }
+            if let workspaceId {
+                return scopeSnapshot.workspaceId(for: sessionId) == workspaceId
+            }
+            if let worktreeId {
+                return scopeSnapshot.worktreeId(for: sessionId) == worktreeId
+            }
+            return false
+        }
+    }
+
+    static func extractAgentNames(
+        from sessions: [ChatSession],
+        unknownAgentLabel: String
+    ) -> [String] {
+        var names = Set<String>()
+        var hasUnknown = false
+
+        for session in sessions {
+            if let name = session.agentName {
+                let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    hasUnknown = true
+                } else {
+                    names.insert(trimmed)
+                }
+            } else {
+                hasUnknown = true
+            }
         }
 
-        if !predicates.isEmpty {
-            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+        var ordered = Array(names).sorted(by: { $0.localizedStandardCompare($1) == .orderedAscending })
+        if hasUnknown {
+            ordered.append(unknownAgentLabel)
         }
-
-        request.sortDescriptors = [
-            NSSortDescriptor(key: "agentName", ascending: true)
-        ]
-
-        return request
+        return ordered
     }
     
     func archiveSession(_ chatSession: ChatSession, context: NSManagedObjectContext) {
@@ -274,10 +306,14 @@ final class SessionsListViewModel: ObservableObject {
     }
     
     func deleteSession(_ chatSession: ChatSession, context: NSManagedObjectContext) {
+        let sessionId = chatSession.id
         context.delete(chatSession)
         
         do {
             try context.save()
+            if let sessionId {
+                ChatSessionScopeStore.shared.clearScope(sessionId: sessionId)
+            }
             logger.info("Deleted session")
         } catch {
             logger.error("Failed to delete session: \(error.localizedDescription)")
@@ -313,6 +349,7 @@ final class SessionsListViewModel: ObservableObject {
             chatSession.worktree = worktree
             do {
                 try chatSession.managedObjectContext?.save()
+                ChatSessionScopeStore.shared.clearScope(sessionId: chatSessionId)
                 chatSession.managedObjectContext?.refresh(chatSession, mergeChanges: false)
                 logger.info("Reattached closed session \(chatSessionId.uuidString) to environment \(worktree.id?.uuidString ?? "nil")")
             } catch {

@@ -26,6 +26,7 @@ struct ChatTabView: View {
     @State private var cachedSessionIds: [UUID] = []
     private let maxCachedSessions = 10
     private let recentSessionsLimit = 3
+    private let recentSessionsFetchLimit = 50
     private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
     // Companion panel state (persisted) - Left
@@ -101,7 +102,7 @@ struct ChatTabView: View {
            (repository.isCrossProject || repository.note == crossProjectRepositoryMarker),
            let workspaceId = repository.workspace?.id {
             recentRequest.predicate = NSPredicate(
-                format: "worktree.repository.workspace.id == %@ AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
+                format: "(worktree.repository.workspace.id == %@ OR worktree == nil) AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
                 workspaceId as CVarArg
             )
         } else if let worktreeId = worktree.id {
@@ -113,7 +114,7 @@ struct ChatTabView: View {
             recentRequest.predicate = NSPredicate(value: false)
         }
         recentRequest.sortDescriptors = [NSSortDescriptor(key: "lastMessageAt", ascending: false)]
-        recentRequest.fetchLimit = recentSessionsLimit
+        recentRequest.fetchLimit = recentSessionsFetchLimit
         recentRequest.relationshipKeyPathsForPrefetching = ["worktree"]
         self._recentSessions = FetchRequest(fetchRequest: recentRequest, animation: nil)
     }
@@ -132,6 +133,36 @@ struct ChatTabView: View {
                 .onChange(of: sessions.count) { _, _ in
                     syncSelectionAndCache()
                 }
+        }
+    }
+
+    private var isCrossProjectScope: Bool {
+        guard let repository = worktree.repository else { return false }
+        return repository.isCrossProject || repository.note == crossProjectRepositoryMarker
+    }
+
+    private var scopedRecentSessions: [ChatSession] {
+        let scopeStore = ChatSessionScopeStore.shared
+        let workspaceId = isCrossProjectScope ? worktree.repository?.workspace?.id : nil
+        let worktreeId = worktree.id
+
+        return recentSessions.filter { session in
+            if let sessionWorktree = session.worktree, !sessionWorktree.isDeleted {
+                if let workspaceId {
+                    return sessionWorktree.repository?.workspace?.id == workspaceId
+                }
+                guard let worktreeId else { return false }
+                return sessionWorktree.id == worktreeId
+            }
+
+            guard let sessionId = session.id else { return false }
+            if let workspaceId {
+                return scopeStore.workspaceId(for: sessionId) == workspaceId
+            }
+            if let worktreeId {
+                return scopeStore.worktreeId(for: sessionId) == worktreeId
+            }
+            return false
         }
     }
 
@@ -433,7 +464,7 @@ struct ChatTabView: View {
                 }
             }
 
-            if !recentSessions.isEmpty {
+            if !scopedRecentSessions.isEmpty {
                 resumeSessionSeparator
                 recentSessionsSection
             }
@@ -481,7 +512,7 @@ struct ChatTabView: View {
             }
 
             VStack(spacing: 8) {
-                ForEach(Array(recentSessions.prefix(recentSessionsLimit)), id: \.objectID) { session in
+                ForEach(Array(scopedRecentSessions.prefix(recentSessionsLimit)), id: \.objectID) { session in
                     Button {
                         resumeRecentSession(session)
                     } label: {
@@ -636,6 +667,7 @@ struct ChatTabView: View {
             session.worktree = worktree
             do {
                 try viewContext.save()
+                ChatSessionScopeStore.shared.clearScope(sessionId: sessionId)
                 viewContext.refresh(session, mergeChanges: false)
             } catch {
                 logger.error("Failed to reattach session: \(error.localizedDescription)")

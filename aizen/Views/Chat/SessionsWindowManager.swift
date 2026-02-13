@@ -19,12 +19,12 @@ final class SessionsWindowManager {
     private init() {}
 
     func show(context: NSManagedObjectContext, worktreeId: UUID? = nil) {
-        let (effectiveWorktreeId, workspaceId) = resolveScope(
+        let (resumeWorktreeId, workspaceId) = resolveScope(
             in: context,
             worktreeId: worktreeId
         )
         let contentView = SessionsListView(
-            worktreeId: effectiveWorktreeId,
+            worktreeId: resumeWorktreeId,
             workspaceId: workspaceId
         )
             .environment(\.managedObjectContext, context)
@@ -59,7 +59,7 @@ final class SessionsWindowManager {
     private func resolveScope(
         in context: NSManagedObjectContext,
         worktreeId: UUID?
-    ) -> (worktreeId: UUID?, workspaceId: UUID?) {
+    ) -> (resumeWorktreeId: UUID?, workspaceId: UUID?) {
         guard let worktreeId else {
             return (nil, nil)
         }
@@ -75,7 +75,7 @@ final class SessionsWindowManager {
 
         let isCrossProject = repository.isCrossProject || repository.note == crossProjectRepositoryMarker
         if isCrossProject, let workspaceId = repository.workspace?.id {
-            return (nil, workspaceId)
+            return (worktreeId, workspaceId)
         }
 
         return (worktreeId, nil)
