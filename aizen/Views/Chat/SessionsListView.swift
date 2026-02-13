@@ -18,8 +18,8 @@ struct SessionsListView: View {
         Color(nsColor: .windowBackgroundColor)
     }
 
-    init(worktreeId: UUID? = nil, workspaceId: UUID? = nil) {
-        let vm = SessionsListViewModel(worktreeId: worktreeId, workspaceId: workspaceId)
+    init(worktreeId: UUID? = nil) {
+        let vm = SessionsListViewModel(worktreeId: worktreeId)
         _viewModel = StateObject(wrappedValue: vm)
     }
     

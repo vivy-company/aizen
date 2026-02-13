@@ -58,14 +58,6 @@ struct WorktreeSessionManager {
                 }
             }
         }
-
-        if let sessionId = session.id {
-            ChatSessionScopeStore.shared.setScope(
-                sessionId: sessionId,
-                worktreeId: worktree.id,
-                workspaceId: worktree.repository?.workspace?.id
-            )
-        }
         
         // Nullify the worktree relationship to "close" the tab
         // The session remains in database for history
