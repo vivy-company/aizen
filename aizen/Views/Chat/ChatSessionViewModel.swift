@@ -200,7 +200,6 @@ class ChatSessionViewModel: ObservableObject {
         
         do {
             let messages = try viewContext.fetch(fetchRequest)
-            logger.info("Loaded \(messages.count) historical messages for session \(sessionId.uuidString)")
             
             self.historicalMessages = messages.reversed().compactMap { chatMessage in
                 guard let id = chatMessage.id,
@@ -251,8 +250,6 @@ class ChatSessionViewModel: ObservableObject {
                 }
             }
             historicalToolCalls = toolCallMap.values.sorted { $0.timestamp < $1.timestamp }
-            
-            logger.info("Parsed \(self.historicalMessages.count) valid historical messages")
         } catch {
             logger.error("Failed to fetch historical messages: \(error.localizedDescription)")
         }
@@ -560,7 +557,6 @@ class ChatSessionViewModel: ObservableObject {
         ),
         !acpSessionId.isEmpty {
             do {
-                logger.info("Resuming existing ACP session: \(acpSessionId)")
                 try await agentSession.resume(
                     acpSessionId: acpSessionId,
                     agentName: selectedAgent,
@@ -707,7 +703,6 @@ class ChatSessionViewModel: ObservableObject {
             
             do {
                 try context.save()
-                logger.info("Created new chat session: \(newChatSession.id?.uuidString ?? "unknown")")
                 
                 await agentSession.close()
                 
@@ -792,48 +787,23 @@ class ChatSessionViewModel: ObservableObject {
     }
 
     private func setupSessionObservers(session: AgentSession) {
-        #if DEBUG
-        logger.info("setupSessionObservers called")
-        logger.info("  - session id: \(session.chatSessionId?.uuidString ?? "nil")")
-        logger.info("  - currentAgentSession id: \(self.currentAgentSession?.chatSessionId?.uuidString ?? "nil")")
-        logger.info("  - observedSessionId: \(self.observedSessionId?.uuidString ?? "nil")")
-        logger.info("  - self.session.id: \(self.session.id?.uuidString ?? "nil")")
-        logger.info("  - currentAgentSession === session: \(self.currentAgentSession === session)")
-        logger.info("  - observedSessionId == self.session.id: \(self.observedSessionId == self.session.id)")
-        logger.info("  - cancellables.isEmpty: \(self.cancellables.isEmpty)")
-        logger.info("  - session.sessionState: \(String(describing: session.sessionState))")
-        logger.info("  - session.isActive: \(session.isActive)")
-        #endif
-        
         // Only skip if we're ALREADY observing THIS EXACT session object for THIS ViewModel's ChatSession
         if currentAgentSession === session && 
            observedSessionId == self.session.id &&
            !cancellables.isEmpty {
             // Already observing - just sync latest state without rebuilding observers
-            #if DEBUG
-            logger.info("  -> SKIPPING observer rebuild, syncing state")
-            #endif
             isProcessing = session.isStreaming
             updateDerivedState(from: session)
-            #if DEBUG
-            logger.info("  -> After sync: sessionState=\(String(describing: self.sessionState)), isSessionReady=\(self.isSessionReady)")
-            #endif
             return
         }
         
         // Clear old observers and set up fresh ones
-        #if DEBUG
-        logger.info("  -> REBUILDING observers")
-        #endif
         cancellables.removeAll()
         observedSessionId = self.session.id
         
         // Sync initial state
         isProcessing = session.isStreaming
         updateDerivedState(from: session)
-        #if DEBUG
-        logger.info("  -> After rebuild: sessionState=\(String(describing: self.sessionState)), isSessionReady=\(self.isSessionReady)")
-        #endif
 
         session.$messages
             // Stream message updates as they arrive for smoother chunk rendering.
@@ -909,12 +879,7 @@ class ChatSessionViewModel: ObservableObject {
         session.$agentPlan
             .receive(on: DispatchQueue.main)
             .sink { [weak self] plan in
-                guard let self = self else {
-                    Logger.forCategory("ChatSession").error("Plan update received but self is nil!")
-                    return
-                }
-                self.logger.info("Plan update received: \(plan?.entries.count ?? 0) entries, wasNil=\(self.currentAgentPlan == nil), isNil=\(plan == nil)")
-                self.currentAgentPlan = plan
+                self?.currentAgentPlan = plan
             }
             .store(in: &cancellables)
 

@@ -108,16 +108,15 @@ extension TextView {
             "_rvMenuItemAction"
         ]
 
-        for item in menu.items {
-            if let itemAction = item.action {
-                if removeItemsContaining.contains(String(describing: itemAction)) {
-                    // Get localized item name, and remove it.
-                    let index = menu.indexOfItem(withTitle: item.title)
-                    if index >= 0 {
-                        menu.removeItem(at: index)
-                    }
-                }
-            }
+        let itemsToRemove = menu.items.filter { item in
+            guard let itemAction = item.action else { return false }
+            return removeItemsContaining.contains(String(describing: itemAction))
+        }
+
+        for item in itemsToRemove {
+            // Explicitly detach submenu before removing item to avoid stale supermenu references.
+            item.submenu = nil
+            menu.removeItem(item)
         }
 
         return menu

@@ -153,7 +153,9 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber, @unchecked Senda
             let crashFiles = files.filter { $0.lastPathComponent.hasPrefix("crash_") }
 
             if !crashFiles.isEmpty {
-                logger.warning("Found \(crashFiles.count) previous crash report(s)")
+                #if DEBUG
+                logger.debug("Found \(crashFiles.count) previous crash report(s)")
+                #endif
             }
         } catch {
             // Directory may not exist yet

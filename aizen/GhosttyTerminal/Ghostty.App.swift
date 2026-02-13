@@ -167,7 +167,6 @@ extension Ghostty {
                 }
             }
 
-            Ghostty.logger.info("Ghostty app initialized successfully")
         }
 
         @objc private func systemAppearanceDidChange(_ notification: Notification) {
@@ -194,7 +193,6 @@ extension Ghostty {
             guard newTheme != lastKnownTheme else { return }
 
             lastKnownTheme = newTheme
-            Ghostty.logger.info("Theme changed, reloading terminal config with theme: \(newTheme)")
             reloadConfig()
         }
 
@@ -274,8 +272,6 @@ extension Ghostty {
 
             // Unset XDG_CONFIG_HOME so it doesn't affect fish/shell config loading
             unsetenv("XDG_CONFIG_HOME")
-
-            Ghostty.logger.info("Configuration reloaded and propagated to \(self.activeSurfaces.count) surfaces")
         }
 
         // MARK: - Private Helpers
@@ -321,8 +317,6 @@ extension Ghostty {
 
                 """
 
-                Ghostty.logger.info("Loading Ghostty theme: \(self.effectiveThemeName)")
-
                 try configContent.write(toFile: configFilePath, atomically: true, encoding: .utf8)
 
                 // Set XDG_CONFIG_HOME to our temp directory
@@ -334,8 +328,6 @@ extension Ghostty {
                 // Load default files - will load our XDG config
                 // Will NOT load user's Ghostty config (com.mitchellh.ghostty) since bundle ID is different
                 ghostty_config_load_default_files(config)
-
-                Ghostty.logger.info("Loaded Aizen terminal settings - Font: \(self.terminalFontName) \(Int(self.terminalFontSize))pt, Theme: \(self.effectiveThemeName)")
             } catch {
                 Ghostty.logger.warning("Failed to write config: \(error)")
             }
@@ -367,7 +359,6 @@ extension Ghostty {
                 // Window/tab title change
                 if let titlePtr = action.action.set_title.title {
                     let title = String(cString: titlePtr)
-                    Ghostty.logger.info("Title changed: \(title)")
 
                     // Propagate to terminal view callback
                     DispatchQueue.main.async {
@@ -378,15 +369,10 @@ extension Ghostty {
 
             case GHOSTTY_ACTION_PWD:
                 // Working directory change
-                if let pwdPtr = action.action.pwd.pwd {
-                    let pwd = String(cString: pwdPtr)
-                    Ghostty.logger.info("PWD changed: \(pwd)")
-                }
                 return true
 
             case GHOSTTY_ACTION_PROMPT_TITLE:
                 // Prompt title update (for shell integration)
-                Ghostty.logger.debug("Prompt title action received")
                 return true
 
             case GHOSTTY_ACTION_PROGRESS_REPORT:
@@ -420,8 +406,6 @@ extension Ghostty {
                 return true
 
             default:
-                // Log unhandled actions
-                Ghostty.logger.debug("Action received: \(action.tag.rawValue) on target: \(target.tag.rawValue)")
                 return false
             }
         }
@@ -440,7 +424,6 @@ extension Ghostty {
                 ghostty_surface_complete_clipboard_request(surface, ptr, state, false)
             }
 
-            Ghostty.logger.debug("Read clipboard: \(clipboardString.prefix(50))...")
         }
 
         static func confirmReadClipboard(
@@ -451,8 +434,6 @@ extension Ghostty {
         ) {
             // Clipboard read confirmation
             // For security, apps can confirm before allowing clipboard access
-            // For now, just log it
-            Ghostty.logger.debug("Clipboard read confirmation requested")
         }
 
         static func writeClipboard(
@@ -485,7 +466,6 @@ extension Ghostty {
                     string = TerminalTextCleaner.cleanText(string, settings: settings)
 
                     Clipboard.copy(string)
-                    Ghostty.logger.debug("Wrote to clipboard: \(string.prefix(50))...")
                     return
                 }
             }
@@ -495,8 +475,6 @@ extension Ghostty {
             // userdata is the GhosttyTerminalView instance
             guard let userdata = userdata else { return }
             let terminalView = Unmanaged<GhosttyTerminalView>.fromOpaque(userdata).takeUnretainedValue()
-
-            Ghostty.logger.info("Close surface: processAlive=\(processAlive)")
 
             // Trigger process exit callback on main thread
             DispatchQueue.main.async {

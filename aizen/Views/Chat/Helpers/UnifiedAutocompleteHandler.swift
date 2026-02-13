@@ -39,7 +39,6 @@ class UnifiedAutocompleteHandler: ObservableObject {
                 await fileSearchService.clearCache(for: worktreePath)
             }
             fileIndex = try await fileSearchService.indexDirectory(worktreePath)
-            logger.debug("Indexed \(self.fileIndex.count) files in worktree")
         } catch {
             logger.error("Failed to index worktree: \(error.localizedDescription)")
             fileIndex = []
