@@ -129,6 +129,11 @@ struct aizenApp: App {
                         in: persistenceController.container.viewContext
                     )
                 }
+                .task {
+                    await SessionPersistenceService.shared.recoverDetachedSessionsFromLegacyScope(
+                        in: persistenceController.container.viewContext
+                    )
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified)

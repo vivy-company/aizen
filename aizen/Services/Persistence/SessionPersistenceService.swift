@@ -34,6 +34,9 @@ final class SessionPersistenceService {
     static let shared = SessionPersistenceService()
     
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "SessionPersistence")
+    private static let legacyWorktreeMapKey = "chatSession.lastWorktreeBySessionId"
+    private static let legacyWorkspaceMapKey = "chatSession.lastWorkspaceBySessionId"
+    private static let legacyRecoveryCompletedKey = "chatSession.legacyDetachedRecovery.completed.v1"
     
     private init() {}
     
@@ -156,6 +159,98 @@ final class SessionPersistenceService {
                 }
             } catch {
                 self.logger.error("Failed to backfill session metadata: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Compatibility migration:
+    /// Reattach legacy detached sessions (worktree == nil) using the previously persisted
+    /// session->worktree map from older builds, and archive them so they remain resumable
+    /// without appearing as open tabs.
+    func recoverDetachedSessionsFromLegacyScope(in context: NSManagedObjectContext) async {
+        let logger = self.logger
+
+        await context.perform {
+            let defaults = UserDefaults.standard
+            guard !defaults.bool(forKey: Self.legacyRecoveryCompletedKey) else {
+                return
+            }
+
+            let rawMap = defaults.dictionary(forKey: Self.legacyWorktreeMapKey) as? [String: String] ?? [:]
+            guard !rawMap.isEmpty else {
+                defaults.set(true, forKey: Self.legacyRecoveryCompletedKey)
+                return
+            }
+
+            let scopeMap = rawMap.reduce(into: [UUID: UUID]()) { partialResult, item in
+                guard let sessionId = UUID(uuidString: item.key),
+                      let worktreeId = UUID(uuidString: item.value) else {
+                    return
+                }
+                partialResult[sessionId] = worktreeId
+            }
+
+            guard !scopeMap.isEmpty else {
+                defaults.set(true, forKey: Self.legacyRecoveryCompletedKey)
+                defaults.removeObject(forKey: Self.legacyWorktreeMapKey)
+                defaults.removeObject(forKey: Self.legacyWorkspaceMapKey)
+                return
+            }
+
+            let detachedRequest: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
+            detachedRequest.predicate = NSPredicate(format: "worktree == nil")
+
+            do {
+                let detachedSessions = try context.fetch(detachedRequest)
+                guard !detachedSessions.isEmpty else {
+                    defaults.set(true, forKey: Self.legacyRecoveryCompletedKey)
+                    defaults.removeObject(forKey: Self.legacyWorktreeMapKey)
+                    defaults.removeObject(forKey: Self.legacyWorkspaceMapKey)
+                    return
+                }
+
+                let targetWorktreeIds = Set(scopeMap.values)
+                guard !targetWorktreeIds.isEmpty else {
+                    defaults.set(true, forKey: Self.legacyRecoveryCompletedKey)
+                    return
+                }
+
+                let worktreeRequest: NSFetchRequest<Worktree> = Worktree.fetchRequest()
+                worktreeRequest.predicate = NSPredicate(format: "id IN %@", Array(targetWorktreeIds))
+                let worktrees = try context.fetch(worktreeRequest)
+                let worktreeById: [UUID: Worktree] = Dictionary(
+                    uniqueKeysWithValues: worktrees.compactMap { worktree in
+                        guard let id = worktree.id else { return nil }
+                        return (id, worktree)
+                    }
+                )
+
+                var recovered = 0
+                for session in detachedSessions {
+                    guard let sessionId = session.id,
+                          let mappedWorktreeId = scopeMap[sessionId],
+                          let worktree = worktreeById[mappedWorktreeId],
+                          !worktree.isDeleted else {
+                        continue
+                    }
+
+                    session.worktree = worktree
+                    session.archived = true
+                    recovered += 1
+                }
+
+                if recovered > 0 {
+                    try context.save()
+                    logger.info("Recovered \(recovered) legacy detached chat sessions")
+                } else {
+                    logger.info("No legacy detached chat sessions were recoverable")
+                }
+
+                defaults.set(true, forKey: Self.legacyRecoveryCompletedKey)
+                defaults.removeObject(forKey: Self.legacyWorktreeMapKey)
+                defaults.removeObject(forKey: Self.legacyWorkspaceMapKey)
+            } catch {
+                logger.error("Failed to recover detached chat sessions: \(error.localizedDescription)")
             }
         }
     }
