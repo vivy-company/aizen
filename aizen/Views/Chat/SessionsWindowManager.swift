@@ -14,11 +14,19 @@ final class SessionsWindowManager {
     static let shared = SessionsWindowManager()
 
     private var window: NSWindow?
+    private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
     private init() {}
 
     func show(context: NSManagedObjectContext, worktreeId: UUID? = nil) {
-        let contentView = SessionsListView(worktreeId: worktreeId)
+        let (effectiveWorktreeId, workspaceId) = resolveScope(
+            in: context,
+            worktreeId: worktreeId
+        )
+        let contentView = SessionsListView(
+            worktreeId: effectiveWorktreeId,
+            workspaceId: workspaceId
+        )
             .environment(\.managedObjectContext, context)
             .modifier(AppearanceModifier())
 
@@ -46,5 +54,30 @@ final class SessionsWindowManager {
 
         self.window = window
         window.makeKeyAndOrderFront(nil)
+    }
+
+    private func resolveScope(
+        in context: NSManagedObjectContext,
+        worktreeId: UUID?
+    ) -> (worktreeId: UUID?, workspaceId: UUID?) {
+        guard let worktreeId else {
+            return (nil, nil)
+        }
+
+        let request: NSFetchRequest<Worktree> = Worktree.fetchRequest()
+        request.fetchLimit = 1
+        request.predicate = NSPredicate(format: "id == %@", worktreeId as CVarArg)
+
+        guard let worktree = try? context.fetch(request).first,
+              let repository = worktree.repository else {
+            return (worktreeId, nil)
+        }
+
+        let isCrossProject = repository.isCrossProject || repository.note == crossProjectRepositoryMarker
+        if isCrossProject, let workspaceId = repository.workspace?.id {
+            return (nil, workspaceId)
+        }
+
+        return (worktreeId, nil)
     }
 }

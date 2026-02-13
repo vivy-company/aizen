@@ -26,6 +26,7 @@ struct ChatTabView: View {
     @State private var cachedSessionIds: [UUID] = []
     private let maxCachedSessions = 10
     private let recentSessionsLimit = 3
+    private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
     // Companion panel state (persisted) - Left
     @AppStorage("companionLeftPanelType") private var leftPanelType: String = ""
@@ -96,9 +97,16 @@ struct ChatTabView: View {
         )
 
         let recentRequest: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        if let worktreeId = worktree.id {
+        if let repository = worktree.repository,
+           (repository.isCrossProject || repository.note == crossProjectRepositoryMarker),
+           let workspaceId = repository.workspace?.id {
             recentRequest.predicate = NSPredicate(
-                format: "worktree.id == %@ AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
+                format: "worktree.repository.workspace.id == %@ AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
+                workspaceId as CVarArg
+            )
+        } else if let worktreeId = worktree.id {
+            recentRequest.predicate = NSPredicate(
+                format: "(worktree.id == %@ OR worktree == nil) AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
                 worktreeId as CVarArg
             )
         } else {

@@ -19,6 +19,7 @@ final class SessionsListViewModel: ObservableObject {
     @Published var selectedFilter: SessionFilter = .active
     @Published var searchText: String = ""
     @Published var selectedWorktreeId: UUID?
+    @Published var selectedWorkspaceId: UUID?
     @Published var selectedAgentName: String?
     @Published var availableAgents: [String] = []
     @Published var errorMessage: String?
@@ -29,8 +30,9 @@ final class SessionsListViewModel: ObservableObject {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "SessionsList")
     nonisolated static let unknownAgentLabel = "Unknown Agent"
     
-    init(worktreeId: UUID? = nil) {
+    init(worktreeId: UUID? = nil, workspaceId: UUID? = nil) {
         self.selectedWorktreeId = worktreeId
+        self.selectedWorkspaceId = workspaceId
     }
     
     func loadMore() {
@@ -48,6 +50,7 @@ final class SessionsListViewModel: ObservableObject {
         let filter = selectedFilter
         let search = searchText
         let worktreeId = selectedWorktreeId
+        let workspaceId = selectedWorkspaceId
         let agentName = selectedAgentName
         let limit = fetchLimit
         let unknownAgentLabel = Self.unknownAgentLabel
@@ -59,6 +62,7 @@ final class SessionsListViewModel: ObservableObject {
                     filter: filter,
                     searchText: search,
                     worktreeId: worktreeId,
+                    workspaceId: workspaceId,
                     fetchLimit: limit,
                     agentName: agentName
                 )
@@ -68,7 +72,8 @@ final class SessionsListViewModel: ObservableObject {
             let agents = try await context.perform {
                 let request = Self.buildAgentNamesRequest(
                     filter: filter,
-                    worktreeId: worktreeId
+                    worktreeId: worktreeId,
+                    workspaceId: workspaceId
                 )
                 let results = try context.fetch(request)
                 var names = Set<String>()
@@ -119,6 +124,7 @@ final class SessionsListViewModel: ObservableObject {
             filter: selectedFilter,
             searchText: searchText,
             worktreeId: selectedWorktreeId,
+            workspaceId: selectedWorkspaceId,
             fetchLimit: fetchLimit,
             agentName: selectedAgentName
         )
@@ -128,6 +134,7 @@ final class SessionsListViewModel: ObservableObject {
         filter: SessionFilter,
         searchText: String,
         worktreeId: UUID?,
+        workspaceId: UUID?,
         fetchLimit: Int,
         agentName: String?
     ) -> NSFetchRequest<ChatSession> {
@@ -147,7 +154,10 @@ final class SessionsListViewModel: ObservableObject {
             predicates.append(NSPredicate(format: "archived == YES"))
         }
         
-        if let worktreeId = worktreeId {
+        if let workspaceId = workspaceId {
+            let workspacePredicate = NSPredicate(format: "worktree.repository.workspace.id == %@", workspaceId as CVarArg)
+            predicates.append(workspacePredicate)
+        } else if let worktreeId = worktreeId {
             // Show sessions for this worktree AND closed sessions (worktree == nil)
             let worktreePredicate = NSPredicate(format: "worktree.id == %@ OR worktree == nil", worktreeId as CVarArg)
             predicates.append(worktreePredicate)
@@ -186,7 +196,8 @@ final class SessionsListViewModel: ObservableObject {
 
     nonisolated static func buildAgentNamesRequest(
         filter: SessionFilter,
-        worktreeId: UUID?
+        worktreeId: UUID?,
+        workspaceId: UUID?
     ) -> NSFetchRequest<NSDictionary> {
         let request = NSFetchRequest<NSDictionary>(entityName: "ChatSession")
         request.resultType = .dictionaryResultType
@@ -207,7 +218,10 @@ final class SessionsListViewModel: ObservableObject {
             predicates.append(NSPredicate(format: "archived == YES"))
         }
 
-        if let worktreeId = worktreeId {
+        if let workspaceId = workspaceId {
+            let workspacePredicate = NSPredicate(format: "worktree.repository.workspace.id == %@", workspaceId as CVarArg)
+            predicates.append(workspacePredicate)
+        } else if let worktreeId = worktreeId {
             let worktreePredicate = NSPredicate(format: "worktree.id == %@ OR worktree == nil", worktreeId as CVarArg)
             predicates.append(worktreePredicate)
         }
