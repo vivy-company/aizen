@@ -12,8 +12,14 @@ extension ChatSessionViewModel {
     // MARK: - Attachment Management
 
     func removeAttachment(_ attachment: ChatAttachment) {
+        guard let index = attachments.firstIndex(of: attachment) else { return }
+        removeAttachment(at: index)
+    }
+
+    func removeAttachment(at index: Int) {
+        guard attachments.indices.contains(index) else { return }
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            attachments.removeAll { $0 == attachment }
+            attachments.remove(at: index)
         }
     }
 

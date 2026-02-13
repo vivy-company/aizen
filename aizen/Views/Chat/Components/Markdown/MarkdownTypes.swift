@@ -208,7 +208,10 @@ nonisolated struct MarkdownInlineContent: Equatable, Hashable {
     }
 
     func hash(into hasher: inout Hasher) {
-        hasher.combine(plainText)
+        hasher.combine(elements.count)
+        for element in elements {
+            hasher.combine(element)
+        }
     }
 }
 
@@ -246,7 +249,46 @@ nonisolated enum InlineElement: Equatable, Hashable {
     }
 
     func hash(into hasher: inout Hasher) {
-        hasher.combine(plainText)
+        switch self {
+        case .text(let text):
+            hasher.combine(0)
+            hasher.combine(text)
+        case .emphasis(let content):
+            hasher.combine(1)
+            hasher.combine(content)
+        case .strong(let content):
+            hasher.combine(2)
+            hasher.combine(content)
+        case .strikethrough(let content):
+            hasher.combine(3)
+            hasher.combine(content)
+        case .code(let code):
+            hasher.combine(4)
+            hasher.combine(code)
+        case .link(let text, let url, let title):
+            hasher.combine(5)
+            hasher.combine(text)
+            hasher.combine(url)
+            hasher.combine(title)
+        case .image(let url, let alt, let title):
+            hasher.combine(6)
+            hasher.combine(url)
+            hasher.combine(alt)
+            hasher.combine(title)
+        case .softBreak:
+            hasher.combine(7)
+        case .hardBreak:
+            hasher.combine(8)
+        case .html(let html):
+            hasher.combine(9)
+            hasher.combine(html)
+        case .math(let math):
+            hasher.combine(10)
+            hasher.combine(math)
+        case .footnoteReference(let id):
+            hasher.combine(11)
+            hasher.combine(id)
+        }
     }
 }
 

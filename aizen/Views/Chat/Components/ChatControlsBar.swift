@@ -80,14 +80,14 @@ struct ChatAttachmentsBar: View {
     }
 
     let attachments: [ChatAttachment]
-    let onRemoveAttachment: (ChatAttachment) -> Void
+    let onRemoveAttachment: (Int) -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Layout.chipSpacing) {
-                ForEach(Array(attachments.enumerated()), id: \.offset) { _, attachment in
+                ForEach(Array(attachments.enumerated()), id: \.offset) { index, attachment in
                     ChatAttachmentChip(attachment: attachment) {
-                        onRemoveAttachment(attachment)
+                        onRemoveAttachment(index)
                     }
                 }
             }

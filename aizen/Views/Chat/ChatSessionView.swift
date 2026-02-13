@@ -165,7 +165,9 @@ struct ChatSessionView: View {
                         if !viewModel.attachments.isEmpty {
                             ChatAttachmentsBar(
                                 attachments: viewModel.attachments,
-                                onRemoveAttachment: viewModel.removeAttachment
+                                onRemoveAttachment: { index in
+                                    viewModel.removeAttachment(at: index)
+                                }
                             )
                             .padding(.horizontal, 20)
                         }
