@@ -17,6 +17,7 @@ struct ToolCallGroupView: View {
     var childToolCallsProvider: (String) -> [ToolCall] = { _ in [] }
 
     @State private var isExpanded: Bool = false
+    @State private var expandedExplorationIds: Set<String> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -33,6 +34,7 @@ struct ToolCallGroupView: View {
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isExpanded = true
+                    expandedExplorationIds = allExplorationIds
                 }
             } label: {
                 Label("Expand All", systemImage: "arrow.down.right.and.arrow.up.left")
@@ -118,20 +120,108 @@ struct ToolCallGroupView: View {
 
     private var expandedContent: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(group.toolCalls) { toolCall in
-                ToolCallView(
-                    toolCall: toolCall,
-                    currentIterationId: currentIterationId,
-                    onOpenDetails: onOpenDetails,
-                    agentSession: agentSession,
-                    onOpenInEditor: onOpenInEditor,
-                    childToolCalls: childToolCallsProvider(toolCall.toolCallId)
-                )
-                .padding(.leading, 8)
+            if let singleCluster = singleExplorationCluster {
+                ForEach(singleCluster.toolCalls) { toolCall in
+                    toolCallRow(toolCall, leadingPadding: 8)
+                }
+            } else {
+                ForEach(group.displayItems) { item in
+                    switch item {
+                    case .toolCall(let toolCall):
+                        toolCallRow(toolCall, leadingPadding: 8)
+                    case .exploration(let cluster):
+                        explorationClusterRow(cluster)
+                    }
+                }
             }
         }
         .padding(.top, 4)
         .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
+    private func toolCallRow(_ toolCall: ToolCall, leadingPadding: CGFloat) -> some View {
+        ToolCallView(
+            toolCall: toolCall,
+            currentIterationId: currentIterationId,
+            onOpenDetails: onOpenDetails,
+            agentSession: agentSession,
+            onOpenInEditor: onOpenInEditor,
+            childToolCalls: childToolCallsProvider(toolCall.toolCallId)
+        )
+        .padding(.leading, leadingPadding)
+    }
+
+    private func explorationClusterRow(_ cluster: ExplorationCluster) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    toggleExplorationCluster(cluster.id)
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(explorationStatusColor(for: cluster))
+                        .frame(width: 6, height: 6)
+
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 12, height: 12)
+
+                    Text(cluster.summaryText)
+                        .font(.system(size: 11))
+                        .foregroundColor(.primary)
+
+                    Image(systemName: isExplorationExpanded(cluster.id) ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(.tertiary)
+
+                    Spacer(minLength: 6)
+                }
+                .padding(.vertical, 3)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 8)
+
+            if isExplorationExpanded(cluster.id) {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(cluster.toolCalls) { toolCall in
+                        toolCallRow(toolCall, leadingPadding: 20)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private var allExplorationIds: Set<String> {
+        Set(group.displayItems.compactMap { item in
+            if case .exploration(let cluster) = item {
+                return cluster.id
+            }
+            return nil
+        })
+    }
+
+    private var singleExplorationCluster: ExplorationCluster? {
+        guard group.displayItems.count == 1,
+              case .exploration(let cluster) = group.displayItems[0] else {
+            return nil
+        }
+        return cluster
+    }
+
+    private func isExplorationExpanded(_ clusterId: String) -> Bool {
+        expandedExplorationIds.contains(clusterId)
+    }
+
+    private func toggleExplorationCluster(_ clusterId: String) {
+        if expandedExplorationIds.contains(clusterId) {
+            expandedExplorationIds.remove(clusterId)
+        } else {
+            expandedExplorationIds.insert(clusterId)
+        }
     }
 
     // MARK: - Status
@@ -139,6 +229,12 @@ struct ToolCallGroupView: View {
     private var statusColor: Color {
         if group.hasFailed { return ToolStatusPresentation.color(for: .failed) }
         if group.isInProgress { return ToolStatusPresentation.color(for: .inProgress) }
+        return ToolStatusPresentation.color(for: .completed)
+    }
+
+    private func explorationStatusColor(for cluster: ExplorationCluster) -> Color {
+        if cluster.hasFailed { return ToolStatusPresentation.color(for: .failed) }
+        if cluster.isInProgress { return ToolStatusPresentation.color(for: .inProgress) }
         return ToolStatusPresentation.color(for: .completed)
     }
 

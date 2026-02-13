@@ -176,10 +176,12 @@ extension ChatSessionViewModel {
         if !toolCallBuffer.isEmpty {
             turnToolCalls.append(contentsOf: toolCallBuffer)
             if isStreaming {
-                // Still streaming - show individual tool calls (no summary)
-                for call in toolCallBuffer {
-                    items.append(.toolCall(call))
-                }
+                // Still streaming - group exploration runs, keep other tools as individual rows.
+                appendStreamingToolCallItems(
+                    from: toolCallBuffer,
+                    lastAgentMessageId: lastAgentMessageId,
+                    into: &items
+                )
             } else {
                 // Streaming ended = TURN END
                 let group = createGroupFromBuffer(
@@ -297,6 +299,37 @@ extension ChatSessionViewModel {
         )
     }
 
+    /// While streaming, show read/search/grep runs as expandable groups and keep other tools as standalone rows.
+    private func appendStreamingToolCallItems(
+        from toolCalls: [ToolCall],
+        lastAgentMessageId: String?,
+        into items: inout [TimelineItem]
+    ) {
+        var explorationBuffer: [ToolCall] = []
+
+        func flushExplorationBuffer() {
+            guard !explorationBuffer.isEmpty else { return }
+            let group = createGroupFromBuffer(
+                toolCalls: explorationBuffer,
+                messageId: lastAgentMessageId,
+                isCompletedTurn: false
+            )
+            items.append(.toolCallGroup(group))
+            explorationBuffer.removeAll(keepingCapacity: true)
+        }
+
+        for call in toolCalls {
+            if ToolCallGroup.isExplorationCandidate(call) {
+                explorationBuffer.append(call)
+                continue
+            }
+
+            flushExplorationBuffer()
+            items.append(.toolCall(call))
+        }
+
+        flushExplorationBuffer()
+    }
     /// Sync messages incrementally - update existing or insert new
     /// When a new agent message is added, triggers timeline rebuild to group preceding tool calls
     func syncMessages(_ newMessages: [MessageItem]) {
@@ -399,6 +432,16 @@ extension ChatSessionViewModel {
         let removedIds = previousToolCallIds.subtracting(newIds)
         let hasStructuralChanges = !addedIds.isEmpty || !removedIds.isEmpty
         let isStreaming = currentAgentSession?.isStreaming ?? false
+
+        if isStreaming {
+            rebuildTimelineWithGrouping(isStreaming: true)
+            previousToolCallIds = newIds
+            if !addedIds.isEmpty, isNearBottom {
+                scrollToBottomDeferred()
+            }
+            return
+        }
+
         let updateBlock = { [self] in
             var updatedItems = timelineItems
             var updatedIndex = timelineIndex

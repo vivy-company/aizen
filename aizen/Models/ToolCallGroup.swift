@@ -31,6 +31,50 @@ struct FileChangeSummary: Identifiable {
     }
 }
 
+// MARK: - Tool Call Display Items
+
+/// Consecutive read/search/grep calls shown as one expandable row.
+struct ExplorationCluster: Identifiable {
+    let id: String
+    let toolCalls: [ToolCall]
+    let uniquePaths: [String]
+
+    var fileCount: Int {
+        let count = uniquePaths.count
+        return count > 0 ? count : 1
+    }
+
+    var summaryText: String {
+        let count = fileCount
+        if count == 1 {
+            return "Explored 1 file"
+        }
+        return "Explored \(count) files"
+    }
+
+    var hasFailed: Bool {
+        toolCalls.contains { $0.status == .failed }
+    }
+
+    var isInProgress: Bool {
+        toolCalls.contains { $0.status == .inProgress || $0.status == .pending }
+    }
+}
+
+enum ToolCallGroupDisplayItem: Identifiable {
+    case toolCall(ToolCall)
+    case exploration(ExplorationCluster)
+
+    var id: String {
+        switch self {
+        case .toolCall(let call):
+            return "call-\(call.id)"
+        case .exploration(let cluster):
+            return "exploration-\(cluster.id)"
+        }
+    }
+}
+
 // MARK: - Tool Call Group
 
 struct ToolCallGroup: Identifiable {
@@ -76,9 +120,45 @@ struct ToolCallGroup: Identifiable {
         Set(toolCalls.compactMap { $0.kind })
     }
 
+    /// Tool calls segmented for display. Consecutive read/search/grep calls become one exploration cluster.
+    var displayItems: [ToolCallGroupDisplayItem] {
+        var items: [ToolCallGroupDisplayItem] = []
+        var explorationBuffer: [ToolCall] = []
+        var explorationIndex = 0
+
+        func flushExplorationBuffer() {
+            guard !explorationBuffer.isEmpty else { return }
+            explorationIndex += 1
+            let cluster = ExplorationCluster(
+                id: Self.explorationClusterId(for: explorationBuffer, index: explorationIndex),
+                toolCalls: explorationBuffer,
+                uniquePaths: Self.uniqueExplorationPaths(for: explorationBuffer)
+            )
+            items.append(.exploration(cluster))
+            explorationBuffer.removeAll(keepingCapacity: true)
+        }
+
+        for call in toolCalls {
+            if Self.isExplorationCandidate(call) {
+                explorationBuffer.append(call)
+                continue
+            }
+
+            flushExplorationBuffer()
+            items.append(.toolCall(call))
+        }
+
+        flushExplorationBuffer()
+        return items
+    }
+
     /// Summary text (e.g., "5 tool calls")
     var summaryText: String {
-        String(localized: "\(toolCalls.count) tool calls")
+        if displayItems.count == 1,
+           case .exploration(let cluster) = displayItems[0] {
+            return cluster.summaryText
+        }
+        return String(localized: "\(toolCalls.count) tool calls")
     }
 
     /// All tool calls completed successfully
@@ -180,5 +260,128 @@ struct ToolCallGroup: Identifiable {
     /// Whether this group has file changes to show in summary
     var hasFileChanges: Bool {
         !fileChanges.isEmpty
+    }
+
+    // MARK: - Exploration Grouping Helpers
+
+    static func isExplorationCandidate(_ call: ToolCall) -> Bool {
+        if let kind = call.kind {
+            let rawValue = kind.rawValue.lowercased()
+            if rawValue == "read" || rawValue == "search" || rawValue == "grep" || rawValue == "list" {
+                return true
+            }
+            if kind == .execute && hasListIntent(call) {
+                return true
+            }
+        }
+
+        return hasListIntent(call)
+    }
+
+    private static func explorationClusterId(for calls: [ToolCall], index: Int) -> String {
+        let firstId = calls.first?.id ?? "unknown"
+        let lastId = calls.last?.id ?? firstId
+        return "\(index)-\(firstId)-\(lastId)-\(calls.count)"
+    }
+
+    private static func uniqueExplorationPaths(for calls: [ToolCall]) -> [String] {
+        var paths = Set<String>()
+        for call in calls {
+            paths.formUnion(explorationPaths(for: call))
+        }
+        return Array(paths).sorted()
+    }
+
+    private static func explorationPaths(for call: ToolCall) -> Set<String> {
+        var paths = Set<String>()
+
+        if let locations = call.locations {
+            for location in locations {
+                if let rawPath = location.path,
+                   let path = normalizePathCandidate(rawPath) {
+                    paths.insert(path)
+                }
+            }
+        }
+
+        for content in call.content {
+            if case .diff(let diff) = content,
+               let path = normalizePathCandidate(diff.path) {
+                paths.insert(path)
+            }
+        }
+
+        if let rawInput = call.rawInput?.value as? [String: Any] {
+            for key in ["path", "file", "filePath", "filepath"] {
+                if let value = rawInput[key] as? String,
+                   let normalized = normalizePathCandidate(value) {
+                    paths.insert(normalized)
+                }
+            }
+
+            if let pathList = rawInput["paths"] as? [String] {
+                for path in pathList {
+                    if let normalized = normalizePathCandidate(path) {
+                        paths.insert(normalized)
+                    }
+                }
+            }
+        }
+
+        if let titlePath = normalizePathTitle(call.title) {
+            paths.insert(titlePath)
+        }
+
+        return paths
+    }
+
+    private static func normalizePathCandidate(_ rawValue: String) -> String? {
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        guard !value.contains("\n"), !value.contains("\r") else { return nil }
+        return value
+    }
+
+    private static func normalizePathTitle(_ title: String) -> String? {
+        let value = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        guard value.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return nil }
+        if value.contains("/") || value.hasPrefix(".") || value.hasPrefix("~") {
+            return value
+        }
+        return nil
+    }
+
+    private static func hasListIntent(_ call: ToolCall) -> Bool {
+        let normalizedTitle = call.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalizedTitle.hasPrefix("list ") || normalizedTitle == "list" {
+            return true
+        }
+
+        if let rawInput = call.rawInput?.value as? [String: Any] {
+            if let command = rawInput["command"] as? String, isListCommand(command) {
+                return true
+            }
+            if let cmd = rawInput["cmd"] as? String, isListCommand(cmd) {
+                return true
+            }
+            if let args = rawInput["args"] as? [String], isListCommand(args.joined(separator: " ")) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private static func isListCommand(_ command: String) -> Bool {
+        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return false }
+
+        let firstToken = trimmed.split(whereSeparator: \.isWhitespace).first.map(String.init) ?? ""
+        if ["ls", "find", "fd", "tree", "dir", "rg", "ripgrep", "grep", "glob"].contains(firstToken) {
+            return true
+        }
+
+        return trimmed.contains(" --files") || trimmed.hasPrefix("list ")
     }
 }
