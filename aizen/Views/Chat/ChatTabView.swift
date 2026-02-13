@@ -84,7 +84,7 @@ struct ChatTabView: View {
         // Handle deleted worktree gracefully - use impossible predicate to return empty results
         let predicate: NSPredicate
         if let worktreeId = worktree.id {
-            predicate = NSPredicate(format: "worktree.id == %@", worktreeId as CVarArg)
+            predicate = NSPredicate(format: "worktree.id == %@ AND archived == NO", worktreeId as CVarArg)
         } else {
             predicate = NSPredicate(value: false)
         }
@@ -98,7 +98,7 @@ struct ChatTabView: View {
         let recentRequest: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
         if let worktreeId = worktree.id {
             recentRequest.predicate = NSPredicate(
-                format: "(worktree.id == %@ OR worktree == nil) AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
+                format: "worktree.id == %@ AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
                 worktreeId as CVarArg
             )
         } else {
@@ -623,14 +623,15 @@ struct ChatTabView: View {
 
     private func resumeRecentSession(_ session: ChatSession) {
         guard let sessionId = session.id else { return }
+        guard session.worktree?.id == worktree.id else { return }
 
-        if session.worktree == nil {
-            session.worktree = worktree
+        if session.archived {
+            session.archived = false
             do {
                 try viewContext.save()
                 viewContext.refresh(session, mergeChanges: false)
             } catch {
-                logger.error("Failed to reattach session: \(error.localizedDescription)")
+                logger.error("Failed to unarchive session: \(error.localizedDescription)")
                 return
             }
         }
@@ -661,6 +662,7 @@ struct ChatTabView: View {
         let session = ChatSession(context: context)
         session.id = UUID()
         session.agentName = agent
+        session.archived = false
         session.createdAt = Date()
         session.worktree = worktree
 

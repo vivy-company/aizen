@@ -21,7 +21,7 @@ struct WorktreeSessionManager {
     var chatSessions: [ChatSession] {
         let sessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
         return sessions
-            .filter { !$0.isDeleted }
+            .filter { !$0.isDeleted && !$0.archived }
             .sorted {
                 let lhsDate = $0.createdAt ?? Date()
                 let rhsDate = $1.createdAt ?? Date()
@@ -59,9 +59,8 @@ struct WorktreeSessionManager {
             }
         }
         
-        // Nullify the worktree relationship to "close" the tab
-        // The session remains in database for history
-        session.worktree = nil
+        // Keep session tied to this worktree and mark it archived so it can be resumed from history.
+        session.archived = true
         
         do {
             try context.save()
@@ -131,6 +130,7 @@ struct WorktreeSessionManager {
         let displayName = AgentRegistry.shared.getMetadata(for: agent)?.name ?? agent.capitalized
         session.title = displayName
         session.agentName = agent
+        session.archived = false
         session.createdAt = Date()
         session.worktree = worktree
 

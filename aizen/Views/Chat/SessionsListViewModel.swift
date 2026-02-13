@@ -148,8 +148,7 @@ final class SessionsListViewModel: ObservableObject {
         }
         
         if let worktreeId = worktreeId {
-            // Show sessions for this worktree AND closed sessions (worktree == nil)
-            let worktreePredicate = NSPredicate(format: "worktree.id == %@ OR worktree == nil", worktreeId as CVarArg)
+            let worktreePredicate = NSPredicate(format: "worktree.id == %@", worktreeId as CVarArg)
             predicates.append(worktreePredicate)
         }
         
@@ -208,7 +207,7 @@ final class SessionsListViewModel: ObservableObject {
         }
 
         if let worktreeId = worktreeId {
-            let worktreePredicate = NSPredicate(format: "worktree.id == %@ OR worktree == nil", worktreeId as CVarArg)
+            let worktreePredicate = NSPredicate(format: "worktree.id == %@", worktreeId as CVarArg)
             predicates.append(worktreePredicate)
         }
 
@@ -278,32 +277,15 @@ final class SessionsListViewModel: ObservableObject {
             return
         }
         
-        // If session is closed (worktree == nil), reattach to current worktree
-        if chatSession.worktree == nil {
-            guard let currentWorktreeId = selectedWorktreeId else {
-                errorMessage = "Open session history from an environment to resume closed sessions"
-                logger.error("Cannot resume closed session without worktree context")
-                return
-            }
-            
-            let fetchRequest: NSFetchRequest<Worktree> = Worktree.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "id == %@", currentWorktreeId as CVarArg)
-            
-            guard let worktree = try? chatSession.managedObjectContext?.fetch(fetchRequest).first else {
-                errorMessage = "Cannot find environment"
-                logger.error("Worktree not found for id: \(currentWorktreeId)")
-                return
-            }
-            
-            // Reattach session to current worktree
-            chatSession.worktree = worktree
+        if chatSession.archived {
+            chatSession.archived = false
             do {
                 try chatSession.managedObjectContext?.save()
                 chatSession.managedObjectContext?.refresh(chatSession, mergeChanges: false)
-                logger.info("Reattached closed session \(chatSessionId.uuidString) to environment \(worktree.id?.uuidString ?? "nil")")
+                logger.info("Unarchived session \(chatSessionId.uuidString) for resume")
             } catch {
-                errorMessage = "Failed to reattach session: \(error.localizedDescription)"
-                logger.error("Failed to save after reattaching: \(error.localizedDescription)")
+                errorMessage = "Failed to resume session: \(error.localizedDescription)"
+                logger.error("Failed to save after unarchiving: \(error.localizedDescription)")
                 return
             }
         }
