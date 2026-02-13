@@ -363,7 +363,7 @@ extension ChatSessionViewModel {
                 var updatedItems = timelineItems
                 updatedItems[idx] = .message(lastAgentMessage)
                 timelineItems = updatedItems
-                if isNearBottom {
+                if !userScrolledUp {
                     scrollToBottomDeferred()
                 }
                 previousMessageIds = newIds
@@ -422,9 +422,9 @@ extension ChatSessionViewModel {
         previousMessageIds = newIds
 
         // New message behavior:
-        // - If pinned, keep following bottom.
-        // - If not pinned, do nothing (user is reading history).
-        if !addedIds.isEmpty, isNearBottom {
+        // - If user hasn't scrolled up, keep following bottom.
+        // - If user scrolled up, do nothing (user is reading history).
+        if !addedIds.isEmpty, !userScrolledUp {
             scrollToBottomDeferred()
         }
     }
@@ -440,7 +440,7 @@ extension ChatSessionViewModel {
         if isStreaming {
             rebuildTimelineWithGrouping(isStreaming: true)
             previousToolCallIds = newIds
-            if !addedIds.isEmpty, isNearBottom {
+            if !addedIds.isEmpty, !userScrolledUp {
                 scrollToBottomDeferred()
             }
             return
@@ -539,6 +539,7 @@ extension ChatSessionViewModel {
     // MARK: - Scrolling
 
     func scrollToBottom() {
+        userScrolledUp = false
         requestScrollToBottom(force: true, animated: true)
     }
 
@@ -561,14 +562,14 @@ extension ChatSessionViewModel {
     }
 
     private func scheduleAutoScrollToBottom() {
-        guard isNearBottom else { return }
+        guard !userScrolledUp else { return }
         guard !suppressNextAutoScroll else { return }
         guard autoScrollTask == nil else { return }
 
         autoScrollTask = Task { @MainActor in
             defer { autoScrollTask = nil }
             try? await Task.sleep(for: .milliseconds(80))
-            if Task.isCancelled || !isNearBottom || suppressNextAutoScroll {
+            if Task.isCancelled || userScrolledUp || suppressNextAutoScroll {
                 return
             }
             scrollRequest = ScrollRequest(id: UUID(), target: .bottom, animated: false, force: false)

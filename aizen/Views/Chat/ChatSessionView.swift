@@ -92,7 +92,7 @@ struct ChatSessionView: View {
                         currentIterationId: viewModel.currentAgentSession?.currentIterationId,
                         scrollRequest: viewModel.scrollRequest,
                         turnAnchorMessageId: viewModel.turnAnchorMessageId,
-                        isAutoScrollEnabled: { viewModel.isNearBottom },
+                        isAutoScrollEnabled: { !viewModel.userScrolledUp },
                         isResizing: isLayoutResizing,
                         onAppear: viewModel.loadMessages,
                         renderInlineMarkdown: viewModel.renderInlineMarkdown,
@@ -108,6 +108,11 @@ struct ChatSessionView: View {
                             if !isLayoutResizing {
                                 if viewModel.isNearBottom != isNearBottom {
                                     viewModel.isNearBottom = isNearBottom
+                                }
+                                if isNearBottom {
+                                    viewModel.userScrolledUp = false
+                                } else if !viewModel.isProcessing && viewModel.autoScrollTask == nil {
+                                    viewModel.userScrolledUp = true
                                 }
                             }
                         },

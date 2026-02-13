@@ -91,6 +91,10 @@ class ChatSessionViewModel: ObservableObject {
     @Published var scrollRequest: ScrollRequest?
     @Published var turnAnchorMessageId: String?
     @Published var isNearBottom: Bool = true
+    /// Tracks user intent: true when user has actively scrolled up away from bottom.
+    /// Unlike isNearBottom (which flips on every content change), this only changes
+    /// on explicit user scroll gestures or forced scroll-to-bottom actions.
+    var userScrolledUp: Bool = false
     private var cancellables = Set<AnyCancellable>()
     private var notificationCancellables = Set<AnyCancellable>()
     private var wasStreaming: Bool = false
