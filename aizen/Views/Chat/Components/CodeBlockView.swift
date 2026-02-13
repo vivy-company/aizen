@@ -36,7 +36,6 @@ struct CodeBlockView: View {
     }
 
     @State private var highlightedText: AttributedString?
-    @State private var isHovering = false
     @State private var isExpanded = false
     @State private var didSetInitialExpand = false
     @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
@@ -123,7 +122,7 @@ struct CodeBlockView: View {
 
                 CopyHoverButton(
                     helpText: "Copy code",
-                    isHovered: isHovering,
+                    isHovered: false,
                     action: copyCode
                 )
 
@@ -166,11 +165,6 @@ struct CodeBlockView: View {
                 .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 4, x: 0, y: 2)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovering = hovering
-            }
-        }
         .task(id: trimmedCode.hashValue) {
             guard !didSetInitialExpand else { return }
             isExpanded = lineCount <= 12

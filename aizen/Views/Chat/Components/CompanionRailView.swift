@@ -117,43 +117,17 @@ struct CompanionRailView: View {
 }
 
 private struct PanelPickerButton: View {
-    @Environment(\.colorScheme) private var colorScheme
-
     let panel: CompanionPanel
     let onTap: () -> Void
-
-    @State private var isHovered = false
 
     var body: some View {
         Button(action: onTap) {
             Image(systemName: panel.icon)
                 .font(.system(size: 14, weight: .medium))
                 .frame(width: 34, height: 34)
-                .background {
-                    buttonBackground
-                }
                 .foregroundStyle(.primary)
-                .scaleEffect(isHovered ? 1.015 : 1.0)
         }
         .buttonStyle(.plain)
-        .help(panel.label)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isHovered = hovering
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var buttonBackground: some View {
-        let shape = Circle()
-
-        shape
-            .fill(isHovered ? Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.08) : .clear)
-            .overlay {
-                shape
-                    .strokeBorder(Color.primary.opacity(isHovered ? 0.10 : 0), lineWidth: 0.6)
-            }
     }
 }
 

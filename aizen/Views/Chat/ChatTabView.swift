@@ -503,7 +503,6 @@ struct ChatTabView: View {
                 }
         }
         .buttonStyle(.plain)
-        .help(agentMetadata.name)
     }
 
     private func loadEnabledAgents() {

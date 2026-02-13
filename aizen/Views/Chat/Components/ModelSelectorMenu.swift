@@ -86,7 +86,6 @@ struct ModelSelectorMenu: View {
         .buttonStyle(.plain)
         .disabled(session.isStreaming)  // Prevent model/agent changes during streaming
         .opacity(session.isStreaming ? 0.5 : 1.0)
-        .help(String(localized: "chat.model.select"))
         .onAppear {
             enabledAgents = AgentRegistry.shared.getEnabledAgents()
         }

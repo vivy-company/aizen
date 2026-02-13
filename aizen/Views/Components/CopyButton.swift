@@ -25,7 +25,6 @@ struct CopyButton: View {
                 .foregroundColor(showConfirmation ? .green : .secondary)
         }
         .buttonStyle(.plain)
-        .help("Copy to clipboard")
     }
 
     private func copyToClipboard() {

@@ -42,7 +42,6 @@ struct CodeBlockHeader: View {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: iconSize))
                     .foregroundStyle(.orange)
-                    .help(errorMessage ?? "Render error")
             }
 
             CopyHoverButton(

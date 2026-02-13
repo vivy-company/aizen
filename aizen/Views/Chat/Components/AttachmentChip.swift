@@ -22,7 +22,6 @@ struct AttachmentChip: View {
     var onDelete: (() -> Void)?
 
     @State private var showingDetail = false
-    @State private var isHovering = false
 
     var body: some View {
         AttachmentGlassCard(cornerRadius: style.cornerRadius) {
@@ -40,17 +39,11 @@ struct AttachmentChip: View {
 
                 if style.showsDelete, let onDelete {
                     DetailCloseButton(action: onDelete, size: 10)
-                        .opacity(style.showsHoverFade ? (isHovering ? 1 : 0.6) : 1)
+                        .opacity(1)
                 }
             }
             .padding(.horizontal, style.paddingHorizontal)
             .padding(.vertical, style.paddingVertical)
-        }
-        .onHover { hovering in
-            guard style.showsHoverFade else { return }
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovering = hovering
-            }
         }
         .sheet(isPresented: $showingDetail) {
             detailView ?? AnyView(EmptyView())

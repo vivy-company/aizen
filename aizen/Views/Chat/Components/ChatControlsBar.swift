@@ -52,7 +52,6 @@ struct ChatControlsBar: View {
                         .foregroundStyle(controlColor)
                     }
                     .buttonStyle(.plain)
-                    .help("Usage")
                 }
 
                 Button(action: onShowHistory) {
@@ -67,7 +66,6 @@ struct ChatControlsBar: View {
                     .foregroundStyle(controlColor)
                 }
                 .buttonStyle(.plain)
-                .help("Session history")
             }
         }
         .padding(.horizontal, Layout.horizontalPadding)

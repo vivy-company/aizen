@@ -56,8 +56,6 @@ struct TurnFileChip: View {
     let change: FileChangeSummary
     var onOpenInEditor: ((String) -> Void)?
 
-    @State private var isHovering = false
-
     var body: some View {
         Button {
             onOpenInEditor?(change.path)
@@ -88,15 +86,9 @@ struct TurnFileChip: View {
             .padding(.vertical, 2)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.primary.opacity(isHovering ? 0.08 : 0.04))
+                    .fill(Color.primary.opacity(0.04))
             )
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovering = hovering
-            }
-        }
-        .help(change.path)
     }
 }

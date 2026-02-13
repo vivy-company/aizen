@@ -42,7 +42,6 @@ struct CopyHoverButton: View {
             )
         }
         .buttonStyle(.plain)
-        .help(helpText)
     }
 
     private func handleCopy() {

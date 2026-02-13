@@ -55,7 +55,6 @@ struct MermaidDiagramView: View {
     @State private var isLoading = true
     @State private var hasError = false
     @State private var errorMessage: String?
-    @State private var isHovering = false
     @Environment(\.colorScheme) private var colorScheme
 
     private var headerBackground: Color {
@@ -76,7 +75,7 @@ struct MermaidDiagramView: View {
                 hasError: hasError,
                 errorMessage: errorMessage,
                 copyHelpText: "Copy Mermaid code",
-                isHovered: isHovering,
+                isHovered: false,
                 headerBackground: headerBackground,
                 onCopy: copyCode
             )
@@ -111,11 +110,6 @@ struct MermaidDiagramView: View {
                 .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 4, x: 0, y: 2)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovering = hovering
-            }
-        }
     }
 
     private var codeView: some View {

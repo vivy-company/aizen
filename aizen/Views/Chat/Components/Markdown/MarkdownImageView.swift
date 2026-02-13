@@ -113,7 +113,6 @@ struct MarkdownImageView: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 )
-                .help(error ?? "Failed to load")
         }
     }
 

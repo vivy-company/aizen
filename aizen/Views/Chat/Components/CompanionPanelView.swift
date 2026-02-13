@@ -19,7 +19,6 @@ struct CompanionPanelView: View {
     @Binding var terminalSessionId: UUID?
     @Binding var browserSessionId: UUID?
     @State private var fileToOpen: String?
-    @State private var isHoveringClose = false
     @State private var gitDiffSubtitle: String = ""
 
     var body: some View {
@@ -60,15 +59,9 @@ struct CompanionPanelView: View {
             } label: {
                 Image(systemName: side == .left ? "chevron.left.circle.fill" : "chevron.right.circle.fill")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(isHoveringClose ? .primary : .secondary)
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help("Collapse panel")
-            .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    isHoveringClose = hovering
-                }
-            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
