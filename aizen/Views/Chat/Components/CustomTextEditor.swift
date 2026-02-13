@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CodeEditSourceEditor
 
 struct CustomTextEditor: NSViewRepresentable {
     @Binding var text: String
@@ -334,9 +335,10 @@ struct CustomTextEditor: NSViewRepresentable {
             attributedString.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
 
             // Find and highlight @mentions (pattern: @followed by non-whitespace until space)
+            let mentionColor = mentionHighlightColor(for: textView)
             let matches = Self.mentionRegex?.matches(in: text, options: [], range: fullRange) ?? []
             for match in matches {
-                attributedString.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: match.range)
+                attributedString.addAttribute(.foregroundColor, value: mentionColor, range: match.range)
             }
 
             // Only update if there are actual mentions to highlight
@@ -348,6 +350,21 @@ struct CustomTextEditor: NSViewRepresentable {
                 }
             }
             didApplyMentionHighlight = !matches.isEmpty
+        }
+
+        private func mentionHighlightColor(for textView: NSTextView) -> NSColor {
+            let defaults = UserDefaults.standard
+            let terminalThemeName = defaults.string(forKey: "terminalThemeName") ?? "Aizen Dark"
+            let terminalThemeNameLight = defaults.string(forKey: "terminalThemeNameLight") ?? "Aizen Light"
+            let usePerAppearanceTheme = defaults.bool(forKey: "terminalUsePerAppearanceTheme")
+            let isDarkAppearance = textView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let effectiveThemeName = usePerAppearanceTheme
+                ? (isDarkAppearance ? terminalThemeName : terminalThemeNameLight)
+                : terminalThemeName
+            if let theme = GhosttyThemeParser.loadTheme(named: effectiveThemeName) {
+                return theme.insertionPoint
+            }
+            return NSColor.controlAccentColor
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

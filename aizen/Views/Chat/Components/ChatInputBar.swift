@@ -17,7 +17,7 @@ struct ChatInputBar: View {
         static let controlSize: CGFloat = 34
         static let attachmentControlSize: CGFloat = 30
         static let iconSize: CGFloat = 15
-        static let textTopInset: CGFloat = 6
+        static let textTopInset: CGFloat = 4
         static let textLeadingInset: CGFloat = 10
         static let minHeightNormal: CGFloat = 50
         static let minHeightVoice: CGFloat = 50
