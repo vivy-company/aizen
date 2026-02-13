@@ -87,7 +87,7 @@ struct ChatAttachmentsBar: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Layout.chipSpacing) {
-                ForEach(attachments) { attachment in
+                ForEach(Array(attachments.enumerated()), id: \.offset) { _, attachment in
                     ChatAttachmentChip(attachment: attachment) {
                         onRemoveAttachment(attachment)
                     }

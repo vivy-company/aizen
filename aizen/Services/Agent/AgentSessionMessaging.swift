@@ -51,17 +51,23 @@ extension AgentSession {
         // Build UI content blocks (for display - excludes prepended text from main block)
         var uiContentBlocks: [ContentBlock] = []
 
+        let availablePromptCapabilities = promptCapabilities
+        let isClaudeAgent = agentName.lowercased().contains("claude")
+        let supportsImagePrompts = availablePromptCapabilities?.image ?? !isClaudeAgent
+        let supportsEmbeddedContext = availablePromptCapabilities?.embeddedContext ?? !isClaudeAgent
+        let agentDisplayName = AgentRegistry.shared.getMetadata(for: agentName)?.name ?? agentName
+        let maxAttachmentSizeBytes = 10 * 1024 * 1024 // 10MB
+
         // Collect text-based attachments to prepend to message (for agent)
-        var prependedContent = ""
+        var prependedContentSegments: [String] = []
+        var attachmentWarnings: [String] = []
+        var hasAttachmentPromptContent = false
+
         for attachment in attachments {
             if let attachmentContent = attachment.contentForAgent {
-                prependedContent += attachmentContent + "\n\n"
+                prependedContentSegments.append(attachmentContent)
             }
         }
-
-        // Add text content (with attachments prepended if any) - this goes to agent
-        let fullContent = prependedContent.isEmpty ? content : prependedContent + content
-        contentBlocks.append(.text(TextContent(text: fullContent, annotations: nil, _meta: nil)))
 
         // For UI, only add the typed message as main text block
         uiContentBlocks.append(.text(TextContent(text: content, annotations: nil, _meta: nil)))
@@ -70,26 +76,56 @@ extension AgentSession {
         for attachment in attachments {
             switch attachment {
             case .image(let data, let mimeType):
-                // Pasted image - create ImageContent block
+                if data.count > maxAttachmentSizeBytes {
+                    let sizeText = ByteCountFormatter.string(
+                        fromByteCount: Int64(data.count),
+                        countStyle: .file
+                    )
+                    throw AgentSessionError.custom(
+                        "Image too large (\(sizeText)). Maximum size is 10MB."
+                    )
+                }
+
+                let encodedImageData = try await encodeBase64Async(data)
                 let imageContent = ImageContent(
-                    data: data.base64EncodedString(),
+                    data: encodedImageData,
                     mimeType: mimeType
                 )
-                contentBlocks.append(.image(imageContent))
                 uiContentBlocks.append(.image(imageContent))
+                if supportsImagePrompts {
+                    contentBlocks.append(.image(imageContent))
+                    hasAttachmentPromptContent = true
+                } else {
+                    let note = "Attached image omitted from prompt for \(agentDisplayName) because image input is not advertised."
+                    prependedContentSegments.append(note)
+                    attachmentWarnings.append(note)
+                }
 
             case .file(let url):
-                // Check if it's an image file
-                if attachment.isImage {
-                    if let imageBlock = try? await createImageBlock(from: url) {
+                uiContentBlocks.append(createResourceLinkBlock(from: url))
+
+                if attachment.isImage, supportsImagePrompts {
+                    do {
+                        let imageBlock = try await createImageBlock(from: url)
                         contentBlocks.append(imageBlock)
-                        uiContentBlocks.append(imageBlock)
+                        hasAttachmentPromptContent = true
+                    } catch {
+                        let warning = "Failed to attach image '\(url.lastPathComponent)': \(error.localizedDescription)"
+                        attachmentWarnings.append(warning)
+                    }
+                } else if supportsEmbeddedContext {
+                    do {
+                        let resourceBlock = try await createResourceBlock(from: url)
+                        contentBlocks.append(resourceBlock)
+                        hasAttachmentPromptContent = true
+                    } catch {
+                        let warning = "Failed to attach file '\(url.lastPathComponent)': \(error.localizedDescription)"
+                        attachmentWarnings.append(warning)
                     }
                 } else {
-                    if let resourceBlock = try? await createResourceBlock(from: url) {
-                        contentBlocks.append(resourceBlock)
-                        uiContentBlocks.append(resourceBlock)
-                    }
+                    let note = makePathReferenceNote(for: url, agentDisplayName: agentDisplayName)
+                    prependedContentSegments.append(note)
+                    attachmentWarnings.append(note)
                 }
 
             case .text(let pastedText):
@@ -106,9 +142,32 @@ extension AgentSession {
             }
         }
 
+        // Add text content (with attachments prepended if any) - this goes to agent
+        let prependedContent = prependedContentSegments.joined(separator: "\n\n")
+        let fullContent: String
+        if prependedContent.isEmpty {
+            fullContent = content
+        } else if content.isEmpty {
+            fullContent = prependedContent
+        } else {
+            fullContent = prependedContent + "\n\n" + content
+        }
+
+        if fullContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasAttachmentPromptContent {
+            throw AgentSessionError.custom("No valid attachment content could be sent.")
+        }
+
+        contentBlocks.insert(.text(TextContent(text: fullContent, annotations: nil, _meta: nil)), at: 0)
+
         // Add user message to UI with UI content blocks (typed text + attachments, not prepended content)
         addUserMessage(content, contentBlocks: uiContentBlocks)
         AgentUsageStore.shared.recordPrompt(agentId: agentName, attachmentsCount: attachments.count)
+
+        if !attachmentWarnings.isEmpty {
+            addSystemMessage(
+                "Some attachments were not sent as binary content:\n\(attachmentWarnings.joined(separator: "\n"))"
+            )
+        }
 
         // Mark streaming active before sending
         isStreaming = true
@@ -185,10 +244,12 @@ extension AgentSession {
     /// Create an image content block from a file URL
     func createImageBlock(from url: URL) async throws -> ContentBlock {
         // Ensure we can access the file
-        guard url.startAccessingSecurityScopedResource() else {
-            throw AgentSessionError.custom("Cannot access file: \(url.lastPathComponent)")
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
         }
-        defer { url.stopAccessingSecurityScopedResource() }
 
         // Check file size (limit to 10MB)
         let maxFileSize = 10 * 1024 * 1024  // 10MB
@@ -204,9 +265,10 @@ extension AgentSession {
 
         // Read image data
         let data = try await readDataFileAsync(url: url)
+        let encodedImageData = try await encodeBase64Async(data)
 
         let imageContent = ImageContent(
-            data: data.base64EncodedString(),
+            data: encodedImageData,
             mimeType: mimeType,
             uri: url.absoluteString
         )
@@ -216,10 +278,12 @@ extension AgentSession {
     /// Create a resource content block from a file URL
     func createResourceBlock(from url: URL) async throws -> ContentBlock {
         // Ensure we can access the file
-        guard url.startAccessingSecurityScopedResource() else {
-            throw AgentSessionError.custom("Cannot access file: \(url.lastPathComponent)")
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
         }
-        defer { url.stopAccessingSecurityScopedResource() }
 
         // Check file size (limit to 10MB)
         let maxFileSize = 10 * 1024 * 1024  // 10MB
@@ -256,7 +320,7 @@ extension AgentSession {
         } else {
             // Read as binary asynchronously and base64 encode
             let data = try await readDataFileAsync(url: url)
-            let base64 = data.base64EncodedString()
+            let base64 = try await encodeBase64Async(data)
             let blobResource = EmbeddedBlobResourceContents(
                 blob: base64,
                 uri: url.absoluteString,
@@ -300,12 +364,48 @@ extension AgentSession {
         }
     }
 
+    /// Asynchronously base64-encode binary payloads off the main actor
+    private func encodeBase64Async(_ data: Data) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: data.base64EncodedString())
+            }
+        }
+    }
+
     /// Get MIME type from file URL
     func getMimeType(for url: URL) -> String? {
         if let utType = UTType(filenameExtension: url.pathExtension) {
             return utType.preferredMIMEType
         }
         return nil
+    }
+
+    private func createResourceLinkBlock(from url: URL) -> ContentBlock {
+        let fileSize: Int?
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+           let size = attributes[.size] as? Int64,
+           size <= Int64(Int.max) {
+            fileSize = Int(size)
+        } else {
+            fileSize = nil
+        }
+
+        let link = ResourceLinkContent(
+            uri: url.absoluteString,
+            name: url.lastPathComponent,
+            title: nil,
+            description: nil,
+            mimeType: getMimeType(for: url),
+            size: fileSize,
+            annotations: nil,
+            _meta: nil
+        )
+        return .resourceLink(link)
+    }
+
+    private func makePathReferenceNote(for url: URL, agentDisplayName: String) -> String {
+        "Attached file path for \(agentDisplayName): \(url.path)"
     }
 
     // MARK: - Message Management

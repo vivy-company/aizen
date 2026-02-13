@@ -29,7 +29,8 @@ struct ChatAttachmentChip: View {
         case .file(let url):
             FileIconView(path: url.path, size: 16)
         case .image(let data, _):
-            if let nsImage = NSImage(data: data) {
+            let maxInlinePreviewBytes = 2 * 1024 * 1024
+            if data.count <= maxInlinePreviewBytes, let nsImage = NSImage(data: data) {
                 Image(nsImage: nsImage)
                     .resizable()
                     .scaledToFill()

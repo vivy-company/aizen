@@ -122,6 +122,7 @@ class AgentSession: ObservableObject, ClientDelegate {
     private let terminalDelegate = AgentTerminalDelegate()
     let permissionHandler = AgentPermissionHandler()
     private var agentCapabilities: AgentCapabilities?
+    var promptCapabilities: PromptCapabilities? { agentCapabilities?.promptCapabilities }
 
     // MARK: - Initialization
 
