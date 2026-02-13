@@ -45,6 +45,7 @@ struct ContentView: View {
     @AppStorage("selectedRepositoryId") private var selectedRepositoryId: String?
     @AppStorage("selectedWorktreeId") private var selectedWorktreeId: String?
     @AppStorage("selectedWorktreeByRepository") private var selectedWorktreeByRepositoryData: String = "{}"
+    @State private var suppressWorkspaceAutoSelection = false
     private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
     init(context: NSManagedObjectContext, repositoryManager: RepositoryManager, gitChangesContext: Binding<GitChangesContext?>) {
@@ -202,6 +203,11 @@ struct ContentView: View {
         }
         .onChange(of: selectedWorkspace) { _, newValue in
             selectedWorkspaceId = newValue?.id?.uuidString
+
+            if suppressWorkspaceAutoSelection {
+                suppressWorkspaceAutoSelection = false
+                return
+            }
 
             if isCrossProjectSelected {
                 isCrossProjectSelected = false
@@ -563,9 +569,32 @@ struct ContentView: View {
             return
         }
 
+        if selectedWorkspace?.id != workspaceId {
+            suppressWorkspaceAutoSelection = true
+        }
         selectedWorkspace = workspace
 
         let allRepositories = (workspace.repositories as? Set<Repository>) ?? []
+        let allWorkspaceWorktrees = allRepositories.flatMap { (repository) -> [Worktree] in
+            ((repository.worktrees as? Set<Worktree>) ?? []).filter { !$0.isDeleted }
+        }
+
+        if let targetWorktree = allWorkspaceWorktrees.first(where: { $0.id == worktreeId }),
+           let targetRepository = targetWorktree.repository {
+            if isCrossProjectRepository(targetRepository) {
+                isCrossProjectSelected = true
+                selectedRepository = nil
+                selectedWorktree = nil
+                crossProjectWorktree = targetWorktree
+                return
+            }
+
+            isCrossProjectSelected = false
+            selectedRepository = targetRepository
+            selectedWorktree = targetWorktree
+            return
+        }
+
         if let crossProjectRepository = allRepositories.first(where: { $0.id == repoId && isCrossProjectRepository($0) }) {
             isCrossProjectSelected = true
             selectedRepository = nil
