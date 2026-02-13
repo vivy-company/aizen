@@ -90,13 +90,7 @@ class ChatSessionViewModel: ObservableObject {
 
     @Published var scrollRequest: ScrollRequest?
     @Published var turnAnchorMessageId: String?
-    @Published var isNearBottom: Bool = true {
-        didSet {
-            if !isNearBottom {
-                cancelPendingAutoScroll()
-            }
-        }
-    }
+    @Published var isNearBottom: Bool = true
     private var cancellables = Set<AnyCancellable>()
     private var notificationCancellables = Set<AnyCancellable>()
     private var wasStreaming: Bool = false

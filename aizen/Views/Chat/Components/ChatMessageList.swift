@@ -34,8 +34,6 @@ struct ChatMessageList: View {
 
     @State private var showLoadingView = false
     @State private var loadingStartTime: Date?
-    @State private var cachedThoughtText: String?
-    @State private var cachedThoughtRendered: AttributedString = AttributedString("")
     @State private var loadedTimelineItemCount: Int = 0
     @State private var isShowingFullHistory: Bool = false
     @State private var lastReportedBottomVisibility: Bool?
@@ -105,15 +103,11 @@ struct ChatMessageList: View {
         .onChange(of: shouldShowLoading) { _, newValue in
             handleLoadingChange(newValue)
         }
-        .onChange(of: currentThought) { _, newThought in
-            updateCachedThought(newThought)
-        }
         .onAppear {
             if shouldShowLoading {
                 showLoadingView = true
                 loadingStartTime = Date()
             }
-            updateCachedThought(currentThought)
         }
     }
 
@@ -141,12 +135,6 @@ struct ChatMessageList: View {
                             .id("plan-request-\(planRequestIdentity)")
                     }
 
-                    if isProcessing {
-                        processingIndicator
-                            .padding(.horizontal, systemAndThinkingHorizontalPadding)
-                            .id("processing")
-                    }
-
                     bottomVisibilitySensor
                 }
                 .padding(.vertical, 12)
@@ -160,11 +148,6 @@ struct ChatMessageList: View {
             }
             .onChange(of: visibleItems.count) { oldCount, newCount in
                 updateTimelineWindowOnCountChange(oldCount: oldCount, newCount: newCount)
-            }
-            .onChange(of: isProcessing) { _, _ in
-                if isAutoScrollEnabled() {
-                    scheduleScrollToBottom(proxy: proxy, animated: true)
-                }
             }
             .onChange(of: planRequestIdentity) { _, _ in
                 if isAutoScrollEnabled() {
@@ -245,31 +228,6 @@ struct ChatMessageList: View {
         }
     }
 
-    // MARK: - Processing Indicator
-
-    private var processingIndicator: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.mini)
-                .frame(width: 14, height: 14)
-
-            if currentThought != nil {
-                Text(cachedThoughtRendered)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .modifier(ShimmerEffect(bandSize: 0.38, duration: 2.2, baseOpacity: 0.08, highlightOpacity: 1.0))
-            } else {
-                Text("chat.agent.thinking", bundle: .main)
-                    .font(.callout)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.secondary)
-                    .modifier(ShimmerEffect(bandSize: 0.38, duration: 2.2, baseOpacity: 0.08, highlightOpacity: 1.0))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     @ViewBuilder
     private var bottomVisibilitySensor: some View {
         Color.clear
@@ -328,10 +286,13 @@ struct ChatMessageList: View {
         switch request.target {
         case .bottom:
             if request.force {
-                reportBottomVisibility(true)
-                scheduleScrollToBottom(proxy: proxy, animated: request.animated, respectAutoScroll: false)
+                // Force isNearBottom via callback, bypassing dedup guard
+                lastReportedBottomVisibility = true
+                onScrollPositionChange(true)
+                scrollToBottomIfNeeded(proxy: proxy, animated: request.animated)
+                // Second attempt after layout pass to ensure we reach the actual bottom
                 Task { @MainActor in
-                    await Task.yield()
+                    try? await Task.sleep(for: .milliseconds(50))
                     scrollToBottomIfNeeded(proxy: proxy, animated: false)
                 }
                 return
@@ -492,15 +453,6 @@ struct ChatMessageList: View {
         }
     }
 
-    private func updateCachedThought(_ thought: String?) {
-        guard thought != cachedThoughtText else { return }
-        cachedThoughtText = thought
-        if let thought {
-            cachedThoughtRendered = renderInlineMarkdown(thought)
-        } else {
-            cachedThoughtRendered = AttributedString("")
-        }
-    }
 }
 
 private struct ScrollBottomObserver: NSViewRepresentable {
@@ -679,6 +631,53 @@ private struct ScrollBottomObserver: NSViewRepresentable {
                 node = current.superview
             }
             return nil
+        }
+    }
+}
+
+// MARK: - Processing Indicator (fixed above input bar)
+
+struct ChatProcessingIndicator: View {
+    let currentThought: String?
+    let renderInlineMarkdown: (String) -> AttributedString
+
+    @State private var cachedThoughtText: String?
+    @State private var cachedThoughtRendered: AttributedString = AttributedString("")
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.mini)
+                .frame(width: 14, height: 14)
+
+            if cachedThoughtText != nil {
+                Text(cachedThoughtRendered)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .modifier(ShimmerEffect(bandSize: 0.38, duration: 2.2, baseOpacity: 0.08, highlightOpacity: 1.0))
+            } else {
+                Text("chat.agent.thinking", bundle: .main)
+                    .font(.callout)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.secondary)
+                    .modifier(ShimmerEffect(bandSize: 0.38, duration: 2.2, baseOpacity: 0.08, highlightOpacity: 1.0))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear { updateCachedThought(currentThought) }
+        .onChange(of: currentThought) { _, newThought in
+            updateCachedThought(newThought)
+        }
+    }
+
+    private func updateCachedThought(_ thought: String?) {
+        guard thought != cachedThoughtText else { return }
+        cachedThoughtText = thought
+        if let thought {
+            cachedThoughtRendered = renderInlineMarkdown(thought)
+        } else {
+            cachedThoughtRendered = AttributedString("")
         }
     }
 }

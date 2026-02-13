@@ -129,6 +129,15 @@ struct ChatSessionView: View {
                 Spacer(minLength: 0)
 
                 VStack(spacing: 10) {
+                    if viewModel.isProcessing {
+                        ChatProcessingIndicator(
+                            currentThought: viewModel.currentAgentSession?.currentThought,
+                            renderInlineMarkdown: viewModel.renderInlineMarkdown
+                        )
+                        .padding(.horizontal, 28)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
                     if let agentSession = viewModel.currentAgentSession,
                        let request = currentPermissionRequest {
                         PlanApprovalPickerView(
