@@ -24,7 +24,8 @@ struct ChatTabView: View {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ChatTabView")
     @State private var enabledAgents: [AgentMetadata] = []
     @State private var cachedSessionIds: [UUID] = []
-    private let maxCachedSessions = 10
+    // Keep only the active chat session mounted to avoid hidden view layout churn.
+    private let maxCachedSessions = 1
     private let recentSessionsLimit = 3
 
     // Companion panel state (persisted) - Left

@@ -1066,8 +1066,9 @@ struct SelectableTextView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var renderKey: Int?
         var measuredRenderKey: Int?
-        var measuredWidth: CGFloat?
-        var measuredSize: CGSize?
+        var measuredSizesByWidth: [Int: CGSize] = [:]
+        let maxCachedWidths = 8
+        var lastResolvedWidth: CGFloat = 0
         var basePath: String?
         var onOpenFileInEditor: ((String) -> Void)?
 
@@ -1112,8 +1113,9 @@ struct SelectableTextView: NSViewRepresentable {
         textView.textContainerInset = .zero
         if let container = textView.textContainer {
             container.lineFragmentPadding = 0
-            container.widthTracksTextView = false
+            container.widthTracksTextView = true
             container.heightTracksTextView = false
+            container.containerSize = NSSize(width: 1, height: CGFloat.greatestFiniteMagnitude)
         }
         textView.isVerticallyResizable = false
         textView.isHorizontallyResizable = false
@@ -1131,8 +1133,7 @@ struct SelectableTextView: NSViewRepresentable {
         guard context.coordinator.renderKey != key else { return }
         context.coordinator.renderKey = key
         context.coordinator.measuredRenderKey = nil
-        context.coordinator.measuredWidth = nil
-        context.coordinator.measuredSize = nil
+        context.coordinator.measuredSizesByWidth.removeAll(keepingCapacity: true)
         textView.textStorage?.setAttributedString(
             content.nsAttributedString(
                 baseFont: baseFont,
@@ -1144,31 +1145,53 @@ struct SelectableTextView: NSViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: FixedTextView, context: Context) -> CGSize? {
-        guard let layoutManager = nsView.layoutManager,
-              let container = nsView.textContainer else {
+        let proposedWidth = proposal.width ?? nsView.bounds.width
+        let resolvedWidth: CGFloat
+        if proposedWidth > 0.5 {
+            resolvedWidth = proposedWidth
+        } else if context.coordinator.lastResolvedWidth > 0.5 {
+            resolvedWidth = context.coordinator.lastResolvedWidth
+        } else {
+            // In lazy containers the first measurement can arrive without a stable width.
+            // Defer until SwiftUI provides a concrete width to avoid bad height estimates.
             return nil
         }
-
-        // Use proposed width, fallback to reasonable default for text readability
-        let proposedWidth = proposal.width ?? nsView.bounds.width
-        let width = max((proposedWidth > 0 ? proposedWidth : 800).rounded(.towardZero), 1)
+        let width = max(resolvedWidth.rounded(.towardZero), 1)
+        context.coordinator.lastResolvedWidth = width
+        let widthKey = Int(width.rounded(.toNearestOrAwayFromZero))
         let key = context.coordinator.renderKey ?? makeRenderKey()
         if context.coordinator.measuredRenderKey == key,
-           let cachedWidth = context.coordinator.measuredWidth,
-           abs(cachedWidth - width) < 0.5,
-           let cachedSize = context.coordinator.measuredSize {
+           let cachedSize = context.coordinator.measuredSizesByWidth[widthKey] {
             return cachedSize
         }
 
-        container.containerSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
-        layoutManager.ensureLayout(for: container)
-
-        let rect = layoutManager.usedRect(for: container)
-        let measuredSize = CGSize(width: width, height: max(rect.height + 2, 16))
+        let measuredSize = measureTextView(nsView, width: width)
         context.coordinator.measuredRenderKey = key
-        context.coordinator.measuredWidth = width
-        context.coordinator.measuredSize = measuredSize
+        context.coordinator.measuredSizesByWidth[widthKey] = measuredSize
+        if context.coordinator.measuredSizesByWidth.count > context.coordinator.maxCachedWidths,
+           let oldestKey = context.coordinator.measuredSizesByWidth.keys.min() {
+            context.coordinator.measuredSizesByWidth.removeValue(forKey: oldestKey)
+        }
         return measuredSize
+    }
+
+    private func measureTextView(_ textView: FixedTextView, width: CGFloat) -> CGSize {
+        guard let textContainer = textView.textContainer,
+              let layoutManager = textView.layoutManager else {
+            return CGSize(width: width, height: 16)
+        }
+
+        let clampedWidth = max(width.rounded(.towardZero), 1)
+        if abs(textView.frame.width - clampedWidth) > 0.5 {
+            textView.setFrameSize(NSSize(width: clampedWidth, height: textView.frame.height))
+        }
+        textContainer.containerSize = NSSize(width: clampedWidth, height: CGFloat.greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: textContainer)
+
+        let usedRect = layoutManager.usedRect(for: textContainer)
+        let insetHeight = textView.textContainerInset.height * 2
+        let measuredHeight = max(ceil(usedRect.height + insetHeight + 2), 16)
+        return CGSize(width: clampedWidth, height: measuredHeight)
     }
 
     private func makeRenderKey() -> Int {
@@ -1205,8 +1228,9 @@ struct CombinedSelectableTextView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var revision: UInt64 = .max
         var measuredRevision: UInt64 = .max
-        var measuredWidth: CGFloat?
-        var measuredSize: CGSize?
+        var measuredSizesByWidth: [Int: CGSize] = [:]
+        let maxCachedWidths = 8
+        var lastResolvedWidth: CGFloat = 0
         var basePath: String?
         var onOpenFileInEditor: ((String) -> Void)?
 
@@ -1251,8 +1275,9 @@ struct CombinedSelectableTextView: NSViewRepresentable {
         textView.textContainerInset = .zero
         if let container = textView.textContainer {
             container.lineFragmentPadding = 0
-            container.widthTracksTextView = false
+            container.widthTracksTextView = true
             container.heightTracksTextView = false
+            container.containerSize = NSSize(width: 1, height: CGFloat.greatestFiniteMagnitude)
         }
         textView.isVerticallyResizable = false
         textView.isHorizontallyResizable = false
@@ -1269,36 +1294,57 @@ struct CombinedSelectableTextView: NSViewRepresentable {
         guard context.coordinator.revision != revision else { return }
         context.coordinator.revision = revision
         context.coordinator.measuredRevision = .max
-        context.coordinator.measuredWidth = nil
-        context.coordinator.measuredSize = nil
+        context.coordinator.measuredSizesByWidth.removeAll(keepingCapacity: true)
         textView.textStorage?.setAttributedString(attributedText)
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: FixedTextView, context: Context) -> CGSize? {
-        guard let layoutManager = nsView.layoutManager,
-              let container = nsView.textContainer else {
+        let proposedWidth = proposal.width ?? nsView.bounds.width
+        let resolvedWidth: CGFloat
+        if proposedWidth > 0.5 {
+            resolvedWidth = proposedWidth
+        } else if context.coordinator.lastResolvedWidth > 0.5 {
+            resolvedWidth = context.coordinator.lastResolvedWidth
+        } else {
+            // In lazy containers the first measurement can arrive without a stable width.
+            // Defer until SwiftUI provides a concrete width to avoid bad height estimates.
             return nil
         }
-
-        // Use proposed width, fallback to reasonable default for text readability
-        let proposedWidth = proposal.width ?? nsView.bounds.width
-        let width = max((proposedWidth > 0 ? proposedWidth : 800).rounded(.towardZero), 1)
+        let width = max(resolvedWidth.rounded(.towardZero), 1)
+        context.coordinator.lastResolvedWidth = width
+        let widthKey = Int(width.rounded(.toNearestOrAwayFromZero))
         if context.coordinator.measuredRevision == revision,
-           let cachedWidth = context.coordinator.measuredWidth,
-           abs(cachedWidth - width) < 0.5,
-           let cachedSize = context.coordinator.measuredSize {
+           let cachedSize = context.coordinator.measuredSizesByWidth[widthKey] {
             return cachedSize
         }
 
-        container.containerSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
-        layoutManager.ensureLayout(for: container)
-
-        let rect = layoutManager.usedRect(for: container)
-        let measuredSize = CGSize(width: width, height: max(rect.height + 2, 16))
+        let measuredSize = measureTextView(nsView, width: width)
         context.coordinator.measuredRevision = revision
-        context.coordinator.measuredWidth = width
-        context.coordinator.measuredSize = measuredSize
+        context.coordinator.measuredSizesByWidth[widthKey] = measuredSize
+        if context.coordinator.measuredSizesByWidth.count > context.coordinator.maxCachedWidths,
+           let oldestKey = context.coordinator.measuredSizesByWidth.keys.min() {
+            context.coordinator.measuredSizesByWidth.removeValue(forKey: oldestKey)
+        }
         return measuredSize
+    }
+
+    private func measureTextView(_ textView: FixedTextView, width: CGFloat) -> CGSize {
+        guard let textContainer = textView.textContainer,
+              let layoutManager = textView.layoutManager else {
+            return CGSize(width: width, height: 16)
+        }
+
+        let clampedWidth = max(width.rounded(.towardZero), 1)
+        if abs(textView.frame.width - clampedWidth) > 0.5 {
+            textView.setFrameSize(NSSize(width: clampedWidth, height: textView.frame.height))
+        }
+        textContainer.containerSize = NSSize(width: clampedWidth, height: CGFloat.greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: textContainer)
+
+        let usedRect = layoutManager.usedRect(for: textContainer)
+        let insetHeight = textView.textContainerInset.height * 2
+        let measuredHeight = max(ceil(usedRect.height + insetHeight + 2), 16)
+        return CGSize(width: clampedWidth, height: measuredHeight)
     }
 }
 

@@ -55,8 +55,7 @@ struct CompanionGitDiffView: View {
             } else if isLoadingDiff && diffOutput.isEmpty {
                 VStack {
                     Spacer()
-                    ProgressView()
-                        .scaleEffect(0.8)
+                    CompanionDiffSpinner()
                     Text(String(localized: "git.diff.loading"))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -246,5 +245,31 @@ struct CompanionGitDiffView: View {
         }
 
         return parts.joined(separator: "\n") + "\n"
+    }
+}
+
+private struct CompanionDiffSpinner: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isAnimating = false
+
+    var body: some View {
+        Circle()
+            .trim(from: 0.18, to: 0.92)
+            .stroke(
+                Color.secondary.opacity(0.85),
+                style: StrokeStyle(lineWidth: 2, lineCap: .round)
+            )
+            .frame(width: 18, height: 18)
+            .rotationEffect(.degrees(isAnimating ? 360 : 0))
+            .animation(
+                reduceMotion ? .none : .linear(duration: 0.9).repeatForever(autoreverses: false),
+                value: isAnimating
+            )
+            .onAppear {
+                isAnimating = true
+            }
+            .onDisappear {
+                isAnimating = false
+            }
     }
 }

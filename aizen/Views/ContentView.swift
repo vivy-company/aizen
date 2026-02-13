@@ -27,7 +27,6 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var showingAddRepository = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var previousWorktree: Worktree?
     @State private var zenModeBeforeCrossProjectSelection: Bool?
     @AppStorage("hasShownOnboarding") private var hasShownOnboarding = false
     @State private var showingOnboarding = false
@@ -45,6 +44,7 @@ struct ContentView: View {
     @AppStorage("selectedRepositoryId") private var selectedRepositoryId: String?
     @AppStorage("selectedWorktreeId") private var selectedWorktreeId: String?
     @AppStorage("selectedWorktreeByRepository") private var selectedWorktreeByRepositoryData: String = "{}"
+    @AppStorage("worktreeMRUOrder") private var worktreeMRUOrderData: String = "[]"
     @State private var suppressWorkspaceAutoSelection = false
     private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
@@ -271,7 +271,7 @@ struct ContentView: View {
             selectedWorktreeId = newValue?.id?.uuidString
 
             if let newWorktree = newValue, !newWorktree.isDeleted {
-                previousWorktree = newWorktree
+                recordWorktreeInMRU(newWorktree)
                 if let repository = selectedRepository {
                     storeWorktreeSelection(newWorktree.id, for: repository)
                 }
@@ -287,6 +287,12 @@ struct ContentView: View {
                     selectedWorktree = worktrees.first(where: { $0.isPrimary && !$0.isDeleted })
                 }
             }
+        }
+        .onChange(of: crossProjectWorktree?.id?.uuidString) { _, _ in
+            guard isCrossProjectSelected, let worktree = crossProjectWorktree, !worktree.isDeleted else {
+                return
+            }
+            recordWorktreeInMRU(worktree)
         }
         .onChange(of: isCrossProjectSelected) { _, newValue in
             if newValue {
@@ -496,18 +502,91 @@ struct ContentView: View {
             return
         }
 
+        let activeWorktree = currentActiveWorktree()
         let currentRepositoryId = selectedRepository?.id?.uuidString
-            ?? selectedWorktree?.repository?.id?.uuidString
+            ?? activeWorktree?.repository?.id?.uuidString
+        let currentWorkspaceId = selectedWorkspace?.id?.uuidString
+            ?? activeWorktree?.repository?.workspace?.id?.uuidString
 
         let controller = CommandPaletteWindowController(
             managedObjectContext: viewContext,
             currentRepositoryId: currentRepositoryId,
-            onNavigate: { workspaceId, repoId, worktreeId in
-                navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
+            currentWorkspaceId: currentWorkspaceId,
+            onNavigate: { action in
+                handleCommandPaletteNavigation(action)
             }
         )
         commandPaletteController = controller
         controller.showWindow(nil)
+    }
+
+    private func handleCommandPaletteNavigation(_ action: CommandPaletteNavigationAction) {
+        switch action {
+        case .worktree(let workspaceId, let repoId, let worktreeId):
+            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
+        case .tab(let workspaceId, let repoId, let worktreeId, let tabId):
+            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
+            postNavigationNotification(
+                name: .switchToWorktreeTab,
+                userInfo: [
+                    "worktreeId": worktreeId,
+                    "tabId": tabId
+                ],
+                primaryDelay: 0.08,
+                retryDelay: 0.22
+            )
+        case .chatSession(let workspaceId, let repoId, let worktreeId, let sessionId):
+            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
+            postNavigationNotification(
+                name: .switchToChatSession,
+                userInfo: ["chatSessionId": sessionId],
+                primaryDelay: 0.1,
+                retryDelay: 0.24
+            )
+        case .terminalSession(let workspaceId, let repoId, let worktreeId, let sessionId):
+            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
+            postNavigationNotification(
+                name: .switchToTerminalSession,
+                userInfo: [
+                    "worktreeId": worktreeId,
+                    "sessionId": sessionId
+                ],
+                primaryDelay: 0.1,
+                retryDelay: 0.24
+            )
+        case .browserSession(let workspaceId, let repoId, let worktreeId, let sessionId):
+            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
+            postNavigationNotification(
+                name: .switchToBrowserSession,
+                userInfo: [
+                    "worktreeId": worktreeId,
+                    "sessionId": sessionId
+                ],
+                primaryDelay: 0.1,
+                retryDelay: 0.24
+            )
+        }
+    }
+
+    private func postNavigationNotification(
+        name: Notification.Name,
+        userInfo: [String: Any],
+        primaryDelay: TimeInterval,
+        retryDelay: TimeInterval
+    ) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + primaryDelay) {
+            NotificationCenter.default.post(name: name, object: nil, userInfo: userInfo)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + retryDelay) {
+            NotificationCenter.default.post(name: name, object: nil, userInfo: userInfo)
+        }
+    }
+
+    private func currentActiveWorktree() -> Worktree? {
+        if isCrossProjectSelected {
+            return crossProjectWorktree
+        }
+        return selectedWorktree
     }
 
     private func decodeSelectedWorktreeByRepository() -> [String: String] {
@@ -544,15 +623,92 @@ struct ContentView: View {
         encodeSelectedWorktreeByRepository(map)
     }
 
+    private func decodeWorktreeMRUOrder() -> [String] {
+        guard let data = worktreeMRUOrderData.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return decoded
+    }
+
+    private func encodeWorktreeMRUOrder(_ order: [String]) {
+        guard let encoded = try? JSONEncoder().encode(order),
+              let json = String(data: encoded, encoding: .utf8) else {
+            return
+        }
+        worktreeMRUOrderData = json
+    }
+
+    private func recordWorktreeInMRU(_ worktree: Worktree) {
+        guard !worktree.isDeleted, let worktreeId = worktree.id?.uuidString else {
+            return
+        }
+
+        var order = decodeWorktreeMRUOrder()
+        order.removeAll { $0 == worktreeId }
+        order.insert(worktreeId, at: 0)
+
+        if order.count > 100 {
+            order = Array(order.prefix(100))
+        }
+
+        encodeWorktreeMRUOrder(order)
+    }
+
+    private func sanitizedMRUOrder(with availableById: [String: Worktree], currentId: String?) -> [String] {
+        var cleaned: [String] = []
+        var seen = Set<String>()
+
+        for id in decodeWorktreeMRUOrder() where availableById[id] != nil {
+            if seen.insert(id).inserted {
+                cleaned.append(id)
+            }
+        }
+
+        if let currentId,
+           availableById[currentId] != nil,
+           !cleaned.contains(currentId) {
+            cleaned.insert(currentId, at: 0)
+        }
+
+        encodeWorktreeMRUOrder(cleaned)
+        return cleaned
+    }
+
     private func quickSwitchToPreviousWorktree() {
         let request: NSFetchRequest<Worktree> = Worktree.fetchRequest()
         request.sortDescriptors = [NSSortDescriptor(keyPath: \Worktree.lastAccessed, ascending: false)]
 
-        guard let worktrees = try? viewContext.fetch(request) else { return }
+        guard let fetchedWorktrees = try? viewContext.fetch(request) else { return }
 
-        // Find first worktree that isn't the current one
-        let currentId = selectedWorktree?.id
-        guard let target = worktrees.first(where: { $0.id != currentId }),
+        let available = fetchedWorktrees.filter { worktree in
+            guard !worktree.isDeleted else { return false }
+            guard worktree.id != nil else { return false }
+            guard worktree.repository?.id != nil else { return false }
+            guard worktree.repository?.workspace?.id != nil else { return false }
+            return true
+        }
+
+        let availableById: [String: Worktree] = Dictionary(
+            uniqueKeysWithValues: available.compactMap { worktree in
+                guard let id = worktree.id?.uuidString else { return nil }
+                return (id, worktree)
+            }
+        )
+
+        let currentId = currentActiveWorktree()?.id?.uuidString
+        let mruOrder = sanitizedMRUOrder(with: availableById, currentId: currentId)
+
+        let targetId: String?
+        if let currentId,
+           mruOrder.first == currentId {
+            targetId = mruOrder.dropFirst().first
+        } else {
+            targetId = mruOrder.first(where: { $0 != currentId })
+        }
+
+        guard let resolvedTargetId = targetId ?? available.first(where: { $0.id?.uuidString != currentId })?.id?.uuidString,
+              let target = availableById[resolvedTargetId],
               let worktreeId = target.id,
               let repoId = target.repository?.id,
               let workspaceId = target.repository?.workspace?.id else {

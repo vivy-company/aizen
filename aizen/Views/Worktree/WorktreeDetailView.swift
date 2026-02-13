@@ -159,6 +159,30 @@ struct WorktreeDetailView: View {
         }
     }
 
+    private var visibleTabIds: [String] {
+        tabConfig.tabOrder
+            .map(\.id)
+            .filter { isTabVisible($0) }
+    }
+
+    private func selectVisibleTab(at oneBasedIndex: Int) {
+        let zeroBased = oneBasedIndex - 1
+        guard zeroBased >= 0, zeroBased < visibleTabIds.count else { return }
+        selectedTab = visibleTabIds[zeroBased]
+    }
+
+    private func cycleVisibleTab(step: Int) {
+        guard !visibleTabIds.isEmpty else { return }
+        guard let currentIndex = visibleTabIds.firstIndex(of: selectedTab) else {
+            selectedTab = visibleTabIds[0]
+            return
+        }
+
+        let count = visibleTabIds.count
+        let nextIndex = (currentIndex + step + count) % count
+        selectedTab = visibleTabIds[nextIndex]
+    }
+
     @ToolbarContentBuilder
     var sessionToolbarItems: some ToolbarContent {
         ToolbarItem(placement: .automatic) {
@@ -419,6 +443,15 @@ struct WorktreeDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .switchToChatSession)) { notification in
             handleSwitchToChatSession(notification)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToWorktreeTab)) { notification in
+            handleSwitchToWorktreeTab(notification)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToTerminalSession)) { notification in
+            handleSwitchToTerminalSession(notification)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToBrowserSession)) { notification in
+            handleSwitchToBrowserSession(notification)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .resumeChatSession)) { notification in
             guard let userInfo = notification.userInfo,
                   let chatSessionId = userInfo["chatSessionId"] as? UUID,
@@ -464,6 +497,54 @@ struct WorktreeDetailView: View {
         if let _ = try? worktree.managedObjectContext?.fetch(request).first {
             selectedTab = "chat"
             viewModel.selectedChatSessionId = sessionId
+        }
+    }
+
+    private func handleSwitchToWorktreeTab(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let targetWorktreeId = userInfo["worktreeId"] as? UUID,
+              let tabId = userInfo["tabId"] as? String,
+              targetWorktreeId == worktree.id else {
+            return
+        }
+
+        guard visibleTabIds.contains(tabId) else { return }
+        selectedTab = tabId
+    }
+
+    private func handleSwitchToTerminalSession(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let targetWorktreeId = userInfo["worktreeId"] as? UUID,
+              let sessionId = userInfo["sessionId"] as? UUID,
+              targetWorktreeId == worktree.id else {
+            return
+        }
+
+        let request: NSFetchRequest<TerminalSession> = TerminalSession.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, targetWorktreeId as CVarArg)
+        request.fetchLimit = 1
+
+        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
+            selectedTab = "terminal"
+            viewModel.selectedTerminalSessionId = sessionId
+        }
+    }
+
+    private func handleSwitchToBrowserSession(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let targetWorktreeId = userInfo["worktreeId"] as? UUID,
+              let sessionId = userInfo["sessionId"] as? UUID,
+              targetWorktreeId == worktree.id else {
+            return
+        }
+
+        let request: NSFetchRequest<BrowserSession> = BrowserSession.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, targetWorktreeId as CVarArg)
+        request.fetchLimit = 1
+
+        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
+            selectedTab = "browser"
+            viewModel.selectedBrowserSessionId = sessionId
         }
     }
 
@@ -565,6 +646,23 @@ struct WorktreeDetailView: View {
                 }
 
                 trailingToolbarItems
+            }
+            .background {
+                Group {
+                    Button("") { cycleVisibleTab(step: 1) }
+                        .keyboardShortcut(.tab, modifiers: [.control])
+                    Button("") { cycleVisibleTab(step: -1) }
+                        .keyboardShortcut(.tab, modifiers: [.control, .shift])
+                    Button("") { selectVisibleTab(at: 1) }
+                        .keyboardShortcut("1", modifiers: .command)
+                    Button("") { selectVisibleTab(at: 2) }
+                        .keyboardShortcut("2", modifiers: .command)
+                    Button("") { selectVisibleTab(at: 3) }
+                        .keyboardShortcut("3", modifiers: .command)
+                    Button("") { selectVisibleTab(at: 4) }
+                        .keyboardShortcut("4", modifiers: .command)
+                }
+                .hidden()
             }
             .task(id: worktree.id) {
                 hasLoadedTabState = false

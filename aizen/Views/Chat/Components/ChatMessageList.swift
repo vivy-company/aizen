@@ -36,7 +36,6 @@ struct ChatMessageList: View {
     @State private var loadingStartTime: Date?
     @State private var loadedTimelineItemCount: Int = 0
     @State private var isShowingFullHistory: Bool = false
-    @State private var lastReportedBottomVisibility: Bool?
 
     private let minimumLoadingDuration: TimeInterval = 0.6
     private let bottomAnchorId = "bottom_anchor"
@@ -116,7 +115,7 @@ struct ChatMessageList: View {
     private var scrollContent: some View {
         ScrollViewReader { proxy in
             scrollViewWithAnchoring {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     if hiddenOlderItemCount > 0 {
                         loadOlderControl(proxy: proxy)
                     }
@@ -286,9 +285,8 @@ struct ChatMessageList: View {
         switch request.target {
         case .bottom:
             if request.force {
-                // Force isNearBottom via callback, bypassing dedup guard
-                lastReportedBottomVisibility = true
-                onScrollPositionChange(true)
+                // Force near-bottom state; dispatch asynchronously to avoid mutating view state mid-update.
+                dispatchScrollPositionChange(true)
                 scrollToBottomIfNeeded(proxy: proxy, animated: request.animated)
                 // Second attempt after layout pass to ensure we reach the actual bottom
                 Task { @MainActor in
@@ -320,10 +318,12 @@ struct ChatMessageList: View {
     }
 
     private func reportBottomVisibility(_ isVisible: Bool) {
-        guard lastReportedBottomVisibility != isVisible else { return }
-        lastReportedBottomVisibility = isVisible
+        dispatchScrollPositionChange(isVisible)
+    }
+
+    private func dispatchScrollPositionChange(_ isNearBottom: Bool) {
         DispatchQueue.main.async {
-            onScrollPositionChange(isVisible)
+            onScrollPositionChange(isNearBottom)
         }
     }
 
@@ -488,6 +488,9 @@ private struct ScrollBottomObserver: NSViewRepresentable {
         private var boundsObserver: NSObjectProtocol?
         private var frameObserver: NSObjectProtocol?
         private var lastState: Bool?
+        private var pendingEmittedState: Bool?
+        private var emitWorkItem: DispatchWorkItem?
+        private var evaluateWorkItem: DispatchWorkItem?
         private var pendingAttachWorkItem: DispatchWorkItem?
 
         init(threshold: CGFloat, onChange: @escaping (Bool) -> Void) {
@@ -502,7 +505,7 @@ private struct ScrollBottomObserver: NSViewRepresentable {
                 let hadAttachedScrollView = scrollView != nil
                 attach(to: view)
                 if forceEvaluate || !hadAttachedScrollView {
-                    evaluateNow()
+                    scheduleEvaluate()
                 }
                 return
             }
@@ -517,7 +520,7 @@ private struct ScrollBottomObserver: NSViewRepresentable {
                 let hadAttachedScrollView = self.scrollView != nil
                 self.attach(to: view)
                 if forceEvaluate || !hadAttachedScrollView {
-                    self.evaluateNow()
+                    self.scheduleEvaluate()
                 }
             }
             pendingAttachWorkItem = workItem
@@ -531,7 +534,18 @@ private struct ScrollBottomObserver: NSViewRepresentable {
             detach()
             scrollView = resolvedScrollView
             observe(scrollView: resolvedScrollView)
-            evaluateNow()
+            scheduleEvaluate()
+        }
+
+        func scheduleEvaluate() {
+            guard evaluateWorkItem == nil else { return }
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.evaluateWorkItem = nil
+                self.evaluateNow()
+            }
+            evaluateWorkItem = workItem
+            DispatchQueue.main.async(execute: workItem)
         }
 
         func evaluateNow() {
@@ -549,12 +563,20 @@ private struct ScrollBottomObserver: NSViewRepresentable {
             } else {
                 distanceToBottom = max(visibleRect.minY - documentView.bounds.minY, 0)
             }
-            emit(distanceToBottom <= threshold + 0.5)
+            let enterThreshold = threshold + 0.5
+            let leaveThreshold = enterThreshold + max(12, threshold * 0.75)
+            let effectiveThreshold = (lastState == true) ? leaveThreshold : enterThreshold
+            emit(distanceToBottom <= effectiveThreshold)
         }
 
         func detach() {
             pendingAttachWorkItem?.cancel()
             pendingAttachWorkItem = nil
+            evaluateWorkItem?.cancel()
+            evaluateWorkItem = nil
+            emitWorkItem?.cancel()
+            emitWorkItem = nil
+            pendingEmittedState = nil
             if let boundsObserver {
                 NotificationCenter.default.removeObserver(boundsObserver)
             }
@@ -575,7 +597,7 @@ private struct ScrollBottomObserver: NSViewRepresentable {
                 object: scrollView.contentView,
                 queue: .main
             ) { [weak self] _ in
-                self?.evaluateNow()
+                self?.scheduleEvaluate()
             }
 
             if let documentView = scrollView.documentView {
@@ -586,7 +608,7 @@ private struct ScrollBottomObserver: NSViewRepresentable {
                     object: documentView,
                     queue: .main
                 ) { [weak self] _ in
-                    self?.evaluateNow()
+                    self?.scheduleEvaluate()
                 }
             }
         }
@@ -607,7 +629,7 @@ private struct ScrollBottomObserver: NSViewRepresentable {
                     object: documentView,
                     queue: .main
                 ) { [weak self] _ in
-                    self?.evaluateNow()
+                    self?.scheduleEvaluate()
                 }
             }
         }
@@ -615,7 +637,17 @@ private struct ScrollBottomObserver: NSViewRepresentable {
         private func emit(_ isNearBottom: Bool) {
             guard lastState != isNearBottom else { return }
             lastState = isNearBottom
-            onChange(isNearBottom)
+            pendingEmittedState = isNearBottom
+            guard emitWorkItem == nil else { return }
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.emitWorkItem = nil
+                guard let state = self.pendingEmittedState else { return }
+                self.pendingEmittedState = nil
+                self.onChange(state)
+            }
+            emitWorkItem = workItem
+            DispatchQueue.main.async(execute: workItem)
         }
 
         private func resolveScrollView(from view: NSView) -> NSScrollView? {
@@ -646,9 +678,7 @@ struct ChatProcessingIndicator: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.mini)
-                .frame(width: 14, height: 14)
+            ChatProcessingSpinner()
 
             if cachedThoughtText != nil {
                 Text(cachedThoughtRendered)
@@ -679,5 +709,31 @@ struct ChatProcessingIndicator: View {
         } else {
             cachedThoughtRendered = AttributedString("")
         }
+    }
+}
+
+private struct ChatProcessingSpinner: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isAnimating = false
+
+    var body: some View {
+        Circle()
+            .trim(from: 0.2, to: 0.9)
+            .stroke(
+                Color.secondary.opacity(0.85),
+                style: StrokeStyle(lineWidth: 1.8, lineCap: .round)
+            )
+            .frame(width: 14, height: 14)
+            .rotationEffect(.degrees(isAnimating ? 360 : 0))
+            .animation(
+                reduceMotion ? .none : .linear(duration: 0.9).repeatForever(autoreverses: false),
+                value: isAnimating
+            )
+            .onAppear {
+                isAnimating = true
+            }
+            .onDisappear {
+                isAnimating = false
+            }
     }
 }

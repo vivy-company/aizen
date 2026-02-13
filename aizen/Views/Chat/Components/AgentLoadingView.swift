@@ -27,7 +27,7 @@ struct AgentLoadingView: View {
         "Each environment has its own terminal, chat, and browser",
         "Right-click files to send them to the agent",
         "Git linked environments let you work on multiple branches at once",
-        "⌘P to open command palette for quick navigation",
+        "⌘K to open command palette for quick navigation",
     ]
 
     private let tipRotationTimer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()

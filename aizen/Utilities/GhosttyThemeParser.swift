@@ -146,7 +146,20 @@ nonisolated struct GhosttyThemeParser {
         }
     }
 
+    private static let cacheLock = NSLock()
+    private static var parsedThemeCache: [String: ParsedTheme] = [:]
+    private static var editorThemeCache: [String: EditorTheme] = [:]
+    private static var backgroundColorCache: [String: NSColor] = [:]
+    private static var dividerColorCache: [String: NSColor] = [:]
+
     private static func parseRaw(contentsOf path: String) -> ParsedTheme? {
+        cacheLock.lock()
+        if let cached = parsedThemeCache[path] {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
         guard let content = try? String(contentsOfFile: path) else {
             return nil
         }
@@ -186,6 +199,9 @@ nonisolated struct GhosttyThemeParser {
             }
         }
 
+        cacheLock.lock()
+        parsedThemeCache[path] = theme
+        cacheLock.unlock()
         return theme
     }
 
@@ -215,7 +231,21 @@ nonisolated struct GhosttyThemeParser {
             .appendingPathComponent("ghostty/themes") as NSString)
             .appendingPathComponent(name)
 
-        return parse(contentsOf: themePath)
+        cacheLock.lock()
+        if let cached = editorThemeCache[themePath] {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
+        guard let parsed = parse(contentsOf: themePath) else {
+            return nil
+        }
+
+        cacheLock.lock()
+        editorThemeCache[themePath] = parsed
+        cacheLock.unlock()
+        return parsed
     }
 
     static func loadGitStatusColors(named name: String) -> GitStatusColors {
@@ -246,15 +276,45 @@ nonisolated struct GhosttyThemeParser {
             .appendingPathComponent("ghostty/themes") as NSString)
             .appendingPathComponent(name)
 
-        return parseRaw(contentsOf: themePath)?.background ?? NSColor(hex: "1E1E2E")
+        cacheLock.lock()
+        if let cached = backgroundColorCache[themePath] {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
+        let color = parseRaw(contentsOf: themePath)?.background ?? NSColor(hex: "1E1E2E")
+        cacheLock.lock()
+        backgroundColorCache[themePath] = color
+        cacheLock.unlock()
+        return color
     }
 
     /// Returns a divider color calculated from the background (Ghostty style)
     static func loadDividerColor(named name: String) -> NSColor {
+        guard let resourcePath = Bundle.main.resourcePath else {
+            let fallback = NSColor(hex: "1E1E2E").darken(by: 0.4)
+            return fallback
+        }
+        let themePath = ((resourcePath as NSString)
+            .appendingPathComponent("ghostty/themes") as NSString)
+            .appendingPathComponent(name)
+
+        cacheLock.lock()
+        if let cached = dividerColorCache[themePath] {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
         let bg = loadBackgroundColor(named: name)
         let isLight = bg.luminance > 0.5
         let darkenAmount: CGFloat = isLight ? 0.08 : 0.4
-        return bg.darken(by: darkenAmount)
+        let divider = bg.darken(by: darkenAmount)
+        cacheLock.lock()
+        dividerColorCache[themePath] = divider
+        cacheLock.unlock()
+        return divider
     }
 
     /// Returns tmux mode-style string for selection highlighting

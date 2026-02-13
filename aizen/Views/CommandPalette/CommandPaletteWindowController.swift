@@ -2,7 +2,7 @@
 //  CommandPaletteWindowController.swift
 //  aizen
 //
-//  Command palette for fast navigation between worktrees
+//  Command palette for fast navigation between worktrees, tabs, and sessions.
 //
 
 import AppKit
@@ -17,9 +17,13 @@ class CommandPaletteWindowController: NSWindowController {
     convenience init(
         managedObjectContext: NSManagedObjectContext,
         currentRepositoryId: String?,
-        onNavigate: @escaping (UUID, UUID, UUID) -> Void
+        currentWorkspaceId: String?,
+        onNavigate: @escaping (CommandPaletteNavigationAction) -> Void
     ) {
-        let viewModel = WorktreeSearchViewModel(currentRepositoryId: currentRepositoryId)
+        let viewModel = WorktreeSearchViewModel(
+            currentRepositoryId: currentRepositoryId,
+            currentWorkspaceId: currentWorkspaceId
+        )
         let panel = CommandPalettePanel(
             managedObjectContext: managedObjectContext,
             viewModel: viewModel,
@@ -29,8 +33,8 @@ class CommandPaletteWindowController: NSWindowController {
         panel.requestClose = { [weak self] in
             self?.closeWindow()
         }
-        panel.requestModeToggle = {
-            viewModel.toggleMode()
+        panel.requestScopeCycle = {
+            viewModel.cycleScopeForward()
         }
         setupAppObservers()
     }
@@ -48,7 +52,6 @@ class CommandPaletteWindowController: NSWindowController {
             self?.closeWindow()
         }
 
-        // Close when panel loses key status (focus)
         windowResignKeyObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResignKeyNotification,
             object: window,
@@ -97,7 +100,7 @@ class CommandPaletteWindowController: NSWindowController {
 
             if event.type == .keyDown {
                 if event.keyCode == 48 { // Tab
-                    panel.requestModeToggle?()
+                    panel.requestScopeCycle?()
                     return nil
                 }
                 return event
@@ -145,12 +148,12 @@ class CommandPaletteWindowController: NSWindowController {
 class CommandPalettePanel: NSPanel {
     let interaction = PaletteInteractionState()
     var requestClose: (() -> Void)?
-    var requestModeToggle: (() -> Void)?
+    var requestScopeCycle: (() -> Void)?
 
     init(
         managedObjectContext: NSManagedObjectContext,
         viewModel: WorktreeSearchViewModel,
-        onNavigate: @escaping (UUID, UUID, UUID) -> Void
+        onNavigate: @escaping (CommandPaletteNavigationAction) -> Void
     ) {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
@@ -200,8 +203,8 @@ class CommandPalettePanel: NSPanel {
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { // ESC key
             requestClose?()
-        } else if event.keyCode == 48 { // Tab key
-            requestModeToggle?()
+        } else if event.keyCode == 48 { // Tab
+            requestScopeCycle?()
         } else {
             super.keyDown(with: event)
         }
@@ -213,7 +216,7 @@ class CommandPalettePanel: NSPanel {
 }
 
 struct CommandPaletteContent: View {
-    let onNavigate: (UUID, UUID, UUID) -> Void
+    let onNavigate: (CommandPaletteNavigationAction) -> Void
     let onClose: () -> Void
     @ObservedObject var viewModel: WorktreeSearchViewModel
 
@@ -235,33 +238,21 @@ struct CommandPaletteContent: View {
     @EnvironmentObject private var interaction: PaletteInteractionState
     @State private var hoveredIndex: Int?
     @AppStorage("selectedWorktreeId") private var currentWorktreeId: String?
-    private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
     var body: some View {
-            LiquidGlassCard(
-                shadowOpacity: 0,
-                sheenOpacity: 0.28,
-                scrimOpacity: 0.14
-            ) {
-                VStack(spacing: 0) {
-                    SpotlightSearchField(
-                    placeholder: {
-                        switch viewModel.mode {
-                        case .workspace:
-                            return "Search workspaces…"
-                        case .environmentGlobal:
-                            return "Search environments globally…"
-                        case .environmentCurrentProject:
-                            return "Search environments in this project…"
-                        }
-                    }(),
+        LiquidGlassCard(
+            shadowOpacity: 0,
+            sheenOpacity: 0.28,
+            scrimOpacity: 0.14
+        ) {
+            VStack(spacing: 0) {
+                SpotlightSearchField(
+                    placeholder: placeholderText(for: viewModel.scope),
                     text: $viewModel.searchQuery,
                     isFocused: $isSearchFocused,
                     onSubmit: {
-                        if let workspace = viewModel.getSelectedWorkspaceResult() {
-                            selectWorkspace(workspace)
-                        } else if let worktree = viewModel.getSelectedResult() {
-                            selectWorktree(worktree)
+                        if let action = viewModel.selectedNavigationAction() {
+                            handleSelection(action)
                         }
                     },
                     onEscape: onClose,
@@ -275,7 +266,11 @@ struct CommandPaletteContent: View {
                 )
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
-                .padding(.bottom, 14)
+                .padding(.bottom, 10)
+
+                scopeChips
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 12)
 
                 Divider().opacity(0.25)
 
@@ -305,59 +300,138 @@ struct CommandPaletteContent: View {
         .onChange(of: currentWorktreeId) { _, _ in
             viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .NSManagedObjectContextObjectsDidChange,
+                object: viewContext
+            )
+        ) { _ in
+            viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
+            viewModel.updateWorkspaceSnapshot(Array(allWorkspaces))
+        }
         .background {
             Group {
                 Button("") {
                     interaction.didUseKeyboard()
                     viewModel.moveSelectionDown()
                 }
-                    .keyboardShortcut(.downArrow, modifiers: [])
+                .keyboardShortcut(.downArrow, modifiers: [])
+
                 Button("") {
                     interaction.didUseKeyboard()
                     viewModel.moveSelectionUp()
                 }
-                    .keyboardShortcut(.upArrow, modifiers: [])
+                .keyboardShortcut(.upArrow, modifiers: [])
+
                 Button("") {
                     interaction.didUseKeyboard()
-                    if let workspace = viewModel.getSelectedWorkspaceResult() {
-                        selectWorkspace(workspace)
-                    } else if let worktree = viewModel.getSelectedResult() {
-                        selectWorktree(worktree)
+                    if let action = viewModel.selectedNavigationAction() {
+                        handleSelection(action)
                     }
                 }
-                    .keyboardShortcut(.return, modifiers: [])
+                .keyboardShortcut(.return, modifiers: [])
+
                 Button("") { onClose() }
                     .keyboardShortcut(.escape, modifiers: [])
+
+                Button("") {
+                    interaction.didUseKeyboard()
+                    viewModel.setScope(.all)
+                }
+                .keyboardShortcut("1", modifiers: .command)
+
+                Button("") {
+                    interaction.didUseKeyboard()
+                    viewModel.setScope(.currentProject)
+                }
+                .keyboardShortcut("2", modifiers: .command)
+
+                Button("") {
+                    interaction.didUseKeyboard()
+                    viewModel.setScope(.workspace)
+                }
+                .keyboardShortcut("3", modifiers: .command)
+
+                Button("") {
+                    interaction.didUseKeyboard()
+                    viewModel.setScope(.tabs)
+                }
+                .keyboardShortcut("4", modifiers: .command)
             }
             .hidden()
         }
+    }
+
+    private func placeholderText(for scope: CommandPaletteScope) -> LocalizedStringKey {
+        switch scope {
+        case .all:
+            return "Search everything…"
+        case .currentProject:
+            return "Search in current project…"
+        case .workspace:
+            return "Search workspaces…"
+        case .tabs:
+            return "Search tabs and sessions…"
+        }
+    }
+
+    private var scopeChips: some View {
+        HStack(spacing: 8) {
+            scopeChip(.all, shortcut: "⌘1")
+            scopeChip(.currentProject, shortcut: "⌘2")
+            scopeChip(.workspace, shortcut: "⌘3")
+            scopeChip(.tabs, shortcut: "⌘4")
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func scopeChip(_ scope: CommandPaletteScope, shortcut: String) -> some View {
+        let isSelected = viewModel.scope == scope
+
+        return Button {
+            interaction.didUseKeyboard()
+            viewModel.setScope(scope)
+        } label: {
+            HStack(spacing: 6) {
+                Text(scope.title)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(shortcut)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(isSelected ? .primary : .secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(isSelected ? Color.white.opacity(0.12) : Color.white.opacity(0.04))
+                    .overlay {
+                        if isSelected {
+                            Capsule(style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+                        }
+                    }
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var resultsList: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    if viewModel.mode == .workspace {
-                        ForEach(viewModel.workspaceResults.indices, id: \.self) { index in
-                            let workspace = viewModel.workspaceResults[index]
-                            workspaceRow(
-                                workspace: workspace,
-                                index: index,
-                                isSelected: index == viewModel.selectedIndex,
-                                isHovered: hoveredIndex == index
+                    ForEach(Array(viewModel.sections.enumerated()), id: \.element.id) { sectionOffset, section in
+                        sectionHeader(section.title)
+
+                        ForEach(Array(section.items.enumerated()), id: \.element.id) { itemOffset, item in
+                            let globalIndex = globalIndexFor(sectionOffset: sectionOffset, itemOffset: itemOffset)
+                            resultRow(
+                                item: item,
+                                globalIndex: globalIndex,
+                                isSelected: globalIndex == viewModel.selectedIndex,
+                                isHovered: hoveredIndex == globalIndex
                             )
-                            .id(index)
-                        }
-                    } else {
-                        ForEach(viewModel.results.indices, id: \.self) { index in
-                            let worktree = viewModel.results[index]
-                            worktreeRow(
-                                worktree: worktree,
-                                index: index,
-                                isSelected: index == viewModel.selectedIndex,
-                                isHovered: hoveredIndex == index
-                            )
-                            .id(index)
+                            .id(globalIndex)
                         }
                     }
                 }
@@ -367,121 +441,56 @@ struct CommandPaletteContent: View {
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .scrollIndicators(.hidden)
-            .frame(maxHeight: 380)
+            .frame(maxHeight: 360)
             .onChange(of: viewModel.selectedIndex) { _, newIndex in
                 proxy.scrollTo(newIndex, anchor: .center)
             }
         }
     }
 
-    private func workspaceRow(workspace: Workspace, index: Int, isSelected: Bool, isHovered: Bool) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: "folder.badge.gearshape")
-                .foregroundStyle(isSelected ? .primary : .secondary)
-                .frame(width: 20, height: 20)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(workspace.name ?? "Workspace")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.primary)
-            }
-
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .tracking(0.5)
             Spacer()
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(
-                    isSelected ? Color.white.opacity(0.12) :
-                        (isHovered ? Color.white.opacity(0.06) : Color.clear)
-                )
-                .overlay {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
-                    }
-                }
-        )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            selectWorkspace(workspace)
-        }
-        .onHover { hovering in
-            guard interaction.allowHoverSelection else { return }
-            hoveredIndex = hovering ? index : nil
-        }
+        .padding(.top, 10)
+        .padding(.bottom, 6)
     }
 
-    private func worktreeRow(worktree: Worktree, index: Int, isSelected: Bool, isHovered: Bool) -> some View {
-        let isCrossProject = isCrossProjectWorktree(worktree)
-
-        return HStack(spacing: 14) {
-            Image(systemName: isCrossProject ? "square.stack.3d.up.fill" : (worktree.isPrimary ? "arrow.triangle.branch" : "arrow.triangle.2.circlepath"))
-                .foregroundStyle(
-                    isCrossProject
-                        ? (isSelected ? Color.primary : Color.red)
-                        : (isSelected ? Color.primary : Color.secondary)
-                )
+    private func resultRow(
+        item: CommandPaletteItem,
+        globalIndex: Int,
+        isSelected: Bool,
+        isHovered: Bool
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: item.icon)
+                .foregroundStyle(itemColor(for: item, isSelected: isSelected))
                 .frame(width: 20, height: 20)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(isCrossProject ? (worktree.repository?.workspace?.name ?? "Workspace") : (worktree.branch ?? "Unknown"))
+                    Text(item.title)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.primary)
 
-                    if isCrossProject {
-                        PillBadge(
-                            text: "cross-project",
-                            color: .red,
-                            textColor: .white,
-                            font: .caption2,
-                            fontWeight: .semibold,
-                            horizontalPadding: 6,
-                            verticalPadding: 2,
-                            backgroundOpacity: 1
-                        )
-                    } else if worktree.isPrimary {
-                        PillBadge(
-                            text: "main",
-                            color: .blue,
-                            textColor: .white,
-                            font: .caption2,
-                            fontWeight: .semibold,
-                            horizontalPadding: 6,
-                            verticalPadding: 2,
-                            backgroundOpacity: 1
-                        )
+                    if let badgeText = item.badgeText {
+                        paletteBadge(text: badgeText)
                     }
                 }
 
-                HStack(spacing: 4) {
-                    if isCrossProject {
-                        Text("All Projects")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        if let workspaceName = worktree.repository?.workspace?.name {
-                            Text(workspaceName)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                        if let repoName = worktree.repository?.name {
-                            Text("›")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary.opacity(0.7))
-                            Text(repoName)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                Text(item.subtitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
             Spacer()
-
-            sessionIndicators(for: worktree, isSelected: isSelected)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
@@ -500,94 +509,105 @@ struct CommandPaletteContent: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            selectWorktree(worktree)
+            if let action = action(for: item) {
+                handleSelection(action)
+            }
         }
         .onHover { hovering in
             guard interaction.allowHoverSelection else { return }
-            hoveredIndex = hovering ? index : nil
+            hoveredIndex = hovering ? globalIndex : nil
         }
-    }
-
-    private func isCrossProjectWorktree(_ worktree: Worktree) -> Bool {
-        guard let repository = worktree.repository else {
-            return false
-        }
-        return repository.isCrossProject || repository.note == crossProjectRepositoryMarker
     }
 
     @ViewBuilder
-    private func sessionIndicators(for worktree: Worktree, isSelected: Bool) -> some View {
-        let chatCount = (worktree.chatSessions as? Set<ChatSession>)?.count ?? 0
-        let terminalCount = (worktree.terminalSessions as? Set<TerminalSession>)?.count ?? 0
-
-        if chatCount > 0 || terminalCount > 0 {
-            HStack(spacing: 6) {
-                if chatCount > 0 {
-                    HStack(spacing: 2) {
-                        Image(systemName: "message")
-                            .font(.system(size: 10))
-                        if chatCount > 1 {
-                            Text("\(chatCount)")
-                                .font(.system(size: 10))
-                        }
-                    }
-                }
-                if terminalCount > 0 {
-                    HStack(spacing: 2) {
-                        Image(systemName: "terminal")
-                            .font(.system(size: 10))
-                        if terminalCount > 1 {
-                            Text("\(terminalCount)")
-                                .font(.system(size: 10))
-                        }
-                    }
-                }
-            }
-            .foregroundStyle(.secondary)
+    private func paletteBadge(text: String) -> some View {
+        if text == "main" {
+            PillBadge(
+                text: text,
+                color: .blue,
+                textColor: .white,
+                font: .caption2,
+                fontWeight: .semibold,
+                horizontalPadding: 6,
+                verticalPadding: 2,
+                backgroundOpacity: 1
+            )
+        } else if text == "cross-project" {
+            PillBadge(
+                text: text,
+                color: .red,
+                textColor: .white,
+                font: .caption2,
+                fontWeight: .semibold,
+                horizontalPadding: 6,
+                verticalPadding: 2,
+                backgroundOpacity: 1
+            )
         }
+    }
+
+    private func itemColor(for item: CommandPaletteItem, isSelected: Bool) -> Color {
+        if isSelected {
+            return .primary
+        }
+        if item.badgeText == "cross-project" {
+            return .red
+        }
+        return .secondary
+    }
+
+    private func action(for item: CommandPaletteItem) -> CommandPaletteNavigationAction? {
+        guard let workspaceId = item.workspaceId,
+              let repoId = item.repoId,
+              let worktreeId = item.worktreeId else {
+            return nil
+        }
+
+        switch item.kind {
+        case .worktree, .workspace:
+            return .worktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
+        case .tab:
+            guard let tabId = item.tabId else { return nil }
+            return .tab(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId, tabId: tabId)
+        case .chatSession:
+            guard let sessionId = item.sessionId else { return nil }
+            return .chatSession(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId, sessionId: sessionId)
+        case .terminalSession:
+            guard let sessionId = item.sessionId else { return nil }
+            return .terminalSession(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId, sessionId: sessionId)
+        case .browserSession:
+            guard let sessionId = item.sessionId else { return nil }
+            return .browserSession(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId, sessionId: sessionId)
+        }
+    }
+
+    private func globalIndexFor(sectionOffset: Int, itemOffset: Int) -> Int {
+        let prefixCount = viewModel.sections
+            .prefix(sectionOffset)
+            .reduce(0) { partial, section in
+                partial + section.items.count
+            }
+        return prefixCount + itemOffset
     }
 
     private var activeResultsEmpty: Bool {
-        viewModel.mode == .workspace ? viewModel.workspaceResults.isEmpty : viewModel.results.isEmpty
+        viewModel.sections.allSatisfy { $0.items.isEmpty }
     }
 
-    private func selectWorkspace(_ workspace: Workspace) {
-        let candidates = (workspace.repositories as? Set<Repository>) ?? []
-        let availableWorktrees = candidates
-            .flatMap { repository -> [Worktree] in
-                return (repository.worktrees as? Set<Worktree>)?.filter { !$0.isDeleted } ?? []
+    private func handleSelection(_ action: CommandPaletteNavigationAction) {
+        switch action {
+        case .worktree(_, _, let worktreeId),
+             .tab(_, _, let worktreeId, _),
+             .chatSession(_, _, let worktreeId, _),
+             .terminalSession(_, _, let worktreeId, _),
+             .browserSession(_, _, let worktreeId, _):
+            if let worktree = allWorktrees.first(where: { $0.id == worktreeId }) {
+                worktree.lastAccessed = Date()
+                try? viewContext.save()
             }
-
-        let workspaceWorktree = availableWorktrees
-            .sorted { left, right in
-                if left.isPrimary != right.isPrimary { return left.isPrimary }
-                if left.lastAccessed != right.lastAccessed { return (left.lastAccessed ?? .distantPast) > (right.lastAccessed ?? .distantPast) }
-                return (left.branch ?? "") < (right.branch ?? "")
-            }
-            .first
-
-        guard let worktree = workspaceWorktree,
-              let worktreeId = worktree.id,
-              let repoId = worktree.repository?.id,
-              let workspaceId = worktree.repository?.workspace?.id else {
-            return
         }
 
-        worktree.lastAccessed = Date()
-        try? viewContext.save()
-        onNavigate(workspaceId, repoId, worktreeId)
-        onClose()
-    }
-
-    private func selectWorktree(_ worktree: Worktree) {
-        guard let worktreeId = worktree.id,
-              let repoId = worktree.repository?.id,
-              let workspaceId = worktree.repository?.workspace?.id else {
-            return
-        }
-        worktree.lastAccessed = Date()
-        try? viewContext.save()
-        onNavigate(workspaceId, repoId, worktreeId)
+        onNavigate(action)
         onClose()
     }
 
@@ -596,23 +616,25 @@ struct CommandPaletteContent: View {
             Image(systemName: "rectangle.stack")
                 .font(.system(size: 30, weight: .semibold))
                 .foregroundStyle(.secondary.opacity(0.5))
-            Text(
-                {
-                    switch viewModel.mode {
-                    case .workspace:
-                        return "No workspaces found"
-                    case .environmentGlobal:
-                        return "No environments found"
-                    case .environmentCurrentProject:
-                        return "No environments found in this project"
-                    }
-                }()
-            )
+            Text(emptyStateText(for: viewModel.scope))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.vertical, 90)
+    }
+
+    private func emptyStateText(for scope: CommandPaletteScope) -> String {
+        switch scope {
+        case .all:
+            return "No results found"
+        case .currentProject:
+            return "No project results found"
+        case .workspace:
+            return "No workspaces found"
+        case .tabs:
+            return "No tabs or sessions found"
+        }
     }
 
     private var footer: some View {
@@ -628,6 +650,13 @@ struct CommandPaletteContent: View {
             Spacer()
 
             HStack(spacing: 6) {
+                KeyCap(text: "⌘1-4")
+                Text("Scope")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 6) {
                 KeyCap(text: "↩")
                 Text("Open")
                     .font(.system(size: 11, weight: .medium))
@@ -636,18 +665,7 @@ struct CommandPaletteContent: View {
 
             HStack(spacing: 6) {
                 KeyCap(text: "Tab")
-                Text(
-                    {
-                        switch viewModel.mode {
-                        case .workspace:
-                            return "Workspace mode"
-                        case .environmentGlobal:
-                            return "Environment mode (global)"
-                        case .environmentCurrentProject:
-                            return "Environment mode (project)"
-                        }
-                    }()
-                )
+                Text("Next Scope")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
             }

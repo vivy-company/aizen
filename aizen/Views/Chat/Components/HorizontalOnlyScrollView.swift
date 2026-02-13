@@ -21,11 +21,11 @@ private final class HorizontalOnlyNSScrollView: NSScrollView {
     }
 
     override var intrinsicContentSize: NSSize {
-        // Report the height of the document view (content) as our height
-        // This allows the ScrollView to fit its content vertically
+        // Use the document frame height to avoid recursive fitting-size queries
+        // while AppKit is resolving constraints.
         guard let docView = documentView else { return super.intrinsicContentSize }
-        let height = docView.fittingSize.height
-        return NSSize(width: NSView.noIntrinsicMetric, height: height > 0 ? height : 20)
+        let height = max(docView.frame.height, 1)
+        return NSSize(width: NSView.noIntrinsicMetric, height: height)
     }
 }
 
@@ -51,7 +51,8 @@ struct HorizontalOnlyScrollView<Content: View>: NSViewRepresentable {
         scrollView.borderType = .noBorder
         
         let host = NSHostingView(rootView: content)
-        host.translatesAutoresizingMaskIntoConstraints = false // We'll manage frame manually for documentView behavior
+        // Frame-driven layout inside NSScrollView; avoid Auto Layout constraints here.
+        host.translatesAutoresizingMaskIntoConstraints = true
         
         scrollView.documentView = host
         context.coordinator.hostingView = host
@@ -74,12 +75,13 @@ struct HorizontalOnlyScrollView<Content: View>: NSViewRepresentable {
         
         let minWidth = scrollView.contentView.bounds.width
         let width = max(size.width, minWidth)
-        let height = size.height
+        let height = max(size.height, 1)
         
-        // Add tolerance to avoid infinite layout loops due to floating point precision
+        // Add tolerance to avoid size-churn loops due to floating point precision.
         if abs(host.frame.size.width - width) > 0.5 || abs(host.frame.size.height - height) > 0.5 {
             host.frame = NSRect(x: 0, y: 0, width: width, height: height)
             scrollView.invalidateIntrinsicContentSize()
+            scrollView.needsLayout = true
         }
     }
 

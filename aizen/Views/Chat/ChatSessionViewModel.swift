@@ -104,6 +104,8 @@ class ChatSessionViewModel: ObservableObject {
     private var pendingStreamingRebuild: Bool = false
     private var pendingStreamingRebuildRequiresToolCallSync: Bool = false
     private var streamingRebuildTask: Task<Void, Never>?
+    private var pendingNearBottomState: Bool?
+    private var nearBottomStateTask: Task<Void, Never>?
     private var skipNextMessagesEmission: Bool = false
     private var skipNextToolCallsEmission: Bool = false
     private var gitPauseApplied: Bool = false
@@ -176,6 +178,8 @@ class ChatSessionViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     deinit {
+        nearBottomStateTask?.cancel()
+        nearBottomStateTask = nil
         if gitPauseApplied, !worktreePathSnapshot.isEmpty {
             let path = worktreePathSnapshot
             Task {
@@ -185,6 +189,42 @@ class ChatSessionViewModel: ObservableObject {
         cancellables.removeAll()
         notificationCancellables.removeAll()
         observedSessionId = nil
+    }
+
+    /// Coalesce bottom-visibility updates to avoid state writes during SwiftUI layout transactions.
+    func enqueueScrollPositionChange(_ isNearBottom: Bool, isLayoutResizing: Bool) {
+        guard !isLayoutResizing else { return }
+
+        if pendingNearBottomState == isNearBottom, nearBottomStateTask != nil {
+            return
+        }
+        pendingNearBottomState = isNearBottom
+
+        guard nearBottomStateTask == nil else { return }
+        nearBottomStateTask = Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self else { return }
+            defer { self.nearBottomStateTask = nil }
+
+            guard let nextState = self.pendingNearBottomState else { return }
+            self.pendingNearBottomState = nil
+            self.applyScrollPositionChange(nextState)
+        }
+    }
+
+    private func applyScrollPositionChange(_ isNearBottom: Bool) {
+        if self.isNearBottom != isNearBottom {
+            self.isNearBottom = isNearBottom
+        }
+        if isNearBottom {
+            if userScrolledUp {
+                userScrolledUp = false
+            }
+        } else if !isProcessing && autoScrollTask == nil {
+            if !userScrolledUp {
+                userScrolledUp = true
+            }
+        }
     }
     
     private func loadHistoricalMessages() {
@@ -807,7 +847,7 @@ class ChatSessionViewModel: ObservableObject {
 
         session.$messages
             // Stream message updates as they arrive for smoother chunk rendering.
-            .removeDuplicates()
+            .removeDuplicates(by: Self.hasEquivalentMessageEnvelope)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newMessages in
                 guard let self = self else { return }
@@ -984,6 +1024,23 @@ class ChatSessionViewModel: ObservableObject {
                 self.currentPermissionRequest = request
             }
             .store(in: &cancellables)
+    }
+
+    /// Fast dedupe for streamed message arrays.
+    /// Avoids deep `MessageItem` equality on every emission, which is expensive for long histories.
+    private static func hasEquivalentMessageEnvelope(_ lhs: [MessageItem], _ rhs: [MessageItem]) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        guard let left = lhs.last, let right = rhs.last else {
+            return lhs.isEmpty && rhs.isEmpty
+        }
+
+        let leftTail = left.content.suffix(64)
+        let rightTail = right.content.suffix(64)
+        return left.id == right.id
+            && left.isComplete == right.isComplete
+            && left.content.count == right.content.count
+            && leftTail == rightTail
+            && left.contentBlocks.count == right.contentBlocks.count
     }
 
     private func resetTimelineSyncState() {

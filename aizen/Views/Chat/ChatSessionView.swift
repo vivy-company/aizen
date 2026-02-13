@@ -105,16 +105,10 @@ struct ChatSessionView: View {
                         },
                         agentSession: viewModel.currentAgentSession,
                         onScrollPositionChange: { isNearBottom in
-                            if !isLayoutResizing {
-                                if viewModel.isNearBottom != isNearBottom {
-                                    viewModel.isNearBottom = isNearBottom
-                                }
-                                if isNearBottom {
-                                    viewModel.userScrolledUp = false
-                                } else if !viewModel.isProcessing && viewModel.autoScrollTask == nil {
-                                    viewModel.userScrolledUp = true
-                                }
-                            }
+                            viewModel.enqueueScrollPositionChange(
+                                isNearBottom,
+                                isLayoutResizing: isLayoutResizing
+                            )
                         },
                         childToolCallsProvider: { parentId in
                             viewModel.childToolCalls(for: parentId)
@@ -229,10 +223,10 @@ struct ChatSessionView: View {
                             GeometryReader { geometry in
                                 Color.clear
                                     .onAppear {
-                                        inputBarWidth = geometry.size.width
+                                        updateInputBarWidth(geometry.size.width)
                                     }
                                     .onChange(of: geometry.size.width) { _, newWidth in
-                                        inputBarWidth = newWidth
+                                        updateInputBarWidth(newWidth)
                                     }
                             }
                         }
@@ -262,14 +256,9 @@ struct ChatSessionView: View {
             isSelected ? chatActions : nil
         )
         .onChange(of: isLayoutResizing) { _, resizing in
-            if resizing {
-                wasNearBottomBeforeResize = viewModel.isNearBottom
-                viewModel.cancelPendingAutoScroll()
-                viewModel.suppressNextAutoScroll = true
-                viewModel.scrollRequest = nil
-                viewModel.isNearBottom = false
-            } else {
-                viewModel.isNearBottom = wasNearBottomBeforeResize
+            // Defer to avoid publishing ObservableObject changes during an active view update/layout pass.
+            DispatchQueue.main.async {
+                handleLayoutResizingChange(resizing)
             }
         }
         .onAppear {
@@ -420,6 +409,29 @@ struct ChatSessionView: View {
         }
 
         return path
+    }
+
+    private func updateInputBarWidth(_ width: CGFloat) {
+        let normalized = max((width * 2).rounded() / 2, 0)
+        guard abs(normalized - inputBarWidth) > 0.5 else { return }
+
+        // Geometry changes can arrive during layout; defer state mutation to next run loop.
+        DispatchQueue.main.async {
+            guard abs(normalized - inputBarWidth) > 0.5 else { return }
+            inputBarWidth = normalized
+        }
+    }
+
+    private func handleLayoutResizingChange(_ resizing: Bool) {
+        if resizing {
+            wasNearBottomBeforeResize = viewModel.isNearBottom
+            viewModel.cancelPendingAutoScroll()
+            viewModel.suppressNextAutoScroll = true
+            viewModel.scrollRequest = nil
+            viewModel.isNearBottom = false
+        } else {
+            viewModel.isNearBottom = wasNearBottomBeforeResize
+        }
     }
 
     private func isPlanRequest(_ request: RequestPermissionRequest) -> Bool {

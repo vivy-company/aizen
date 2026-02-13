@@ -162,11 +162,20 @@ struct TerminalViewWrapper: NSViewRepresentable {
 
         // Handle focus changes - focus the terminal view, not the scroll view
         if let terminalView = terminalView {
-            if shouldFocus {
-                guard let window = nsView.window else { return }
-                window.makeFirstResponder(terminalView)
-            } else if !isFocused && nsView.window?.firstResponder == terminalView {
-                nsView.window?.makeFirstResponder(nil)
+            // Defer responder updates to avoid re-entrant AppKit layout work during SwiftUI view updates.
+            let shouldRequestFocus = shouldFocus
+            let shouldResignFocus = !isFocused
+            DispatchQueue.main.async { [weak terminalView, weak nsView] in
+                guard let terminalView,
+                      let window = terminalView.window ?? nsView?.window else { return }
+
+                if shouldRequestFocus {
+                    if window.firstResponder !== terminalView {
+                        window.makeFirstResponder(terminalView)
+                    }
+                } else if shouldResignFocus, window.firstResponder === terminalView {
+                    window.makeFirstResponder(nil)
+                }
             }
 
             // Keep callbacks up to date if settings/state changed
