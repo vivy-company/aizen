@@ -9,35 +9,35 @@ import SwiftUI
 import AppKit
 import Combine
 import Markdown
+import CodeEditSourceEditor
+
+private enum MarkdownInlineCodeTheme {
+    static func inlineCodeColor(
+        colorScheme: ColorScheme,
+        terminalThemeName: String,
+        terminalThemeNameLight: String,
+        usePerAppearanceTheme: Bool
+    ) -> NSColor {
+        let effectiveThemeName: String
+        if usePerAppearanceTheme {
+            effectiveThemeName = colorScheme == .dark ? terminalThemeName : terminalThemeNameLight
+        } else {
+            effectiveThemeName = terminalThemeName
+        }
+
+        if let theme = GhosttyThemeParser.loadTheme(named: effectiveThemeName) {
+            // Cursor/insertion-point color is the closest thing to a theme accent.
+            return theme.insertionPoint
+        }
+
+        return NSColor.controlAccentColor
+    }
+}
 
 // MARK: - Fixed Text View
 
 /// NSTextView subclass that doesn't trigger layout updates during drawing
-class FixedTextView: NSTextView {
-    private var isDrawing = false
-
-    override func draw(_ dirtyRect: NSRect) {
-        isDrawing = true
-        super.draw(dirtyRect)
-        isDrawing = false
-    }
-
-    override func setFrameSize(_ newSize: NSSize) {
-        // Only prevent frame changes during actual drawing to avoid constraint loops
-        guard !isDrawing else { return }
-        super.setFrameSize(newSize)
-    }
-
-    override var intrinsicContentSize: NSSize {
-        guard let layoutManager = layoutManager,
-              let container = textContainer else {
-            return NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
-        }
-        layoutManager.ensureLayout(for: container)
-        let rect = layoutManager.usedRect(for: container)
-        return NSSize(width: NSView.noIntrinsicMetric, height: rect.height + 2)
-    }
-}
+final class FixedTextView: NSTextView {}
 
 // MARK: - Markdown View
 
@@ -46,6 +46,7 @@ struct MarkdownView: View {
     let content: String
     var isStreaming: Bool = false
     var basePath: String? = nil  // Base path for resolving relative URLs (e.g., directory of markdown file)
+    var onOpenFileInEditor: ((String) -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
@@ -64,7 +65,11 @@ struct MarkdownView: View {
                 switch group {
                 case .textGroup(let blocks):
                     // Render multiple text blocks in a single selectable view
-                    CombinedTextBlockView(blocks: blocks)
+                    CombinedTextBlockView(
+                        blocks: blocks,
+                        basePath: basePath,
+                        onOpenFileInEditor: onOpenFileInEditor
+                    )
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.vertical, 2)
                         .transition(blockTransition)
@@ -75,7 +80,8 @@ struct MarkdownView: View {
                     SpecialBlockRenderer(
                         block: block,
                         isStreaming: isStreaming && isLastBlock,
-                        basePath: basePath
+                        basePath: basePath,
+                        onOpenFileInEditor: onOpenFileInEditor
                     )
                     .transition(blockTransition)
 
@@ -248,10 +254,26 @@ private enum BlockGroup {
 /// Renders multiple text blocks using NSTextView for stable layout and selection
 struct CombinedTextBlockView: View {
     let blocks: [MarkdownBlock]
+    var basePath: String? = nil
+    var onOpenFileInEditor: ((String) -> Void)? = nil
 
     @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
     @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
     @AppStorage(ChatSettings.blockSpacingKey) private var blockSpacing = ChatSettings.defaultBlockSpacing
+    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
+    @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
+    @AppStorage("terminalUsePerAppearanceTheme") private var terminalUsePerAppearanceTheme = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var inlineCodeColor: NSColor {
+        MarkdownInlineCodeTheme.inlineCodeColor(
+            colorScheme: colorScheme,
+            terminalThemeName: terminalThemeName,
+            terminalThemeNameLight: terminalThemeNameLight,
+            usePerAppearanceTheme: terminalUsePerAppearanceTheme
+        )
+    }
+    @StateObject private var textCache = CombinedTextLayoutCache()
 
     private func chatFont(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
         if chatFontFamily == "System Font" {
@@ -265,8 +287,32 @@ struct CombinedTextBlockView: View {
     }
 
     var body: some View {
-        CombinedSelectableTextView(attributedText: buildAttributedText())
+        let resolved = textCache.resolve(key: renderKey) { buildAttributedText() }
+        CombinedSelectableTextView(
+            attributedText: resolved.text,
+            revision: resolved.revision,
+            basePath: basePath,
+            onOpenFileInEditor: onOpenFileInEditor
+        )
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var renderKey: Int {
+        var hasher = Hasher()
+        hasher.combine(chatFontFamily)
+        hasher.combine(chatFontSize)
+        hasher.combine(blockSpacing)
+        hasher.combine(terminalThemeName)
+        hasher.combine(terminalThemeNameLight)
+        hasher.combine(terminalUsePerAppearanceTheme)
+        hasher.combine(String(describing: colorScheme))
+        hasher.combine(basePath ?? "")
+        hasher.combine(blocks.count)
+        for block in blocks {
+            hasher.combine(block.id)
+            hasher.combine(String(describing: block.type))
+        }
+        return hasher.finalize()
     }
 
     private func buildAttributedText() -> NSAttributedString {
@@ -288,13 +334,17 @@ struct CombinedTextBlockView: View {
             case .paragraph(let content):
                 result.append(content.nsAttributedString(
                     baseFont: chatFont(size: fontSize),
-                    baseColor: .labelColor
+                    baseColor: .labelColor,
+                    inlineCodeColor: inlineCodeColor,
+                    basePath: basePath
                 ))
 
             case .heading(let content, let level):
                 result.append(content.nsAttributedString(
                     baseFont: fontForHeading(level: level, baseSize: fontSize),
-                    baseColor: .labelColor
+                    baseColor: .labelColor,
+                    inlineCodeColor: inlineCodeColor,
+                    basePath: basePath
                 ))
 
             case .blockQuote(let nestedBlocks):
@@ -337,7 +387,9 @@ struct CombinedTextBlockView: View {
                     if case .paragraph(let content) = defBlock.type {
                         let contentAttr = content.nsAttributedString(
                             baseFont: chatFont(size: fontSize - 1),
-                            baseColor: .secondaryLabelColor
+                            baseColor: .secondaryLabelColor,
+                            inlineCodeColor: inlineCodeColor,
+                            basePath: basePath
                         )
                         result.append(contentAttr)
                     }
@@ -376,7 +428,9 @@ struct CombinedTextBlockView: View {
                 let italic = NSFontManager.shared.convert(base, toHaveTrait: .italicFontMask)
                 let contentAttr = content.nsAttributedString(
                     baseFont: italic,
-                    baseColor: .secondaryLabelColor
+                    baseColor: .secondaryLabelColor,
+                    inlineCodeColor: inlineCodeColor,
+                    basePath: basePath
                 )
                 result.append(contentAttr)
             }
@@ -417,7 +471,9 @@ struct CombinedTextBlockView: View {
 
             var contentAttr = item.content.nsAttributedString(
                 baseFont: chatFont(size: fontSize),
-                baseColor: .labelColor
+                baseColor: .labelColor,
+                inlineCodeColor: inlineCodeColor,
+                basePath: basePath
             )
             if item.checkbox == .checked {
                 let mutable = NSMutableAttributedString(attributedString: contentAttr)
@@ -495,6 +551,24 @@ struct CombinedTextBlockView: View {
     }
 }
 
+@MainActor
+private final class CombinedTextLayoutCache: ObservableObject {
+    private var currentKey: Int?
+    private var currentText: NSAttributedString = NSAttributedString(string: "")
+    private var currentRevision: UInt64 = 0
+
+    func resolve(key: Int, build: () -> NSAttributedString) -> (text: NSAttributedString, revision: UInt64) {
+        guard currentKey != key else {
+            return (currentText, currentRevision)
+        }
+
+        currentKey = key
+        currentText = build()
+        currentRevision &+= 1
+        return (currentText, currentRevision)
+    }
+}
+
 // MARK: - Special Block Renderer
 
 /// Renders blocks that need special handling (code, mermaid, math, tables, images, paragraphs with images)
@@ -502,12 +576,17 @@ struct SpecialBlockRenderer: View {
     let block: MarkdownBlock
     var isStreaming: Bool = false
     var basePath: String? = nil
+    var onOpenFileInEditor: ((String) -> Void)? = nil
 
     var body: some View {
         switch block.type {
         case .paragraph(let content):
             // Paragraph with images
-            MixedContentParagraphView(content: content, basePath: basePath)
+            MixedContentParagraphView(
+                content: content,
+                basePath: basePath,
+                onOpenFileInEditor: onOpenFileInEditor
+            )
                 .padding(.vertical, 2)
 
         case .codeBlock(let code, let language, _):
@@ -816,6 +895,7 @@ struct BlockRenderer: View {
 struct MixedContentParagraphView: View {
     let content: MarkdownInlineContent
     var basePath: String? = nil
+    var onOpenFileInEditor: ((String) -> Void)? = nil
 
     @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
     @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
@@ -854,7 +934,9 @@ struct MixedContentParagraphView: View {
                             SelectableTextView(
                                 content: MarkdownInlineContent(elements: elements),
                                 baseFont: nsFont(size: CGFloat(chatFontSize)),
-                                baseColor: .labelColor
+                                baseColor: .labelColor,
+                                basePath: basePath,
+                                onOpenFileInEditor: onOpenFileInEditor
                             )
                         }
                     case .image(let url, let alt, let linkURL):
@@ -952,13 +1034,6 @@ struct LinkedImageView: View {
                 MarkdownImageView(url: url, alt: alt, basePath: basePath)
             }
             .buttonStyle(.plain)
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.pointingHand.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
         } else {
             MarkdownImageView(url: url, alt: alt, basePath: basePath)
         }
@@ -972,6 +1047,62 @@ struct SelectableTextView: NSViewRepresentable {
     let content: MarkdownInlineContent
     let baseFont: NSFont
     let baseColor: NSColor
+    var basePath: String? = nil
+    var onOpenFileInEditor: ((String) -> Void)? = nil
+    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
+    @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
+    @AppStorage("terminalUsePerAppearanceTheme") private var terminalUsePerAppearanceTheme = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var inlineCodeColor: NSColor {
+        MarkdownInlineCodeTheme.inlineCodeColor(
+            colorScheme: colorScheme,
+            terminalThemeName: terminalThemeName,
+            terminalThemeNameLight: terminalThemeNameLight,
+            usePerAppearanceTheme: terminalUsePerAppearanceTheme
+        )
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var renderKey: Int?
+        var measuredRenderKey: Int?
+        var measuredWidth: CGFloat?
+        var measuredSize: CGSize?
+        var basePath: String?
+        var onOpenFileInEditor: ((String) -> Void)?
+
+        func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
+            guard let url = linkURL(from: link),
+                  let destination = MarkdownLocalPathResolver.existingDestinationPath(from: url, basePath: basePath) else {
+                return false
+            }
+
+            if let onOpenFileInEditor {
+                onOpenFileInEditor(destination)
+            } else {
+                NotificationCenter.default.post(
+                    name: .openFileInEditor,
+                    object: nil,
+                    userInfo: ["path": destination]
+                )
+            }
+            return true
+        }
+
+        private func linkURL(from link: Any) -> URL? {
+            if let url = link as? URL {
+                return url
+            }
+            if let string = link as? String {
+                return URL(string: string)
+            }
+            return nil
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeNSView(context: Context) -> FixedTextView {
         let textView = FixedTextView()
@@ -979,21 +1110,37 @@ struct SelectableTextView: NSViewRepresentable {
         textView.isSelectable = true
         textView.drawsBackground = false
         textView.textContainerInset = .zero
-        textView.textContainer?.lineFragmentPadding = 0
+        if let container = textView.textContainer {
+            container.lineFragmentPadding = 0
+            container.widthTracksTextView = false
+            container.heightTracksTextView = false
+        }
         textView.isVerticallyResizable = false
         textView.isHorizontallyResizable = false
-        textView.translatesAutoresizingMaskIntoConstraints = false
-        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        textView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        textView.usesFindBar = false
+        textView.isRichText = false
+        textView.delegate = context.coordinator
         return textView
     }
 
     func updateNSView(_ textView: FixedTextView, context: Context) {
-        let attributed = content.nsAttributedString(baseFont: baseFont, baseColor: baseColor)
-        // Only update if content changed
-        if textView.attributedString() != attributed {
-            textView.textStorage?.setAttributedString(attributed)
-        }
+        context.coordinator.basePath = basePath
+        context.coordinator.onOpenFileInEditor = onOpenFileInEditor
+
+        let key = makeRenderKey()
+        guard context.coordinator.renderKey != key else { return }
+        context.coordinator.renderKey = key
+        context.coordinator.measuredRenderKey = nil
+        context.coordinator.measuredWidth = nil
+        context.coordinator.measuredSize = nil
+        textView.textStorage?.setAttributedString(
+            content.nsAttributedString(
+                baseFont: baseFont,
+                baseColor: baseColor,
+                inlineCodeColor: inlineCodeColor,
+                basePath: basePath
+            )
+        )
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: FixedTextView, context: Context) -> CGSize? {
@@ -1003,18 +1150,98 @@ struct SelectableTextView: NSViewRepresentable {
         }
 
         // Use proposed width, fallback to reasonable default for text readability
-        let width = proposal.width ?? 800
+        let proposedWidth = proposal.width ?? nsView.bounds.width
+        let width = max((proposedWidth > 0 ? proposedWidth : 800).rounded(.towardZero), 1)
+        let key = context.coordinator.renderKey ?? makeRenderKey()
+        if context.coordinator.measuredRenderKey == key,
+           let cachedWidth = context.coordinator.measuredWidth,
+           abs(cachedWidth - width) < 0.5,
+           let cachedSize = context.coordinator.measuredSize {
+            return cachedSize
+        }
+
         container.containerSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
         layoutManager.ensureLayout(for: container)
 
         let rect = layoutManager.usedRect(for: container)
-        return CGSize(width: width, height: max(rect.height + 2, 16))
+        let measuredSize = CGSize(width: width, height: max(rect.height + 2, 16))
+        context.coordinator.measuredRenderKey = key
+        context.coordinator.measuredWidth = width
+        context.coordinator.measuredSize = measuredSize
+        return measuredSize
+    }
+
+    private func makeRenderKey() -> Int {
+        var hasher = Hasher()
+        hasher.combine(content.elements)
+        hasher.combine(baseFont.fontName)
+        hasher.combine(baseFont.pointSize)
+        combineColor(baseColor, into: &hasher)
+        combineColor(inlineCodeColor, into: &hasher)
+        hasher.combine(basePath ?? "")
+        hasher.combine(terminalThemeName)
+        hasher.combine(terminalThemeNameLight)
+        hasher.combine(terminalUsePerAppearanceTheme)
+        hasher.combine(String(describing: colorScheme))
+        return hasher.finalize()
+    }
+
+    private func combineColor(_ color: NSColor, into hasher: inout Hasher) {
+        let converted = color.usingColorSpace(.deviceRGB) ?? color
+        hasher.combine(converted.redComponent)
+        hasher.combine(converted.greenComponent)
+        hasher.combine(converted.blueComponent)
+        hasher.combine(converted.alphaComponent)
     }
 }
 
 /// NSTextView-based text view for combined attributed markdown blocks
 struct CombinedSelectableTextView: NSViewRepresentable {
     let attributedText: NSAttributedString
+    let revision: UInt64
+    var basePath: String? = nil
+    var onOpenFileInEditor: ((String) -> Void)? = nil
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var revision: UInt64 = .max
+        var measuredRevision: UInt64 = .max
+        var measuredWidth: CGFloat?
+        var measuredSize: CGSize?
+        var basePath: String?
+        var onOpenFileInEditor: ((String) -> Void)?
+
+        func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
+            guard let url = linkURL(from: link),
+                  let destination = MarkdownLocalPathResolver.existingDestinationPath(from: url, basePath: basePath) else {
+                return false
+            }
+
+            if let onOpenFileInEditor {
+                onOpenFileInEditor(destination)
+            } else {
+                NotificationCenter.default.post(
+                    name: .openFileInEditor,
+                    object: nil,
+                    userInfo: ["path": destination]
+                )
+            }
+            return true
+        }
+
+        private func linkURL(from link: Any) -> URL? {
+            if let url = link as? URL {
+                return url
+            }
+            if let string = link as? String {
+                return URL(string: string)
+            }
+            return nil
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeNSView(context: Context) -> FixedTextView {
         let textView = FixedTextView()
@@ -1022,19 +1249,29 @@ struct CombinedSelectableTextView: NSViewRepresentable {
         textView.isSelectable = true
         textView.drawsBackground = false
         textView.textContainerInset = .zero
-        textView.textContainer?.lineFragmentPadding = 0
+        if let container = textView.textContainer {
+            container.lineFragmentPadding = 0
+            container.widthTracksTextView = false
+            container.heightTracksTextView = false
+        }
         textView.isVerticallyResizable = false
         textView.isHorizontallyResizable = false
-        textView.translatesAutoresizingMaskIntoConstraints = false
-        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        textView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        textView.usesFindBar = false
+        textView.isRichText = false
+        textView.delegate = context.coordinator
         return textView
     }
 
     func updateNSView(_ textView: FixedTextView, context: Context) {
-        if !textView.attributedString().isEqual(to: attributedText) {
-            textView.textStorage?.setAttributedString(attributedText)
-        }
+        context.coordinator.basePath = basePath
+        context.coordinator.onOpenFileInEditor = onOpenFileInEditor
+
+        guard context.coordinator.revision != revision else { return }
+        context.coordinator.revision = revision
+        context.coordinator.measuredRevision = .max
+        context.coordinator.measuredWidth = nil
+        context.coordinator.measuredSize = nil
+        textView.textStorage?.setAttributedString(attributedText)
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: FixedTextView, context: Context) -> CGSize? {
@@ -1044,12 +1281,24 @@ struct CombinedSelectableTextView: NSViewRepresentable {
         }
 
         // Use proposed width, fallback to reasonable default for text readability
-        let width = proposal.width ?? 800
+        let proposedWidth = proposal.width ?? nsView.bounds.width
+        let width = max((proposedWidth > 0 ? proposedWidth : 800).rounded(.towardZero), 1)
+        if context.coordinator.measuredRevision == revision,
+           let cachedWidth = context.coordinator.measuredWidth,
+           abs(cachedWidth - width) < 0.5,
+           let cachedSize = context.coordinator.measuredSize {
+            return cachedSize
+        }
+
         container.containerSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
         layoutManager.ensureLayout(for: container)
 
         let rect = layoutManager.usedRect(for: container)
-        return CGSize(width: width, height: max(rect.height + 2, 16))
+        let measuredSize = CGSize(width: width, height: max(rect.height + 2, 16))
+        context.coordinator.measuredRevision = revision
+        context.coordinator.measuredWidth = width
+        context.coordinator.measuredSize = measuredSize
+        return measuredSize
     }
 }
 

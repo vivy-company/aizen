@@ -65,6 +65,7 @@ extension ChatSessionViewModel {
             index[parent, default: []].append(call)
         }
         childToolCallsByParentId = index
+        childToolCallsEpoch &+= 1
     }
 
     // MARK: - Timeline
@@ -362,6 +363,9 @@ extension ChatSessionViewModel {
                 var updatedItems = timelineItems
                 updatedItems[idx] = .message(lastAgentMessage)
                 timelineItems = updatedItems
+                if isNearBottom {
+                    scrollToBottomDeferred()
+                }
                 previousMessageIds = newIds
                 return
             }
@@ -421,7 +425,7 @@ extension ChatSessionViewModel {
         // - If pinned, keep following bottom.
         // - If not pinned, do nothing (user is reading history).
         if !addedIds.isEmpty, isNearBottom {
-            requestScrollToBottom(force: false, animated: false)
+            scrollToBottomDeferred()
         }
     }
 
@@ -558,12 +562,13 @@ extension ChatSessionViewModel {
 
     private func scheduleAutoScrollToBottom() {
         guard isNearBottom else { return }
+        guard !suppressNextAutoScroll else { return }
         guard autoScrollTask == nil else { return }
 
         autoScrollTask = Task { @MainActor in
             defer { autoScrollTask = nil }
-            try? await Task.sleep(for: .milliseconds(16))
-            if Task.isCancelled || !isNearBottom {
+            try? await Task.sleep(for: .milliseconds(80))
+            if Task.isCancelled || !isNearBottom || suppressNextAutoScroll {
                 return
             }
             scrollRequest = ScrollRequest(id: UUID(), target: .bottom, animated: false, force: false)

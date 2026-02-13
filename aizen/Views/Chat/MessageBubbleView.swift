@@ -13,6 +13,8 @@ import SwiftUI
 struct MessageBubbleView: View {
     let message: MessageItem
     let agentName: String?
+    var markdownBasePath: String? = nil
+    var onOpenFileInEditor: ((String) -> Void)? = nil
 
     @State private var showCopyConfirmation = false
 
@@ -88,7 +90,12 @@ struct MessageBubbleView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 6) {
                             if !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                MessageContentView(content: message.content, isStreaming: !message.isComplete)
+                                MessageContentView(
+                                    content: message.content,
+                                    isStreaming: !message.isComplete,
+                                    basePath: markdownBasePath,
+                                    onOpenFileInEditor: onOpenFileInEditor
+                                )
                                     .fixedSize(horizontal: false, vertical: true)
                             }
 
@@ -176,13 +183,6 @@ struct MessageBubbleView: View {
 
 // MARK: - User Bubble
 
-private struct BubbleWidthKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
 struct UserBubble<Background: View>: View {
     let content: String
     let timestamp: Date
@@ -191,7 +191,6 @@ struct UserBubble<Background: View>: View {
     let copyAction: () -> Void
     @ViewBuilder let backgroundView: () -> Background
 
-    @State private var measuredWidth: CGFloat?
     @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
     @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
 
@@ -232,10 +231,8 @@ struct UserBubble<Background: View>: View {
             bubbleContent
                 .padding(.horizontal, hPadding)
                 .padding(.vertical, vPadding)
-                .frame(width: calculatedBubbleWidth, alignment: .trailing)
                 .background(backgroundView())
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .background(measureUnwrappedWidth)
                 .contextMenu {
                     Button {
                         copyAction()
@@ -265,7 +262,6 @@ struct UserBubble<Background: View>: View {
                         .foregroundStyle(showCopyConfirmation ? .green : .secondary)
                 }
                 .buttonStyle(.plain)
-                .help(String(localized: "chat.message.copy"))
             }
             .padding(.trailing, 4)
         }
@@ -327,29 +323,6 @@ struct UserBubble<Background: View>: View {
             detailView: AnyView(TextAttachmentDetailView(content: text, showsCopyButton: true)),
             style: AttachmentChip.Style(showsDelete: false, showsHoverFade: false)
         )
-    }
-
-    private var measureUnwrappedWidth: some View {
-        Text(content)
-            .font(chatFont)
-            .fixedSize()
-            .background(
-                GeometryReader { geo in
-                    Color.clear.preference(key: BubbleWidthKey.self, value: geo.size.width)
-                }
-            )
-            .hidden()
-            .onPreferenceChange(BubbleWidthKey.self) { width in
-                measuredWidth = width
-            }
-    }
-
-    private var calculatedBubbleWidth: CGFloat? {
-        guard let measured = measuredWidth else { return nil }
-        // Minimum width for timestamp (~50pt) + some padding
-        let minContentWidth: CGFloat = 60
-        let contentWidth = min(max(measured, minContentWidth), maxContentWidth)
-        return contentWidth + hPadding * 2
     }
 
     private func formatTimestamp(_ date: Date) -> String {

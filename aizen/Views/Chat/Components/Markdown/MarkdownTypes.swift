@@ -8,6 +8,7 @@ import SwiftUI
 import Combine
 import Markdown
 import AppKit
+import Foundation
 
 // MARK: - Parsed Markdown Document
 
@@ -246,6 +247,70 @@ nonisolated enum InlineElement: Equatable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(plainText)
+    }
+}
+
+nonisolated enum MarkdownLocalPathResolver {
+    private static let linkScheme = "aizen-file"
+
+    static func destinationPath(from url: URL, basePath: String?) -> String? {
+        if url.scheme?.lowercased() == linkScheme {
+            guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  let rawPath = components.queryItems?.first(where: { $0.name == "path" })?.value,
+                  !rawPath.isEmpty else {
+                return nil
+            }
+            return resolveToAbsolutePath(rawPath, basePath: basePath)
+        }
+
+        if url.scheme == nil {
+            let raw = url.relativeString.removingPercentEncoding ?? url.relativeString
+            guard raw.contains("/") else { return nil }
+            return resolveToAbsolutePath(raw, basePath: basePath)
+        }
+
+        return nil
+    }
+
+    static func existingDestinationPath(from url: URL, basePath: String?) -> String? {
+        guard let path = destinationPath(from: url, basePath: basePath) else { return nil }
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) ? path : nil
+    }
+
+    private static func resolveToAbsolutePath(_ rawPath: String, basePath: String?) -> String {
+        let stripped = stripLineColumnSuffix(rawPath)
+        let expanded = (stripped as NSString).expandingTildeInPath
+
+        if expanded.hasPrefix("/") {
+            return URL(fileURLWithPath: expanded).standardizedFileURL.path
+        }
+
+        if let basePath, !basePath.isEmpty {
+            return URL(fileURLWithPath: basePath)
+                .appendingPathComponent(expanded)
+                .standardizedFileURL
+                .path
+        }
+
+        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(expanded)
+            .standardizedFileURL
+            .path
+    }
+
+    private static func stripLineColumnSuffix(_ path: String) -> String {
+        let parts = path.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count >= 2 else { return path }
+
+        if Int(parts[parts.count - 1]) != nil {
+            if parts.count >= 3, Int(parts[parts.count - 2]) != nil {
+                return parts.dropLast(2).joined(separator: ":")
+            }
+            return parts.dropLast().joined(separator: ":")
+        }
+
+        return path
     }
 }
 
@@ -692,38 +757,41 @@ nonisolated final class MarkdownParser {
 
     // MARK: - Inline Parsing
 
-    private func parseInlineContent<S: Sequence>(_ elements: S) -> MarkdownInlineContent where S.Element == Markup {
+    private func parseInlineContent<S: Sequence>(
+        _ elements: S,
+        detectFilePaths: Bool = true
+    ) -> MarkdownInlineContent where S.Element == Markup {
         var result: [InlineElement] = []
 
         for element in elements {
-            result.append(contentsOf: parseInlineElement(element))
+            result.append(contentsOf: parseInlineElement(element, detectFilePaths: detectFilePaths))
         }
 
         return MarkdownInlineContent(elements: result)
     }
 
-    private func parseInlineElement(_ element: Markup) -> [InlineElement] {
+    private func parseInlineElement(_ element: Markup, detectFilePaths: Bool) -> [InlineElement] {
         switch element {
         case let text as Markdown.Text:
-            return parseTextWithMath(text.string)
+            return parseTextWithMath(text.string, detectFilePaths: detectFilePaths)
 
         case let emphasis as Emphasis:
-            let content = parseInlineContent(emphasis.children)
+            let content = parseInlineContent(emphasis.children, detectFilePaths: detectFilePaths)
             return [.emphasis(content)]
 
         case let strong as Strong:
-            let content = parseInlineContent(strong.children)
+            let content = parseInlineContent(strong.children, detectFilePaths: detectFilePaths)
             return [.strong(content)]
 
         case let strikethrough as Strikethrough:
-            let content = parseInlineContent(strikethrough.children)
+            let content = parseInlineContent(strikethrough.children, detectFilePaths: detectFilePaths)
             return [.strikethrough(content)]
 
         case let code as InlineCode:
             return [.code(code.code)]
 
         case let link as Markdown.Link:
-            let content = parseInlineContent(link.children)
+            let content = parseInlineContent(link.children, detectFilePaths: false)
             return [.link(text: content, url: link.destination ?? "", title: link.title)]
 
         case let image as Markdown.Image:
@@ -743,7 +811,7 @@ nonisolated final class MarkdownParser {
         }
     }
 
-    private func parseTextWithMath(_ text: String) -> [InlineElement] {
+    private func parseTextWithMath(_ text: String, detectFilePaths: Bool = true) -> [InlineElement] {
         var result: [InlineElement] = []
         var currentText = ""
         var i = text.startIndex
@@ -794,7 +862,139 @@ nonisolated final class MarkdownParser {
             result.append(.text(currentText))
         }
 
-        return result.isEmpty ? [.text(text)] : result
+        let parsed = result.isEmpty ? [.text(text)] : result
+        guard detectFilePaths else { return parsed }
+
+        let withFileLinks = parsed.flatMap { element -> [InlineElement] in
+            guard case .text(let value) = element else { return [element] }
+            return parseTextWithFilePaths(value)
+        }
+
+        return mergeAdjacentTextElements(withFileLinks)
+    }
+
+    private static let inlineFilePathRegex: NSRegularExpression = {
+        // Matches slash-separated path-like tokens such as:
+        // docs/specs/file.md, ./src/app.ts, /Users/me/project/file.swift:42
+        let pattern = #"(?<![\w.~/-])((?:~|\.{1,2}|/)?[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)+(?::\d+(?::\d+)?)?)"#
+        // Safe: static literal regex pattern validated at compile time.
+        return try! NSRegularExpression(pattern: pattern)
+    }()
+
+    private func parseTextWithFilePaths(_ text: String) -> [InlineElement] {
+        guard !text.isEmpty else { return [.text(text)] }
+
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        let matches = Self.inlineFilePathRegex.matches(in: text, options: [], range: range)
+        guard !matches.isEmpty else { return [.text(text)] }
+
+        var result: [InlineElement] = []
+        var cursor = text.startIndex
+        var foundFilePath = false
+
+        for match in matches {
+            guard match.numberOfRanges > 1,
+                  let candidateRange = Range(match.range(at: 1), in: text) else {
+                continue
+            }
+
+            let effectiveRange = trimmedPathRange(in: text, from: candidateRange)
+            guard !effectiveRange.isEmpty else { continue }
+
+            let candidate = String(text[effectiveRange])
+            guard isLikelyInlineFilePath(candidate, in: text, at: effectiveRange) else {
+                continue
+            }
+
+            foundFilePath = true
+
+            if cursor < effectiveRange.lowerBound {
+                result.append(.text(String(text[cursor..<effectiveRange.lowerBound])))
+            }
+
+            if let linkURL = makeInlineFileLinkURL(for: candidate) {
+                result.append(
+                    .link(
+                        text: MarkdownInlineContent(text: candidate),
+                        url: linkURL,
+                        title: nil
+                    )
+                )
+            } else {
+                result.append(.text(candidate))
+            }
+
+            cursor = effectiveRange.upperBound
+        }
+
+        if cursor < text.endIndex {
+            result.append(.text(String(text[cursor...])))
+        }
+
+        guard foundFilePath else { return [.text(text)] }
+        return result
+    }
+
+    private func trimmedPathRange(
+        in text: String,
+        from range: Range<String.Index>
+    ) -> Range<String.Index> {
+        var end = range.upperBound
+
+        while end > range.lowerBound {
+            let previous = text[text.index(before: end)]
+            if previous == "." || previous == "," || previous == ";" || previous == "!" || previous == "?" || previous == ")" {
+                end = text.index(before: end)
+            } else {
+                break
+            }
+        }
+
+        return range.lowerBound..<end
+    }
+
+    private func isLikelyInlineFilePath(
+        _ candidate: String,
+        in fullText: String,
+        at range: Range<String.Index>
+    ) -> Bool {
+        guard candidate.contains("/") else { return false }
+        guard candidate.contains(where: \.isLetter) else { return false }
+
+        let prefix = fullText[..<range.lowerBound]
+        let tokenStart = prefix.lastIndex(where: \.isWhitespace).map { fullText.index(after: $0) } ?? fullText.startIndex
+        let tokenPrefix = fullText[tokenStart..<range.lowerBound]
+
+        // Avoid turning URL paths (e.g. https://host/path) into local file links.
+        if tokenPrefix.contains("://") {
+            return false
+        }
+
+        return true
+    }
+
+    private func makeInlineFileLinkURL(for rawPath: String) -> String? {
+        let allowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+"))
+        guard let encoded = rawPath.addingPercentEncoding(withAllowedCharacters: allowed) else {
+            return nil
+        }
+        return "aizen-file://open?path=\(encoded)"
+    }
+
+    private func mergeAdjacentTextElements(_ elements: [InlineElement]) -> [InlineElement] {
+        guard !elements.isEmpty else { return [] }
+
+        var merged: [InlineElement] = []
+        for element in elements {
+            if case .text(let text) = element,
+               case .text(let previous)? = merged.last {
+                merged.removeLast()
+                merged.append(.text(previous + text))
+            } else {
+                merged.append(element)
+            }
+        }
+        return merged
     }
 
     /// Extract footnote reference [^id] from text
@@ -949,12 +1149,19 @@ extension MarkdownInlineContent {
 
     func attributedString(
         baseFont: Font = .body,
-        baseColor: Color = .primary
+        baseColor: Color = .primary,
+        inlineCodeColor: Color? = nil,
+        basePath: String? = nil
     ) -> AttributedString {
         var result = AttributedString()
 
         for element in elements {
-            result += element.attributedString(baseFont: baseFont, baseColor: baseColor)
+            result += element.attributedString(
+                baseFont: baseFont,
+                baseColor: baseColor,
+                inlineCodeColor: inlineCodeColor,
+                basePath: basePath
+            )
         }
 
         return result
@@ -962,12 +1169,21 @@ extension MarkdownInlineContent {
 
     func nsAttributedString(
         baseFont: NSFont = .systemFont(ofSize: NSFont.systemFontSize),
-        baseColor: NSColor = .labelColor
+        baseColor: NSColor = .labelColor,
+        inlineCodeColor: NSColor? = nil,
+        basePath: String? = nil
     ) -> NSAttributedString {
         let result = NSMutableAttributedString()
 
         for element in elements {
-            result.append(element.nsAttributedString(baseFont: baseFont, baseColor: baseColor))
+            result.append(
+                element.nsAttributedString(
+                    baseFont: baseFont,
+                    baseColor: baseColor,
+                    inlineCodeColor: inlineCodeColor,
+                    basePath: basePath
+                )
+            )
         }
 
         return result
@@ -976,7 +1192,12 @@ extension MarkdownInlineContent {
 
 extension InlineElement {
 
-    func attributedString(baseFont: Font, baseColor: Color) -> AttributedString {
+    func attributedString(
+        baseFont: Font,
+        baseColor: Color,
+        inlineCodeColor: Color? = nil,
+        basePath: String? = nil
+    ) -> AttributedString {
         switch self {
         case .text(let text):
             var attr = AttributedString(text)
@@ -985,28 +1206,59 @@ extension InlineElement {
             return attr
 
         case .emphasis(let content):
-            var attr = content.attributedString(baseFont: baseFont, baseColor: baseColor)
+            var attr = content.attributedString(
+                baseFont: baseFont,
+                baseColor: baseColor,
+                inlineCodeColor: inlineCodeColor,
+                basePath: basePath
+            )
             attr.font = baseFont.italic()
             return attr
 
         case .strong(let content):
-            var attr = content.attributedString(baseFont: baseFont, baseColor: baseColor)
+            var attr = content.attributedString(
+                baseFont: baseFont,
+                baseColor: baseColor,
+                inlineCodeColor: inlineCodeColor,
+                basePath: basePath
+            )
             attr.font = baseFont.bold()
             return attr
 
         case .strikethrough(let content):
-            var attr = content.attributedString(baseFont: baseFont, baseColor: baseColor)
+            var attr = content.attributedString(
+                baseFont: baseFont,
+                baseColor: baseColor,
+                inlineCodeColor: inlineCodeColor,
+                basePath: basePath
+            )
             attr.strikethroughStyle = .single
             return attr
 
         case .code(let code):
             var attr = AttributedString(code)
             attr.font = .system(.body, design: .monospaced)
-            attr.backgroundColor = Color(nsColor: .quaternaryLabelColor)
+            attr.foregroundColor = inlineCodeColor ?? baseColor
             return attr
 
         case .link(let text, let url, _):
-            var attr = text.attributedString(baseFont: baseFont, baseColor: .blue)
+            let localPathCandidate = isLocalPathCandidate(url)
+            let hasExistingLocalTarget = existingLocalPath(for: url, basePath: basePath) != nil
+            if localPathCandidate && !hasExistingLocalTarget {
+                return text.attributedString(
+                    baseFont: baseFont,
+                    baseColor: baseColor,
+                    inlineCodeColor: inlineCodeColor,
+                    basePath: basePath
+                )
+            }
+
+            var attr = text.attributedString(
+                baseFont: baseFont,
+                baseColor: .blue,
+                inlineCodeColor: inlineCodeColor,
+                basePath: basePath
+            )
             attr.underlineStyle = .single
             if let linkURL = URL(string: url) {
                 attr.link = linkURL
@@ -1045,7 +1297,12 @@ extension InlineElement {
         }
     }
 
-    func nsAttributedString(baseFont: NSFont, baseColor: NSColor) -> NSAttributedString {
+    func nsAttributedString(
+        baseFont: NSFont,
+        baseColor: NSColor,
+        inlineCodeColor: NSColor? = nil,
+        basePath: String? = nil
+    ) -> NSAttributedString {
         switch self {
         case .text(let text):
             return NSAttributedString(string: text, attributes: [
@@ -1054,19 +1311,40 @@ extension InlineElement {
             ])
 
         case .emphasis(let content):
-            let result = NSMutableAttributedString(attributedString: content.nsAttributedString(baseFont: baseFont, baseColor: baseColor))
+            let result = NSMutableAttributedString(
+                attributedString: content.nsAttributedString(
+                    baseFont: baseFont,
+                    baseColor: baseColor,
+                    inlineCodeColor: inlineCodeColor,
+                    basePath: basePath
+                )
+            )
             let italicFont = NSFontManager.shared.convert(baseFont, toHaveTrait: .italicFontMask)
             result.addAttribute(.font, value: italicFont, range: NSRange(location: 0, length: result.length))
             return result
 
         case .strong(let content):
-            let result = NSMutableAttributedString(attributedString: content.nsAttributedString(baseFont: baseFont, baseColor: baseColor))
+            let result = NSMutableAttributedString(
+                attributedString: content.nsAttributedString(
+                    baseFont: baseFont,
+                    baseColor: baseColor,
+                    inlineCodeColor: inlineCodeColor,
+                    basePath: basePath
+                )
+            )
             let boldFont = NSFontManager.shared.convert(baseFont, toHaveTrait: .boldFontMask)
             result.addAttribute(.font, value: boldFont, range: NSRange(location: 0, length: result.length))
             return result
 
         case .strikethrough(let content):
-            let result = NSMutableAttributedString(attributedString: content.nsAttributedString(baseFont: baseFont, baseColor: baseColor))
+            let result = NSMutableAttributedString(
+                attributedString: content.nsAttributedString(
+                    baseFont: baseFont,
+                    baseColor: baseColor,
+                    inlineCodeColor: inlineCodeColor,
+                    basePath: basePath
+                )
+            )
             result.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: NSRange(location: 0, length: result.length))
             return result
 
@@ -1074,12 +1352,29 @@ extension InlineElement {
             let monoFont = NSFont.monospacedSystemFont(ofSize: baseFont.pointSize, weight: .regular)
             return NSAttributedString(string: code, attributes: [
                 .font: monoFont,
-                .foregroundColor: baseColor,
-                .backgroundColor: NSColor.quaternaryLabelColor
+                .foregroundColor: inlineCodeColor ?? baseColor
             ])
 
         case .link(let text, let url, _):
-            let result = NSMutableAttributedString(attributedString: text.nsAttributedString(baseFont: baseFont, baseColor: .linkColor))
+            let localPathCandidate = isLocalPathCandidate(url)
+            let hasExistingLocalTarget = existingLocalPath(for: url, basePath: basePath) != nil
+            if localPathCandidate && !hasExistingLocalTarget {
+                return text.nsAttributedString(
+                    baseFont: baseFont,
+                    baseColor: baseColor,
+                    inlineCodeColor: inlineCodeColor,
+                    basePath: basePath
+                )
+            }
+
+            let result = NSMutableAttributedString(
+                attributedString: text.nsAttributedString(
+                    baseFont: baseFont,
+                    baseColor: .linkColor,
+                    inlineCodeColor: inlineCodeColor,
+                    basePath: basePath
+                )
+            )
             result.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: NSRange(location: 0, length: result.length))
             if let linkURL = URL(string: url) {
                 result.addAttribute(.link, value: linkURL, range: NSRange(location: 0, length: result.length))
@@ -1120,5 +1415,17 @@ extension InlineElement {
                 .baselineOffset: 4
             ])
         }
+    }
+
+    private func isLocalPathCandidate(_ urlString: String) -> Bool {
+        guard let url = URL(string: urlString) else {
+            return urlString.contains("/")
+        }
+        return MarkdownLocalPathResolver.destinationPath(from: url, basePath: nil) != nil
+    }
+
+    private func existingLocalPath(for urlString: String, basePath: String?) -> String? {
+        guard let url = URL(string: urlString) else { return nil }
+        return MarkdownLocalPathResolver.existingDestinationPath(from: url, basePath: basePath)
     }
 }

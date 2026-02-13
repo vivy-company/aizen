@@ -38,7 +38,13 @@ class ChatSessionViewModel: ObservableObject {
     @Published var currentAgentSession: AgentSession?
     @Published var currentPermissionRequest: RequestPermissionRequest?
     @Published var attachments: [ChatAttachment] = []
-    @Published var timelineItems: [TimelineItem] = []
+    @Published var timelineItems: [TimelineItem] = [] {
+        didSet {
+            timelineRenderEpoch &+= 1
+        }
+    }
+    @Published var timelineRenderEpoch: UInt64 = 0
+    @Published var childToolCallsEpoch: UInt64 = 0
 
     // Track previous IDs for incremental sync (avoids storing full duplicate arrays)
     var previousMessageIds: Set<String> = []
@@ -104,6 +110,8 @@ class ChatSessionViewModel: ObservableObject {
     private var pendingStreamingRebuild: Bool = false
     private var pendingStreamingRebuildRequiresToolCallSync: Bool = false
     private var streamingRebuildTask: Task<Void, Never>?
+    private var skipNextMessagesEmission: Bool = false
+    private var skipNextToolCallsEmission: Bool = false
     private var gitPauseApplied: Bool = false
     private var settingUpSessionId: UUID? = nil
 
@@ -375,6 +383,7 @@ class ChatSessionViewModel: ObservableObject {
         guard settingUpSessionId != sessionId else { return }
         settingUpSessionId = sessionId
 
+        resetTimelineSyncState()
         loadPendingAttachmentsIfNeeded()
         loadHistoricalMessages()
 
@@ -393,10 +402,7 @@ class ChatSessionViewModel: ObservableObject {
             autocompleteHandler.agentSession = existingSession
             updateDerivedState(from: existingSession)
 
-            previousMessageIds = Set(messages.map { $0.id })
-            previousToolCallIds = Set(existingSession.toolCalls.map { $0.id })
-
-            rebuildTimelineWithGrouping(isStreaming: existingSession.isStreaming)
+            bootstrapTimelineState(from: existingSession)
 
             setupSessionObservers(session: existingSession)
 
@@ -454,11 +460,7 @@ class ChatSessionViewModel: ObservableObject {
         autocompleteHandler.agentSession = newSession
         updateDerivedState(from: newSession)
 
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            previousMessageIds = Set(messages.map { $0.id })
-            previousToolCallIds = Set(newSession.toolCalls.map { $0.id })
-            rebuildTimelineWithGrouping(isStreaming: newSession.isStreaming)
-        }
+        bootstrapTimelineState(from: newSession)
 
         setupSessionObservers(session: newSession)
 
@@ -804,6 +806,8 @@ class ChatSessionViewModel: ObservableObject {
         // Sync initial state
         isProcessing = session.isStreaming
         updateDerivedState(from: session)
+        skipNextMessagesEmission = true
+        skipNextToolCallsEmission = true
 
         session.$messages
             // Stream message updates as they arrive for smoother chunk rendering.
@@ -811,6 +815,10 @@ class ChatSessionViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newMessages in
                 guard let self = self else { return }
+                if self.skipNextMessagesEmission {
+                    self.skipNextMessagesEmission = false
+                    return
+                }
                 // AgentSession is @MainActor so we're already on main thread
                 if session.isStreaming {
                     self.enqueueStreamingMessages(newMessages)
@@ -829,6 +837,10 @@ class ChatSessionViewModel: ObservableObject {
             .throttle(for: .milliseconds(60), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] _ in
                 guard let self = self, let session = self.currentAgentSession else { return }
+                if self.skipNextToolCallsEmission {
+                    self.skipNextToolCallsEmission = false
+                    return
+                }
                 let newToolCalls = session.toolCalls
                 self.syncToolCalls(newToolCalls)
                 self.performStreamingRebuildIfReady()
@@ -966,6 +978,34 @@ class ChatSessionViewModel: ObservableObject {
                 self.currentPermissionRequest = request
             }
             .store(in: &cancellables)
+    }
+
+    private func resetTimelineSyncState() {
+        cancelPendingAutoScroll()
+        scrollRequest = nil
+
+        streamFlushTask?.cancel()
+        streamFlushTask = nil
+        pendingStreamMessages = nil
+
+        streamingRebuildTask?.cancel()
+        streamingRebuildTask = nil
+        pendingStreamingRebuild = false
+        pendingStreamingRebuildRequiresToolCallSync = false
+
+        skipNextMessagesEmission = false
+        skipNextToolCallsEmission = false
+    }
+
+    private func bootstrapTimelineState(from session: AgentSession) {
+        previousMessageIds = Set(messages.map { $0.id })
+        previousToolCallIds = Set(session.toolCalls.map { $0.id })
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            rebuildTimelineWithGrouping(isStreaming: session.isStreaming)
+        }
     }
 
     private func enqueueStreamingMessages(_ newMessages: [MessageItem]) {

@@ -17,7 +17,7 @@ struct ChatInputBar: View {
         static let controlSize: CGFloat = 34
         static let attachmentControlSize: CGFloat = 30
         static let iconSize: CGFloat = 15
-        static let placeholderTopPadding: CGFloat = 4
+        static let textTopInset: CGFloat = 6
         static let textLeadingInset: CGFloat = 10
         static let minHeightNormal: CGFloat = 50
         static let minHeightVoice: CGFloat = 50
@@ -50,9 +50,9 @@ struct ChatInputBar: View {
     let onCancel: () -> Void
     let onAutocompleteSelect: () -> Void
     let onImagePaste: (Data, String) -> Void
+    let onFilePaste: (URL) -> Void
     let onAgentSelect: (String) -> Void
 
-    @State private var isHoveringInput = false
     @State private var measuredTextHeight: CGFloat = 0
     @State private var isTextEditorFocused = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -98,7 +98,7 @@ struct ChatInputBar: View {
                         Text(placeholderText)
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.tertiary)
-                            .padding(.top, Layout.placeholderTopPadding)
+                            .padding(.top, Layout.textTopInset)
                             .padding(.leading, Layout.textLeadingInset)
                             .allowsHitTesting(false)
                     }
@@ -108,6 +108,7 @@ struct ChatInputBar: View {
                         measuredHeight: $measuredTextHeight,
                         isFocused: $isTextEditorFocused,
                         textInset: Layout.textLeadingInset,
+                        textTopInset: Layout.textTopInset,
                         onSubmit: {
                             if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 onSend()
@@ -124,6 +125,7 @@ struct ChatInputBar: View {
                             handleAutocompleteNavigation(action)
                         },
                         onImagePaste: onImagePaste,
+                        onFilePaste: onFilePaste,
                         onLargeTextPaste: { pastedText in
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 attachments.append(.text(pastedText))
@@ -202,7 +204,6 @@ struct ChatInputBar: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(!isSessionReady)
-                        .help(String(localized: "chat.voice.record"))
                         .transition(.opacity)
 
                         if isProcessing {
@@ -254,7 +255,7 @@ struct ChatInputBar: View {
                 .allowsHitTesting(false)
             } else if currentModeId != "plan" {
                 RoundedRectangle(cornerRadius: inputCornerRadius, style: .continuous)
-                    .strokeBorder(.separator.opacity(isHoveringInput ? 0.5 : 0.2), lineWidth: 0.5)
+                    .strokeBorder(.separator.opacity(isTextEditorFocused ? 0.45 : 0.2), lineWidth: 0.5)
                     .allowsHitTesting(false)
             }
 
@@ -267,11 +268,6 @@ struct ChatInputBar: View {
                     isActive: shouldAnimateBorder
                 )
                 .allowsHitTesting(false)
-            }
-        }
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isHoveringInput = hovering
             }
         }
         .onChange(of: showingAttachmentPicker) { _, isShowing in

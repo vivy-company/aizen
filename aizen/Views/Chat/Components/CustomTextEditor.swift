@@ -12,6 +12,7 @@ struct CustomTextEditor: NSViewRepresentable {
     @Binding var measuredHeight: CGFloat
     @Binding var isFocused: Bool
     var textInset: CGFloat = 10
+    var textTopInset: CGFloat = 6
     let onSubmit: () -> Void
 
     // Autocomplete callbacks - passes (text, cursorPosition, cursorRect)
@@ -20,6 +21,9 @@ struct CustomTextEditor: NSViewRepresentable {
 
     // Image paste callback - (imageData, mimeType)
     var onImagePaste: ((Data, String) -> Void)?
+
+    // File paste callback - used to avoid loading file contents on the UI thread
+    var onFilePaste: ((URL) -> Void)?
 
     // Large text paste callback - text exceeding threshold becomes attachment
     var onLargeTextPaste: ((String) -> Void)?
@@ -62,7 +66,7 @@ struct CustomTextEditor: NSViewRepresentable {
         textView.isHorizontallyResizable = false
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.textContainerInset = NSSize(width: textInset, height: 6)
+        textView.textContainerInset = NSSize(width: textInset, height: textTopInset)
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.heightTracksTextView = false
@@ -98,6 +102,7 @@ struct CustomTextEditor: NSViewRepresentable {
         context.coordinator.onCursorChange = onCursorChange
         context.coordinator.onAutocompleteNavigate = onAutocompleteNavigate
         context.coordinator.onImagePaste = onImagePaste
+        context.coordinator.onFilePaste = onFilePaste
         context.coordinator.onLargeTextPaste = onLargeTextPaste
         context.coordinator.updateMeasuredHeightIfNeeded()
 
@@ -119,6 +124,7 @@ struct CustomTextEditor: NSViewRepresentable {
             onCursorChange: onCursorChange,
             onAutocompleteNavigate: onAutocompleteNavigate,
             onImagePaste: onImagePaste,
+            onFilePaste: onFilePaste,
             onLargeTextPaste: onLargeTextPaste
         )
     }
@@ -131,6 +137,7 @@ struct CustomTextEditor: NSViewRepresentable {
         var onCursorChange: ((String, Int, NSRect) -> Void)?
         var onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?
         var onImagePaste: ((Data, String) -> Void)?
+        var onFilePaste: ((URL) -> Void)?
         var onLargeTextPaste: ((String) -> Void)?
         weak var textView: NSTextView?
         weak var scrollView: NSScrollView?
@@ -151,6 +158,7 @@ struct CustomTextEditor: NSViewRepresentable {
             onCursorChange: ((String, Int, NSRect) -> Void)?,
             onAutocompleteNavigate: ((AutocompleteNavigationAction) -> Bool)?,
             onImagePaste: ((Data, String) -> Void)?,
+            onFilePaste: ((URL) -> Void)?,
             onLargeTextPaste: ((String) -> Void)?
         ) {
             _text = text
@@ -160,6 +168,7 @@ struct CustomTextEditor: NSViewRepresentable {
             self.onCursorChange = onCursorChange
             self.onAutocompleteNavigate = onAutocompleteNavigate
             self.onImagePaste = onImagePaste
+            self.onFilePaste = onFilePaste
             self.onLargeTextPaste = onLargeTextPaste
             super.init()
             setupEventMonitor()
@@ -212,18 +221,18 @@ struct CustomTextEditor: NSViewRepresentable {
         }
 
         private func handleImagePaste() -> Bool {
-            guard let onImagePaste = onImagePaste else { return false }
-
             let pasteboard = NSPasteboard.general
 
             // Check for PNG data first (most common for screenshots)
             if let data = pasteboard.data(forType: .png) {
+                guard let onImagePaste = onImagePaste else { return false }
                 onImagePaste(data, "image/png")
                 return true
             }
 
             // Check for TIFF data (common for copied images)
             if let data = pasteboard.data(forType: .tiff) {
+                guard let onImagePaste = onImagePaste else { return false }
                 // Convert TIFF to PNG for better compatibility
                 if let image = NSImage(data: data),
                    let tiffData = image.tiffRepresentation,
@@ -240,6 +249,11 @@ struct CustomTextEditor: NSViewRepresentable {
                 let ext = url.pathExtension.lowercased()
                 let imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "tiff", "bmp"]
                 if imageExtensions.contains(ext) {
+                    if let onFilePaste = onFilePaste {
+                        onFilePaste(url)
+                        return true
+                    }
+                    guard let onImagePaste = onImagePaste else { return false }
                     if let data = try? Data(contentsOf: url) {
                         let mimeType = mimeTypeForExtension(ext)
                         onImagePaste(data, mimeType)

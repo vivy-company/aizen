@@ -37,6 +37,8 @@ struct ChatSessionView: View {
     // Input state (local to avoid re-rendering entire view on keystroke)
     @State private var inputText = ""
     @State private var pendingCursorPosition: Int?
+    @State private var isInlinePlanCollapsed = true
+    @State private var inputBarWidth: CGFloat = 0
 
     private var supportsUsageMetrics: Bool {
         switch UsageProvider.fromAgentId(viewModel.selectedAgent) {
@@ -79,7 +81,8 @@ struct ChatSessionView: View {
 
             VStack(spacing: 0) {
                 ZStack(alignment: .bottom) {
-                    ChatMessageList(
+                    ChatTimelineContainer(
+                        key: timelineRenderKey,
                         timelineItems: viewModel.timelineItems,
                         isProcessing: viewModel.isProcessing,
                         isSessionInitializing: viewModel.isSessionInitializing,
@@ -89,10 +92,11 @@ struct ChatSessionView: View {
                         currentIterationId: viewModel.currentAgentSession?.currentIterationId,
                         scrollRequest: viewModel.scrollRequest,
                         turnAnchorMessageId: viewModel.turnAnchorMessageId,
-                        shouldAutoScroll: viewModel.isNearBottom,
+                        isAutoScrollEnabled: { viewModel.isNearBottom },
                         isResizing: isLayoutResizing,
                         onAppear: viewModel.loadMessages,
                         renderInlineMarkdown: viewModel.renderInlineMarkdown,
+                        worktreePath: worktree.path,
                         onToolTap: { toolCall in
                             selectedToolCall = toolCall
                         },
@@ -111,14 +115,15 @@ struct ChatSessionView: View {
                             viewModel.childToolCalls(for: parentId)
                         }
                     )
+                    .equatable()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .layoutPriority(1)
 
-                    if shouldShowScrollToBottom {
-                        scrollToBottomButton
-                            .padding(.bottom, 16)
-                            .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                    }
+                    scrollToBottomButton
+                        .padding(.bottom, 16)
+                        .opacity(shouldShowScrollToBottom ? 1 : 0)
+                        .allowsHitTesting(shouldShowScrollToBottom)
+                        .accessibilityHidden(!shouldShowScrollToBottom)
                 }
 
                 Spacer(minLength: 0)
@@ -134,11 +139,27 @@ struct ChatSessionView: View {
                         .transition(.opacity)
                         .padding(.horizontal, 20)
                     } else {
-                        if pendingPlanTimelineRequest == nil,
-                           let plan = viewModel.currentAgentPlan {
-                            AgentPlanInlineView(plan: plan)
-                                .padding(.horizontal, 20)
-                                .transition(.opacity)
+                        if let plan = inlinePlan {
+                            Group {
+                                if let inlinePlanWidth {
+                                    AgentPlanInlineView(
+                                        plan: plan,
+                                        isCollapsed: $isInlinePlanCollapsed,
+                                        isAttachedToComposer: shouldAttachInlinePlanToInput
+                                    )
+                                    .frame(width: inlinePlanWidth)
+                                } else {
+                                    AgentPlanInlineView(
+                                        plan: plan,
+                                        isCollapsed: $isInlinePlanCollapsed,
+                                        isAttachedToComposer: shouldAttachInlinePlanToInput
+                                    )
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, shouldAttachInlinePlanToInput ? -10 : 0)
+                            .transition(.opacity)
                         }
 
                         if !viewModel.attachments.isEmpty {
@@ -170,10 +191,35 @@ struct ChatSessionView: View {
                             onCancel: viewModel.cancelCurrentPrompt,
                             onAutocompleteSelect: { handleAutocompleteSelection() },
                             onImagePaste: { data, mimeType in
+                                let maxImageSizeBytes = 10 * 1024 * 1024
+                                guard data.count <= maxImageSizeBytes else {
+                                    let sizeText = ByteCountFormatter.string(
+                                        fromByteCount: Int64(data.count),
+                                        countStyle: .file
+                                    )
+                                    viewModel.currentAgentSession?.addSystemMessage(
+                                        "Pasted image is too large (\(sizeText)). Maximum size is 10MB."
+                                    )
+                                    return
+                                }
                                 viewModel.attachments.append(.image(data, mimeType: mimeType))
+                            },
+                            onFilePaste: { url in
+                                viewModel.attachments.append(.file(url))
                             },
                             onAgentSelect: viewModel.requestAgentSwitch
                         )
+                        .background {
+                            GeometryReader { geometry in
+                                Color.clear
+                                    .onAppear {
+                                        inputBarWidth = geometry.size.width
+                                    }
+                                    .onChange(of: geometry.size.width) { _, newWidth in
+                                        inputBarWidth = newWidth
+                                    }
+                            }
+                        }
                         .padding(.horizontal, 20)
                     }
 
@@ -264,10 +310,11 @@ struct ChatSessionView: View {
         }
         .onChange(of: fileToOpenInEditor) { _, path in
             guard let path = path else { return }
+            let normalizedPath = normalizedEditorPath(path)
             NotificationCenter.default.post(
                 name: .openFileInEditor,
                 object: nil,
-                userInfo: ["path": path]
+                userInfo: ["path": normalizedPath]
             )
             fileToOpenInEditor = nil
         }
@@ -324,6 +371,41 @@ struct ChatSessionView: View {
 
     // MARK: - Helpers
 
+    private func normalizedEditorPath(_ path: String) -> String {
+        let stripped = stripLineColumnSuffix(from: path)
+        let expanded = (stripped as NSString).expandingTildeInPath
+
+        if expanded.hasPrefix("/") {
+            return URL(fileURLWithPath: expanded).standardizedFileURL.path
+        }
+
+        if let worktreePath = worktree.path, !worktreePath.isEmpty {
+            return URL(fileURLWithPath: worktreePath)
+                .appendingPathComponent(expanded)
+                .standardizedFileURL
+                .path
+        }
+
+        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(expanded)
+            .standardizedFileURL
+            .path
+    }
+
+    private func stripLineColumnSuffix(from path: String) -> String {
+        let parts = path.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count >= 2 else { return path }
+
+        if Int(parts[parts.count - 1]) != nil {
+            if parts.count >= 3, Int(parts[parts.count - 2]) != nil {
+                return parts.dropLast(2).joined(separator: ":")
+            }
+            return parts.dropLast().joined(separator: ":")
+        }
+
+        return path
+    }
+
     private func isPlanRequest(_ request: RequestPermissionRequest) -> Bool {
         guard let toolCall = request.toolCall,
               let rawInput = toolCall.rawInput?.value as? [String: Any],
@@ -341,6 +423,55 @@ struct ChatSessionView: View {
         return request
     }
 
+    private var pendingPlanTimelineRequestIdentity: String {
+        guard let request = pendingPlanTimelineRequest else { return "none" }
+        let optionIds = (request.options ?? []).map(\.optionId).joined(separator: "|")
+        let toolId = request.toolCall?.toolCallId ?? "none"
+        return "req-\(toolId)-\(optionIds)-\(request.message ?? "")"
+    }
+
+    private var timelineRenderKey: ChatTimelineRenderKey {
+        ChatTimelineRenderKey(
+            timelineRenderEpoch: viewModel.timelineRenderEpoch,
+            childToolCallsEpoch: viewModel.childToolCallsEpoch,
+            isProcessing: viewModel.isProcessing,
+            isSessionInitializing: viewModel.isSessionInitializing,
+            pendingPlanRequestIdentity: pendingPlanTimelineRequestIdentity,
+            selectedAgent: viewModel.selectedAgent,
+            currentThought: viewModel.currentAgentSession?.currentThought,
+            currentIterationId: viewModel.currentAgentSession?.currentIterationId,
+            scrollRequestId: viewModel.scrollRequest?.id,
+            turnAnchorMessageId: viewModel.turnAnchorMessageId,
+            isResizing: isWindowResizing || isCompanionResizing
+        )
+    }
+
+    private var inlinePlan: Plan? {
+        guard pendingPlanTimelineRequest == nil,
+              let plan = viewModel.currentAgentPlan,
+              !plan.entries.isEmpty else {
+            return nil
+        }
+
+        let completedCount = plan.entries.filter { $0.status == .completed }.count
+        guard completedCount < plan.entries.count else {
+            return nil
+        }
+
+        return plan
+    }
+
+    private var shouldAttachInlinePlanToInput: Bool {
+        inlinePlan != nil && viewModel.attachments.isEmpty
+    }
+
+    private var inlinePlanWidth: CGFloat? {
+        guard shouldAttachInlinePlanToInput, inputBarWidth > 0 else {
+            return nil
+        }
+        return inputBarWidth * 0.95
+    }
+
     private var currentPermissionRequest: RequestPermissionRequest? {
         guard viewModel.showingPermissionAlert,
               let request = viewModel.currentPermissionRequest else {
@@ -354,7 +485,6 @@ struct ChatSessionView: View {
     }
 
     private func scrollToBottom() {
-        viewModel.isNearBottom = true
         viewModel.scrollToBottom()
     }
 
@@ -585,5 +715,70 @@ struct ChatSessionView: View {
         } else {
             window.dismiss()
         }
+    }
+}
+
+private struct ChatTimelineRenderKey: Equatable {
+    let timelineRenderEpoch: UInt64
+    let childToolCallsEpoch: UInt64
+    let isProcessing: Bool
+    let isSessionInitializing: Bool
+    let pendingPlanRequestIdentity: String
+    let selectedAgent: String
+    let currentThought: String?
+    let currentIterationId: String?
+    let scrollRequestId: UUID?
+    let turnAnchorMessageId: String?
+    let isResizing: Bool
+}
+
+private struct ChatTimelineContainer: View, Equatable {
+    let key: ChatTimelineRenderKey
+    let timelineItems: [TimelineItem]
+    let isProcessing: Bool
+    let isSessionInitializing: Bool
+    let pendingPlanRequest: RequestPermissionRequest?
+    let selectedAgent: String
+    let currentThought: String?
+    let currentIterationId: String?
+    let scrollRequest: ChatSessionViewModel.ScrollRequest?
+    let turnAnchorMessageId: String?
+    let isAutoScrollEnabled: () -> Bool
+    let isResizing: Bool
+    let onAppear: () -> Void
+    let renderInlineMarkdown: (String) -> AttributedString
+    let worktreePath: String?
+    let onToolTap: (ToolCall) -> Void
+    let onOpenFileInEditor: (String) -> Void
+    let agentSession: AgentSession?
+    let onScrollPositionChange: (Bool) -> Void
+    let childToolCallsProvider: (String) -> [ToolCall]
+
+    static func == (lhs: ChatTimelineContainer, rhs: ChatTimelineContainer) -> Bool {
+        lhs.key == rhs.key
+    }
+
+    var body: some View {
+        ChatMessageList(
+            timelineItems: timelineItems,
+            isProcessing: isProcessing,
+            isSessionInitializing: isSessionInitializing,
+            pendingPlanRequest: pendingPlanRequest,
+            selectedAgent: selectedAgent,
+            currentThought: currentThought,
+            currentIterationId: currentIterationId,
+            scrollRequest: scrollRequest,
+            turnAnchorMessageId: turnAnchorMessageId,
+            isAutoScrollEnabled: isAutoScrollEnabled,
+            isResizing: isResizing,
+            onAppear: onAppear,
+            renderInlineMarkdown: renderInlineMarkdown,
+            worktreePath: worktreePath,
+            onToolTap: onToolTap,
+            onOpenFileInEditor: onOpenFileInEditor,
+            agentSession: agentSession,
+            onScrollPositionChange: onScrollPositionChange,
+            childToolCallsProvider: childToolCallsProvider
+        )
     }
 }

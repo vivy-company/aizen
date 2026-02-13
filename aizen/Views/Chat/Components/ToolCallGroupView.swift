@@ -100,9 +100,10 @@ struct ToolCallGroupView: View {
 
     @ViewBuilder
     private var toolKindIcons: some View {
-        let kinds = Array(group.toolKinds.prefix(4))
+        let sortedKinds = group.toolKinds.sorted(by: { $0.rawValue < $1.rawValue })
+        let kinds = Array(sortedKinds.prefix(4))
         HStack(spacing: 4) {
-            ForEach(kinds.sorted(by: { $0.rawValue < $1.rawValue }), id: \.rawValue) { kind in
+            ForEach(kinds, id: \.rawValue) { kind in
                 Image(systemName: kind.symbolName)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
@@ -279,6 +280,5 @@ struct FileChangeChip: View {
             .cornerRadius(3)
         }
         .buttonStyle(.plain)
-        .help(change.path)
     }
 }
