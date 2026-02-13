@@ -84,7 +84,6 @@ struct AgentPlanInlineView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .truncationMode(.tail)
-                        .layoutPriority(1)
 
                     Spacer(minLength: 8)
 
