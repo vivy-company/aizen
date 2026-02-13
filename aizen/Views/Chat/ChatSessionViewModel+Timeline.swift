@@ -77,6 +77,7 @@ extension ChatSessionViewModel {
         timelineItems = (messages.map { .message($0) } + toolCalls.map { .toolCall($0) })
             .sorted { $0.timestamp < $1.timestamp }
             .filter { seen.insert($0.stableId).inserted }
+        timelineRenderEpoch &+= 1
         rebuildTimelineIndex()
         rebuildChildToolCallsIndex()
     }
@@ -216,6 +217,7 @@ extension ChatSessionViewModel {
         }
 
         timelineItems = items
+        timelineRenderEpoch &+= 1
         rebuildTimelineIndex()
         rebuildChildToolCallsIndex()
     }
@@ -411,6 +413,7 @@ extension ChatSessionViewModel {
             if didMutate {
                 timelineItems = updatedItems
                 if hasStructuralChanges {
+                    timelineRenderEpoch &+= 1
                     timelineIndex = updatedIndex
                 }
             }
@@ -486,6 +489,7 @@ extension ChatSessionViewModel {
             if didMutate {
                 timelineItems = updatedItems
                 if hasStructuralChanges {
+                    timelineRenderEpoch &+= 1
                     timelineIndex = updatedIndex
                 }
             }

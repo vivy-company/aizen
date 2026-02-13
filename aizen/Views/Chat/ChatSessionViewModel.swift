@@ -38,11 +38,7 @@ class ChatSessionViewModel: ObservableObject {
     @Published var currentAgentSession: AgentSession?
     @Published var currentPermissionRequest: RequestPermissionRequest?
     @Published var attachments: [ChatAttachment] = []
-    @Published var timelineItems: [TimelineItem] = [] {
-        didSet {
-            timelineRenderEpoch &+= 1
-        }
-    }
+    @Published var timelineItems: [TimelineItem] = []
     @Published var timelineRenderEpoch: UInt64 = 0
     @Published var childToolCallsEpoch: UInt64 = 0
 
@@ -682,6 +678,7 @@ class ChatSessionViewModel: ObservableObject {
         previousMessageIds = []
         previousToolCallIds = []
         timelineItems = []
+        timelineRenderEpoch &+= 1
 
         setupAgentSession()
         pendingAgentSwitch = nil
@@ -725,6 +722,7 @@ class ChatSessionViewModel: ObservableObject {
                 previousMessageIds = []
                 previousToolCallIds = []
                 timelineItems = []
+                timelineRenderEpoch &+= 1
                 
                 setupSessionObservers(session: freshAgentSession)
                 

@@ -88,7 +88,7 @@ struct ChatSessionView: View {
                         isSessionInitializing: viewModel.isSessionInitializing,
                         pendingPlanRequest: pendingPlanTimelineRequest,
                         selectedAgent: viewModel.selectedAgent,
-                        currentThought: viewModel.currentAgentSession?.currentThought,
+                        currentThought: nil,
                         currentIterationId: viewModel.currentAgentSession?.currentIterationId,
                         scrollRequest: viewModel.scrollRequest,
                         turnAnchorMessageId: viewModel.turnAnchorMessageId,
@@ -450,11 +450,9 @@ struct ChatSessionView: View {
         ChatTimelineRenderKey(
             timelineRenderEpoch: viewModel.timelineRenderEpoch,
             childToolCallsEpoch: viewModel.childToolCallsEpoch,
-            isProcessing: viewModel.isProcessing,
             isSessionInitializing: viewModel.isSessionInitializing,
             pendingPlanRequestIdentity: pendingPlanTimelineRequestIdentity,
             selectedAgent: viewModel.selectedAgent,
-            currentThought: viewModel.currentAgentSession?.currentThought,
             currentIterationId: viewModel.currentAgentSession?.currentIterationId,
             scrollRequestId: viewModel.scrollRequest?.id,
             turnAnchorMessageId: viewModel.turnAnchorMessageId,
@@ -737,11 +735,9 @@ struct ChatSessionView: View {
 private struct ChatTimelineRenderKey: Equatable {
     let timelineRenderEpoch: UInt64
     let childToolCallsEpoch: UInt64
-    let isProcessing: Bool
     let isSessionInitializing: Bool
     let pendingPlanRequestIdentity: String
     let selectedAgent: String
-    let currentThought: String?
     let currentIterationId: String?
     let scrollRequestId: UUID?
     let turnAnchorMessageId: String?
