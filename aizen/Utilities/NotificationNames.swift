@@ -38,10 +38,27 @@ extension Notification.Name {
     /// Posted when navigating to a specific worktree from command palette
     static let navigateToWorktree = Notification.Name("NavigateToWorktree")
 
+    /// Posted when switching to a specific tab in a specific worktree
+    static let switchToWorktreeTab = Notification.Name("SwitchToWorktreeTab")
+
+    /// Posted when switching to a specific terminal session in a specific worktree
+    static let switchToTerminalSession = Notification.Name("SwitchToTerminalSession")
+
+    /// Posted when switching to a specific browser session in a specific worktree
+    static let switchToBrowserSession = Notification.Name("SwitchToBrowserSession")
+
     // MARK: - File Operations
 
     /// Posted when a file should be opened in the editor (from tool calls, etc.)
     static let openFileInEditor = Notification.Name("OpenFileInEditor")
+
+    // MARK: - Agent Streaming
+
+    /// Posted when agent streaming starts for a worktree (userInfo: ["worktreePath": String])
+    static let agentStreamingDidStart = Notification.Name("AgentStreamingDidStart")
+
+    /// Posted when agent streaming stops for a worktree (userInfo: ["worktreePath": String])
+    static let agentStreamingDidStop = Notification.Name("AgentStreamingDidStop")
 
     // MARK: - Settings
 

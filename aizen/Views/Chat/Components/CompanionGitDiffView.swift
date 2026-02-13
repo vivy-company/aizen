@@ -18,6 +18,7 @@ struct CompanionGitDiffView: View {
     @State private var gitIndexWatchToken: UUID?
     @State private var diffReloadTask: Task<Void, Never>?
     @State private var diffLoadTask: Task<Void, Never>?
+    @State private var isAgentStreaming: Bool = false
 
     @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
     @AppStorage("diffFontSize") private var diffFontSize: Double = 11.0
@@ -102,15 +103,33 @@ struct CompanionGitDiffView: View {
             diffLoadTask = nil
         }
         .onChange(of: gitStatus) { _, _ in
+            guard !isAgentStreaming else { return }
             reloadDiffDebounced()
             publishSummary()
         }
         .onChange(of: worktreePath) { _, newPath in
             guard !newPath.isEmpty else { return }
             gitRepositoryService.updateWorktreePath(newPath)
+            guard !isAgentStreaming else { return }
             gitRepositoryService.reloadStatus(lightweight: true)
             reloadDiffNow()
             publishSummary()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .agentStreamingDidStart)) { notification in
+            guard let path = notification.userInfo?["worktreePath"] as? String,
+                  path == worktreePath else { return }
+            isAgentStreaming = true
+            diffReloadTask?.cancel()
+            diffReloadTask = nil
+            diffLoadTask?.cancel()
+            diffLoadTask = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .agentStreamingDidStop)) { notification in
+            guard let path = notification.userInfo?["worktreePath"] as? String,
+                  path == worktreePath else { return }
+            isAgentStreaming = false
+            gitRepositoryService.reloadStatus()
+            reloadDiffDebounced()
         }
     }
 

@@ -932,11 +932,21 @@ class ChatSessionViewModel: ObservableObject {
                 if let path = self.worktree.path, !path.isEmpty {
                     if isStreaming && !self.gitPauseApplied {
                         self.gitPauseApplied = true
+                        NotificationCenter.default.post(
+                            name: .agentStreamingDidStart,
+                            object: nil,
+                            userInfo: ["worktreePath": path]
+                        )
                         Task {
                             await GitIndexWatchCenter.shared.pause(worktreePath: path)
                         }
                     } else if !isStreaming && self.gitPauseApplied {
                         self.gitPauseApplied = false
+                        NotificationCenter.default.post(
+                            name: .agentStreamingDidStop,
+                            object: nil,
+                            userInfo: ["worktreePath": path]
+                        )
                         Task {
                             await GitIndexWatchCenter.shared.resume(worktreePath: path)
                         }
