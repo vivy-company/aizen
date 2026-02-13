@@ -220,7 +220,7 @@ final class SessionsListViewModel: ObservableObject {
             return sessions
         }
 
-        return sessions.filter { session in
+        let strictMatches = sessions.filter { session in
             if let sessionWorktree = session.worktree, !sessionWorktree.isDeleted {
                 if let workspaceId {
                     return sessionWorktree.repository?.workspace?.id == workspaceId
@@ -237,6 +237,37 @@ final class SessionsListViewModel: ObservableObject {
             }
             if let worktreeId {
                 return scopeSnapshot.worktreeId(for: sessionId) == worktreeId
+            }
+            return false
+        }
+
+        if !strictMatches.isEmpty {
+            return strictMatches
+        }
+
+        return sessions.filter { session in
+            if let sessionWorktree = session.worktree, !sessionWorktree.isDeleted {
+                if let workspaceId {
+                    return sessionWorktree.repository?.workspace?.id == workspaceId
+                }
+                if let worktreeId {
+                    return sessionWorktree.id == worktreeId
+                }
+                return true
+            }
+
+            guard let sessionId = session.id else { return false }
+            if let workspaceId {
+                if let storedWorkspaceId = scopeSnapshot.workspaceId(for: sessionId) {
+                    return storedWorkspaceId == workspaceId
+                }
+                return true
+            }
+            if let worktreeId {
+                if let storedWorktreeId = scopeSnapshot.worktreeId(for: sessionId) {
+                    return storedWorktreeId == worktreeId
+                }
+                return true
             }
             return false
         }

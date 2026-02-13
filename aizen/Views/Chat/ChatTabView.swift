@@ -145,17 +145,22 @@ struct ChatTabView: View {
         let scopeStore = ChatSessionScopeStore.shared
         let workspaceId = isCrossProjectScope ? worktree.repository?.workspace?.id : nil
         let worktreeId = worktree.id
-
-        return recentSessions.filter { session in
-            if let sessionWorktree = session.worktree, !sessionWorktree.isDeleted {
-                if let workspaceId {
-                    return sessionWorktree.repository?.workspace?.id == workspaceId
-                }
-                guard let worktreeId else { return false }
-                return sessionWorktree.id == worktreeId
+        let inScopeAttachedSessions = recentSessions.filter { session in
+            guard let sessionWorktree = session.worktree, !sessionWorktree.isDeleted else {
+                return false
             }
 
+            if let workspaceId {
+                return sessionWorktree.repository?.workspace?.id == workspaceId
+            }
+            guard let worktreeId else { return false }
+            return sessionWorktree.id == worktreeId
+        }
+
+        let strictDetachedSessions = recentSessions.filter { session in
+            guard session.worktree == nil else { return false }
             guard let sessionId = session.id else { return false }
+
             if let workspaceId {
                 return scopeStore.workspaceId(for: sessionId) == workspaceId
             }
@@ -164,6 +169,32 @@ struct ChatTabView: View {
             }
             return false
         }
+
+        let strictSessions = inScopeAttachedSessions + strictDetachedSessions
+        if !strictSessions.isEmpty {
+            return strictSessions
+        }
+
+        let fallbackDetachedSessions = recentSessions.filter { session in
+            guard session.worktree == nil else { return false }
+            guard let sessionId = session.id else { return false }
+
+            if let workspaceId {
+                if let storedWorkspaceId = scopeStore.workspaceId(for: sessionId) {
+                    return storedWorkspaceId == workspaceId
+                }
+                return true
+            }
+            if let worktreeId {
+                if let storedWorktreeId = scopeStore.worktreeId(for: sessionId) {
+                    return storedWorktreeId == worktreeId
+                }
+                return true
+            }
+            return false
+        }
+
+        return inScopeAttachedSessions + fallbackDetachedSessions
     }
 
     @ViewBuilder
