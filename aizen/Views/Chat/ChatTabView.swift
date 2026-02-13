@@ -98,7 +98,7 @@ struct ChatTabView: View {
         let recentRequest: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
         if let worktreeId = worktree.id {
             recentRequest.predicate = NSPredicate(
-                format: "(worktree.id == %@ OR worktree == nil) AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
+                format: "worktree.id == %@ AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
                 worktreeId as CVarArg
             )
         } else {
