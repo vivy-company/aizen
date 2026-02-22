@@ -446,6 +446,7 @@ struct CommandPaletteContent: View {
                 proxy.scrollTo(newIndex, anchor: .center)
             }
         }
+        .id(viewModel.scope)
     }
 
     private func sectionHeader(_ title: String) -> some View {

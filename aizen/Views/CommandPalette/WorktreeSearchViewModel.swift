@@ -77,7 +77,6 @@ final class WorktreeSearchViewModel: ObservableObject {
     private var currentRepositoryId: String?
     private var currentWorkspaceId: String?
     private var cancellables = Set<AnyCancellable>()
-    private var searchTask: Task<Void, Never>?
     private var ignoreExplicitScope = false
     private var flattenedItems: [CommandPaletteItem] = []
     private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
@@ -127,8 +126,6 @@ final class WorktreeSearchViewModel: ObservableObject {
     }
 
     func performSearch() {
-        searchTask?.cancel()
-
         let query = searchQuery
         let worktreeSnapshot = allWorktrees
         let workspaceSnapshot = allWorkspaces
@@ -144,25 +141,21 @@ final class WorktreeSearchViewModel: ObservableObject {
             scope = parsed.scope
         }
 
-        searchTask = Task { [weak self] in
-            guard let self else { return }
+        let resolved = buildSections(
+            scope: effectiveScope,
+            query: parsed.query,
+            worktrees: worktreeSnapshot,
+            workspaces: workspaceSnapshot,
+            currentWorktreeId: currentWorktreeId,
+            currentRepositoryId: currentRepositoryId,
+            currentWorkspaceId: currentWorkspaceId
+        )
 
-            let resolved = self.buildSections(
-                scope: effectiveScope,
-                query: parsed.query,
-                worktrees: worktreeSnapshot,
-                workspaces: workspaceSnapshot,
-                currentWorktreeId: currentWorktreeId,
-                currentRepositoryId: currentRepositoryId,
-                currentWorkspaceId: currentWorkspaceId
-            )
-            guard !Task.isCancelled else { return }
-            guard query == self.searchQuery else { return }
+        guard query == searchQuery else { return }
 
-            self.sections = resolved
-            self.flattenedItems = resolved.flatMap(\.items)
-            self.selectedIndex = 0
-        }
+        sections = resolved
+        flattenedItems = resolved.flatMap(\.items)
+        selectedIndex = 0
     }
 
     func setScope(_ newScope: CommandPaletteScope, ignoreQueryPrefix: Bool = true) {
@@ -278,7 +271,11 @@ final class WorktreeSearchViewModel: ObservableObject {
         case .workspace:
             return buildWorkspaceSections(
                 query: query,
-                workspaces: workspaces
+                workspaces: workspaces,
+                worktrees: worktrees,
+                currentWorktreeId: currentWorktreeId,
+                currentRepositoryId: currentRepositoryId,
+                currentWorkspaceId: currentWorkspaceId
             )
         case .tabs:
             return buildTabsSections(
@@ -305,7 +302,8 @@ final class WorktreeSearchViewModel: ObservableObject {
             worktrees: worktrees,
             currentWorktreeId: currentWorktreeId,
             currentRepositoryId: currentRepositoryId,
-            currentWorkspaceId: currentWorkspaceId
+            currentWorkspaceId: currentWorkspaceId,
+            includeCurrentWorktree: false
         )
 
         var sections: [CommandPaletteSection] = []
@@ -389,7 +387,8 @@ final class WorktreeSearchViewModel: ObservableObject {
             worktrees: worktrees,
             currentWorktreeId: currentWorktreeId,
             currentRepositoryId: currentRepositoryId,
-            currentWorkspaceId: currentWorkspaceId
+            currentWorkspaceId: currentWorkspaceId,
+            includeCurrentWorktree: true
         ).filter { item in
             guard let repoId = item.repoId?.uuidString, let currentRepositoryId else {
                 return false
@@ -397,35 +396,47 @@ final class WorktreeSearchViewModel: ObservableObject {
             return repoId == currentRepositoryId
         }
 
-        var sections: [CommandPaletteSection] = []
-        sections.append(
-            contentsOf: buildTabsSections(
+        guard !worktreeItems.isEmpty else { return [] }
+        return [
+            CommandPaletteSection(
+                id: "current-project-environments",
+                title: "Environments",
+                items: Array(worktreeItems.prefix(24))
+            )
+        ]
+    }
+
+    private func buildWorkspaceSections(
+        query: String,
+        workspaces: [Workspace],
+        worktrees: [Worktree],
+        currentWorktreeId: String?,
+        currentRepositoryId: String?,
+        currentWorkspaceId: String?
+    ) -> [CommandPaletteSection] {
+        if let currentWorkspaceId {
+            let workspaceEnvironmentItems = buildWorktreeItems(
                 query: query,
                 worktrees: worktrees,
                 currentWorktreeId: currentWorktreeId,
                 currentRepositoryId: currentRepositoryId,
                 currentWorkspaceId: currentWorkspaceId,
-                includeAllWorktrees: false
-            )
-        )
+                includeCurrentWorktree: true
+            ).filter { item in
+                item.workspaceId?.uuidString == currentWorkspaceId
+            }
 
-        if !worktreeItems.isEmpty {
-            sections.append(
-                CommandPaletteSection(
-                    id: "current-project",
-                    title: "Current Project",
-                    items: Array(worktreeItems.prefix(24))
-                )
-            )
+            if !workspaceEnvironmentItems.isEmpty {
+                return [
+                    CommandPaletteSection(
+                        id: "workspace-environments",
+                        title: "Environments",
+                        items: Array(workspaceEnvironmentItems.prefix(24))
+                    )
+                ]
+            }
         }
 
-        return sections
-    }
-
-    private func buildWorkspaceSections(
-        query: String,
-        workspaces: [Workspace]
-    ) -> [CommandPaletteSection] {
         let workspaceItems = buildWorkspaceItems(query: query, workspaces: workspaces)
         guard !workspaceItems.isEmpty else { return [] }
         return [
@@ -478,7 +489,8 @@ final class WorktreeSearchViewModel: ObservableObject {
         worktrees: [Worktree],
         currentWorktreeId: String?,
         currentRepositoryId: String?,
-        currentWorkspaceId: String?
+        currentWorkspaceId: String?,
+        includeCurrentWorktree: Bool
     ) -> [CommandPaletteItem] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowerQuery = trimmedQuery.lowercased()
@@ -486,7 +498,8 @@ final class WorktreeSearchViewModel: ObservableObject {
         let base = worktrees.filter { worktree in
             guard !worktree.isDeleted else { return false }
             guard worktree.repository?.workspace != nil else { return false }
-            if let currentId = currentWorktreeId,
+            if !includeCurrentWorktree,
+               let currentId = currentWorktreeId,
                let worktreeId = worktree.id?.uuidString,
                currentId == worktreeId {
                 return false

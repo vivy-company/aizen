@@ -18,6 +18,20 @@ class RepositoryManager: ObservableObject {
         case copy
     }
 
+    struct LinkedEnvironmentSubmoduleOptions: Sendable {
+        let initialize: Bool
+        let recursive: Bool
+        let paths: [String]
+        let matchBranchToEnvironment: Bool
+
+        static let disabled = LinkedEnvironmentSubmoduleOptions(
+            initialize: false,
+            recursive: true,
+            paths: [],
+            matchBranchToEnvironment: false
+        )
+    }
+
     private let viewContext: NSManagedObjectContext
     private let container: NSPersistentContainer
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "RepositoryManager")
@@ -27,6 +41,7 @@ class RepositoryManager: ObservableObject {
     private let branchService = GitBranchService()
     private let worktreeService = GitWorktreeService()
     private let remoteService = GitRemoteService()
+    private let submoduleService = GitSubmoduleService()
     private let fileSystemManager: RepositoryFileSystemManager
     private let postCreateExecutor = PostCreateActionExecutor()
 
@@ -211,6 +226,18 @@ class RepositoryManager: ObservableObject {
 
         // Add it as an existing repository
         return try await addExistingRepository(path: fullPath, workspace: workspace)
+    }
+
+    func listSubmodules(for repository: Repository) async -> [GitSubmoduleInfo] {
+        guard let path = repository.path else { return [] }
+        guard GitUtils.isGitRepository(at: path) else { return [] }
+
+        do {
+            return try await submoduleService.listSubmodules(at: path)
+        } catch {
+            logger.error("Failed to detect submodules: \(error.localizedDescription)")
+            return []
+        }
     }
 
     private func extractRepoName(from url: String) -> String {
@@ -406,7 +433,14 @@ class RepositoryManager: ObservableObject {
         }
     }
 
-    func addLinkedEnvironment(to repository: Repository, path: String, branch: String, createBranch: Bool, baseBranch: String? = nil) async throws -> Worktree {
+    func addLinkedEnvironment(
+        to repository: Repository,
+        path: String,
+        branch: String,
+        createBranch: Bool,
+        baseBranch: String? = nil,
+        submoduleOptions: LinkedEnvironmentSubmoduleOptions = .disabled
+    ) async throws -> Worktree {
         guard let repoPath = repository.path else {
             throw Libgit2Error.invalidPath("Project path is nil")
         }
@@ -426,6 +460,32 @@ class RepositoryManager: ObservableObject {
             createBranch: createBranch,
             baseBranch: baseBranch
         )
+
+        if submoduleOptions.initialize {
+            do {
+                try await submoduleService.initializeSubmodules(
+                    at: normalizedEnvironmentPath,
+                    recursive: submoduleOptions.recursive,
+                    paths: submoduleOptions.paths
+                )
+                if submoduleOptions.matchBranchToEnvironment {
+                    try await submoduleService.checkoutMatchingBranch(
+                        at: normalizedEnvironmentPath,
+                        branchName: branch,
+                        paths: submoduleOptions.paths
+                    )
+                }
+            } catch {
+                logger.error("Submodule initialization failed: \(error.localizedDescription)")
+                // Roll back partially-created linked environment to avoid leaving broken state.
+                try? await worktreeService.removeWorktree(
+                    at: normalizedEnvironmentPath,
+                    repoPath: repoPath,
+                    force: true
+                )
+                throw error
+            }
+        }
 
         let worktree = Worktree(context: viewContext)
         worktree.id = UUID()

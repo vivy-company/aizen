@@ -37,6 +37,12 @@ struct WorktreeCreateSheet: View {
     @State private var selectedTemplateIndex: Int?
     @State private var showingPostCreateActions = false
     @State private var independentMethod: RepositoryManager.IndependentEnvironmentMethod = .clone
+    @State private var detectedSubmodules: [GitSubmoduleInfo] = []
+    @State private var loadingSubmodules = false
+    @State private var initializeSubmodules = true
+    @State private var includeNestedSubmodules = true
+    @State private var selectedSubmodulePaths: Set<String> = []
+    @State private var matchSubmoduleBranchToEnvironment = false
 
     @AppStorage("branchNameTemplates") private var branchNameTemplatesData: Data = Data()
 
@@ -73,13 +79,6 @@ struct WorktreeCreateSheet: View {
         return root.appendingPathComponent(trimmedName).path
     }
 
-    private var currentPlaceholder: String {
-        if let index = selectedTemplateIndex, index < branchNameTemplates.count {
-            return branchNameTemplates[index]
-        }
-        return String(localized: "worktree.create.branchNamePlaceholder")
-    }
-
     private var existingWorktreeNames: [String] {
         let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
         return worktrees.compactMap { $0.branch }
@@ -91,6 +90,36 @@ struct WorktreeCreateSheet: View {
             return mainWorktree.branch ?? "main"
         }
         return "main"
+    }
+
+    private var hasSubmodules: Bool {
+        !detectedSubmodules.isEmpty
+    }
+
+    private var selectedSubmoduleCount: Int {
+        let available = Set(detectedSubmodules.map(\.path))
+        return selectedSubmodulePaths.intersection(available).count
+    }
+
+    private var branchNamePrompt: String {
+        let trimmedName = environmentName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedName.isEmpty {
+            return "feature-login-auth"
+        }
+        return "feature/\(trimmedName)"
+    }
+
+    private func submoduleSelectionBinding(for path: String) -> Binding<Bool> {
+        Binding(
+            get: { selectedSubmodulePaths.contains(path) },
+            set: { selected in
+                if selected {
+                    selectedSubmodulePaths.insert(path)
+                } else {
+                    selectedSubmodulePaths.remove(path)
+                }
+            }
+        )
     }
 
     private var environmentNameWarning: String? {
@@ -130,39 +159,20 @@ struct WorktreeCreateSheet: View {
 
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Picker("Environment Type", selection: $mode) {
-                        Text(EnvironmentCreationMode.linked.title)
-                            .tag(EnvironmentCreationMode.linked)
-                            .disabled(!isGitProject)
-                        Text(EnvironmentCreationMode.independent.title)
-                            .tag(EnvironmentCreationMode.independent)
-                    }
-                    .pickerStyle(.segmented)
-                    .onChange(of: mode) { _, newMode in
-                        if newMode == .independent && !isGitProject {
-                            independentMethod = .copy
-                        }
-                    }
+            Form {
+                environmentTypeSection
+                namingSection
 
-                    if !isGitProject && mode == .linked {
-                        Text("Linked environments require a git project. Use Independent mode instead.")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
+                if mode == .linked {
+                    linkedModeSections
+                } else {
+                    independentModeSections
+                }
 
-                    environmentNameSection
+                postCreateActionsSection
 
-                    if mode == .linked {
-                        linkedModeSection
-                    } else {
-                        independentModeSection
-                    }
-
-                    postCreateActionsSection
-
-                    if let error = errorMessage {
+                if let error = errorMessage {
+                    Section {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 4) {
                                 Image(systemName: "exclamationmark.circle.fill")
@@ -175,13 +185,11 @@ struct WorktreeCreateSheet: View {
                                 .font(.system(.caption, design: .monospaced))
                         }
                         .foregroundStyle(.red)
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
-                .padding()
             }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
 
             Divider()
 
@@ -220,111 +228,183 @@ struct WorktreeCreateSheet: View {
                 mode = .independent
                 independentMethod = .copy
             }
+            loadSubmodules()
         }
-    }
-
-    @ViewBuilder
-    private var environmentNameSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Environment Name")
-                .font(.headline)
-
-            TextField("feature-landing-redesign", text: $environmentName)
-                .textFieldStyle(.roundedBorder)
-
-            if let warning = environmentNameWarning {
-                HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                    Text(warning)
-                        .font(.caption)
-                }
-                .foregroundStyle(.orange)
+        .onChange(of: initializeSubmodules) { _, newValue in
+            if !newValue {
+                matchSubmoduleBranchToEnvironment = false
+            }
+        }
+        .onChange(of: selectedSubmodulePaths) { _, _ in
+            if selectedSubmoduleCount == 0 {
+                matchSubmoduleBranchToEnvironment = false
             }
         }
     }
 
     @ViewBuilder
-    private var linkedModeSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("worktree.create.branchName", bundle: .main)
-                        .font(.headline)
+    private var environmentTypeSection: some View {
+        Section("Environment Type") {
+            Picker("Type", selection: $mode) {
+                Text(EnvironmentCreationMode.linked.title)
+                    .tag(EnvironmentCreationMode.linked)
+                    .disabled(!isGitProject)
+                Text(EnvironmentCreationMode.independent.title)
+                    .tag(EnvironmentCreationMode.independent)
+            }
+            .pickerStyle(.radioGroup)
+            .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onChange(of: mode) { _, newMode in
+                if newMode == .independent && !isGitProject {
+                    independentMethod = .copy
+                }
+            }
 
-                    Spacer()
+            if !isGitProject && mode == .linked {
+                warningRow("Linked environments require a git project. Use Independent mode instead.")
+            }
+        }
+    }
 
-                    Button {
-                        generateRandomName()
-                    } label: {
-                        Image(systemName: "shuffle")
-                            .foregroundStyle(.secondary)
+    @ViewBuilder
+    private var namingSection: some View {
+        Section("Naming") {
+            LabeledContent("Environment Name") {
+                TextField("", text: $environmentName, prompt: Text("feature-landing-redesign"))
+                    .frame(maxWidth: 280)
+            }
+
+            if let warning = environmentNameWarning {
+                warningRow(warning)
+            }
+
+            if mode == .linked {
+                LabeledContent {
+                    HStack(spacing: 8) {
+                        TextField("", text: $branchName, prompt: Text(branchNamePrompt))
+                            .frame(maxWidth: 260)
+                            .onChange(of: branchName) { _, _ in
+                                validateBranchName()
+                            }
+                            .onSubmit {
+                                if !branchName.isEmpty && validationWarning == nil {
+                                    createEnvironment()
+                                }
+                            }
+                        Button {
+                            generateRandomName()
+                        } label: {
+                            Image(systemName: "shuffle")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(String(localized: "worktree.create.generateRandom"))
                     }
-                    .buttonStyle(.plain)
-                    .help(String(localized: "worktree.create.generateRandom"))
+                } label: {
+                    Text(String(localized: "worktree.create.branchName", bundle: .main))
                 }
 
-                TextField(currentPlaceholder, text: $branchName)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: branchName) { _, _ in
-                        validateBranchName()
-                    }
-                    .onSubmit {
-                        if !branchName.isEmpty && validationWarning == nil {
-                            createEnvironment()
-                        }
-                    }
-
                 if !branchNameTemplates.isEmpty {
-                    HStack(spacing: 6) {
-                        ForEach(Array(branchNameTemplates.enumerated()), id: \.offset) { index, template in
-                            Button {
-                                if selectedTemplateIndex == index {
-                                    selectedTemplateIndex = nil
-                                } else {
-                                    selectedTemplateIndex = index
-                                    branchName = template
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 6) {
+                            ForEach(Array(branchNameTemplates.enumerated()), id: \.offset) { index, template in
+                                Button {
+                                    if selectedTemplateIndex == index {
+                                        selectedTemplateIndex = nil
+                                    } else {
+                                        selectedTemplateIndex = index
+                                        branchName = template
+                                    }
+                                    validateBranchName()
+                                } label: {
+                                    Text(template)
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(
+                                            selectedTemplateIndex == index
+                                                ? Color.accentColor.opacity(0.3)
+                                                : Color.secondary.opacity(0.2),
+                                            in: Capsule()
+                                        )
                                 }
-                                validateBranchName()
-                            } label: {
-                                Text(template)
-                                    .font(.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        selectedTemplateIndex == index
-                                            ? Color.accentColor.opacity(0.3)
-                                            : Color.secondary.opacity(0.2),
-                                        in: Capsule()
-                                    )
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
+                        .padding(.vertical, 2)
                     }
                 }
 
                 if let warning = validationWarning {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                        Text(warning)
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.orange)
+                    warningRow(warning)
                 }
             }
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("worktree.create.baseBranch", bundle: .main)
-                    .font(.headline)
+    @ViewBuilder
+    private var linkedModeSections: some View {
+        Section(String(localized: "worktree.create.baseBranch", bundle: .main)) {
+            BranchSelectorButton(
+                selectedBranch: selectedBranch,
+                defaultBranch: defaultBaseBranch,
+                isPresented: $showingBranchSelector
+            )
 
-                BranchSelectorButton(
-                    selectedBranch: selectedBranch,
-                    defaultBranch: defaultBaseBranch,
-                    isPresented: $showingBranchSelector
-                )
+            Text("worktree.create.baseBranchHelp", bundle: .main)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
 
-                Text("worktree.create.baseBranchHelp", bundle: .main)
+        Section("Submodules") {
+            if loadingSubmodules {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Detecting submodules...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if hasSubmodules {
+                Toggle("Initialize submodules after environment creation", isOn: $initializeSubmodules)
+                Toggle("Include nested submodules recursively", isOn: $includeNestedSubmodules)
+                    .disabled(!initializeSubmodules)
+
+                Text("\(selectedSubmoduleCount) of \(detectedSubmodules.count) submodule\(detectedSubmodules.count == 1 ? "" : "s") selected")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if initializeSubmodules {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(detectedSubmodules.prefix(8)), id: \.path) { submodule in
+                            Toggle(isOn: submoduleSelectionBinding(for: submodule.path)) {
+                                Text(submodule.path)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            .toggleStyle(.checkbox)
+                            .controlSize(.small)
+                        }
+
+                        if detectedSubmodules.count > 8 {
+                            Text("+\(detectedSubmodules.count - 8) more")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+
+                    Toggle(
+                        "Checkout/create branch '\(branchName.isEmpty ? "new-environment" : branchName)' in selected submodules",
+                        isOn: $matchSubmoduleBranchToEnvironment
+                    )
+                    .disabled(selectedSubmoduleCount == 0 || branchName.isEmpty)
+                }
+            } else {
+                Text("No submodules detected in this repository.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -332,35 +412,32 @@ struct WorktreeCreateSheet: View {
     }
 
     @ViewBuilder
-    private var independentModeSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Source")
-                .font(.headline)
-
+    private var independentModeSections: some View {
+        Section("Source") {
             Text(sourcePath ?? "No source path available")
-                .font(.caption)
-                .fontDesign(.monospaced)
+                .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                .textSelection(.enabled)
 
-            if isGitProject {
-                Text("Method")
-                    .font(.headline)
+            if !isGitProject {
+                Text("Files will be copied into a separate environment.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
 
+        if isGitProject {
+            Section("Method") {
                 Picker("Method", selection: $independentMethod) {
                     Text("Clone")
                         .tag(RepositoryManager.IndependentEnvironmentMethod.clone)
                     Text("Copy")
                         .tag(RepositoryManager.IndependentEnvironmentMethod.copy)
                 }
+                .labelsHidden()
                 .pickerStyle(.segmented)
-            } else {
-                Text("Files will be copied into a separate environment.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -370,22 +447,19 @@ struct WorktreeCreateSheet: View {
         let actions = repository.postCreateActions
         let enabledCount = actions.filter { $0.enabled }.count
 
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Post-Create Actions")
-                .font(.headline)
-
+        Section("Post-Create Actions") {
             Button {
                 showingPostCreateActions = true
             } label: {
-                HStack {
+                HStack(alignment: .top, spacing: 10) {
                     if actions.isEmpty {
                         Image(systemName: "gearshape.2")
-                            .font(.title3)
+                            .font(.body)
                             .foregroundStyle(.secondary)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("No actions configured")
-                                .font(.subheadline)
+                                .font(.callout)
                             Text("Tap to add actions that run after environment creation")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -421,10 +495,7 @@ struct WorktreeCreateSheet: View {
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
-                .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             .buttonStyle(.plain)
 
@@ -434,6 +505,17 @@ struct WorktreeCreateSheet: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    @ViewBuilder
+    private func warningRow(_ warning: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption)
+            Text(warning)
+                .font(.caption)
+        }
+        .foregroundStyle(.orange)
     }
 
     private func actionSummary(_ action: PostCreateAction) -> String {
@@ -451,6 +533,31 @@ struct WorktreeCreateSheet: View {
 
     private func suggestEnvironmentName() {
         generateRandomName()
+    }
+
+    private func loadSubmodules() {
+        guard isGitProject else {
+            detectedSubmodules = []
+            initializeSubmodules = false
+            selectedSubmodulePaths = []
+            matchSubmoduleBranchToEnvironment = false
+            loadingSubmodules = false
+            return
+        }
+
+        loadingSubmodules = true
+        Task {
+            let submodules = await repositoryManager.listSubmodules(for: repository)
+            await MainActor.run {
+                detectedSubmodules = submodules
+                initializeSubmodules = !submodules.isEmpty
+                selectedSubmodulePaths = Set(submodules.map(\.path))
+                if submodules.isEmpty {
+                    matchSubmoduleBranchToEnvironment = false
+                }
+                loadingSubmodules = false
+            }
+        }
     }
 
     private func generateRandomName() {
@@ -496,12 +603,28 @@ struct WorktreeCreateSheet: View {
             do {
                 switch mode {
                 case .linked:
+                    let submoduleOptions: RepositoryManager.LinkedEnvironmentSubmoduleOptions
+                    let selectedPaths = detectedSubmodules
+                        .map(\.path)
+                        .filter { selectedSubmodulePaths.contains($0) }
+                    if initializeSubmodules && !selectedPaths.isEmpty {
+                        submoduleOptions = RepositoryManager.LinkedEnvironmentSubmoduleOptions(
+                            initialize: true,
+                            recursive: includeNestedSubmodules,
+                            paths: selectedPaths,
+                            matchBranchToEnvironment: matchSubmoduleBranchToEnvironment && !branchName.isEmpty
+                        )
+                    } else {
+                        submoduleOptions = .disabled
+                    }
+
                     _ = try await repositoryManager.addLinkedEnvironment(
                         to: repository,
                         path: destinationPath,
                         branch: branchName,
                         createBranch: true,
-                        baseBranch: baseBranchName
+                        baseBranch: baseBranchName,
+                        submoduleOptions: submoduleOptions
                     )
                 case .independent:
                     guard let source else {

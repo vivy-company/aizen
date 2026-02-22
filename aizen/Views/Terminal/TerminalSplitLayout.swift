@@ -212,6 +212,27 @@ indirect enum SplitNode: Codable, Equatable {
     }
 }
 
+enum TerminalLayoutDefaults {
+    static func paneId(sessionId: UUID?, focusedPaneId: String?) -> String {
+        if let focusedPaneId {
+            let trimmed = focusedPaneId.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+
+        if let sessionId {
+            return sessionId.uuidString
+        }
+
+        return UUID().uuidString
+    }
+
+    static func defaultLayout(paneId: String) -> SplitNode {
+        .leaf(paneId: paneId)
+    }
+}
+
 // Helper for encoding/decoding layout to JSON
 struct SplitLayoutHelper {
     static func encode(_ node: SplitNode) -> String? {
@@ -230,7 +251,7 @@ struct SplitLayoutHelper {
         return try? decoder.decode(SplitNode.self, from: data)
     }
 
-    static func createDefault() -> SplitNode {
-        return .leaf(paneId: UUID().uuidString)
+    static func createDefault(paneId: String = UUID().uuidString) -> SplitNode {
+        TerminalLayoutDefaults.defaultLayout(paneId: paneId)
     }
 }

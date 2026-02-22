@@ -155,6 +155,9 @@ struct WorktreeSessionManager {
         session.id = UUID()
         session.createdAt = Date()
         session.worktree = worktree
+        let defaultPaneId = TerminalLayoutDefaults.paneId(sessionId: session.id, focusedPaneId: nil)
+        session.focusedPaneId = defaultPaneId
+        session.splitLayout = SplitLayoutHelper.encode(TerminalLayoutDefaults.defaultLayout(paneId: defaultPaneId))
 
         if let preset = preset {
             session.title = preset.name

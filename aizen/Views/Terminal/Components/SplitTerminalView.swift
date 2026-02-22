@@ -59,9 +59,13 @@ struct SplitTerminalView: View {
             _layout = State(initialValue: decoded)
             _focusedPaneId = State(initialValue: session.focusedPaneId ?? decoded.allPaneIds().first ?? "")
         } else {
-            let defaultLayout = SplitLayoutHelper.createDefault()
+            let defaultPaneId = TerminalLayoutDefaults.paneId(
+                sessionId: session.id,
+                focusedPaneId: session.focusedPaneId
+            )
+            let defaultLayout = SplitLayoutHelper.createDefault(paneId: defaultPaneId)
             _layout = State(initialValue: defaultLayout)
-            _focusedPaneId = State(initialValue: defaultLayout.allPaneIds().first ?? "")
+            _focusedPaneId = State(initialValue: defaultPaneId)
         }
     }
 
@@ -82,6 +86,7 @@ struct SplitTerminalView: View {
             // Initial persistence to store default layout/pane (only for selected session)
             .onAppear {
                 DispatchQueue.main.async {
+                    seedSessionLayoutIfNeeded()
                     if isSelected {
                         persistLayout()
                         persistFocus()
@@ -103,6 +108,9 @@ struct SplitTerminalView: View {
             // Trigger focus when tab becomes selected (views are kept alive via opacity)
             .onChange(of: isSelected) { _, newValue in
                 if newValue {
+                    persistLayout()
+                    persistFocus()
+                    applyTitleForFocusedPane()
                     focusRequestVersion += 1
                 }
             }
@@ -371,6 +379,35 @@ struct SplitTerminalView: View {
     }
 
     // MARK: - Persistence Helpers
+
+    private func seedSessionLayoutIfNeeded() {
+        guard !session.isDeleted else { return }
+        guard let context = session.managedObjectContext else { return }
+
+        let resolvedPaneId = TerminalLayoutDefaults.paneId(
+            sessionId: session.id,
+            focusedPaneId: focusedPaneId
+        )
+
+        var didChange = false
+        if session.focusedPaneId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            session.focusedPaneId = resolvedPaneId
+            didChange = true
+        }
+
+        if session.splitLayout?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true,
+           let json = SplitLayoutHelper.encode(TerminalLayoutDefaults.defaultLayout(paneId: resolvedPaneId)) {
+            session.splitLayout = json
+            didChange = true
+        }
+
+        guard didChange else { return }
+        do {
+            try context.save()
+        } catch {
+            Logger.terminal.error("Failed to seed terminal session layout: \(error.localizedDescription)")
+        }
+    }
 
     private func scheduleLayoutSave() {
         layoutSaveTask?.cancel()
