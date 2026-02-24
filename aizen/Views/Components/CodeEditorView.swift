@@ -2,12 +2,12 @@
 //  CodeEditorView.swift
 //  aizen
 //
-//  Code editor with line numbers and syntax highlighting using CodeEditSourceEditor
+//  Code editor with line numbers and syntax highlighting using VVCode
 //
 
+import AppKit
 import SwiftUI
-import CodeEditSourceEditor
-import CodeEditLanguages
+import VVCode
 
 struct CodeEditorView: View {
     let content: String
@@ -18,10 +18,8 @@ struct CodeEditorView: View {
     var hasUnsavedChanges: Bool = false
     var onContentChange: ((String) -> Void)?
 
-    @State private var text: String
-    @State private var editorState = SourceEditorState()
-    @State private var gitDiffStatus: [Int: GitDiffLineStatus] = [:]
-    @State private var gitDiffCoordinator = GitDiffCoordinator()
+    @State private var document: VVDocument
+    @State private var gitDiffText: String?
     @State private var diffReloadTask: Task<Void, Never>?
 
     // Editor settings from AppStorage
@@ -41,6 +39,28 @@ struct CodeEditorView: View {
         return colorScheme == .dark ? editorTheme : editorThemeLight
     }
 
+    private var detectedLanguage: VVLanguage? {
+        VVLanguageBridge.language(from: language)
+    }
+
+    private var editorThemeValue: VVTheme {
+        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
+            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
+    }
+
+    private var editorConfiguration: VVConfiguration {
+        let font = NSFont(name: editorFontFamily, size: editorFontSize)
+            ?? .monospacedSystemFont(ofSize: editorFontSize, weight: .regular)
+
+        return VVConfiguration.default
+            .with(font: font)
+            .with(tabWidth: editorIndentSpaces)
+            .with(wrapLines: editorWrapLines)
+            .with(showLineNumbers: editorShowGutter)
+            .with(showGutter: editorShowGutter)
+            .with(showGitGutter: editorShowGutter)
+    }
+
     init(
         content: String,
         language: String?,
@@ -57,79 +77,46 @@ struct CodeEditorView: View {
         self.repoPath = repoPath
         self.hasUnsavedChanges = hasUnsavedChanges
         self.onContentChange = onContentChange
-        _text = State(initialValue: content)
+
+        let document = VVDocument(text: content, language: VVLanguageBridge.language(from: language))
+        _document = State(initialValue: document)
     }
 
     var body: some View {
-        let theme = GhosttyThemeParser.loadTheme(named: effectiveThemeName) ?? defaultTheme()
-
-        SourceEditor(
-            $text,
-            language: detectedLanguage,
-            configuration: SourceEditorConfiguration(
-                appearance: .init(
-                    theme: theme,
-                    font: NSFont(name: editorFontFamily, size: editorFontSize) ?? .monospacedSystemFont(ofSize: editorFontSize, weight: .regular),
-                    wrapLines: editorWrapLines
-                ),
-                behavior: .init(
-                    indentOption: .spaces(count: editorIndentSpaces)
-                ),
-                peripherals: .init(
-                    showGutter: editorShowGutter,
-                    showMinimap: editorShowMinimap
-                )
-            ),
-            state: $editorState,
-            coordinators: [gitDiffCoordinator]
-        )
-        .disabled(!isEditable)
-        .clipped()
-        .onChange(of: content) { _, newValue in
-            if text != newValue {
-                text = newValue
+        VVCodeView(document: $document)
+            .language(detectedLanguage)
+            .theme(editorThemeValue)
+            .configuration(editorConfiguration)
+            .gitDiff(gitDiffText)
+            .lspDisabled(true)
+            .onTextChange { newValue in
+                if isEditable, newValue != content {
+                    onContentChange?(newValue)
+                }
             }
-        }
-        .onChange(of: text) { _, newValue in
-            if isEditable {
-                onContentChange?(newValue)
+            .disabled(!isEditable)
+            .clipped()
+            .onChange(of: content) { _, newValue in
+                if document.text != newValue {
+                    document.text = newValue
+                }
+                if !hasUnsavedChanges {
+                    scheduleDiffReload()
+                }
             }
-        }
-        .task {
-            // Load git diff status when view appears
-            scheduleDiffReload()
-        }
-        .onChange(of: content) { _, _ in
-            guard !hasUnsavedChanges else { return }
-            // Reload git diff when saved content changes
-            scheduleDiffReload()
-        }
-        .onChange(of: hasUnsavedChanges) { _, isDirty in
-            if isDirty {
-                diffReloadTask?.cancel()
-            } else {
-                // Refresh diff after save/revert so it reflects on-disk state
+            .onChange(of: language) { _, newValue in
+                document.language = VVLanguageBridge.language(from: newValue)
+            }
+            .task {
                 scheduleDiffReload()
             }
-        }
-    }
-
-    private func loadGitDiff() async {
-        guard let filePath = filePath,
-              let repoPath = repoPath else {
-            return
-        }
-
-        do {
-            let provider = GitDiffProvider()
-            let diffStatus = try await provider.getLineDiff(filePath: filePath, repoPath: repoPath)
-            await MainActor.run {
-                gitDiffStatus = diffStatus
-                gitDiffCoordinator.gitDiffStatus = diffStatus
+            .onChange(of: hasUnsavedChanges) { _, isDirty in
+                if isDirty {
+                    diffReloadTask?.cancel()
+                } else {
+                    scheduleDiffReload()
+                }
             }
-        } catch {
-            // Silently fail if git diff isn't available
-        }
     }
 
     private func scheduleDiffReload() {
@@ -146,36 +133,58 @@ struct CodeEditorView: View {
         }
     }
 
-    private func defaultTheme() -> EditorTheme {
-        let bg = NSColor(named: "EditorBackground") ?? NSColor(red: 0.12, green: 0.12, blue: 0.18, alpha: 1.0)
-        let fg = NSColor(named: "EditorText") ?? NSColor(red: 0.8, green: 0.84, blue: 0.96, alpha: 1.0)
-
-        return EditorTheme(
-            text: .init(color: fg),
-            insertionPoint: fg,
-            invisibles: .init(color: .systemGray),
-            background: bg,
-            lineHighlight: bg.withAlphaComponent(0.05),
-            selection: .selectedTextBackgroundColor,
-            keywords: .init(color: .systemPurple),
-            commands: .init(color: .systemBlue),
-            types: .init(color: .systemYellow),
-            attributes: .init(color: .systemRed),
-            variables: .init(color: .systemBlue),
-            values: .init(color: .systemOrange),
-            numbers: .init(color: .systemOrange),
-            strings: .init(color: .systemGreen),
-            characters: .init(color: .systemGreen),
-            comments: .init(color: .systemGray)
-        )
-    }
-
-    private var detectedLanguage: CodeLanguage {
-        guard let lang = language?.lowercased() else {
-            return CodeLanguage.default
+    private func loadGitDiff() async {
+        guard let filePath,
+              let repoPath else {
+            await MainActor.run { gitDiffText = nil }
+            return
         }
 
-        // Use LanguageDetection to map extension to language
-        return LanguageDetection.codeLanguageFromString(lang)
+        let fileURL = URL(fileURLWithPath: filePath)
+        let repoURL = URL(fileURLWithPath: repoPath)
+        var relativePath = fileURL.path
+        if fileURL.path.hasPrefix(repoURL.path + "/") {
+            relativePath = String(fileURL.path.dropFirst(repoURL.path.count + 1))
+        }
+
+        if let diff = await runGitDiff(repoPath: repoPath, arguments: ["diff", "HEAD", "--", relativePath]),
+           !diff.isEmpty {
+            await MainActor.run { gitDiffText = diff }
+            return
+        }
+
+        if let diff = await runGitDiff(repoPath: repoPath, arguments: ["diff", "--", relativePath]),
+           !diff.isEmpty {
+            await MainActor.run { gitDiffText = diff }
+            return
+        }
+
+        await MainActor.run { gitDiffText = nil }
     }
+
+    private func runGitDiff(repoPath: String, arguments: [String]) async -> String? {
+        await Task.detached(priority: .utility) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = ["git", "-C", repoPath] + arguments
+
+            let outPipe = Pipe()
+            let errPipe = Pipe()
+            process.standardOutput = outPipe
+            process.standardError = errPipe
+
+            do {
+                try process.run()
+            } catch {
+                return nil
+            }
+
+            process.waitUntilExit()
+
+            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+            guard !data.isEmpty else { return nil }
+            return String(data: data, encoding: .utf8)
+        }.value
+    }
+
 }

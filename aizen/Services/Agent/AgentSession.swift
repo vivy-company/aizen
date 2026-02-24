@@ -1104,8 +1104,14 @@ class AgentSession: ObservableObject, ClientDelegate {
 
     func loadPersistedToolCalls(_ toolCalls: [ToolCall]) {
         clearToolCalls()
-        let sortedCalls = toolCalls.sorted { $0.timestamp < $1.timestamp }
-        for call in sortedCalls {
+        let sortedCalls = toolCalls.enumerated().sorted { lhs, rhs in
+            if lhs.element.timestamp != rhs.element.timestamp {
+                return lhs.element.timestamp < rhs.element.timestamp
+            }
+            return lhs.offset < rhs.offset
+        }
+        for entry in sortedCalls {
+            let call = entry.element
             upsertToolCall(call)
             persistedToolCallIds.insert(call.toolCallId)
         }

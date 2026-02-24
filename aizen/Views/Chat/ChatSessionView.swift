@@ -26,8 +26,6 @@ struct ChatSessionView: View {
     @State private var showingPermissionError = false
     @State private var permissionErrorMessage = ""
     @State private var showingUsageSheet = false
-    @State private var selectedToolCall: ToolCall?
-    @State private var fileToOpenInEditor: String?
     @State private var autocompleteWindow: AutocompleteWindowController?
     @State private var keyMonitor: Any?
     @State private var chatActions = ChatActions()
@@ -76,7 +74,7 @@ struct ChatSessionView: View {
     var body: some View {
         let isLayoutResizing = isWindowResizing || isCompanionResizing
         ZStack {
-            Color(nsColor: .windowBackgroundColor)
+            Color.clear
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -84,37 +82,21 @@ struct ChatSessionView: View {
                     ChatTimelineContainer(
                         key: timelineRenderKey,
                         timelineItems: viewModel.timelineItems,
-                        isProcessing: viewModel.isProcessing,
                         isSessionInitializing: viewModel.isSessionInitializing,
                         pendingPlanRequest: pendingPlanTimelineRequest,
                         selectedAgent: viewModel.selectedAgent,
-                        currentThought: nil,
-                        currentIterationId: viewModel.currentAgentSession?.currentIterationId,
                         scrollRequest: viewModel.scrollRequest,
-                        turnAnchorMessageId: viewModel.turnAnchorMessageId,
                         isAutoScrollEnabled: { !viewModel.userScrolledUp },
-                        isResizing: isLayoutResizing,
                         onAppear: viewModel.loadMessages,
-                        renderInlineMarkdown: viewModel.renderInlineMarkdown,
-                        worktreePath: worktree.path,
-                        onToolTap: { toolCall in
-                            selectedToolCall = toolCall
-                        },
-                        onOpenFileInEditor: { path in
-                            fileToOpenInEditor = path
-                        },
-                        agentSession: viewModel.currentAgentSession,
                         onScrollPositionChange: { isNearBottom in
                             viewModel.enqueueScrollPositionChange(
                                 isNearBottom,
                                 isLayoutResizing: isLayoutResizing
                             )
-                        },
-                        childToolCallsProvider: { parentId in
-                            viewModel.childToolCalls(for: parentId)
                         }
                     )
                     .equatable()
+                    .padding(.horizontal, 20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .layoutPriority(1)
 
@@ -313,16 +295,6 @@ struct ChatSessionView: View {
         .onReceive(viewModel.autocompleteHandler.$state) { state in
             updateAutocompleteWindow(state: state)
         }
-        .onChange(of: fileToOpenInEditor) { _, path in
-            guard let path = path else { return }
-            let normalizedPath = normalizedEditorPath(path)
-            NotificationCenter.default.post(
-                name: .openFileInEditor,
-                object: nil,
-                userInfo: ["path": normalizedPath]
-            )
-            fileToOpenInEditor = nil
-        }
         .sheet(isPresented: viewModel.needsAuthBinding) {
             if let agentSession = viewModel.currentAgentSession {
                 AuthenticationSheet(session: agentSession)
@@ -346,9 +318,6 @@ struct ChatSessionView: View {
                 agentId: viewModel.selectedAgent,
                 agentName: viewModel.selectedAgentDisplayName
             )
-        }
-        .sheet(item: $selectedToolCall) { toolCall in
-            ToolDetailsSheet(toolCalls: [toolCall], agentSession: viewModel.currentAgentSession)
         }
         .alert(String(localized: "chat.agent.switch.title"), isPresented: $viewModel.showingAgentSwitchWarning) {
             Button(String(localized: "chat.button.cancel"), role: .cancel) {
@@ -375,41 +344,6 @@ struct ChatSessionView: View {
     }
 
     // MARK: - Helpers
-
-    private func normalizedEditorPath(_ path: String) -> String {
-        let stripped = stripLineColumnSuffix(from: path)
-        let expanded = (stripped as NSString).expandingTildeInPath
-
-        if expanded.hasPrefix("/") {
-            return URL(fileURLWithPath: expanded).standardizedFileURL.path
-        }
-
-        if let worktreePath = worktree.path, !worktreePath.isEmpty {
-            return URL(fileURLWithPath: worktreePath)
-                .appendingPathComponent(expanded)
-                .standardizedFileURL
-                .path
-        }
-
-        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent(expanded)
-            .standardizedFileURL
-            .path
-    }
-
-    private func stripLineColumnSuffix(from path: String) -> String {
-        let parts = path.split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count >= 2 else { return path }
-
-        if Int(parts[parts.count - 1]) != nil {
-            if parts.count >= 3, Int(parts[parts.count - 2]) != nil {
-                return parts.dropLast(2).joined(separator: ":")
-            }
-            return parts.dropLast().joined(separator: ":")
-        }
-
-        return path
-    }
 
     private func updateInputBarWidth(_ width: CGFloat) {
         let normalized = max((width * 2).rounded() / 2, 0)
@@ -461,14 +395,10 @@ struct ChatSessionView: View {
     private var timelineRenderKey: ChatTimelineRenderKey {
         ChatTimelineRenderKey(
             timelineRenderEpoch: viewModel.timelineRenderEpoch,
-            childToolCallsEpoch: viewModel.childToolCallsEpoch,
             isSessionInitializing: viewModel.isSessionInitializing,
             pendingPlanRequestIdentity: pendingPlanTimelineRequestIdentity,
             selectedAgent: viewModel.selectedAgent,
-            currentIterationId: viewModel.currentAgentSession?.currentIterationId,
-            scrollRequestId: viewModel.scrollRequest?.id,
-            turnAnchorMessageId: viewModel.turnAnchorMessageId,
-            isResizing: isWindowResizing || isCompanionResizing
+            scrollRequestId: viewModel.scrollRequest?.id
         )
     }
 
@@ -746,37 +676,22 @@ struct ChatSessionView: View {
 
 private struct ChatTimelineRenderKey: Equatable {
     let timelineRenderEpoch: UInt64
-    let childToolCallsEpoch: UInt64
     let isSessionInitializing: Bool
     let pendingPlanRequestIdentity: String
     let selectedAgent: String
-    let currentIterationId: String?
     let scrollRequestId: UUID?
-    let turnAnchorMessageId: String?
-    let isResizing: Bool
 }
 
 private struct ChatTimelineContainer: View, Equatable {
     let key: ChatTimelineRenderKey
     let timelineItems: [TimelineItem]
-    let isProcessing: Bool
     let isSessionInitializing: Bool
     let pendingPlanRequest: RequestPermissionRequest?
     let selectedAgent: String
-    let currentThought: String?
-    let currentIterationId: String?
     let scrollRequest: ChatSessionViewModel.ScrollRequest?
-    let turnAnchorMessageId: String?
     let isAutoScrollEnabled: () -> Bool
-    let isResizing: Bool
     let onAppear: () -> Void
-    let renderInlineMarkdown: (String) -> AttributedString
-    let worktreePath: String?
-    let onToolTap: (ToolCall) -> Void
-    let onOpenFileInEditor: (String) -> Void
-    let agentSession: AgentSession?
     let onScrollPositionChange: (Bool) -> Void
-    let childToolCallsProvider: (String) -> [ToolCall]
 
     static func == (lhs: ChatTimelineContainer, rhs: ChatTimelineContainer) -> Bool {
         lhs.key == rhs.key
@@ -785,24 +700,13 @@ private struct ChatTimelineContainer: View, Equatable {
     var body: some View {
         ChatMessageList(
             timelineItems: timelineItems,
-            isProcessing: isProcessing,
             isSessionInitializing: isSessionInitializing,
             pendingPlanRequest: pendingPlanRequest,
             selectedAgent: selectedAgent,
-            currentThought: currentThought,
-            currentIterationId: currentIterationId,
             scrollRequest: scrollRequest,
-            turnAnchorMessageId: turnAnchorMessageId,
             isAutoScrollEnabled: isAutoScrollEnabled,
-            isResizing: isResizing,
             onAppear: onAppear,
-            renderInlineMarkdown: renderInlineMarkdown,
-            worktreePath: worktreePath,
-            onToolTap: onToolTap,
-            onOpenFileInEditor: onOpenFileInEditor,
-            agentSession: agentSession,
-            onScrollPositionChange: onScrollPositionChange,
-            childToolCallsProvider: childToolCallsProvider
+            onScrollPositionChange: onScrollPositionChange
         )
     }
 }

@@ -2,12 +2,12 @@
 //  GhosttyThemeParser.swift
 //  aizen
 //
-//  Parser for Ghostty theme files to convert them to EditorTheme
+//  Parser for Ghostty theme files to convert them to VV theme models
 //
 
 import Foundation
 import AppKit
-import CodeEditSourceEditor
+import VVCode
 
 // MARK: - NSColor Hex Extension
 
@@ -52,8 +52,6 @@ nonisolated extension NSColor {
     }
 }
 
-typealias Attribute = EditorTheme.Attribute
-
 nonisolated struct GitStatusColors {
     let modified: NSColor   // yellow - modified/mixed files
     let added: NSColor      // green - staged/added files
@@ -88,26 +86,16 @@ nonisolated struct GhosttyThemeParser {
             )
         }
 
-        func toEditorTheme() -> EditorTheme {
+        func toVVTheme() -> VVTheme {
             let bg = background ?? NSColor(hex: "1E1E2E")
             let fg = foreground ?? NSColor(hex: "CDD6F4")
             let selection = selectionBackground ?? NSColor(hex: "585B70")
-
-            // Map ANSI colors to syntax highlighting
-            // ANSI colors: 0=black, 1=red, 2=green, 3=yellow, 4=blue, 5=magenta, 6=cyan, 7=white
-            let green = palette[2] ?? NSColor(hex: "A6E3A1")
-            let yellow = palette[3] ?? NSColor(hex: "F9E2AF")
-            let blue = palette[4] ?? NSColor(hex: "89B4FA")
-            let magenta = palette[5] ?? NSColor(hex: "F5C2E7")
-            let cyan = palette[6] ?? NSColor(hex: "94E2D5")
             let brightBlack = palette[8] ?? NSColor(hex: "585B70")
 
-            // Create line highlight color (slightly lighter/darker than background)
             var lineHighlightColor = bg
             if let components = bg.usingColorSpace(.deviceRGB) {
                 let brightness = components.brightnessComponent
                 if brightness < 0.5 {
-                    // Dark theme - make slightly lighter
                     lineHighlightColor = NSColor(
                         red: min(components.redComponent + 0.05, 1.0),
                         green: min(components.greenComponent + 0.05, 1.0),
@@ -115,7 +103,6 @@ nonisolated struct GhosttyThemeParser {
                         alpha: 1.0
                     )
                 } else {
-                    // Light theme - make slightly darker
                     lineHighlightColor = NSColor(
                         red: max(components.redComponent - 0.05, 0.0),
                         green: max(components.greenComponent - 0.05, 0.0),
@@ -125,30 +112,29 @@ nonisolated struct GhosttyThemeParser {
                 }
             }
 
-            return EditorTheme(
-                text: Attribute(color: fg),
-                insertionPoint: cursorColor ?? fg,
-                invisibles: Attribute(color: brightBlack),
-                background: bg,
-                lineHighlight: lineHighlightColor,
-                selection: selection,
-                keywords: Attribute(color: magenta),
-                commands: Attribute(color: blue),
-                types: Attribute(color: yellow),
-                attributes: Attribute(color: green),
-                variables: Attribute(color: cyan),
-                values: Attribute(color: magenta),
-                numbers: Attribute(color: yellow),
-                strings: Attribute(color: green),
-                characters: Attribute(color: green),
-                comments: Attribute(color: brightBlack)
+            let gitColors = toGitStatusColors()
+
+            return VVTheme(
+                id: "ghostty-\(bg.hexString)-\(fg.hexString)",
+                backgroundColor: bg,
+                textColor: fg,
+                selectionColor: selection,
+                currentLineColor: lineHighlightColor,
+                gutterBackgroundColor: bg,
+                gutterTextColor: brightBlack,
+                gutterActiveTextColor: fg,
+                gutterSeparatorColor: brightBlack.withAlphaComponent(0.5),
+                cursorColor: cursorColor ?? fg,
+                gitAddedColor: gitColors.added,
+                gitModifiedColor: gitColors.modified,
+                gitDeletedColor: gitColors.deleted
             )
         }
     }
 
     private static let cacheLock = NSLock()
     private static var parsedThemeCache: [String: ParsedTheme] = [:]
-    private static var editorThemeCache: [String: EditorTheme] = [:]
+    private static var vvThemeCache: [String: VVTheme] = [:]
     private static var backgroundColorCache: [String: NSColor] = [:]
     private static var dividerColorCache: [String: NSColor] = [:]
 
@@ -205,8 +191,8 @@ nonisolated struct GhosttyThemeParser {
         return theme
     }
 
-    static func parse(contentsOf path: String) -> EditorTheme? {
-        parseRaw(contentsOf: path)?.toEditorTheme()
+    static func parseVVTheme(contentsOf path: String) -> VVTheme? {
+        parseRaw(contentsOf: path)?.toVVTheme()
     }
 
     static func availableThemes() -> [String] {
@@ -225,25 +211,25 @@ nonisolated struct GhosttyThemeParser {
         }.sorted()
     }
 
-    static func loadTheme(named name: String) -> EditorTheme? {
+    static func loadVVTheme(named name: String) -> VVTheme? {
         guard let resourcePath = Bundle.main.resourcePath else { return nil }
         let themePath = ((resourcePath as NSString)
             .appendingPathComponent("ghostty/themes") as NSString)
             .appendingPathComponent(name)
 
         cacheLock.lock()
-        if let cached = editorThemeCache[themePath] {
+        if let cached = vvThemeCache[themePath] {
             cacheLock.unlock()
             return cached
         }
         cacheLock.unlock()
 
-        guard let parsed = parse(contentsOf: themePath) else {
+        guard let parsed = parseVVTheme(contentsOf: themePath) else {
             return nil
         }
 
         cacheLock.lock()
-        editorThemeCache[themePath] = parsed
+        vvThemeCache[themePath] = parsed
         cacheLock.unlock()
         return parsed
     }

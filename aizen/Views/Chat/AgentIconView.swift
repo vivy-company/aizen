@@ -47,10 +47,20 @@ struct AgentIconView: View {
         case .builtin(let name):
             iconForBuiltinName(name)
         case .sfSymbol(let symbolName):
-            Image(systemName: symbolName)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
+            if let nsImage = configuredSymbolImage(
+                NSImage(systemSymbolName: symbolName, accessibilityDescription: nil),
+                pointSize: size,
+                weight: .semibold
+            ) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: size, height: size)
+            } else {
+                Image(systemName: symbolName)
+                    .font(.system(size: size, weight: .semibold))
+                    .frame(width: size, height: size)
+            }
         case .customImage(let imageData):
             if let nsImage = NSImage(data: imageData) {
                 Image(nsImage: nsImage)
@@ -78,53 +88,55 @@ struct AgentIconView: View {
     private func iconForBuiltinName(_ name: String) -> some View {
         switch name.lowercased() {
         case "claude":
-            Image("claude")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
+            assetSymbolIcon("claude")
         case "gemini":
-            Image("gemini")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
+            assetSymbolIcon("gemini")
         case "codex", "openai":
-            Image("openai")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
+            assetSymbolIcon("openai")
         case "copilot":
-            Image("copilot")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
+            assetSymbolIcon("copilot")
         case "droid":
-            Image("droid")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
+            assetSymbolIcon("droid")
         case "kimi":
-            Image("kimi")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
+            assetSymbolIcon("kimi")
         case "opencode":
-            Image("opencode")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
+            assetSymbolIcon("opencode")
         case "vibe", "mistral":
-            Image("mistral")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
+            assetSymbolIcon("mistral")
         case "qwen":
-            Image("qwen")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
+            assetSymbolIcon("qwen")
         default:
             defaultIcon
         }
+    }
+
+    @ViewBuilder
+    private func assetSymbolIcon(_ assetName: String) -> some View {
+        if let baseImage = NSImage(named: assetName),
+           let configured = configuredSymbolImage(baseImage, pointSize: size, weight: .semibold) {
+            Image(nsImage: configured)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+        } else {
+            Image(assetName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+        }
+    }
+
+    private func configuredSymbolImage(_ image: NSImage?, pointSize: CGFloat, weight: NSFont.Weight) -> NSImage? {
+        guard let image else { return nil }
+        let config = NSImage.SymbolConfiguration(
+            pointSize: max(12, pointSize),
+            weight: weight,
+            scale: .medium
+        )
+        if let configured = image.withSymbolConfiguration(config) {
+            return configured
+        }
+        return image
     }
 
     private var defaultIcon: some View {

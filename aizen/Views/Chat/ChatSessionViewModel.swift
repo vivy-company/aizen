@@ -40,12 +40,10 @@ class ChatSessionViewModel: ObservableObject {
     @Published var attachments: [ChatAttachment] = []
     @Published var timelineItems: [TimelineItem] = []
     @Published var timelineRenderEpoch: UInt64 = 0
-    @Published var childToolCallsEpoch: UInt64 = 0
 
     // Track previous IDs for incremental sync (avoids storing full duplicate arrays)
     var previousMessageIds: Set<String> = []
     var previousToolCallIds: Set<String> = []
-    var childToolCallsByParentId: [String: [ToolCall]] = [:]
 
     // Historical messages loaded from Core Data (separate from live session)
     var historicalMessages: [MessageItem] = []
@@ -85,7 +83,6 @@ class ChatSessionViewModel: ObservableObject {
     // MARK: - Internal State
 
     @Published var scrollRequest: ScrollRequest?
-    @Published var turnAnchorMessageId: String?
     @Published var isNearBottom: Bool = true
     /// Tracks user intent: true when user has actively scrolled up away from bottom.
     /// Unlike isNearBottom (which flips on every content change), this only changes
@@ -241,16 +238,23 @@ class ChatSessionViewModel: ObservableObject {
         fetchRequest.fetchLimit = 200
         
         do {
-            let messages = try viewContext.fetch(fetchRequest)
-            
-            self.historicalMessages = messages.reversed().compactMap { chatMessage in
+            let fetchedMessages = try viewContext.fetch(fetchRequest)
+            let chronologicalMessages = Array(fetchedMessages.reversed())
+
+            var decodedMessages: [MessageItem] = []
+            decodedMessages.reserveCapacity(chronologicalMessages.count)
+
+            var orderedToolCalls: [ToolCall] = []
+            var seenToolCallIds = Set<String>()
+
+            for chatMessage in chronologicalMessages {
                 guard let id = chatMessage.id,
                       let role = chatMessage.role,
                       let contentJSON = chatMessage.contentJSON else {
                     logger.warning("Skipping message: missing required fields")
-                    return nil
+                    continue
                 }
-                
+
                 let messageRole: MessageRole
                 switch role {
                 case "user":
@@ -259,9 +263,9 @@ class ChatSessionViewModel: ObservableObject {
                     messageRole = .agent
                 default:
                     logger.warning("Skipping message with unknown role: \(role)")
-                    return nil
+                    continue
                 }
-                
+
                 let contentBlocks = parseContentBlocks(from: contentJSON)
                 let content = contentBlocks.map { block in
                     switch block {
@@ -271,8 +275,28 @@ class ChatSessionViewModel: ObservableObject {
                         return ""
                     }
                 }.joined()
-                
-                return MessageItem(
+
+                let records = ((chatMessage.toolCalls as? Set<ToolCallRecord>) ?? [])
+                    .sorted { lhs, rhs in
+                        let leftTimestamp = lhs.timestamp ?? .distantPast
+                        let rightTimestamp = rhs.timestamp ?? .distantPast
+                        if leftTimestamp != rightTimestamp {
+                            return leftTimestamp < rightTimestamp
+                        }
+                        return (lhs.id ?? "") < (rhs.id ?? "")
+                    }
+
+                var messageToolCalls: [ToolCall] = []
+                for record in records {
+                    guard let call = decodeToolCall(from: record) else { continue }
+                    messageToolCalls.append(call)
+
+                    if seenToolCallIds.insert(call.id).inserted {
+                        orderedToolCalls.append(call)
+                    }
+                }
+
+                var messageItem = MessageItem(
                     id: id.uuidString,
                     role: messageRole,
                     content: content,
@@ -280,18 +304,12 @@ class ChatSessionViewModel: ObservableObject {
                     contentBlocks: contentBlocks,
                     isComplete: true
                 )
+                messageItem.toolCalls = messageToolCalls
+                decodedMessages.append(messageItem)
             }
 
-            var toolCallMap: [String: ToolCall] = [:]
-            for chatMessage in messages {
-                let records = (chatMessage.toolCalls as? Set<ToolCallRecord>) ?? []
-                for record in records {
-                    if let call = decodeToolCall(from: record) {
-                        toolCallMap[call.toolCallId] = call
-                    }
-                }
-            }
-            historicalToolCalls = toolCallMap.values.sorted { $0.timestamp < $1.timestamp }
+            historicalMessages = decodedMessages
+            historicalToolCalls = orderedToolCalls
         } catch {
             logger.error("Failed to fetch historical messages: \(error.localizedDescription)")
         }

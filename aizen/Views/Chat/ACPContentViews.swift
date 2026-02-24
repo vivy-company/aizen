@@ -5,9 +5,9 @@
 //  Shared views for rendering ACP content blocks
 //
 
+import Foundation
 import SwiftUI
-import CodeEditLanguages
-import CodeEditSourceEditor
+import VVCode
 
 // MARK: - Attachment Glass Card
 
@@ -200,25 +200,33 @@ struct ACPResourceView: View {
     let mimeType: String?
     let text: String?
 
-    @State private var highlightedText: AttributedString?
-    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
-    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
-    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var effectiveThemeName: String {
-        guard usePerAppearanceTheme else { return editorTheme }
-        return colorScheme == .dark ? editorTheme : editorThemeLight
+    private var localPath: String? {
+        if uri.hasPrefix("file://"), let url = URL(string: uri) {
+            return url.path
+        }
+        return uri
     }
-
-    private let highlighter = TreeSitterHighlighter()
 
     private var isCodeFile: Bool {
-        LanguageDetection.isCodeFile(mimeType: mimeType, uri: uri)
+        if languageHint != nil {
+            return true
+        }
+        if let localPath {
+            return VVLanguageBridge.language(fromPath: localPath) != nil
+        }
+        return VVLanguageBridge.language(fromMIMEType: mimeType) != nil
     }
 
-    private var detectedLanguage: CodeLanguage {
-        LanguageDetection.detectLanguage(mimeType: mimeType, uri: uri, content: text)
+    private var languageHint: String? {
+        if let fromPath = VVLanguageBridge.language(fromPath: localPath)?.identifier {
+            return fromPath
+        }
+
+        if let fromMime = VVLanguageBridge.language(fromMIMEType: mimeType)?.identifier {
+            return fromMime
+        }
+
+        return nil
     }
 
     var body: some View {
@@ -241,22 +249,15 @@ struct ACPResourceView: View {
                 Divider()
 
                 if isCodeFile {
-                    HorizontalOnlyScrollView(showsIndicators: true) {
-                        Group {
-                            if let highlighted = highlightedText {
-                                Text(highlighted)
-                            } else {
-                                Text(text)
-                                    .foregroundColor(.primary)
-                            }
-                        }
-                        .font(.system(.body, design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding(8)
-                    }
-                    .task(id: text) {
-                        await performHighlight(text)
-                    }
+                    VVCodeSnippetView(
+                        text: text,
+                        languageHint: languageHint,
+                        filePath: localPath,
+                        mimeType: mimeType,
+                        maxHeight: 260,
+                        showLineNumbers: true,
+                        wrapLines: false
+                    )
                 } else {
                     Text(text)
                         .font(.system(.body, design: .default))
@@ -268,44 +269,5 @@ struct ACPResourceView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.blue.opacity(0.05))
         .cornerRadius(8)
-    }
-
-    private func performHighlight(_ text: String) async {
-        do {
-            let theme = GhosttyThemeParser.loadTheme(named: effectiveThemeName) ?? defaultTheme()
-
-            let attributed = try await highlighter.highlightCode(
-                text,
-                language: detectedLanguage,
-                theme: theme
-            )
-            highlightedText = attributed
-        } catch {
-            highlightedText = AttributedString(text)
-        }
-    }
-
-    private func defaultTheme() -> EditorTheme {
-        let bg = NSColor(red: 0.12, green: 0.12, blue: 0.18, alpha: 1.0)
-        let fg = NSColor(red: 0.8, green: 0.84, blue: 0.96, alpha: 1.0)
-
-        return EditorTheme(
-            text: .init(color: fg),
-            insertionPoint: fg,
-            invisibles: .init(color: .systemGray),
-            background: bg,
-            lineHighlight: bg.withAlphaComponent(0.05),
-            selection: .selectedTextBackgroundColor,
-            keywords: .init(color: .systemPurple),
-            commands: .init(color: .systemBlue),
-            types: .init(color: .systemYellow),
-            attributes: .init(color: .systemRed),
-            variables: .init(color: .systemCyan),
-            values: .init(color: .systemOrange),
-            numbers: .init(color: .systemOrange),
-            strings: .init(color: .systemGreen),
-            characters: .init(color: .systemGreen),
-            comments: .init(color: .systemGray)
-        )
     }
 }

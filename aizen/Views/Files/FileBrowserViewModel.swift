@@ -295,6 +295,10 @@ class FileBrowserViewModel: ObservableObject {
             return
         }
 
+        guard openFiles[index].content != content else {
+            return
+        }
+
         openFiles[index].content = content
         openFiles[index].hasUnsavedChanges = true
     }

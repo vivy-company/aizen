@@ -19,7 +19,6 @@ extension ChatSessionViewModel {
     struct ScrollRequest: Equatable {
         enum Target: Equatable {
             case bottom
-            case item(id: String, anchor: UnitPoint)
         }
 
         let id: UUID
@@ -57,17 +56,6 @@ extension ChatSessionViewModel {
         timelineIndex = makeTimelineIndex(from: items)
     }
 
-    /// Rebuild child tool call index for quick lookup in views
-    private func rebuildChildToolCallsIndex() {
-        var index: [String: [ToolCall]] = [:]
-        for call in toolCalls {
-            guard let parent = call.parentToolCallId else { continue }
-            index[parent, default: []].append(call)
-        }
-        childToolCallsByParentId = index
-        childToolCallsEpoch &+= 1
-    }
-
     // MARK: - Timeline
 
     /// Full rebuild - used only for initial load or major state changes
@@ -79,7 +67,6 @@ extension ChatSessionViewModel {
             .filter { seen.insert($0.stableId).inserted }
         timelineRenderEpoch &+= 1
         rebuildTimelineIndex()
-        rebuildChildToolCallsIndex()
     }
 
     /// Rebuild timeline with tool call grouping by message boundaries
@@ -89,20 +76,70 @@ extension ChatSessionViewModel {
         // Filter tool calls (skip children, they render inside parent)
         let topLevelCalls = toolCalls.filter { $0.parentToolCallId == nil }
 
+        // Anchor restored tool calls to their owning message when available.
+        // This preserves grouping boundaries even when persisted timestamps are coarse/equal.
+        var anchoredTimestampByToolId: [String: Date] = [:]
+        for message in messages {
+            let topLevelMessageCalls = message.toolCalls.filter { $0.parentToolCallId == nil }
+            guard !topLevelMessageCalls.isEmpty else { continue }
+            for (index, call) in topLevelMessageCalls.enumerated() {
+                let remaining = topLevelMessageCalls.count - index
+                let offset = Double(remaining) * 0.000_001
+                let anchored = message.timestamp.addingTimeInterval(-offset)
+                if let existing = anchoredTimestampByToolId[call.id] {
+                    if anchored < existing {
+                        anchoredTimestampByToolId[call.id] = anchored
+                    }
+                } else {
+                    anchoredTimestampByToolId[call.id] = anchored
+                }
+            }
+        }
+
         // Create merged timeline entries sorted by timestamp (including system messages)
         enum EntryType {
             case message(MessageItem)
             case toolCall(ToolCall)
         }
 
-        var entries: [(type: EntryType, timestamp: Date)] = []
+        func sortPriority(for entryType: EntryType) -> Int {
+            switch entryType {
+            case .toolCall:
+                return 1
+            case .message(let message):
+                switch message.role {
+                case .user:
+                    return 0
+                case .agent:
+                    return 2
+                case .system:
+                    return 3
+                }
+            }
+        }
+
+        var sequence = 0
+        var entries: [(type: EntryType, timestamp: Date, priority: Int, sequence: Int)] = []
         for msg in messages {
-            entries.append((.message(msg), msg.timestamp))
+            let entryType: EntryType = .message(msg)
+            entries.append((entryType, msg.timestamp, sortPriority(for: entryType), sequence))
+            sequence += 1
         }
         for call in topLevelCalls {
-            entries.append((.toolCall(call), call.timestamp))
+            let entryType: EntryType = .toolCall(call)
+            let effectiveTimestamp = anchoredTimestampByToolId[call.id] ?? call.timestamp
+            entries.append((entryType, effectiveTimestamp, sortPriority(for: entryType), sequence))
+            sequence += 1
         }
-        entries.sort { $0.timestamp < $1.timestamp }
+        entries.sort { lhs, rhs in
+            if lhs.timestamp != rhs.timestamp {
+                return lhs.timestamp < rhs.timestamp
+            }
+            if lhs.priority != rhs.priority {
+                return lhs.priority < rhs.priority
+            }
+            return lhs.sequence < rhs.sequence
+        }
 
         // Build timeline: group tool calls at message boundaries
         // Turn summary ONLY appears when turn actually ends:
@@ -128,12 +165,12 @@ extension ChatSessionViewModel {
                 if msg.role == .user {
                     // Group any remaining buffered tool calls
                     if !toolCallBuffer.isEmpty {
-                        let group = createGroupFromBuffer(
-                            toolCalls: toolCallBuffer,
+                        appendBufferedToolCalls(
+                            toolCallBuffer,
                             messageId: lastAgentMessageId,
-                            isCompletedTurn: false
+                            isCompletedTurn: false,
+                            into: &items
                         )
-                        items.append(.toolCallGroup(group))
                         turnToolCalls.append(contentsOf: toolCallBuffer)
                         toolCallBuffer = []
                     }
@@ -152,12 +189,12 @@ extension ChatSessionViewModel {
 
                 // Agent message after tools: just group them (turn not over yet)
                 if msg.role == .agent && !toolCallBuffer.isEmpty {
-                    let group = createGroupFromBuffer(
-                        toolCalls: toolCallBuffer,
+                    appendBufferedToolCalls(
+                        toolCallBuffer,
                         messageId: lastAgentMessageId,
-                        isCompletedTurn: true
+                        isCompletedTurn: true,
+                        into: &items
                     )
-                    items.append(.toolCallGroup(group))
                     turnToolCalls.append(contentsOf: toolCallBuffer)
                     toolCallBuffer = []
                     // NO summary here - turn continues
@@ -186,12 +223,12 @@ extension ChatSessionViewModel {
                 )
             } else {
                 // Streaming ended = TURN END
-                let group = createGroupFromBuffer(
-                    toolCalls: toolCallBuffer,
+                appendBufferedToolCalls(
+                    toolCallBuffer,
                     messageId: lastAgentMessageId,
-                    isCompletedTurn: true
+                    isCompletedTurn: true,
+                    into: &items
                 )
-                items.append(.toolCallGroup(group))
                 let summary = createTurnSummary(from: turnToolCalls)
                 items.append(.turnSummary(summary))
                 // Add pending system messages after final turn summary
@@ -219,7 +256,6 @@ extension ChatSessionViewModel {
         timelineItems = items
         timelineRenderEpoch &+= 1
         rebuildTimelineIndex()
-        rebuildChildToolCallsIndex()
     }
 
     /// Create turn summary from all tool calls in the turn
@@ -302,6 +338,27 @@ extension ChatSessionViewModel {
         )
     }
 
+    /// Append buffered tool calls as a single row when possible; only create groups for 2+ calls.
+    private func appendBufferedToolCalls(
+        _ toolCalls: [ToolCall],
+        messageId: String?,
+        isCompletedTurn: Bool,
+        into items: inout [TimelineItem]
+    ) {
+        guard !toolCalls.isEmpty else { return }
+        if toolCalls.count == 1, let single = toolCalls.first {
+            items.append(.toolCall(single))
+            return
+        }
+
+        let group = createGroupFromBuffer(
+            toolCalls: toolCalls,
+            messageId: messageId,
+            isCompletedTurn: isCompletedTurn
+        )
+        items.append(.toolCallGroup(group))
+    }
+
     /// While streaming, show read/search/grep runs as expandable groups and keep other tools as standalone rows.
     private func appendStreamingToolCallItems(
         from toolCalls: [ToolCall],
@@ -312,12 +369,12 @@ extension ChatSessionViewModel {
 
         func flushExplorationBuffer() {
             guard !explorationBuffer.isEmpty else { return }
-            let group = createGroupFromBuffer(
-                toolCalls: explorationBuffer,
+            appendBufferedToolCalls(
+                explorationBuffer,
                 messageId: lastAgentMessageId,
-                isCompletedTurn: false
+                isCompletedTurn: false,
+                into: &items
             )
-            items.append(.toolCallGroup(group))
             explorationBuffer.removeAll(keepingCapacity: true)
         }
 
@@ -497,8 +554,6 @@ extension ChatSessionViewModel {
 
         updateBlock()
 
-        rebuildChildToolCallsIndex()
-
         // Update tracked IDs for next sync
         previousToolCallIds = newIds
     }
@@ -528,18 +583,6 @@ extension ChatSessionViewModel {
         items.insert(item, at: low)
     }
 
-    // MARK: - Tool Call Grouping
-
-    /// Get child tool calls for a parent Task
-    func childToolCalls(for parentId: String) -> [ToolCall] {
-        childToolCallsByParentId[parentId] ?? []
-    }
-
-    /// Check if a tool call has children (is a Task with nested calls)
-    func hasChildToolCalls(toolCallId: String) -> Bool {
-        !(childToolCallsByParentId[toolCallId]?.isEmpty ?? true)
-    }
-
     // MARK: - Scrolling
 
     func scrollToBottom() {
@@ -554,15 +597,6 @@ extension ChatSessionViewModel {
 
     private func requestScrollToBottom(force: Bool, animated: Bool) {
         scrollRequest = ScrollRequest(id: UUID(), target: .bottom, animated: animated, force: force)
-    }
-
-    private func requestScrollToItem(id: String, anchor: UnitPoint, force: Bool, animated: Bool) {
-        scrollRequest = ScrollRequest(
-            id: UUID(),
-            target: .item(id: id, anchor: anchor),
-            animated: animated,
-            force: force
-        )
     }
 
     private func scheduleAutoScrollToBottom() {

@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import CodeEditSourceEditor
+import VVCode
 
 struct CustomTextEditor: NSViewRepresentable {
     @Binding var text: String
@@ -361,8 +361,8 @@ struct CustomTextEditor: NSViewRepresentable {
             let effectiveThemeName = usePerAppearanceTheme
                 ? (isDarkAppearance ? terminalThemeName : terminalThemeNameLight)
                 : terminalThemeName
-            if let theme = GhosttyThemeParser.loadTheme(named: effectiveThemeName) {
-                return theme.insertionPoint
+            if let theme = GhosttyThemeParser.loadVVTheme(named: effectiveThemeName) {
+                return theme.cursorColor
             }
             return NSColor.controlAccentColor
         }

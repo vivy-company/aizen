@@ -99,13 +99,8 @@ struct FileContentView: View {
             if isMarkdown && showPreview {
                 // Markdown preview - pass directory of file as basePath for relative image URLs
                 let fileDirectory = (file.path as NSString).deletingLastPathComponent
-                GeometryReader { geometry in
-                    ScrollView {
-                        MarkdownView(content: file.content, isStreaming: false, basePath: fileDirectory)
-                            .frame(width: geometry.size.width - 32, alignment: .leading)
-                            .padding()
-                    }
-                }
+                MarkdownView(content: file.content, isStreaming: false, basePath: fileDirectory)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 // Code editor
                 CodeEditorView(

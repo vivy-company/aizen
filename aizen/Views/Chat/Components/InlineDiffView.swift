@@ -1,11 +1,13 @@
 //  InlineDiffView.swift
 //  aizen
 //
-//  Inline diff view with syntax highlighting
+//  Inline diff view backed by VVDiffView
 //
 
 import ACP
+import AppKit
 import SwiftUI
+import VVCode
 
 struct InlineDiffView: View {
     let diff: ToolCallDiff
@@ -13,17 +15,20 @@ struct InlineDiffView: View {
 
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
+    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
+    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
+    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var cachedDiffLines: [ChatDiffLine]?
-    @State private var isComputing: Bool = false
-    @State private var showFullDiff: Bool = false
+    @State private var isComputing = false
+    @State private var showFullDiff = false
     @State private var lastComputedDiffId: String?
 
     private let previewLineCount = 8
-
-    private var fontSize: CGFloat {
-        max(terminalFontSize - 2, 9)
-    }
+    private let previewRenderLineCap = 200
+    private let largeDiffCharacterThreshold = 120_000
+    private let largeDiffLineThreshold = 4_000
 
     private var diffId: String {
         "\(diff.path)-\(diff.oldText?.hashValue ?? 0)-\(diff.newText.hashValue)"
@@ -37,34 +42,64 @@ struct InlineDiffView: View {
         cachedDiffLines ?? []
     }
 
+    private var isDeletedFileDiff: Bool {
+        guard let oldText = diff.oldText else { return false }
+        return !oldText.isEmpty && diff.newText.isEmpty
+    }
+
     private var hasMoreLines: Bool {
         diffLines.count > previewLineCount
     }
 
-    private var previewLines: [ChatDiffLine] {
-        if hasMoreLines {
-            return Array(diffLines.prefix(previewLineCount))
-        }
-        return diffLines
+    private var previewDiffLines: [ChatDiffLine] {
+        Array(diffLines.prefix(previewRenderLineCap))
     }
-    
+
     private var previewHeight: CGFloat {
-        let rowHeight = SelectableDiffView.calculateRowHeight(fontSize: fontSize, fontFamily: terminalFontName)
-        return CGFloat(previewLines.count) * rowHeight
+        let rowHeight = max(15, CGFloat(terminalFontSize + 4))
+        return CGFloat(previewLineCount) * rowHeight + 26
+    }
+
+    private var effectiveThemeName: String {
+        guard usePerAppearanceTheme else { return editorTheme }
+        return colorScheme == .dark ? editorTheme : editorThemeLight
+    }
+
+    private var theme: VVTheme {
+        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
+            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
+    }
+
+    private var configuration: VVConfiguration {
+        let font = NSFont(name: terminalFontName, size: max(terminalFontSize - 1, 10))
+            ?? .monospacedSystemFont(ofSize: max(terminalFontSize - 1, 10), weight: .regular)
+
+        return VVConfiguration.default
+            .with(font: font)
+            .with(showLineNumbers: true)
+            .with(showGutter: true)
+            .with(showGitGutter: false)
+            .with(wrapLines: true)
+    }
+
+    private var unifiedDiffText: String {
+        Self.buildUnifiedDiff(path: diff.path, lines: diffLines)
+    }
+
+    private var previewUnifiedDiffText: String {
+        Self.buildUnifiedDiff(path: diff.path, lines: previewDiffLines)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // File path header
             HStack(spacing: 4) {
-                Image(systemName: "doc.badge.plus")
+                Image(systemName: isDeletedFileDiff ? "trash" : "doc.badge.plus")
                     .font(.system(size: 9))
                 Text(URL(fileURLWithPath: diff.path).lastPathComponent)
                     .font(.system(size: 10, weight: .medium))
             }
             .foregroundStyle(.secondary)
 
-            // Diff content with multiline selection support
             VStack(alignment: .leading, spacing: 0) {
                 if !allowCompute {
                     Text("Diff will appear when the tool completes")
@@ -82,16 +117,16 @@ struct InlineDiffView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
-                } else if !previewLines.isEmpty {
-                    SelectableDiffView(
-                        lines: previewLines,
-                        fontSize: fontSize,
-                        fontFamily: terminalFontName,
-                        scrollable: false
-                    )
-                    .frame(height: previewHeight)
+                } else if isDeletedFileDiff {
+                    deletedFilePlaceholder
+                } else {
+                    VVDiffView(unifiedDiff: previewUnifiedDiffText)
+                        .theme(theme)
+                        .configuration(configuration)
+                        .renderStyle(.unifiedTable)
+                        .syntaxHighlighting(true)
+                        .frame(height: previewHeight)
 
-                    // Show more button
                     if hasMoreLines {
                         Button {
                             showFullDiff = true
@@ -119,12 +154,28 @@ struct InlineDiffView: View {
             await computeDiffAsync()
         }
         .sheet(isPresented: $showFullDiff) {
-            FullDiffSheet(diff: diff, diffLines: diffLines, terminalFontName: terminalFontName, fontSize: fontSize)
-        }
+                FullDiffSheet(
+                    diff: diff,
+                    unifiedDiffText: unifiedDiffText,
+                    terminalFontName: terminalFontName,
+                    fontSize: terminalFontSize
+                )
+            }
     }
-    
-    // MARK: - Async Diff Computation
-    
+
+    private var deletedFilePlaceholder: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "trash")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text("File removed. Diff content omitted.")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+    }
+
     private func computeDiffAsync() async {
         guard allowCompute else { return }
 
@@ -134,33 +185,88 @@ struct InlineDiffView: View {
 
         guard cachedDiffLines == nil else { return }
         lastComputedDiffId = diffId
-        
+
+        if isDeletedFileDiff {
+            cachedDiffLines = []
+            isComputing = false
+            return
+        }
+
         isComputing = true
-        
+
         let oldText = diff.oldText
         let newText = diff.newText
-        
+        let oldLineCount = oldText?.split(separator: "\n", omittingEmptySubsequences: false).count ?? 0
+        let newLineCount = newText.split(separator: "\n", omittingEmptySubsequences: false).count
+        let combinedCharacters = (oldText?.count ?? 0) + newText.count
+        let isLargeDiff = combinedCharacters > largeDiffCharacterThreshold || (oldLineCount + newLineCount) > largeDiffLineThreshold
+
         let lines = await Task.detached(priority: .userInitiated) {
-            InlineDiffComputer.computeUnifiedDiff(oldText: oldText, newText: newText)
+            if isLargeDiff {
+                return InlineDiffComputer.computeUnifiedDiff(
+                    oldText: oldText,
+                    newText: newText,
+                    contextLines: 1,
+                    maxOutputLines: 600
+                )
+            }
+            return InlineDiffComputer.computeUnifiedDiff(
+                oldText: oldText,
+                newText: newText,
+                contextLines: 3,
+                maxOutputLines: 2_000
+            )
         }.value
-        
+
         cachedDiffLines = lines
         isComputing = false
     }
 
+    private static func buildUnifiedDiff(path: String, lines: [ChatDiffLine]) -> String {
+        let normalizedPath = path.isEmpty ? "file" : path
+        var output: [String] = [
+            "diff --git a/\(normalizedPath) b/\(normalizedPath)",
+            "--- a/\(normalizedPath)",
+            "+++ b/\(normalizedPath)",
+            "@@ -1,1 +1,1 @@"
+        ]
+
+        if lines.isEmpty {
+            output.append(" ")
+            return output.joined(separator: "\n")
+        }
+
+        for line in lines {
+            switch line.type {
+            case .context:
+                output.append(" \(line.content)")
+            case .added:
+                output.append("+\(line.content)")
+            case .deleted:
+                output.append("-\(line.content)")
+            case .separator:
+                output.append("@@ -1,1 +1,1 @@")
+            }
+        }
+
+        return output.joined(separator: "\n")
+    }
 }
 
 // MARK: - Diff Computation
 
 private nonisolated enum InlineDiffComputer {
-    static func computeUnifiedDiff(oldText: String?, newText: String, contextLines: Int = 3) -> [ChatDiffLine] {
+    static func computeUnifiedDiff(
+        oldText: String?,
+        newText: String,
+        contextLines: Int = 3,
+        maxOutputLines: Int = 2_000
+    ) -> [ChatDiffLine] {
         let oldLines = (oldText ?? "").split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let newLines = newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
 
-        // Compute LCS to find matching lines
         let lcs = longestCommonSubsequence(oldLines, newLines)
 
-        // Build edit script
         var edits: [(type: ChatDiffLineType, content: String)] = []
         var oldIdx = 0
         var newIdx = 0
@@ -168,25 +274,21 @@ private nonisolated enum InlineDiffComputer {
 
         while oldIdx < oldLines.count || newIdx < newLines.count {
             if lcsIdx < lcs.count && oldIdx < oldLines.count && newIdx < newLines.count &&
-               oldLines[oldIdx] == lcs[lcsIdx] && newLines[newIdx] == lcs[lcsIdx] {
-                // Matching line (context)
+                oldLines[oldIdx] == lcs[lcsIdx] && newLines[newIdx] == lcs[lcsIdx] {
                 edits.append((.context, oldLines[oldIdx]))
                 oldIdx += 1
                 newIdx += 1
                 lcsIdx += 1
             } else if oldIdx < oldLines.count && (lcsIdx >= lcs.count || oldLines[oldIdx] != lcs[lcsIdx]) {
-                // Line removed from old
                 edits.append((.deleted, oldLines[oldIdx]))
                 oldIdx += 1
             } else if newIdx < newLines.count {
-                // Line added in new
                 edits.append((.added, newLines[newIdx]))
                 newIdx += 1
             }
         }
 
-        // Generate unified diff with context
-        return generateHunks(edits: edits, contextLines: contextLines)
+        return generateHunks(edits: edits, contextLines: contextLines, maxOutputLines: maxOutputLines)
     }
 
     static func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
@@ -194,11 +296,8 @@ private nonisolated enum InlineDiffComputer {
         let n = b.count
         guard m > 0 && n > 0 else { return [] }
 
-        // For very large diffs, use a simpler line-by-line comparison
-        // to avoid O(n²) memory/time complexity
         let maxLCSSize = 1000
         if m * n > maxLCSSize * maxLCSSize {
-            // Fallback: simple line matching for very large diffs
             return simpleLCS(a, b)
         }
 
@@ -214,9 +313,9 @@ private nonisolated enum InlineDiffComputer {
             }
         }
 
-        // Backtrack to find LCS
         var result: [String] = []
-        var i = m, j = n
+        var i = m
+        var j = n
         while i > 0 && j > 0 {
             if a[i - 1] == b[j - 1] {
                 result.append(a[i - 1])
@@ -231,16 +330,18 @@ private nonisolated enum InlineDiffComputer {
         return result.reversed()
     }
 
-    /// Simple LCS for large files - only matches exact consecutive sequences
     static func simpleLCS(_ a: [String], _ b: [String]) -> [String] {
         let bSet = Set(b)
         return a.filter { bSet.contains($0) }
     }
 
-    static func generateHunks(edits: [(type: ChatDiffLineType, content: String)], contextLines: Int) -> [ChatDiffLine] {
+    static func generateHunks(
+        edits: [(type: ChatDiffLineType, content: String)],
+        contextLines: Int,
+        maxOutputLines: Int
+    ) -> [ChatDiffLine] {
         var result: [ChatDiffLine] = []
 
-        // Find ranges of changes
         var changeIndices: [Int] = []
         for (i, edit) in edits.enumerated() {
             if edit.type != .context {
@@ -249,10 +350,9 @@ private nonisolated enum InlineDiffComputer {
         }
 
         if changeIndices.isEmpty {
-            return [] // No changes
+            return []
         }
 
-        // Group changes into hunks
         var hunks: [[Int]] = []
         var currentHunk: [Int] = []
 
@@ -270,20 +370,21 @@ private nonisolated enum InlineDiffComputer {
             hunks.append(currentHunk)
         }
 
-        // Generate output for each hunk
         for (hunkIdx, hunk) in hunks.enumerated() {
             let startIdx = max(0, hunk.first! - contextLines)
             let endIdx = min(edits.count - 1, hunk.last! + contextLines)
 
-            // Add separator between hunks
             if hunkIdx > 0 {
                 result.append(ChatDiffLine(type: .separator, content: "···"))
             }
 
-            // Add lines in this hunk
             for i in startIdx...endIdx {
                 let edit = edits[i]
                 result.append(ChatDiffLine(type: edit.type, content: edit.content))
+                if result.count >= maxOutputLines {
+                    result.append(ChatDiffLine(type: .separator, content: "… truncated …"))
+                    return result
+                }
             }
         }
 
@@ -297,13 +398,39 @@ private struct FullDiffSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let diff: ToolCallDiff
-    let diffLines: [ChatDiffLine]
+    let unifiedDiffText: String
     let terminalFontName: String
-    let fontSize: CGFloat
+    let fontSize: Double
+
+    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
+    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
+    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var effectiveThemeName: String {
+        guard usePerAppearanceTheme else { return editorTheme }
+        return colorScheme == .dark ? editorTheme : editorThemeLight
+    }
+
+    private var theme: VVTheme {
+        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
+            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
+    }
+
+    private var configuration: VVConfiguration {
+        let font = NSFont(name: terminalFontName, size: max(fontSize - 1, 10))
+            ?? .monospacedSystemFont(ofSize: max(fontSize - 1, 10), weight: .regular)
+
+        return VVConfiguration.default
+            .with(font: font)
+            .with(showLineNumbers: true)
+            .with(showGutter: true)
+            .with(showGitGutter: false)
+            .with(wrapLines: true)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             DetailHeaderBar(
                 showsBackground: false,
                 padding: EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
@@ -323,15 +450,27 @@ private struct FullDiffSheet: View {
 
             Divider()
 
-            // Full diff content with multiline selection
-            SelectableDiffView(
-                lines: diffLines,
-                fontSize: fontSize,
-                fontFamily: terminalFontName
-            )
-            .background(Color(nsColor: .textBackgroundColor))
+            VVDiffView(unifiedDiff: unifiedDiffText)
+                .theme(theme)
+                .configuration(configuration)
+                .renderStyle(.unifiedTable)
+                .syntaxHighlighting(true)
+                .background(Color(nsColor: .textBackgroundColor))
         }
         .background(.ultraThinMaterial)
         .frame(minWidth: 600, idealWidth: 800, minHeight: 400, idealHeight: 600)
     }
+}
+
+nonisolated private enum ChatDiffLineType: Sendable {
+    case context
+    case added
+    case deleted
+    case separator
+}
+
+nonisolated private struct ChatDiffLine: Identifiable, Sendable {
+    let id = UUID()
+    let type: ChatDiffLineType
+    let content: String
 }

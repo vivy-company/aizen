@@ -2,13 +2,14 @@
 //  DiffView.swift
 //  aizen
 //
-//  NSTableView-based diff renderer for git changes
+//  Unified diff renderer backed by VVDiffView.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
+import VVCode
 
-struct DiffView: NSViewRepresentable {
+struct DiffView: View {
     // Input mode 1: Raw diff string (for multi-file view)
     private let diffOutput: String?
 
@@ -24,6 +25,11 @@ struct DiffView: NSViewRepresentable {
     let onOpenFile: ((String) -> Void)?
     let commentedLines: Set<String>
     let onAddComment: ((DiffLine, String) -> Void)?
+
+    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
+    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
+    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
+    @Environment(\.colorScheme) private var colorScheme
 
     // Init for raw diff output (used by GitChangesOverlayView)
     init(
@@ -73,464 +79,331 @@ struct DiffView: NSViewRepresentable {
         self.onAddComment = onAddComment
     }
 
-    func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
-        let tableView = CopyableTableView()
-        tableView.copyProvider = context.coordinator
-
-        tableView.style = .plain
-        tableView.headerView = nil
-        tableView.usesAlternatingRowBackgroundColors = false
-        tableView.selectionHighlightStyle = .regular
-        tableView.allowsMultipleSelection = true
-        tableView.intercellSpacing = NSSize(width: 0, height: 0)
-        tableView.backgroundColor = .clear
-        tableView.allowsColumnReordering = false
-        tableView.allowsColumnResizing = false
-        tableView.allowsColumnSelection = false
-        tableView.usesAutomaticRowHeights = true
-        tableView.gridStyleMask = []
-        tableView.gridColor = .clear
-
-        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("diff"))
-        column.resizingMask = .autoresizingMask
-        tableView.addTableColumn(column)
-
-        tableView.delegate = context.coordinator
-        tableView.dataSource = context.coordinator
-
-        scrollView.documentView = tableView
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = true
-        scrollView.autohidesScrollers = true
-        scrollView.backgroundColor = .clear
-        scrollView.drawsBackground = false
-
-        context.coordinator.tableView = tableView
-        context.coordinator.repoPath = repoPath
-        context.coordinator.showFileHeaders = showFileHeaders
-        context.coordinator.setupScrollObserver(for: scrollView)
-
-        if let lines = preloadedLines {
-            context.coordinator.loadLines(lines, fontSize: fontSize, fontFamily: fontFamily)
-        } else if let output = diffOutput {
-            context.coordinator.parseAndReload(diffOutput: output, fontSize: fontSize, fontFamily: fontFamily)
-        }
-
-        return scrollView
+    private var effectiveThemeName: String {
+        guard usePerAppearanceTheme else { return editorTheme }
+        return colorScheme == .dark ? editorTheme : editorThemeLight
     }
 
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        context.coordinator.onFileVisible = onFileVisible
-        context.coordinator.onOpenFile = onOpenFile
-        context.coordinator.repoPath = repoPath
-        context.coordinator.showFileHeaders = showFileHeaders
-        context.coordinator.onAddComment = onAddComment
-
-        let commentedLinesChanged = context.coordinator.commentedLines != commentedLines
-        context.coordinator.commentedLines = commentedLines
-
-        if let lines = preloadedLines {
-            context.coordinator.loadLines(lines, fontSize: fontSize, fontFamily: fontFamily)
-        } else if let output = diffOutput {
-            context.coordinator.parseAndReload(diffOutput: output, fontSize: fontSize, fontFamily: fontFamily)
-        }
-
-        // Refresh cells if commented lines changed
-        if commentedLinesChanged {
-            context.coordinator.tableView?.reloadData()
-        }
-
-        // Handle scroll to file request
-        if let file = scrollToFile, file != context.coordinator.lastScrolledFile {
-            context.coordinator.scrollToFile(file)
-            context.coordinator.lastScrolledFile = file
-        }
+    private var theme: VVTheme {
+        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
+            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
     }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(
-            repoPath: repoPath,
-            showFileHeaders: showFileHeaders,
-            onOpenFile: onOpenFile,
-            commentedLines: commentedLines,
-            onAddComment: onAddComment
-        )
+    private var configuration: VVConfiguration {
+        let font = NSFont(name: fontFamily, size: fontSize)
+            ?? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
+
+        return VVConfiguration.default
+            .with(font: font)
+            .with(showLineNumbers: true)
+            .with(showGutter: true)
+            .with(showGitGutter: false)
+            .with(wrapLines: true)
     }
 
-    // MARK: - Coordinator
-
-    class Coordinator: NSObject, NSTableViewDelegate, NSTableViewDataSource, CopyableTableViewProvider {
-        weak var tableView: NSTableView?
-        var rows: [DiffRow] = []
-        var rowHeight: CGFloat = 20
-        var fontSize: Double = 12
-        var fontFamily: String = "Menlo"
-        var repoPath: String = ""
-        var showFileHeaders: Bool = true
-        var onFileVisible: ((String) -> Void)?
-        var onOpenFile: ((String) -> Void)?
-        var lastScrolledFile: String?
-        var commentedLines: Set<String> = []
-        var onAddComment: ((DiffLine, String) -> Void)?
-
-        private var lastDataHash: Int = 0
-        private var fileRowIndices: [String: Int] = [:]
-        private var rowToFilePath: [Int: String] = [:]
-        private var lastVisibleFile: String?
-        private var scrollObserver: NSObjectProtocol?
-        private var rawLines: [String] = []
-        private var parsedRows: [Int: DiffRow] = [:]
-        private var lineParser: DiffLineParser?
-        private var parseTask: Task<ParsedDiffMetadata, Never>?
-
-        enum DiffRow {
-            case fileHeader(path: String)
-            case line(DiffLine)
-            case lazyLine(rawIndex: Int)
+    private var unifiedDiff: String {
+        if let diffOutput {
+            return diffOutput
         }
 
-        private enum RowKind: Sendable {
-            case fileHeader(path: String)
-            case lazyLine(rawIndex: Int)
+        guard let preloadedLines else {
+            return ""
         }
 
-        private struct ParsedDiffMetadata: Sendable {
-            let rawLines: [String]
-            let rowKinds: [RowKind]
-            let fileRowIndices: [String: Int]
-            let rowToFilePath: [Int: String]
+        return Self.unifiedDiff(from: preloadedLines)
+    }
+
+    private var displayDiff: String {
+        let collapsed = Self.collapsedDeletedFileSections(in: unifiedDiff)
+        return Self.normalizeDiffPaths(in: collapsed, repoPath: repoPath)
+    }
+
+    private var filePaths: [String] {
+        Self.filePaths(in: displayDiff)
+    }
+
+    private var showsDeletedFilePlaceholder: Bool {
+        guard let preloadedLines, !preloadedLines.isEmpty else {
+            return false
         }
 
-        init(
-            repoPath: String,
-            showFileHeaders: Bool,
-            onOpenFile: ((String) -> Void)?,
-            commentedLines: Set<String>,
-            onAddComment: ((DiffLine, String) -> Void)?
-        ) {
-            self.repoPath = repoPath
-            self.showFileHeaders = showFileHeaders
-            self.onOpenFile = onOpenFile
-            self.commentedLines = commentedLines
-            self.onAddComment = onAddComment
-            super.init()
+        let hasDeletedMarker = preloadedLines.contains { line in
+            line.type == .header && line.content.hasPrefix("deleted file mode")
         }
+        let hasDeletedLines = preloadedLines.contains { $0.type == .deleted }
+        let hasAdditionsOrContext = preloadedLines.contains { $0.type == .added || $0.type == .context }
+        return (hasDeletedMarker || hasDeletedLines) && !hasAdditionsOrContext
+    }
 
-        deinit {
-            if let observer = scrollObserver {
-                NotificationCenter.default.removeObserver(observer)
-            }
-            parseTask?.cancel()
-        }
-
-        func setupScrollObserver(for scrollView: NSScrollView) {
-            scrollObserver = NotificationCenter.default.addObserver(
-                forName: NSView.boundsDidChangeNotification,
-                object: scrollView.contentView,
-                queue: .main
-            ) { [weak self] _ in
-                self?.updateVisibleFile()
-            }
-            scrollView.contentView.postsBoundsChangedNotifications = true
-        }
-
-        private func updateVisibleFile() {
-            guard let tableView = tableView else { return }
-            let visibleRect = tableView.visibleRect
-
-            let firstVisibleRow = max(0, tableView.row(at: NSPoint(x: 0, y: visibleRect.minY + 1)))
-            guard firstVisibleRow >= 0, firstVisibleRow < rows.count else { return }
-
-            var file = rowToFilePath[firstVisibleRow]
-
-            if file == nil {
-                let lastVisibleRow = min(rows.count - 1, max(firstVisibleRow, tableView.row(at: NSPoint(x: 0, y: visibleRect.maxY - 1))))
-                if lastVisibleRow >= firstVisibleRow {
-                    for row in firstVisibleRow...lastVisibleRow {
-                        if let path = rowToFilePath[row] {
-                            file = path
-                            break
-                        }
-                    }
-                }
-            }
-
-            if file == nil, firstVisibleRow > 0 {
-                for row in stride(from: firstVisibleRow - 1, through: 0, by: -1) {
-                    if let path = rowToFilePath[row] {
-                        file = path
-                        break
-                    }
-                }
-            }
-
-            if let file, file != lastVisibleFile {
-                lastVisibleFile = file
-                onFileVisible?(file)
-            }
-        }
-
-        func scrollToFile(_ file: String) {
-            guard let tableView = tableView,
-                  let rowIndex = fileRowIndices[file] else { return }
-
-            tableView.scrollRowToVisible(rowIndex)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                let rowRect = tableView.rect(ofRow: rowIndex)
-                tableView.enclosingScrollView?.contentView.scroll(to: NSPoint(x: 0, y: rowRect.minY))
-            }
-        }
-
-        // Load pre-parsed DiffLine array
-        func loadLines(_ lines: [DiffLine], fontSize: Double, fontFamily: String) {
-            let newHash = lines.hashValue ^ fontSize.hashValue ^ fontFamily.hashValue
-            guard newHash != lastDataHash else { return }
-
-            lastDataHash = newHash
-            self.fontSize = fontSize
-            self.fontFamily = fontFamily
-
-            let font = NSFont(name: fontFamily, size: fontSize) ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
-            rowHeight = ceil(font.ascender - font.descender + font.leading) + 6
-
-            rows = lines.map { .line($0) }
-            tableView?.reloadData()
-        }
-
-        // Parse raw diff output - store raw lines for lazy parsing
-        func parseAndReload(diffOutput: String, fontSize: Double, fontFamily: String) {
-            let newHash = diffOutput.hashValue ^ fontSize.hashValue ^ fontFamily.hashValue
-            guard newHash != lastDataHash else { return }
-
-            lastDataHash = newHash
-            self.fontSize = fontSize
-            self.fontFamily = fontFamily
-
-            let font = NSFont(name: fontFamily, size: fontSize) ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
-            rowHeight = ceil(font.ascender - font.descender + font.leading) + 6
-
-            parseTask?.cancel()
-            let showFileHeaders = self.showFileHeaders
-
-            let task = Task.detached(priority: .utility) {
-                Self.parseDiffOutput(diffOutput: diffOutput, showFileHeaders: showFileHeaders)
-            }
-            parseTask = task
-
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                let parsed = await task.value
-                guard !Task.isCancelled, self.lastDataHash == newHash else { return }
-
-                self.rawLines = parsed.rawLines
-                self.lineParser = DiffLineParser(rawLines: parsed.rawLines)
-
-                self.parsedRows.removeAll(keepingCapacity: true)
-                self.fileRowIndices = parsed.fileRowIndices
-                self.rowToFilePath = parsed.rowToFilePath
-                self.rows = parsed.rowKinds.map { kind in
-                    switch kind {
-                    case .fileHeader(let path):
-                        return .fileHeader(path: path)
-                    case .lazyLine(let rawIndex):
-                        return .lazyLine(rawIndex: rawIndex)
-                    }
-                }
-
-                self.tableView?.reloadData()
-            }
-        }
-
-        nonisolated private static func parseDiffOutput(diffOutput: String, showFileHeaders: Bool) -> ParsedDiffMetadata {
-            var rawLines: [String] = []
-            let maxRawLines = 200_000
-            rawLines.reserveCapacity(min(max(128, diffOutput.count / 48), maxRawLines))
-            var didTruncate = false
-
-            diffOutput.enumerateLines { line, stop in
-                if rawLines.count >= maxRawLines {
-                    didTruncate = true
-                    stop = true
-                    return
-                }
-                rawLines.append(line)
-            }
-            if didTruncate {
-                rawLines.append("@@ ... diff view truncated (too many lines) ... @@")
-            }
-
-            var rowKinds: [RowKind] = []
-            rowKinds.reserveCapacity(rawLines.count)
-
-            var fileRowIndices: [String: Int] = [:]
-            var rowToFilePath: [Int: String] = [:]
-
-            var rowIndex = 0
-            var currentFilePath: String?
-
-            for (lineIndex, line) in rawLines.enumerated() {
-                if line.hasPrefix("diff --git ") {
-                    currentFilePath = parseFilePathFromDiffHeader(line)
-                    if showFileHeaders, let path = currentFilePath, !path.isEmpty {
-                        fileRowIndices[path] = rowIndex
-                        rowKinds.append(.fileHeader(path: path))
-                        rowToFilePath[rowIndex] = path
-                        rowIndex += 1
-                    }
-                    continue
-                }
-
-                if line.hasPrefix("--- ") ||
-                    line.hasPrefix("+++ ") ||
-                    line.hasPrefix("index ") ||
-                    line.hasPrefix("new file") ||
-                    line.hasPrefix("deleted file") ||
-                    line.hasPrefix("similarity index") ||
-                    line.hasPrefix("rename from") ||
-                    line.hasPrefix("rename to") {
-                    continue
-                }
-
-                guard let firstChar = line.first else { continue }
-
-                if firstChar == "@" || firstChar == "+" || firstChar == "-" || firstChar == " " {
-                    rowKinds.append(.lazyLine(rawIndex: lineIndex))
-                    if let path = currentFilePath {
-                        rowToFilePath[rowIndex] = path
-                    }
-                    rowIndex += 1
-                }
-            }
-
-            return ParsedDiffMetadata(
-                rawLines: rawLines,
-                rowKinds: rowKinds,
-                fileRowIndices: fileRowIndices,
-                rowToFilePath: rowToFilePath
-            )
-        }
-
-        nonisolated private static func parseFilePathFromDiffHeader(_ line: String) -> String? {
-            // Format: "diff --git a/<path> b/<path>"
-            let parts = line.split(separator: " ")
-            guard parts.count >= 4 else { return nil }
-            let bPart = parts[3]
-            if bPart.hasPrefix("b/") {
-                return String(bPart.dropFirst(2))
-            }
-            return String(bPart)
-        }
-
-        func getRow(at index: Int) -> DiffRow {
-            guard index < rows.count else {
-                return .line(DiffLine(lineNumber: 0, oldLineNumber: nil, newLineNumber: nil, content: "", type: .context))
-            }
-
-            switch rows[index] {
-            case .lazyLine(let rawIndex):
-                if let cached = parsedRows[index] {
-                    return cached
-                }
-                let parsed = DiffRow.line(lineParser?.parseLine(at: rawIndex) ?? DiffLine(lineNumber: rawIndex, oldLineNumber: nil, newLineNumber: nil, content: "", type: .context))
-                parsedRows[index] = parsed
-                return parsed
-            default:
-                return rows[index]
-            }
-        }
-
-        func numberOfRows(in tableView: NSTableView) -> Int {
-            rows.count
-        }
-
-        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-            guard row < rows.count else { return nil }
-
-            let resolvedRow = getRow(at: row)
-            switch resolvedRow {
-            case .fileHeader(let path):
-                return makeFileHeaderCell(path: path, tableView: tableView)
-            case .line(let diffLine):
-                return makeLineCell(diffLine: diffLine, row: row, tableView: tableView)
-            case .lazyLine:
-                return nil
-            }
-        }
-
-        func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
-            guard row < rows.count else { return nil }
-            let rowView = DiffNSRowView()
-
-            let resolvedRow = getRow(at: row)
-            switch resolvedRow {
-            case .fileHeader:
-                rowView.lineType = nil
-            case .line(let diffLine):
-                rowView.lineType = diffLine.type
-            case .lazyLine:
-                rowView.lineType = .context
-            }
-
-            return rowView
-        }
-
-        private func makeFileHeaderCell(path: String, tableView: NSTableView) -> NSView {
-            let id = NSUserInterfaceItemIdentifier("FileHeader")
-            if let cell = tableView.makeView(withIdentifier: id, owner: nil) as? FileHeaderCellView {
-                cell.configure(path: path, repoPath: repoPath, fontSize: fontSize, fontFamily: fontFamily, onOpenFile: onOpenFile)
-                return cell
-            }
-            let cell = FileHeaderCellView(identifier: id)
-            cell.configure(path: path, repoPath: repoPath, fontSize: fontSize, fontFamily: fontFamily, onOpenFile: onOpenFile)
-            return cell
-        }
-
-        private func makeLineCell(diffLine: DiffLine, row: Int, tableView: NSTableView) -> NSView {
-            let id = NSUserInterfaceItemIdentifier("DiffLine")
-            let filePath = rowToFilePath[row] ?? ""
-            let commentKey = "\(filePath):\(diffLine.lineNumber)"
-            let hasComment = commentedLines.contains(commentKey)
-
-            let cell: LineCellView
-            if let existingCell = tableView.makeView(withIdentifier: id, owner: nil) as? LineCellView {
-                cell = existingCell
+    var body: some View {
+        Group {
+            if showsDeletedFilePlaceholder {
+                deletedFilePlaceholderView
             } else {
-                cell = LineCellView(identifier: id)
+                VVDiffView(unifiedDiff: displayDiff)
+                    .theme(theme)
+                    .configuration(configuration)
+                    .renderStyle(.unifiedTable)
+                    .syntaxHighlighting(true)
+                    .onFileHeaderActivate { path in
+                        onOpenFile?(path)
+                    }
             }
+        }
+        .onAppear {
+            if let target = scrollToFile {
+                onFileVisible?(target)
+            } else if let first = filePaths.first {
+                onFileVisible?(first)
+            }
+        }
+        .onChange(of: scrollToFile) { _, newValue in
+            if let newValue {
+                onFileVisible?(newValue)
+            }
+        }
+    }
 
-            cell.configure(
-                diffLine: diffLine,
-                fontSize: fontSize,
-                fontFamily: fontFamily,
-                hasComment: hasComment,
-                onCommentTap: { [weak self] in
-                    self?.onAddComment?(diffLine, filePath)
+    private var deletedFilePlaceholderView: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "trash")
+                .foregroundStyle(.secondary)
+            Text("File removed. Diff content omitted.")
+                .font(.system(size: max(fontSize - 1, 10)))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    private static func filePaths(in diff: String) -> [String] {
+        diff
+            .components(separatedBy: .newlines)
+            .compactMap { line in
+                guard line.hasPrefix("diff --git ") else { return nil }
+                let parts = line.split(separator: " ")
+                guard parts.count >= 4 else { return nil }
+                let bPath = String(parts[3])
+                if bPath.hasPrefix("b/") {
+                    return String(bPath.dropFirst(2))
                 }
-            )
-            return cell
+                return bPath
+            }
+    }
+
+    private static func unifiedDiff(from lines: [DiffLine]) -> String {
+        let detectedPath = detectPath(from: lines) ?? "file"
+        var output: [String] = []
+
+        output.append("diff --git a/\(detectedPath) b/\(detectedPath)")
+        output.append("--- a/\(detectedPath)")
+        output.append("+++ b/\(detectedPath)")
+
+        var hasHunkHeader = false
+
+        for line in lines {
+            switch line.type {
+            case .header:
+                if line.content.hasPrefix("@@") {
+                    output.append(line.content)
+                    hasHunkHeader = true
+                } else if line.content.hasPrefix("index ") ||
+                            line.content.hasPrefix("new file") ||
+                            line.content.hasPrefix("deleted file") ||
+                            line.content.hasPrefix("Binary files") {
+                    output.append(line.content)
+                }
+            case .added:
+                if !hasHunkHeader {
+                    output.append("@@ -1,1 +1,1 @@")
+                    hasHunkHeader = true
+                }
+                output.append("+\(line.content)")
+            case .deleted:
+                if !hasHunkHeader {
+                    output.append("@@ -1,1 +1,1 @@")
+                    hasHunkHeader = true
+                }
+                output.append("-\(line.content)")
+            case .context:
+                if !hasHunkHeader {
+                    output.append("@@ -1,1 +1,1 @@")
+                    hasHunkHeader = true
+                }
+                output.append(" \(line.content)")
+            }
         }
 
-        func getSelectedContent() -> String {
-            guard let tableView = tableView else { return "" }
-            var lines: [String] = []
-            for rowIndex in tableView.selectedRowIndexes {
-                let row = getRow(at: rowIndex)
-                switch row {
-                case .fileHeader(let path):
-                    lines.append("--- \(path) ---")
-                case .line(let diffLine):
-                    let marker = diffLine.type.marker
-                    lines.append("\(marker)\(diffLine.content)")
-                case .lazyLine:
-                    break
+        if !hasHunkHeader {
+            output.append("@@ -1,1 +1,1 @@")
+        }
+
+        return output.joined(separator: "\n")
+    }
+
+    private static func collapsedDeletedFileSections(in diff: String) -> String {
+        guard diff.contains("deleted file mode") else {
+            return diff
+        }
+
+        let lines = diff.components(separatedBy: .newlines)
+        var preamble: [String] = []
+        var chunks: [[String]] = []
+        var currentChunk: [String] = []
+        var hasDiffHeader = false
+
+        for line in lines {
+            if line.hasPrefix("diff --git ") {
+                if hasDiffHeader {
+                    chunks.append(currentChunk)
+                    currentChunk = [line]
+                } else {
+                    hasDiffHeader = true
+                    preamble = currentChunk
+                    currentChunk = [line]
+                }
+                continue
+            }
+            currentChunk.append(line)
+        }
+
+        guard hasDiffHeader else {
+            return diff
+        }
+
+        chunks.append(currentChunk)
+
+        var output: [String] = preamble
+        for chunk in chunks {
+            if isDeletedFileChunk(chunk) {
+                output.append(contentsOf: summarizedDeletedChunk(chunk))
+            } else {
+                output.append(contentsOf: chunk)
+            }
+        }
+        return output.joined(separator: "\n")
+    }
+
+    private static func isDeletedFileChunk(_ chunk: [String]) -> Bool {
+        chunk.contains(where: { $0.hasPrefix("deleted file mode ") }) ||
+        chunk.contains(where: { $0.hasPrefix("+++ /dev/null") })
+    }
+
+    private static func summarizedDeletedChunk(_ chunk: [String]) -> [String] {
+        var output: [String] = []
+
+        if let header = chunk.first(where: { $0.hasPrefix("diff --git ") }) {
+            output.append(header)
+        }
+        if let index = chunk.first(where: { $0.hasPrefix("index ") }) {
+            output.append(index)
+        }
+        if let deletedMode = chunk.first(where: { $0.hasPrefix("deleted file mode ") }) {
+            output.append(deletedMode)
+        }
+        if let oldFile = chunk.first(where: { $0.hasPrefix("--- ") }) {
+            output.append(oldFile)
+        }
+        if let newFile = chunk.first(where: { $0.hasPrefix("+++ ") }) {
+            output.append(newFile)
+        } else {
+            output.append("+++ /dev/null")
+        }
+        return output
+    }
+
+    private static func normalizeDiffPaths(in diff: String, repoPath: String) -> String {
+        guard !repoPath.isEmpty else {
+            return diff
+        }
+
+        let standardizedRepoPath = URL(fileURLWithPath: repoPath).standardizedFileURL.path
+        guard !standardizedRepoPath.isEmpty else {
+            return diff
+        }
+
+        let normalizedLines = diff.components(separatedBy: .newlines).map { line in
+            if line.hasPrefix("diff --git ") {
+                return normalizeDiffGitHeader(line, repoPath: standardizedRepoPath)
+            }
+            if line.hasPrefix("--- ") {
+                let value = String(line.dropFirst(4))
+                let normalized = normalizePathToken(value, repoPath: standardizedRepoPath)
+                return "--- \(normalized)"
+            }
+            if line.hasPrefix("+++ ") {
+                let value = String(line.dropFirst(4))
+                let normalized = normalizePathToken(value, repoPath: standardizedRepoPath)
+                return "+++ \(normalized)"
+            }
+            return line
+        }
+
+        return normalizedLines.joined(separator: "\n")
+    }
+
+    private static func normalizeDiffGitHeader(_ line: String, repoPath: String) -> String {
+        let parts = line.split(separator: " ", omittingEmptySubsequences: false)
+        guard parts.count >= 4 else {
+            return line
+        }
+
+        let leftPath = normalizePathToken(String(parts[2]), repoPath: repoPath)
+        let rightPath = normalizePathToken(String(parts[3]), repoPath: repoPath)
+        return "diff --git \(leftPath) \(rightPath)"
+    }
+
+    private static func normalizePathToken(_ token: String, repoPath: String) -> String {
+        let trimmed = token.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty || trimmed == "/dev/null" {
+            return trimmed
+        }
+
+        let prefix: String
+        let rawPath: String
+        if trimmed.hasPrefix("a/") || trimmed.hasPrefix("b/") {
+            prefix = String(trimmed.prefix(2))
+            rawPath = String(trimmed.dropFirst(2))
+        } else {
+            prefix = ""
+            rawPath = trimmed
+        }
+
+        let standardizedPath: String
+        if rawPath.hasPrefix("/") {
+            standardizedPath = URL(fileURLWithPath: rawPath).standardizedFileURL.path
+        } else {
+            standardizedPath = rawPath
+        }
+        let relativePath: String
+        if standardizedPath == repoPath {
+            relativePath = "."
+        } else if standardizedPath.hasPrefix(repoPath + "/") {
+            relativePath = String(standardizedPath.dropFirst(repoPath.count + 1))
+        } else {
+            relativePath = rawPath
+        }
+
+        if prefix.isEmpty {
+            return relativePath
+        }
+        return "\(prefix)\(relativePath)"
+    }
+
+    private static func detectPath(from lines: [DiffLine]) -> String? {
+        for line in lines where line.type == .header {
+            if line.content.hasPrefix("new file: ") {
+                let value = line.content.replacingOccurrences(of: "new file: ", with: "")
+                if !value.isEmpty {
+                    return value
                 }
             }
-            return lines.joined(separator: "\n")
+            if line.content.contains("/") {
+                return line.content
+            }
         }
-
-        func selectedCopyText() -> String {
-            getSelectedContent()
-        }
+        return nil
     }
 }

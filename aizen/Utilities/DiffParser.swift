@@ -16,8 +16,30 @@ nonisolated enum DiffParser {
         var lineCounter = 0
         var oldLineNum = 0
         var newLineNum = 0
+        var isDeletedFile = false
+        var deletedPlaceholderInserted = false
 
         diffOutput.enumerateLines { line, _ in
+            if line.hasPrefix("diff --git ") {
+                isDeletedFile = false
+                deletedPlaceholderInserted = false
+                return
+            }
+
+            if line.hasPrefix("deleted file mode ") {
+                isDeletedFile = true
+                deletedPlaceholderInserted = false
+                parsed.append(DiffLine(
+                    lineNumber: lineCounter,
+                    oldLineNumber: nil,
+                    newLineNumber: nil,
+                    content: line,
+                    type: .header
+                ))
+                lineCounter += 1
+                return
+            }
+
             if line.hasPrefix("@@") {
                 // Hunk header
                 for component in line.split(separator: " ") {
@@ -44,6 +66,19 @@ nonisolated enum DiffParser {
                     type: .header
                 ))
                 lineCounter += 1
+
+                if isDeletedFile && !deletedPlaceholderInserted {
+                    oldLineNum += 1
+                    parsed.append(DiffLine(
+                        lineNumber: lineCounter,
+                        oldLineNumber: String(oldLineNum),
+                        newLineNumber: nil,
+                        content: "[deleted file content omitted]",
+                        type: .deleted
+                    ))
+                    lineCounter += 1
+                    deletedPlaceholderInserted = true
+                }
                 return
             }
 
@@ -51,6 +86,28 @@ nonisolated enum DiffParser {
                 line.hasPrefix("diff ") || line.hasPrefix("index ") {
                 // Skip file headers
                 return
+            }
+
+            if isDeletedFile {
+                if line.hasPrefix("-") {
+                    if !deletedPlaceholderInserted {
+                        oldLineNum += 1
+                        parsed.append(DiffLine(
+                            lineNumber: lineCounter,
+                            oldLineNumber: String(oldLineNum),
+                            newLineNumber: nil,
+                            content: "[deleted file content omitted]",
+                            type: .deleted
+                        ))
+                        lineCounter += 1
+                        deletedPlaceholderInserted = true
+                    }
+                    return
+                }
+
+                if line.hasPrefix("+") || line.hasPrefix(" ") {
+                    return
+                }
             }
 
             if line.hasPrefix("+") {
