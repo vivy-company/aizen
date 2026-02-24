@@ -903,7 +903,9 @@ struct ChatMessageList: View {
     }
 
     private func normalizedMessageMarkdown(_ content: String, role: MessageRole) -> String {
-        let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
+        let normalized = content
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\u{00A0}", with: " ")
         let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
 
@@ -949,7 +951,6 @@ struct ChatMessageList: View {
 
         // Some agents emit left indentation before prose/headings; strip it (outside fences) to avoid right-shifted blocks.
         inFence = false
-        let maxProseIndent = 8
         lines = lines.map { line in
             let marker = line.trimmingCharacters(in: .whitespaces)
             if marker.hasPrefix("```") || marker.hasPrefix("~~~") {
@@ -960,7 +961,7 @@ struct ChatMessageList: View {
                 return line
             }
             let indent = line.prefix { $0 == " " || $0 == "\t" }.count
-            guard indent > 0 && indent <= maxProseIndent else {
+            guard indent > 0 else {
                 return line
             }
             guard let first = marker.first else {
