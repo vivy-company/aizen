@@ -563,7 +563,7 @@ struct ChatMessageList: View {
                 return []
             }
 
-            let messageRevisionSeed = "\(message.id)|\(message.isComplete)|\(message.content)|\(message.contentBlocks.count)"
+            let messageRevisionSeed = "\(message.id)|\(message.isComplete)|\(message.content)|\(message.contentBlocks.count)|normalized:\(content)"
 
             if message.role == .system {
                 let compact = content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -947,8 +947,9 @@ struct ChatMessageList: View {
             }
         }
 
-        // Some agents emit light (1-2 space) indentation before headings/paragraphs; strip it for cleaner layout.
+        // Some agents emit left indentation before prose/headings; strip it (outside fences) to avoid right-shifted blocks.
         inFence = false
+        let maxProseIndent = 8
         lines = lines.map { line in
             let marker = line.trimmingCharacters(in: .whitespaces)
             if marker.hasPrefix("```") || marker.hasPrefix("~~~") {
@@ -959,13 +960,18 @@ struct ChatMessageList: View {
                 return line
             }
             let indent = line.prefix { $0 == " " || $0 == "\t" }.count
-            guard indent > 0 && indent <= 2 else {
+            guard indent > 0 && indent <= maxProseIndent else {
                 return line
             }
             guard let first = marker.first else {
                 return line
             }
-            let shouldUnindent = first == "#" || first.isLetter || first.isNumber
+            let shouldUnindent = first == "#"
+                || first == "`"
+                || first == "\""
+                || first == "'"
+                || first.isLetter
+                || first.isNumber
             guard shouldUnindent else {
                 return line
             }
