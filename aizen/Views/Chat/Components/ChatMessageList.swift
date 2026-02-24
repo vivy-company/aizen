@@ -124,7 +124,7 @@ struct ChatMessageList: View {
             timelineInsets: .init(top: 10, left: horizontalInset, bottom: 10, right: horizontalInset + 4),
             messageSpacing: 6,
             userInsets: .init(top: 7, left: horizontalInset, bottom: 7, right: max(horizontalInset, 10)),
-            assistantInsets: .init(top: 3, left: 4, bottom: 4, right: 10),
+            assistantInsets: .init(top: 3, left: 0, bottom: 4, right: 10),
             systemInsets: .init(top: 15, left: 0, bottom: 15, right: 0),
             backgroundColor: .clear
         )
@@ -869,10 +869,12 @@ struct ChatMessageList: View {
     }
 
     private func messageMarkdown(_ message: MessageItem) -> String {
-        let normalizedContent = message.content.replacingOccurrences(of: "\r\n", with: "\n")
-        let trimmed = normalizedContent.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            return trimmed
+        let normalizedContent = normalizedMessageMarkdown(
+            message.content,
+            role: message.role
+        )
+        if !normalizedContent.isEmpty {
+            return normalizedContent
         }
 
         var lines: [String] = []
@@ -897,7 +899,50 @@ struct ChatMessageList: View {
             }
         }
 
-        return lines.joined(separator: "\n\n")
+        return normalizedMessageMarkdown(lines.joined(separator: "\n\n"), role: message.role)
+    }
+
+    private func normalizedMessageMarkdown(_ content: String, role: MessageRole) -> String {
+        let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
+        let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        guard role == .agent else {
+            return trimmed
+        }
+
+        let lines = trimmed.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var commonIndent: Int?
+
+        for line in lines {
+            if line.trimmingCharacters(in: .whitespaces).isEmpty {
+                continue
+            }
+            let indent = line.prefix { $0 == " " || $0 == "\t" }.count
+            commonIndent = min(commonIndent ?? indent, indent)
+            if commonIndent == 0 {
+                break
+            }
+        }
+
+        guard let commonIndent, commonIndent > 0 else {
+            return trimmed
+        }
+
+        let dedented = lines.map { line -> String in
+            guard !line.isEmpty else { return line }
+            var remaining = commonIndent
+            var index = line.startIndex
+            while remaining > 0, index < line.endIndex {
+                let char = line[index]
+                guard char == " " || char == "\t" else { break }
+                index = line.index(after: index)
+                remaining -= 1
+            }
+            return String(line[index...])
+        }
+
+        return dedented.joined(separator: "\n")
     }
 
     private func toolCallMarkdown(_ toolCall: ToolCall) -> String {
