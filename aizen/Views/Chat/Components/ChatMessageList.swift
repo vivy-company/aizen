@@ -911,11 +911,18 @@ struct ChatMessageList: View {
             return trimmed
         }
 
-        let lines = trimmed.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        var commonIndent: Int?
+        var lines = trimmed.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
 
+        // Remove accidental uniform left indentation from prose while preserving fenced code blocks.
+        var inFence = false
+        var commonIndent: Int?
         for line in lines {
-            if line.trimmingCharacters(in: .whitespaces).isEmpty {
+            let marker = line.trimmingCharacters(in: .whitespaces)
+            if marker.hasPrefix("```") || marker.hasPrefix("~~~") {
+                inFence.toggle()
+                continue
+            }
+            if inFence || marker.isEmpty {
                 continue
             }
             let indent = line.prefix { $0 == " " || $0 == "\t" }.count
@@ -925,24 +932,60 @@ struct ChatMessageList: View {
             }
         }
 
-        guard let commonIndent, commonIndent > 0 else {
-            return trimmed
-        }
-
-        let dedented = lines.map { line -> String in
-            guard !line.isEmpty else { return line }
-            var remaining = commonIndent
-            var index = line.startIndex
-            while remaining > 0, index < line.endIndex {
-                let char = line[index]
-                guard char == " " || char == "\t" else { break }
-                index = line.index(after: index)
-                remaining -= 1
+        if let commonIndent, commonIndent > 0 {
+            inFence = false
+            lines = lines.map { line in
+                let marker = line.trimmingCharacters(in: .whitespaces)
+                if marker.hasPrefix("```") || marker.hasPrefix("~~~") {
+                    inFence.toggle()
+                    return line
+                }
+                if inFence || line.isEmpty {
+                    return line
+                }
+                return dropLeadingIndent(line, maxCount: commonIndent)
             }
-            return String(line[index...])
         }
 
-        return dedented.joined(separator: "\n")
+        // Some agents emit light (1-2 space) indentation before headings/paragraphs; strip it for cleaner layout.
+        inFence = false
+        lines = lines.map { line in
+            let marker = line.trimmingCharacters(in: .whitespaces)
+            if marker.hasPrefix("```") || marker.hasPrefix("~~~") {
+                inFence.toggle()
+                return line
+            }
+            if inFence || marker.isEmpty {
+                return line
+            }
+            let indent = line.prefix { $0 == " " || $0 == "\t" }.count
+            guard indent > 0 && indent <= 2 else {
+                return line
+            }
+            guard let first = marker.first else {
+                return line
+            }
+            let shouldUnindent = first == "#" || first.isLetter || first.isNumber
+            guard shouldUnindent else {
+                return line
+            }
+            return dropLeadingIndent(line, maxCount: indent)
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func dropLeadingIndent(_ line: String, maxCount: Int) -> String {
+        guard maxCount > 0, !line.isEmpty else { return line }
+        var remaining = maxCount
+        var index = line.startIndex
+        while remaining > 0, index < line.endIndex {
+            let char = line[index]
+            guard char == " " || char == "\t" else { break }
+            index = line.index(after: index)
+            remaining -= 1
+        }
+        return String(line[index...])
     }
 
     private func toolCallMarkdown(_ toolCall: ToolCall) -> String {
