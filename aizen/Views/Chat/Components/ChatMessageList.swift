@@ -75,8 +75,8 @@ struct ChatMessageList: View {
         let headerPointSize = max(basePointSize + 2, 16)
         let timestampPointSize = max(basePointSize - 0.25, 12.5)
         var theme = colorScheme == .dark ? MarkdownTheme.dark : MarkdownTheme.light
-        theme.paragraphSpacing = 4
-        theme.headingSpacing = 10
+        theme.paragraphSpacing = 3
+        theme.headingSpacing = 6
         theme.contentPadding = 0
         var draftTheme = theme
         draftTheme.textColor = theme.textColor.withOpacity(theme.textColor.w * 0.72)
@@ -121,10 +121,10 @@ struct ChatMessageList: View {
             bubbleMetadataMinWidth: 1,
             headerSpacing: 4,
             footerSpacing: 0,
-            timelineInsets: .init(top: 10, left: horizontalInset, bottom: 10, right: horizontalInset),
+            timelineInsets: .init(top: 10, left: horizontalInset, bottom: 10, right: horizontalInset + 4),
             messageSpacing: 6,
             userInsets: .init(top: 7, left: horizontalInset, bottom: 7, right: max(horizontalInset, 10)),
-            assistantInsets: .init(top: 3, left: 4, bottom: 4, right: 0),
+            assistantInsets: .init(top: 3, left: 4, bottom: 4, right: 10),
             systemInsets: .init(top: 15, left: 0, bottom: 15, right: 0),
             backgroundColor: .clear
         )
@@ -869,9 +869,10 @@ struct ChatMessageList: View {
     }
 
     private func messageMarkdown(_ message: MessageItem) -> String {
-        let trimmed = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedContent = message.content.replacingOccurrences(of: "\r\n", with: "\n")
+        let trimmed = normalizedContent.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
-            return message.content
+            return trimmed
         }
 
         var lines: [String] = []
