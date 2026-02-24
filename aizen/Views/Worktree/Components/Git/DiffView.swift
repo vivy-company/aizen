@@ -206,8 +206,9 @@ struct DiffView: View {
         for line in lines {
             switch line.type {
             case .header:
-                if line.content.hasPrefix("@@") {
-                    output.append(line.content)
+                let trimmedHeader = line.content.trimmingCharacters(in: .whitespaces)
+                if trimmedHeader.hasPrefix("@@") {
+                    output.append(trimmedHeader)
                     hasHunkHeader = true
                 } else if line.content.hasPrefix("index ") ||
                             line.content.hasPrefix("new file") ||
@@ -228,6 +229,12 @@ struct DiffView: View {
                 }
                 output.append("-\(line.content)")
             case .context:
+                let trimmedContext = line.content.trimmingCharacters(in: .whitespaces)
+                if trimmedContext.hasPrefix("@@") {
+                    output.append(trimmedContext)
+                    hasHunkHeader = true
+                    continue
+                }
                 if !hasHunkHeader {
                     output.append("@@ -1,1 +1,1 @@")
                     hasHunkHeader = true

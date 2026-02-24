@@ -90,12 +90,12 @@ struct ChatMessageList: View {
             timestampFont: timelineFont(size: timestampPointSize, weight: .medium),
             headerTextColor: colorScheme == .dark ? .rgba(0.98, 0.98, 1.0, 1.0) : .rgba(0.14, 0.16, 0.20, 1.0),
             timestampTextColor: colorScheme == .dark ? .rgba(0.66, 0.69, 0.75, 1.0) : .rgba(0.45, 0.48, 0.54, 1.0),
-            userBubbleColor: colorScheme == .dark ? .rgba(0.18, 0.20, 0.24, 0.62) : .rgba(0.92, 0.94, 0.97, 0.78),
-            userBubbleBorderColor: colorScheme == .dark ? .rgba(0.62, 0.66, 0.74, 0.22) : .rgba(0.62, 0.66, 0.74, 0.18),
+            userBubbleColor: colorScheme == .dark ? .rgba(0.20, 0.22, 0.25, 0.42) : .rgba(0.91, 0.93, 0.96, 0.62),
+            userBubbleBorderColor: colorScheme == .dark ? .rgba(0.64, 0.69, 0.76, 0.18) : .rgba(0.62, 0.66, 0.74, 0.16),
             userBubbleBorderWidth: 0.6,
             userBubbleCornerRadius: 16,
-            userBubbleInsets: .init(top: 9, left: 14, bottom: 9, right: 14),
-            userBubbleMaxWidth: 420,
+            userBubbleInsets: .init(top: 8, left: 14, bottom: 8, right: 14),
+            userBubbleMaxWidth: 560,
             assistantBubbleEnabled: false,
             assistantBubbleMaxWidth: 700,
             assistantBubbleAlignment: .leading,
@@ -118,14 +118,14 @@ struct ChatMessageList: View {
             assistantTimestampEnabled: false,
             systemTimestampEnabled: false,
             userTimestampSuffix: "",
-            bubbleMetadataMinWidth: 0,
+            bubbleMetadataMinWidth: 1,
             headerSpacing: 4,
             footerSpacing: 0,
             timelineInsets: .init(top: 10, left: horizontalInset, bottom: 10, right: horizontalInset),
-            messageSpacing: 4,
+            messageSpacing: 6,
             userInsets: .init(top: 7, left: horizontalInset, bottom: 7, right: max(horizontalInset, 10)),
-            assistantInsets: .init(top: 2, left: 4, bottom: 2, right: 0),
-            systemInsets: .init(top: 9, left: 0, bottom: 9, right: 0),
+            assistantInsets: .init(top: 3, left: 4, bottom: 4, right: 0),
+            systemInsets: .init(top: 15, left: 0, bottom: 15, right: 0),
             backgroundColor: .clear
         )
     }
@@ -324,6 +324,16 @@ struct ChatMessageList: View {
                 expandedToolGroupIDs.insert(entryID)
             }
             scheduleSyncTimeline(scrollToBottom: false, debounce: false)
+            return
+        }
+
+        if let call = toolCallForEntryID(entryID),
+           let diff = toolDiffContents(for: call).first {
+            presentedToolDiff = PresentedToolDiff(
+                id: "diff-\(call.id)",
+                title: call.title,
+                unifiedDiff: unifiedDiffDocument(for: diff)
+            )
         }
     }
 
@@ -363,7 +373,7 @@ struct ChatMessageList: View {
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
                     leadingIconSpacing: showsAgentLaneIcon ? agentLaneIconSpacing : nil,
                     showsTimestamp: false,
-                    contentFontScale: 0.92,
+                    contentFontScale: 0.86,
                     textOpacityMultiplier: dimmedMetaOpacity
                 )
             case "toolCallDetail":
@@ -375,8 +385,8 @@ struct ChatMessageList: View {
                     headerIconURL: nil,
                     leadingLaneWidth: agentLaneWidth,
                     showsTimestamp: false,
-                    contentFontScale: 0.9,
-                    textOpacityMultiplier: dimmedMetaOpacity * 0.9
+                    contentFontScale: 0.84,
+                    textOpacityMultiplier: dimmedMetaOpacity * 0.88
                 )
             case "toolCallGroup":
                 role = .assistant
@@ -390,7 +400,7 @@ struct ChatMessageList: View {
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
                     leadingIconSpacing: showsAgentLaneIcon ? agentLaneIconSpacing : nil,
                     showsTimestamp: false,
-                    contentFontScale: 0.9,
+                    contentFontScale: 0.84,
                     textOpacityMultiplier: dimmedMetaOpacity,
                     prefixGlyphColor: toolGroupStatusColor(statusRawValue: decoded?.status),
                     prefixGlyphCount: 1
@@ -405,7 +415,7 @@ struct ChatMessageList: View {
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
                     leadingIconSpacing: showsAgentLaneIcon ? agentLaneIconSpacing : nil,
                     showsTimestamp: false,
-                    contentFontScale: 0.9,
+                    contentFontScale: 0.84,
                     textOpacityMultiplier: dimmedMetaOpacity,
                     prefixGlyphColor: toolGroupStatusColor(statusRawValue: "completed"),
                     prefixGlyphCount: 1
@@ -567,8 +577,8 @@ struct ChatMessageList: View {
                     presentation: VVChatMessagePresentation(
                         showsHeader: false,
                         showsTimestamp: false,
-                        contentFontScale: 0.84,
-                        textOpacityMultiplier: colorScheme == .dark ? 0.56 : 0.62
+                        contentFontScale: 0.78,
+                        textOpacityMultiplier: colorScheme == .dark ? 0.5 : 0.58
                     )
                 ))]
             }
@@ -627,6 +637,9 @@ struct ChatMessageList: View {
             return built
 
         case .toolCallGroup(let group):
+            if group.toolCalls.count == 1, let only = group.toolCalls.first {
+                return makeEntries(from: .toolCall(only), startsAssistantLane: startsAssistantLane)
+            }
             let isExpanded = expandedToolGroupIDs.contains(item.stableId)
             let markdown = toolCallGroupMarkdown(group, isExpanded: isExpanded)
             let payload = TimelineCustomPayload(
@@ -738,7 +751,10 @@ struct ChatMessageList: View {
                 leadingIconURL: startsAssistantLane ? agentLaneIconURL : nil,
                 leadingIconSize: startsAssistantLane ? agentLaneIconSize : nil,
                 leadingIconSpacing: startsAssistantLane ? agentLaneIconSpacing : nil,
-                showsTimestamp: false
+                showsTimestamp: false,
+                timestampSuffixIconURL: copySuffixIconURL(for: message.id),
+                timestampIconSize: max(13, CGFloat(chatFontSize) - 1),
+                timestampIconSpacing: 0
             )
         case .system:
             return nil
@@ -751,7 +767,8 @@ struct ChatMessageList: View {
             let hoverToken = hoveredCopyUserMessageID == message.id ? "hover" : "rest"
             return "user-copy-\(copyFooterStateToken(for: message.id))-\(hoverToken)-v2"
         case .agent:
-            return "assistant-lane-\(startsAssistantLane ? "start" : "cont")-v2"
+            let hoverToken = hoveredCopyUserMessageID == message.id ? "hover" : "rest"
+            return "assistant-lane-\(startsAssistantLane ? "start" : "cont")-copy-\(copyFooterStateToken(for: message.id))-\(hoverToken)-v3"
         case .system:
             return "system"
         }
@@ -892,7 +909,6 @@ struct ChatMessageList: View {
             if diffs.count > 1 {
                 parts.append("+\(diffs.count - 1) more file diff\(diffs.count == 2 ? "" : "s")")
             }
-            parts.append("open diff from copy icon")
             return parts.joined(separator: " • ")
         }
 
@@ -917,7 +933,8 @@ struct ChatMessageList: View {
         var sections: [String] = ["• \(toolCallMarkdown(toolCall))"]
         let diffs = toolDiffContents(for: toolCall)
         if let primary = diffs.first {
-            sections.append("```diff\n\(unifiedDiffPreview(for: primary))\n```")
+            sections.append("Diff preview ready • click row to open")
+            sections.append(compactDisplayPath(primary.path))
             if diffs.count > 1 {
                 sections.append("… +\(diffs.count - 1) more file diff\(diffs.count == 2 ? "" : "s")")
             }
@@ -929,7 +946,7 @@ struct ChatMessageList: View {
     }
 
     private func shouldShowStandaloneToolCallDetail(_ toolCall: ToolCall) -> Bool {
-        !toolDiffContents(for: toolCall).isEmpty
+        false
     }
 
     private func toolCallGroupMarkdown(_ group: ToolCallGroup, isExpanded: Bool) -> String {
