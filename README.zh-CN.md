@@ -126,7 +126,7 @@ open aizen.xcodeproj
 ## 依赖项
 
 - [libghostty](https://github.com/ghostty-org/ghostty) — 终端模拟器
-- [CodeEdit](https://github.com/CodeEditApp/CodeEdit) 包 — 语法高亮（Tree-sitter）
+- [VVDevKit](https://github.com/vivy-company/VVDevKit) — 编辑器/Markdown/时间线/Diff 与 Tree-sitter 高亮
 - [Sparkle](https://github.com/sparkle-project/Sparkle) — 自动更新
 
 ## 架构

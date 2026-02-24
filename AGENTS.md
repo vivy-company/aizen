@@ -159,7 +159,7 @@ aizen/
 - libgit2: Native git operations.
 - swift-markdown: Markdown parsing (Apple official).
 - HighlightSwift: Syntax highlighting (highlight.js wrapper).
-- CodeEdit packages: Tree-sitter syntax highlighting.
+- VVDevKit highlighting: Tree-sitter syntax highlighting.
 - Sparkle: Auto-update framework.
 
 ### Build Notes

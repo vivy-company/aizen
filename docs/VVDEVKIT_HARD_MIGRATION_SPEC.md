@@ -10,7 +10,7 @@ Owners: Aizen core
 We will do a hard cutover to VVDevKit with no backward-compatibility layer and no runtime feature flags.
 
 This means:
-- Legacy CodeEdit/old markdown/old timeline/old diff code will be removed.
+- Legacy editor/old markdown/old timeline/old diff code will be removed.
 - Aizen will depend directly on VVDevKit surfaces.
 - Any gaps needed for Aizen behavior will be patched in VVDevKit first, in a generic way.
 
@@ -22,7 +22,7 @@ In scope:
 - Markdown migration to `VVMarkdownView`.
 - Chat timeline migration to `VVChatTimeline` with generic custom entries.
 - Diff migration to `VVDiffView` and `VVMultiBufferDiffView`.
-- Removal of legacy implementations and CodeEdit dependencies.
+- Removal of legacy implementations and legacy editor-package dependencies.
 
 Out of scope:
 - Incremental compatibility switches.
@@ -106,13 +106,11 @@ In `aizen.xcodeproj/project.pbxproj`:
 - Add VVDevKit package.
 - Link at minimum: `VVCode`, `VVMarkdown`, `VVChatTimeline`, `VVGit` (or umbrella `VVDevKit` if enough).
 - Remove:
-  - `Packages/CodeEditSourceEditor`
-  - `Packages/CodeEditTextView`
-  - `CodeEditLanguages`
-  - orphaned CodeEditSymbols product dependencies if no longer required
+  - `Packages/*` legacy local editor forks
+  - orphaned legacy symbol product dependencies if no longer required
 
 Status: In progress
-- Active code usage scan is clean for CodeEdit and removed highlighting/diff coordinator symbols.
+- Active code usage scan is clean for legacy editor-package dependencies and removed highlighting/diff coordinator symbols.
 
 ## 4.2 Code Editor + Highlighting
 
@@ -188,10 +186,10 @@ Status: In progress
 
 ## 4.6 Legacy Deletion Pass
 
-Delete all remaining `CodeEditSourceEditor` and `CodeEditLanguages` imports and code paths.
+Delete all remaining legacy editor-package imports and code paths.
 
 Target removal check:
-- `rg "CodeEditSourceEditor|CodeEditLanguages|SourceEditor|EditorTheme|CodeLanguage" aizen`
+- `rg "SourceEditor|EditorTheme|CodeLanguage" aizen`
 returns no legacy runtime dependencies (except temporary migration comments, then remove those too).
 
 Status: In progress
@@ -206,7 +204,7 @@ Status: In progress
 
 ## 6. Acceptance Criteria
 
-- Project builds with no CodeEdit package dependencies.
+- Project builds with no legacy local editor-package dependencies.
 - Chat markdown local-file links open editor paths through VVMarkdown link handler.
 - Timeline supports message + custom rows without Aizen-specific code in VVDevKit.
 - Worktree and inline diffs render through VVDevKit surfaces.
@@ -214,7 +212,7 @@ Status: In progress
 
 ## 7. Verification Checklist
 
-- `rg "CodeEditSourceEditor|CodeEditLanguages" aizen aizen.xcodeproj/project.pbxproj` has no active dependency usage.
+- `rg "SourceEditor|CodeLanguage" aizen aizen.xcodeproj/project.pbxproj` has no active dependency usage.
 - `xcodebuild -project aizen.xcodeproj -scheme aizen -configuration Debug build` succeeds.
 - `xcodebuild -project aizen.xcodeproj -scheme "aizen nightly" -configuration Debug build` succeeds.
 - Chat:

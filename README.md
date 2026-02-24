@@ -126,7 +126,7 @@ Settings > General:
 ## Dependencies
 
 - [libghostty](https://github.com/ghostty-org/ghostty) — Terminal emulator
-- [CodeEdit](https://github.com/CodeEditApp/CodeEdit) packages — Syntax highlighting (Tree-sitter)
+- [VVDevKit](https://github.com/vivy-company/VVDevKit) — Editor/markdown/timeline/diff + Tree-sitter highlighting
 - [Sparkle](https://github.com/sparkle-project/Sparkle) — Auto-updates
 
 ## Architecture
