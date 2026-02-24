@@ -1239,7 +1239,7 @@
 			repositoryURL = "https://github.com/vivy-company/VVDevKit";
 			requirement = {
 				kind = revision;
-				revision = 80d52a644d94c59443ca3777ac75a75ffee1f8ea;
+				revision = 411bc3831afaa08b5191ca61a71104688c75128f;
 			};
 		};
 		CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
