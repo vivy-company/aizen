@@ -368,7 +368,7 @@ struct ChatMessageList: View {
                     showsHeader: false,
                     headerTitle: nil,
                     headerIconURL: nil,
-                    leadingLaneWidth: showsAgentLaneIcon ? agentLaneWidth : 0,
+                    leadingLaneWidth: agentLaneWidth,
                     leadingIconURL: showsAgentLaneIcon ? agentLaneIconURL : nil,
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
                     leadingIconSpacing: showsAgentLaneIcon ? agentLaneIconSpacing : nil,
@@ -383,7 +383,7 @@ struct ChatMessageList: View {
                     showsHeader: false,
                     headerTitle: nil,
                     headerIconURL: nil,
-                    leadingLaneWidth: 0,
+                    leadingLaneWidth: agentLaneWidth,
                     showsTimestamp: false,
                     contentFontScale: 0.84,
                     textOpacityMultiplier: dimmedMetaOpacity * 0.88
@@ -395,7 +395,7 @@ struct ChatMessageList: View {
                     showsHeader: false,
                     headerTitle: nil,
                     headerIconURL: nil,
-                    leadingLaneWidth: showsAgentLaneIcon ? agentLaneWidth : 0,
+                    leadingLaneWidth: agentLaneWidth,
                     leadingIconURL: showsAgentLaneIcon ? agentLaneIconURL : nil,
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
                     leadingIconSpacing: showsAgentLaneIcon ? agentLaneIconSpacing : nil,
@@ -410,7 +410,7 @@ struct ChatMessageList: View {
                 presentation = VVChatMessagePresentation(
                     bubbleStyle: nil,
                     showsHeader: false,
-                    leadingLaneWidth: showsAgentLaneIcon ? agentLaneWidth : 0,
+                    leadingLaneWidth: agentLaneWidth,
                     leadingIconURL: showsAgentLaneIcon ? agentLaneIconURL : nil,
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
                     leadingIconSpacing: showsAgentLaneIcon ? agentLaneIconSpacing : nil,
@@ -747,7 +747,7 @@ struct ChatMessageList: View {
                     alignment: .leading
                 ),
                 showsHeader: false,
-                leadingLaneWidth: startsAssistantLane ? agentLaneWidth : 0,
+                leadingLaneWidth: agentLaneWidth,
                 leadingIconURL: startsAssistantLane ? agentLaneIconURL : nil,
                 leadingIconSize: startsAssistantLane ? agentLaneIconSize : nil,
                 leadingIconSpacing: startsAssistantLane ? agentLaneIconSpacing : nil,
@@ -927,7 +927,7 @@ struct ChatMessageList: View {
             if inFence || marker.isEmpty {
                 continue
             }
-            let indent = line.prefix { $0 == " " || $0 == "\t" }.count
+            let indent = leadingHorizontalWhitespaceCount(line)
             commonIndent = min(commonIndent ?? indent, indent)
             if commonIndent == 0 {
                 break
@@ -960,7 +960,7 @@ struct ChatMessageList: View {
             if inFence || marker.isEmpty {
                 return line
             }
-            let indent = line.prefix { $0 == " " || $0 == "\t" }.count
+            let indent = leadingHorizontalWhitespaceCount(line)
             guard indent > 0 else {
                 return line
             }
@@ -988,11 +988,26 @@ struct ChatMessageList: View {
         var index = line.startIndex
         while remaining > 0, index < line.endIndex {
             let char = line[index]
-            guard char == " " || char == "\t" else { break }
+            guard isHorizontalWhitespace(char) else { break }
             index = line.index(after: index)
             remaining -= 1
         }
         return String(line[index...])
+    }
+
+    private func leadingHorizontalWhitespaceCount(_ line: String) -> Int {
+        var count = 0
+        for char in line {
+            guard isHorizontalWhitespace(char) else { break }
+            count += 1
+        }
+        return count
+    }
+
+    private func isHorizontalWhitespace(_ char: Character) -> Bool {
+        char.unicodeScalars.allSatisfy { scalar in
+            scalar.properties.isWhitespace && !CharacterSet.newlines.contains(scalar)
+        }
     }
 
     private func toolCallMarkdown(_ toolCall: ToolCall) -> String {
