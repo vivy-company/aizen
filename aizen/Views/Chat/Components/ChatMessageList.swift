@@ -75,7 +75,7 @@ struct ChatMessageList: View {
     private var timelineStyle: VVChatTimelineStyle {
         let horizontalInset: CGFloat = 10
         let basePointSize = CGFloat(chatFontSize)
-        let headerPointSize = max(basePointSize + 2, 16)
+        let headerPointSize = max(basePointSize - 1.5, 11.5)
         let timestampPointSize = max(basePointSize - 0.25, 12.5)
         var theme = colorScheme == .dark ? MarkdownTheme.dark : MarkdownTheme.light
         theme.codeColor = markdownInlineCodeColor
@@ -90,7 +90,7 @@ struct ChatMessageList: View {
             draftTheme: draftTheme,
             baseFont: timelineFont(size: basePointSize),
             draftFont: timelineFont(size: basePointSize),
-            headerFont: timelineFont(size: headerPointSize, weight: .semibold),
+            headerFont: timelineFont(size: headerPointSize, weight: .regular),
             timestampFont: timelineFont(size: timestampPointSize, weight: .medium),
             headerTextColor: colorScheme == .dark ? .rgba(0.98, 0.98, 1.0, 1.0) : .rgba(0.14, 0.16, 0.20, 1.0),
             timestampTextColor: colorScheme == .dark ? .rgba(0.66, 0.69, 0.75, 1.0) : .rgba(0.45, 0.48, 0.54, 1.0),
@@ -116,14 +116,14 @@ struct ChatMessageList: View {
             assistantHeaderTitle: "",
             systemHeaderTitle: "",
             assistantHeaderIconURL: nil,
-            headerIconSize: max(17, headerPointSize + 1),
-            headerIconSpacing: 7,
+            headerIconSize: max(13, headerPointSize + 0.5),
+            headerIconSpacing: 6,
             userTimestampEnabled: true,
             assistantTimestampEnabled: false,
             systemTimestampEnabled: false,
             userTimestampSuffix: "",
             bubbleMetadataMinWidth: 1,
-            headerSpacing: 4,
+            headerSpacing: 1,
             footerSpacing: 0,
             timelineInsets: .init(top: 10, left: horizontalInset, bottom: 10, right: horizontalInset + 4),
             messageSpacing: 6,
@@ -162,9 +162,9 @@ struct ChatMessageList: View {
 
     private var headerIconTintColor: NSColor {
         if colorScheme == .dark {
-            return NSColor(calibratedWhite: 0.78, alpha: 1)
+            return NSColor(calibratedWhite: 0.94, alpha: 1)
         }
-        return NSColor(calibratedWhite: 0.33, alpha: 1)
+        return NSColor(calibratedWhite: 0.18, alpha: 1)
     }
 
     private var timelineBackingScale: CGFloat {
@@ -332,13 +332,8 @@ struct ChatMessageList: View {
             return
         }
 
-        if let call = toolCallForEntryID(messageID),
-           let diff = toolDiffContents(for: call).first {
-            presentedToolDiff = PresentedToolDiff(
-                id: "diff-\(call.id)",
-                title: call.title,
-                unifiedDiff: unifiedDiffDocument(for: diff)
-            )
+        if let call = toolCallForEntryID(messageID) {
+            presentToolDiff(for: call, entryID: messageID)
         }
     }
 
@@ -353,14 +348,30 @@ struct ChatMessageList: View {
             return
         }
 
-        if let call = toolCallForEntryID(entryID),
-           let diff = toolDiffContents(for: call).first {
-            presentedToolDiff = PresentedToolDiff(
-                id: "diff-\(call.id)",
-                title: call.title,
-                unifiedDiff: unifiedDiffDocument(for: diff)
-            )
+        if let call = toolCallForEntryID(entryID) {
+            presentToolDiff(for: call, entryID: entryID)
         }
+    }
+
+    private func presentToolDiff(for toolCall: ToolCall, entryID: String) {
+        let diffs = toolDiffContents(for: toolCall)
+        guard !diffs.isEmpty else { return }
+
+        let requestedIndex = diffIndexFromEntryID(entryID) ?? 0
+        let index = diffs.indices.contains(requestedIndex) ? requestedIndex : 0
+        let selected = diffs[index]
+
+        presentedToolDiff = PresentedToolDiff(
+            id: "diff-\(toolCall.id)-\(index)",
+            title: toolCallDiffRowTitle(
+                selected,
+                toolCall: toolCall,
+                index: index,
+                total: diffs.count,
+                includeOpenHint: false
+            ),
+            unifiedDiff: unifiedDiffDocument(for: selected)
+        )
     }
 
     private func handleUserMessageCopyHoverChange(_ messageID: String?) {
@@ -385,48 +396,73 @@ struct ChatMessageList: View {
             let role: VVChatMessageRole
             let presentation: VVChatMessagePresentation?
             let showsAgentLaneIcon = decoded?.showsAgentLaneIcon == true
+            let headerTitle = decoded?.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let headerIconURL = toolHeaderIconURL(for: decoded?.toolKind)
+            var messageContent = content
 
             switch custom.kind {
             case "toolCall":
                 role = .assistant
+                messageContent = content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : content
                 presentation = VVChatMessagePresentation(
                     bubbleStyle: nil,
-                    showsHeader: false,
-                    headerTitle: nil,
-                    headerIconURL: nil,
+                    showsHeader: headerTitle?.isEmpty == false,
+                    headerTitle: headerTitle,
+                    headerIconURL: headerIconURL,
                     leadingLaneWidth: agentLaneWidth,
                     leadingIconURL: showsAgentLaneIcon ? agentLaneIconURL : nil,
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
                     leadingIconSpacing: showsAgentLaneIcon ? agentLaneIconSpacing : nil,
                     showsTimestamp: false,
-                    contentFontScale: 0.86,
-                    textOpacityMultiplier: dimmedMetaOpacity
+                    contentFontScale: 0.70,
+                    textOpacityMultiplier: dimmedMetaOpacity,
+                    prefixGlyphColor: toolGroupStatusColor(statusRawValue: decoded?.status),
+                    prefixGlyphCount: 1
                 )
             case "toolCallDetail":
                 role = .assistant
+                messageContent = ""
                 presentation = VVChatMessagePresentation(
                     bubbleStyle: nil,
-                    showsHeader: false,
-                    headerTitle: nil,
-                    headerIconURL: nil,
+                    showsHeader: headerTitle?.isEmpty == false,
+                    headerTitle: headerTitle,
+                    headerIconURL: headerIconURL,
                     leadingLaneWidth: agentLaneWidth,
                     showsTimestamp: false,
-                    contentFontScale: 0.84,
-                    textOpacityMultiplier: dimmedMetaOpacity * 0.88
+                    contentFontScale: 0.72,
+                    textOpacityMultiplier: dimmedMetaOpacity * 0.93,
+                    prefixGlyphColor: toolGroupStatusColor(statusRawValue: decoded?.status),
+                    prefixGlyphCount: 1
+                )
+            case "toolCallDiff":
+                role = .assistant
+                messageContent = ""
+                presentation = VVChatMessagePresentation(
+                    bubbleStyle: nil,
+                    showsHeader: headerTitle?.isEmpty == false,
+                    headerTitle: headerTitle,
+                    headerIconURL: symbolIconURL("doc.text", fallbackID: "tool-diff", tintColor: headerIconTintColor),
+                    leadingLaneWidth: agentLaneWidth,
+                    showsTimestamp: false,
+                    contentFontScale: 0.70,
+                    textOpacityMultiplier: dimmedMetaOpacity * 0.96,
+                    prefixGlyphColor: toolGroupStatusColor(statusRawValue: decoded?.status),
+                    prefixGlyphCount: 1
                 )
             case "toolCallGroup":
                 role = .assistant
+                messageContent = ""
                 presentation = VVChatMessagePresentation(
                     bubbleStyle: nil,
-                    showsHeader: false,
-                    headerTitle: nil,
-                    headerIconURL: nil,
+                    showsHeader: headerTitle?.isEmpty == false,
+                    headerTitle: headerTitle,
+                    headerIconURL: symbolIconURL("square.stack.3d.up", fallbackID: "tool-group", tintColor: headerIconTintColor),
                     leadingLaneWidth: agentLaneWidth,
                     leadingIconURL: showsAgentLaneIcon ? agentLaneIconURL : nil,
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
                     leadingIconSpacing: showsAgentLaneIcon ? agentLaneIconSpacing : nil,
                     showsTimestamp: false,
-                    contentFontScale: 0.84,
+                    contentFontScale: 0.74,
                     textOpacityMultiplier: dimmedMetaOpacity,
                     prefixGlyphColor: toolGroupStatusColor(statusRawValue: decoded?.status),
                     prefixGlyphCount: 1
@@ -455,52 +491,12 @@ struct ChatMessageList: View {
                 id: custom.id,
                 role: role,
                 state: .final,
-                content: content,
+                content: messageContent,
                 revision: custom.revision,
                 timestamp: custom.timestamp,
                 presentation: presentation
             )
         }
-    }
-
-    private func toolCallBubbleStyle(statusRawValue: String?) -> VVChatBubbleStyle {
-        let darkBorder: SIMD4<Float>
-        let lightBorder: SIMD4<Float>
-
-        switch statusRawValue {
-        case "failed":
-            darkBorder = .rgba(0.76, 0.34, 0.36, 0.44)
-            lightBorder = .rgba(0.82, 0.44, 0.46, 0.56)
-        case "in_progress":
-            darkBorder = .rgba(0.48, 0.58, 0.86, 0.44)
-            lightBorder = .rgba(0.46, 0.58, 0.88, 0.56)
-        default:
-            darkBorder = .rgba(0.34, 0.40, 0.50, 0.34)
-            lightBorder = .rgba(0.68, 0.72, 0.80, 0.42)
-        }
-
-        if colorScheme == .dark {
-            return VVChatBubbleStyle(
-                isEnabled: true,
-                color: .rgba(0.11, 0.13, 0.17, 0.78),
-                borderColor: darkBorder,
-                borderWidth: 1,
-                cornerRadius: 6,
-                insets: .init(top: 6, left: 10, bottom: 6, right: 10),
-                maxWidth: 760,
-                alignment: .leading
-            )
-        }
-        return VVChatBubbleStyle(
-            isEnabled: true,
-            color: .rgba(0.96, 0.97, 0.99, 0.92),
-            borderColor: lightBorder,
-            borderWidth: 1,
-            cornerRadius: 6,
-            insets: .init(top: 6, left: 10, bottom: 6, right: 10),
-            maxWidth: 760,
-            alignment: .leading
-        )
     }
 
     private func toolHeaderIconURL(for kindRawValue: String?) -> String? {
@@ -512,10 +508,11 @@ struct ChatMessageList: View {
     }
 
     private func symbolIconURL(_ symbolName: String, fallbackID: String? = nil, tintColor: NSColor? = nil) -> String? {
-        ChatTimelineHeaderIconStore.urlString(
+        let resolvedTintColor = tintColor ?? headerIconTintColor
+        return ChatTimelineHeaderIconStore.urlString(
             for: .sfSymbol(symbolName),
             fallbackAgentId: fallbackID ?? "symbol-\(symbolName)",
-            tintColor: tintColor
+            tintColor: resolvedTintColor
         )
     }
 
@@ -539,17 +536,28 @@ struct ChatMessageList: View {
     private func buildEntries() -> [VVChatTimelineEntry] {
         var entries: [VVChatTimelineEntry] = []
         entries.reserveCapacity(visibleItems.count + (pendingPlanRequest == nil ? 0 : 1))
-        var previousWasAssistantLane = false
+        var hasRenderedAgentMessageInTurn = false
 
         for item in visibleItems {
-            let isAssistantLane = isAssistantLaneItem(item)
-            let startsAssistantLane = isAssistantLane && !previousWasAssistantLane
-            let built = makeEntries(from: item, startsAssistantLane: startsAssistantLane)
-            if !built.isEmpty {
-                entries.append(contentsOf: built)
-                previousWasAssistantLane = isAssistantLane
-            } else if !isAssistantLane {
-                previousWasAssistantLane = false
+            switch item {
+            case .message(let message):
+                let startsAssistantLane = message.role == .agent && !hasRenderedAgentMessageInTurn
+                let built = makeEntries(from: item, startsAssistantLane: startsAssistantLane)
+                if !built.isEmpty {
+                    entries.append(contentsOf: built)
+                    if message.role == .agent {
+                        hasRenderedAgentMessageInTurn = true
+                    } else {
+                        hasRenderedAgentMessageInTurn = false
+                    }
+                } else if message.role != .agent {
+                    hasRenderedAgentMessageInTurn = false
+                }
+            case .toolCall, .toolCallGroup, .turnSummary:
+                let built = makeEntries(from: item, startsAssistantLane: false)
+                if !built.isEmpty {
+                    entries.append(contentsOf: built)
+                }
             }
         }
 
@@ -570,15 +578,6 @@ struct ChatMessageList: View {
         }
 
         return entries
-    }
-
-    private func isAssistantLaneItem(_ item: TimelineItem) -> Bool {
-        switch item {
-        case .message(let message):
-            return message.role == .agent
-        case .toolCall, .toolCallGroup, .turnSummary:
-            return true
-        }
     }
 
     private func makeEntries(from item: TimelineItem, startsAssistantLane: Bool) -> [VVChatTimelineEntry] {
@@ -620,15 +619,16 @@ struct ChatMessageList: View {
             ))]
 
         case .toolCall(let toolCall):
+            let title = toolCallSummaryTitle(toolCall)
             let markdown = toolCallMarkdown(toolCall)
             let payload = TimelineCustomPayload(
-                title: toolCall.title,
+                title: title,
                 body: markdown,
                 status: toolCall.status.rawValue,
                 toolKind: toolCall.kind?.rawValue,
                 showsAgentLaneIcon: startsAssistantLane
             )
-            var built: [VVChatTimelineEntry] = [.custom(
+            let built: [VVChatTimelineEntry] = [.custom(
                 VVCustomTimelineEntry(
                     id: item.stableId,
                     kind: "toolCall",
@@ -637,39 +637,50 @@ struct ChatMessageList: View {
                     timestamp: toolCall.timestamp
                 )
             )]
+            let diffs = toolDiffContents(for: toolCall)
+            if diffs.isEmpty {
+                return built
+            }
 
-            if shouldShowStandaloneToolCallDetail(toolCall) {
-                let detailMarkdown = toolCallDetailMarkdown(toolCall)
-                let detailPayload = TimelineCustomPayload(
-                    title: toolCall.title,
-                    body: detailMarkdown,
+            var expanded = built
+            for (index, diff) in diffs.enumerated() {
+                let diffTitle = toolCallDiffRowTitle(
+                    diff,
+                    toolCall: toolCall,
+                    index: index,
+                    total: diffs.count,
+                    includeOpenHint: true
+                )
+                let diffPayload = TimelineCustomPayload(
+                    title: diffTitle,
+                    body: "",
                     status: toolCall.status.rawValue,
                     toolKind: toolCall.kind?.rawValue,
                     showsAgentLaneIcon: false
                 )
-                built.append(
+                expanded.append(
                     .custom(
                         VVCustomTimelineEntry(
-                            id: "\(item.stableId)::detail",
-                            kind: "toolCallDetail",
-                            payload: encodeCustomPayload(detailPayload, fallback: detailMarkdown),
-                            revision: revisionKey(detailMarkdown + toolCall.id + toolCall.status.rawValue + "detail"),
+                            id: "\(item.stableId)::diff::\(index)",
+                            kind: "toolCallDiff",
+                            payload: encodeCustomPayload(diffPayload, fallback: diffTitle),
+                            revision: revisionKey(diffTitle + "\(toolCall.id)-\(index)-\(diff.path)-\(diff.newText.hashValue)-\(diff.oldText?.hashValue ?? 0)"),
                             timestamp: toolCall.timestamp
                         )
                     )
                 )
             }
-
-            return built
+            return expanded
 
         case .toolCallGroup(let group):
             if group.toolCalls.count == 1, let only = group.toolCalls.first {
                 return makeEntries(from: .toolCall(only), startsAssistantLane: startsAssistantLane)
             }
             let isExpanded = expandedToolGroupIDs.contains(item.stableId)
+            let title = toolCallGroupTitle(group)
             let markdown = toolCallGroupMarkdown(group, isExpanded: isExpanded)
             let payload = TimelineCustomPayload(
-                title: group.summaryText,
+                title: title,
                 body: markdown,
                 status: toolGroupStatusRawValue(group),
                 toolKind: nil,
@@ -686,9 +697,10 @@ struct ChatMessageList: View {
             )]
             if expandedToolGroupIDs.contains(item.stableId) {
                 for call in group.toolCalls {
+                    let callTitle = toolCallSummaryTitle(call)
                     let detailMarkdown = toolCallDetailMarkdown(call)
                     let detailPayload = TimelineCustomPayload(
-                        title: call.title,
+                        title: callTitle,
                         body: detailMarkdown,
                         status: call.status.rawValue,
                         toolKind: call.kind?.rawValue,
@@ -705,6 +717,37 @@ struct ChatMessageList: View {
                             )
                         )
                     )
+
+                    let callDiffs = toolDiffContents(for: call)
+                    if !callDiffs.isEmpty {
+                        for (diffIndex, diff) in callDiffs.enumerated() {
+                            let diffTitle = toolCallDiffRowTitle(
+                                diff,
+                                toolCall: call,
+                                index: diffIndex,
+                                total: callDiffs.count,
+                                includeOpenHint: true
+                            )
+                            let diffPayload = TimelineCustomPayload(
+                                title: diffTitle,
+                                body: "",
+                                status: call.status.rawValue,
+                                toolKind: call.kind?.rawValue,
+                                showsAgentLaneIcon: false
+                            )
+                            built.append(
+                                .custom(
+                                    VVCustomTimelineEntry(
+                                        id: "\(item.stableId)::call::\(call.id)::diff::\(diffIndex)",
+                                        kind: "toolCallDiff",
+                                        payload: encodeCustomPayload(diffPayload, fallback: diffTitle),
+                                        revision: revisionKey(diffTitle + "\(call.id)-\(diffIndex)-\(diff.path)-\(diff.newText.hashValue)-\(diff.oldText?.hashValue ?? 0)"),
+                                        timestamp: call.timestamp
+                                    )
+                                )
+                            )
+                        }
+                    }
                 }
             }
             return built
@@ -812,6 +855,487 @@ struct ChatMessageList: View {
         case .confirmed:
             return "confirmed"
         }
+    }
+
+    private func toolCallCompactOutcome(_ toolCall: ToolCall) -> String? {
+        if let text = firstTextContent(for: toolCall) {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                if trimmed.localizedCaseInsensitiveContains("no matches") {
+                    return "0 matches"
+                }
+                let lines = trimmed.split(separator: "\n", omittingEmptySubsequences: false).count
+                if toolCall.kind == .read {
+                    return "\(lines) line\(lines == 1 ? "" : "s")"
+                }
+            }
+        }
+
+        if toolCall.status == .failed {
+            return "failed"
+        }
+        return nil
+    }
+
+    private func toolCallAggregateDeltaText(_ toolCall: ToolCall) -> String? {
+        guard let delta = toolCallAggregateDelta(toolCall) else { return nil }
+        let deltaText = "+\(delta.added) -\(delta.removed)"
+        if delta.fileCount > 1 {
+            return "\(deltaText) · \(delta.fileCount) files"
+        }
+        return deltaText
+    }
+
+    private func toolCallAggregateDelta(_ toolCall: ToolCall) -> (added: Int, removed: Int, fileCount: Int)? {
+        let diffs = toolDiffContents(for: toolCall)
+        guard !diffs.isEmpty else { return nil }
+
+        var added = 0
+        var removed = 0
+        for diff in diffs {
+            let delta = toolCallDiffDelta(diff)
+            added += delta.added
+            removed += delta.removed
+        }
+        return (added, removed, diffs.count)
+    }
+
+    private func toolCallDiffRowTitle(
+        _ diff: ToolCallDiff,
+        toolCall: ToolCall,
+        index: Int,
+        total: Int,
+        includeOpenHint: Bool
+    ) -> String {
+        let delta = toolCallDiffDelta(diff)
+        let path = compactDisplayPath(diff.path)
+
+        var segments: [String] = ["Diff", path]
+        if total > 1 {
+            segments.append("\(index + 1)/\(total)")
+        }
+        segments.append("+\(delta.added) -\(delta.removed)")
+        if includeOpenHint {
+            segments.append("click to open")
+        }
+        if toolCall.status == .failed {
+            segments.append("failed")
+        }
+        return segments.joined(separator: " • ")
+    }
+
+    private func toolCallDiffDelta(_ diff: ToolCallDiff) -> (added: Int, removed: Int) {
+        let oldLines = diff.oldText?.components(separatedBy: "\n") ?? []
+        let newLines = diff.newText.components(separatedBy: "\n")
+        let oldCount = oldLines.count
+        let newCount = newLines.count
+
+        if oldCount == 0 && newCount > 0 {
+            return (newCount, 0)
+        }
+        if newCount == 0 && oldCount > 0 {
+            return (0, oldCount)
+        }
+        if newCount >= oldCount {
+            return (newCount - oldCount, 0)
+        }
+        return (0, oldCount - newCount)
+    }
+
+    private func firstTextContent(for toolCall: ToolCall) -> String? {
+        for content in toolCall.content {
+            guard case .content(let block) = content else { continue }
+            if case .text(let text) = block {
+                let trimmed = text.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    return text.text
+                }
+            }
+        }
+        return nil
+    }
+
+    private func compactDisplayPath(_ rawPath: String) -> String {
+        let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return rawPath }
+
+        let expanded = (trimmed as NSString).expandingTildeInPath
+        let components = expanded.split(separator: "/", omittingEmptySubsequences: true)
+        if components.count <= 4 {
+            return expanded
+        }
+        return "…/" + components.suffix(4).joined(separator: "/")
+    }
+
+    private func turnSummaryMarkdown(_ summary: TurnSummary) -> String {
+        var segments: [String] = [
+            "✓",
+            "\(summary.toolCallCount) tool call\(summary.toolCallCount == 1 ? "" : "s")",
+            summary.formattedDuration
+        ]
+
+        if !summary.fileChanges.isEmpty {
+            let fileSegments = summary.fileChanges.prefix(3).map { change -> String in
+                let delta: String
+                if change.linesAdded > 0 || change.linesRemoved > 0 {
+                    delta = " +\(change.linesAdded)/-\(change.linesRemoved)"
+                } else {
+                    delta = ""
+                }
+                return "\(change.filename)\(delta)"
+            }
+            segments.append(contentsOf: fileSegments)
+
+            if summary.fileChanges.count > 3 {
+                segments.append("+\(summary.fileChanges.count - 3)")
+            }
+        }
+
+        return segments.joined(separator: " • ")
+    }
+
+    private func planRequestMarkdown(_ request: RequestPermissionRequest) -> String {
+        var sections: [String] = ["**Plan approval requested**"]
+
+        if let message = request.message,
+           !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append(message)
+        }
+
+        if let toolCall = request.toolCall,
+           let rawInput = toolCall.rawInput?.value as? [String: Any],
+           let plan = rawInput["plan"] as? String,
+           !plan.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append(plan)
+        }
+
+        if let options = request.options, !options.isEmpty {
+            let optionLines = options.map { "- \($0.name)" }
+            sections.append(optionLines.joined(separator: "\n"))
+        }
+
+        return sections.joined(separator: "\n\n")
+    }
+
+    private func primaryPath(for toolCall: ToolCall) -> String? {
+        if let path = toolCall.locations?.first?.path {
+            return path
+        }
+
+        for content in toolCall.content {
+            if case .diff(let diff) = content {
+                return diff.path
+            }
+        }
+
+        if toolCall.title.contains("/") {
+            return toolCall.title
+        }
+
+        return nil
+    }
+
+    private func toolDiffContents(for toolCall: ToolCall) -> [ToolCallDiff] {
+        toolCall.content.compactMap { content in
+            if case .diff(let diff) = content {
+                return diff
+            }
+            return nil
+        }
+    }
+
+    private func isToolGroupEntryID(_ entryID: String) -> Bool {
+        visibleItems.contains { item in
+            if case .toolCallGroup = item {
+                return item.stableId == entryID
+            }
+            return false
+        }
+    }
+
+    private func toolCallForEntryID(_ entryID: String) -> ToolCall? {
+        if let groupedCallID = groupedToolCallID(from: entryID) {
+            for item in visibleItems {
+                guard case .toolCallGroup(let group) = item else { continue }
+                if let matched = group.toolCalls.first(where: { $0.id == groupedCallID }) {
+                    return matched
+                }
+            }
+            return nil
+        }
+
+        if let standaloneCallID = standaloneToolCallDetailID(from: entryID) {
+            for item in visibleItems {
+                guard case .toolCall(let call) = item else { continue }
+                if call.id == standaloneCallID {
+                    return call
+                }
+            }
+            return nil
+        }
+
+        for item in visibleItems {
+            switch item {
+            case .toolCall(let call):
+                if call.id == entryID {
+                    return call
+                }
+            case .toolCallGroup(let group):
+                if let matched = group.toolCalls.first(where: { $0.id == entryID }) {
+                    return matched
+                }
+            case .message, .turnSummary:
+                continue
+            }
+        }
+        return nil
+    }
+
+    private func groupedToolCallID(from entryID: String) -> String? {
+        let marker = "::call::"
+        guard let range = entryID.range(of: marker) else { return nil }
+        let trailing = String(entryID[range.upperBound...])
+        if let suffix = trailing.range(of: "::") {
+            return String(trailing[..<suffix.lowerBound])
+        }
+        return trailing
+    }
+
+    private func standaloneToolCallDetailID(from entryID: String) -> String? {
+        guard let range = entryID.range(of: "::") else { return nil }
+        return String(entryID[..<range.lowerBound])
+    }
+
+    private func diffIndexFromEntryID(_ entryID: String) -> Int? {
+        guard let range = entryID.range(of: "::diff::", options: .backwards) else {
+            return nil
+        }
+        let trailing = entryID[range.upperBound...]
+        return Int(trailing)
+    }
+
+    private func unifiedDiffDocument(for diff: ToolCallDiff) -> String {
+        let normalizedPath = normalizedDiffPath(diff.path)
+        let oldLines = (diff.oldText ?? "").split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let newLines = diff.newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+
+        let linePairs = unifiedDiffLines(
+            oldLines: oldLines,
+            newLines: newLines,
+            contextLines: 3,
+            maxOutputLines: 8_000
+        )
+
+        var output: [String] = [
+            "diff --git a/\(normalizedPath) b/\(normalizedPath)",
+            "--- a/\(normalizedPath)",
+            "+++ b/\(normalizedPath)"
+        ]
+
+        output.append("@@ -1,1 +1,1 @@")
+
+        if linePairs.isEmpty {
+            output.append(" ")
+            return output.joined(separator: "\n")
+        }
+
+        for line in linePairs {
+            switch line.type {
+            case .context:
+                output.append(" \(line.content)")
+            case .added:
+                output.append("+\(line.content)")
+            case .deleted:
+                output.append("-\(line.content)")
+            case .separator:
+                output.append("@@ -1,1 +1,1 @@")
+            }
+        }
+
+        return output.joined(separator: "\n")
+    }
+
+    private func normalizedDiffPath(_ rawPath: String) -> String {
+        let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "file" }
+
+        let expanded = (trimmed as NSString).expandingTildeInPath
+        if !expanded.hasPrefix("/") {
+            return expanded
+        }
+
+        let cwd = FileManager.default.currentDirectoryPath
+        if expanded.hasPrefix(cwd + "/") {
+            return String(expanded.dropFirst(cwd.count + 1))
+        }
+
+        let pathURL = URL(fileURLWithPath: expanded)
+        let components = pathURL.pathComponents.filter { $0 != "/" }
+        if components.count >= 3 {
+            return components.suffix(3).joined(separator: "/")
+        }
+        return pathURL.lastPathComponent.isEmpty ? expanded : pathURL.lastPathComponent
+    }
+
+    private func unifiedDiffLines(
+        oldLines: [String],
+        newLines: [String],
+        contextLines: Int,
+        maxOutputLines: Int
+    ) -> [ToolDiffPreviewLine] {
+        if oldLines == newLines {
+            return []
+        }
+
+        let complexityLimit = 350_000
+        let complexity = oldLines.count * newLines.count
+        if complexity > complexityLimit {
+            return fastUnifiedDiffLines(oldLines: oldLines, newLines: newLines, maxOutputLines: maxOutputLines)
+        }
+
+        let lcs = longestCommonSubsequence(oldLines, newLines)
+        var edits: [(type: ToolDiffPreviewLineType, content: String)] = []
+        edits.reserveCapacity(oldLines.count + newLines.count)
+
+        var oldIdx = 0
+        var newIdx = 0
+        var lcsIdx = 0
+
+        while oldIdx < oldLines.count || newIdx < newLines.count {
+            if lcsIdx < lcs.count && oldIdx < oldLines.count && newIdx < newLines.count &&
+                oldLines[oldIdx] == lcs[lcsIdx] && newLines[newIdx] == lcs[lcsIdx] {
+                edits.append((.context, oldLines[oldIdx]))
+                oldIdx += 1
+                newIdx += 1
+                lcsIdx += 1
+            } else if oldIdx < oldLines.count && (lcsIdx >= lcs.count || oldLines[oldIdx] != lcs[lcsIdx]) {
+                edits.append((.deleted, oldLines[oldIdx]))
+                oldIdx += 1
+            } else if newIdx < newLines.count {
+                edits.append((.added, newLines[newIdx]))
+                newIdx += 1
+            }
+        }
+
+        return hunkedDiffLines(edits: edits, contextLines: contextLines, maxOutputLines: maxOutputLines)
+    }
+
+    private func fastUnifiedDiffLines(
+        oldLines: [String],
+        newLines: [String],
+        maxOutputLines: Int
+    ) -> [ToolDiffPreviewLine] {
+        var result: [ToolDiffPreviewLine] = []
+        result.reserveCapacity(min(maxOutputLines + 1, oldLines.count + newLines.count))
+
+        let oldLimit = min(oldLines.count, maxOutputLines / 2)
+        let newLimit = min(newLines.count, maxOutputLines - oldLimit)
+
+        for line in oldLines.prefix(oldLimit) {
+            result.append(ToolDiffPreviewLine(type: .deleted, content: line))
+        }
+        for line in newLines.prefix(newLimit) {
+            result.append(ToolDiffPreviewLine(type: .added, content: line))
+        }
+
+        if oldLines.count > oldLimit || newLines.count > newLimit {
+            result.append(ToolDiffPreviewLine(type: .separator, content: "… truncated …"))
+        }
+
+        return result
+    }
+
+    private func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
+        guard !a.isEmpty, !b.isEmpty else { return [] }
+        let maxMatrixSize = 900
+        if a.count > maxMatrixSize || b.count > maxMatrixSize {
+            return simpleLCS(a, b)
+        }
+
+        let rows = a.count + 1
+        let cols = b.count + 1
+        var dp = Array(repeating: Array(repeating: 0, count: cols), count: rows)
+
+        for i in 1..<rows {
+            for j in 1..<cols {
+                if a[i - 1] == b[j - 1] {
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                } else {
+                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+                }
+            }
+        }
+
+        var result: [String] = []
+        var i = a.count
+        var j = b.count
+        while i > 0 && j > 0 {
+            if a[i - 1] == b[j - 1] {
+                result.append(a[i - 1])
+                i -= 1
+                j -= 1
+            } else if dp[i - 1][j] > dp[i][j - 1] {
+                i -= 1
+            } else {
+                j -= 1
+            }
+        }
+        return result.reversed()
+    }
+
+    private func simpleLCS(_ a: [String], _ b: [String]) -> [String] {
+        let bSet = Set(b)
+        return a.filter { bSet.contains($0) }
+    }
+
+    private func hunkedDiffLines(
+        edits: [(type: ToolDiffPreviewLineType, content: String)],
+        contextLines: Int,
+        maxOutputLines: Int
+    ) -> [ToolDiffPreviewLine] {
+        var changeIndices: [Int] = []
+        for (index, edit) in edits.enumerated() where edit.type != .context {
+            changeIndices.append(index)
+        }
+        guard !changeIndices.isEmpty else { return [] }
+
+        var hunks: [[Int]] = []
+        var current: [Int] = []
+        for index in changeIndices {
+            if current.isEmpty {
+                current = [index]
+            } else if index - (current.last ?? index) <= (contextLines * 2 + 1) {
+                current.append(index)
+            } else {
+                hunks.append(current)
+                current = [index]
+            }
+        }
+        if !current.isEmpty {
+            hunks.append(current)
+        }
+
+        var result: [ToolDiffPreviewLine] = []
+        result.reserveCapacity(min(maxOutputLines + hunks.count, edits.count))
+
+        for (hunkIndex, hunk) in hunks.enumerated() {
+            let start = max(0, (hunk.first ?? 0) - contextLines)
+            let end = min(edits.count - 1, (hunk.last ?? 0) + contextLines)
+
+            if hunkIndex > 0 {
+                result.append(ToolDiffPreviewLine(type: .separator, content: "···"))
+            }
+
+            for index in start...end {
+                result.append(ToolDiffPreviewLine(type: edits[index].type, content: edits[index].content))
+                if result.count >= maxOutputLines {
+                    result.append(ToolDiffPreviewLine(type: .separator, content: "… truncated …"))
+                    return result
+                }
+            }
+        }
+
+        return result
     }
 
     private func userMessagePresentation(for message: MessageItem) -> VVChatMessagePresentation {
@@ -1037,629 +1561,270 @@ struct ChatMessageList: View {
     }
 
     private func toolCallMarkdown(_ toolCall: ToolCall) -> String {
-        let diffs = toolDiffContents(for: toolCall)
-        if let primaryDiff = diffs.first {
-            let statusText = toolCall.status.rawValue.replacingOccurrences(of: "_", with: " ")
-            let fileName = URL(fileURLWithPath: primaryDiff.path).lastPathComponent
-            let delta = toolCallDiffDeltaSummary(primaryDiff)
-            var parts = ["Edit", statusText, fileName, delta]
-            if diffs.count > 1 {
-                parts.append("+\(diffs.count - 1) more file diff\(diffs.count == 2 ? "" : "s")")
+        toolCallSummaryBody(toolCall)
+    }
+
+    private func toolCallSummaryTitle(_ toolCall: ToolCall) -> String {
+        var summary = toolCallHumanAction(toolCall)
+
+        if toolCall.kind != .edit {
+            if let delta = toolCallAggregateDeltaText(toolCall) {
+                summary += " • \(delta)"
+            } else if let outcome = toolCallCompactOutcome(toolCall),
+                      !summary.localizedCaseInsensitiveContains(outcome) {
+                summary += " • \(outcome)"
             }
-            return parts.joined(separator: " • ")
         }
 
-        var lines: [String] = []
-        let statusText = toolCall.status.rawValue.replacingOccurrences(of: "_", with: " ")
-        let kindText = toolCall.kind?.rawValue.replacingOccurrences(of: "_", with: " ").capitalized ?? "Tool"
-
-        var meta: [String] = ["\(kindText) • \(statusText)"]
-        if let path = primaryPath(for: toolCall) {
-            meta.append(compactDisplayPath(path))
+        switch toolCall.status.rawValue {
+        case "failed":
+            return "Failed: \(summary)"
+        case "in_progress":
+            return "\(summary)…"
+        case "completed":
+            return summary
+        default:
+            return "\(summary) • \(toolCall.status.rawValue.replacingOccurrences(of: "_", with: " "))"
         }
-        lines.append(meta.joined(separator: " • "))
+    }
 
-        if let snippet = contentSnippets(for: toolCall).first {
-            lines.append(abbreviated(snippet, maxLength: 180))
+    private func toolCallDetailMarkdown(_ toolCall: ToolCall) -> String {
+        ""
+    }
+
+    private func toolCallSummaryBody(_ toolCall: ToolCall) -> String {
+        guard let delta = toolCallAggregateDelta(toolCall) else {
+            return ""
+        }
+
+        var lines: [String] = [
+            "```diff",
+            "+\(delta.added) lines added",
+            "-\(delta.removed) lines removed",
+            "```",
+            "Click to open full diff"
+        ]
+
+        if delta.fileCount > 1 {
+            lines.insert("Affects \(delta.fileCount) files", at: 0)
         }
 
         return lines.joined(separator: "\n")
     }
 
-    private func toolCallDetailMarkdown(_ toolCall: ToolCall) -> String {
-        var sections: [String] = ["• \(toolCallMarkdown(toolCall))"]
-        let diffs = toolDiffContents(for: toolCall)
-        if let primary = diffs.first {
-            sections.append("Diff preview ready • click row to open")
-            sections.append(compactDisplayPath(primary.path))
-            if diffs.count > 1 {
-                sections.append("… +\(diffs.count - 1) more file diff\(diffs.count == 2 ? "" : "s")")
-            }
-        }
-        if let snippetBlock = toolCallDetailSnippetMarkdown(toolCall) {
-            sections.append(snippetBlock)
-        }
-        return sections.joined(separator: "\n\n")
-    }
-
-    private func shouldShowStandaloneToolCallDetail(_ toolCall: ToolCall) -> Bool {
-        false
-    }
-
-    private func toolCallGroupMarkdown(_ group: ToolCallGroup, isExpanded: Bool) -> String {
-        var parts: [String] = []
-        parts.append("\(toolGroupStatusMarker(group)) \(compactPathsInText(group.summaryText))")
-        parts.append("\(group.toolCalls.count) call\(group.toolCalls.count == 1 ? "" : "s")")
-        if let duration = group.formattedDuration {
-            parts.append(duration)
-        }
-        parts.append(isExpanded ? "click to collapse" : "click to expand")
-        return parts.joined(separator: " • ")
-    }
-
-    private func toolCallDetailSnippetMarkdown(_ toolCall: ToolCall) -> String? {
-        guard let text = firstTextContent(for: toolCall) else { return nil }
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        let lineLimit = 220
-        let lines = trimmed.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let clipped: String
-        if lines.count > lineLimit {
-            clipped = lines.prefix(lineLimit).joined(separator: "\n") + "\n…"
-        } else {
-            clipped = trimmed
-        }
-
-        let language = markdownLanguageID(for: toolCall)
-        if let language, looksLikeCodeSnippet(clipped) {
-            return "```\(language)\n\(clipped)\n```"
-        }
-
-        if clipped.count <= 280 {
-            return clipped
-        }
-        return "```text\n\(clipped)\n```"
-    }
-
-    private func firstTextContent(for toolCall: ToolCall) -> String? {
-        for content in toolCall.content {
-            guard case .content(let block) = content else { continue }
-            if case .text(let text) = block {
-                let trimmed = text.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty {
-                    return text.text
-                }
-            }
-        }
-        return nil
-    }
-
-    private func markdownLanguageID(for toolCall: ToolCall) -> String? {
-        guard let path = primaryPath(for: toolCall),
-              let language = VVLanguageBridge.language(fromPath: path) else {
-            return nil
-        }
-        return language.identifier
-    }
-
-    private func looksLikeCodeSnippet(_ text: String) -> Bool {
-        let lower = text.lowercased()
-        let codeMarkers = [
-            "import ", "func ", "class ", "struct ", "enum ", "let ", "var ",
-            "public ", "private ", "return ", "{", "}", "=>", "->"
-        ]
-        let markerHits = codeMarkers.reduce(into: 0) { count, marker in
-            if lower.contains(marker) { count += 1 }
-        }
-        let lineCount = text.split(separator: "\n", omittingEmptySubsequences: false).count
-        return markerHits >= 2 || lineCount >= 12
-    }
-
-    private func compactDisplayPath(_ rawPath: String) -> String {
-        let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return rawPath }
-
-        let expanded = (trimmed as NSString).expandingTildeInPath
-        let components = expanded.split(separator: "/", omittingEmptySubsequences: true)
-        if components.count <= 4 {
-            return expanded
-        }
-        return "…/" + components.suffix(4).joined(separator: "/")
-    }
-
-    private func compactPathsInText(_ text: String) -> String {
-        guard text.contains("/") else { return text }
-        let pattern = #"/[^\s•]+"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
-        let nsText = text as NSString
-        let matches = regex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
-        guard !matches.isEmpty else { return text }
-
-        var result = text
-        for match in matches.reversed() {
-            let token = nsText.substring(with: match.range)
-            let compact = compactDisplayPath(token)
-            if let range = Range(match.range, in: result) {
-                result.replaceSubrange(range, with: compact)
-            }
-        }
-        return result
-    }
-
-    private func toolCallDiffDeltaSummary(_ diff: ToolCallDiff) -> String {
-        let oldLines = diff.oldText?.components(separatedBy: "\n") ?? []
-        let newLines = diff.newText.components(separatedBy: "\n")
-        let oldCount = oldLines.count
-        let newCount = newLines.count
-        if oldCount == 0 && newCount > 0 {
-            return "+\(newCount)"
-        }
-        if newCount == 0 && oldCount > 0 {
-            return "-\(oldCount)"
-        }
-        if newCount >= oldCount {
-            return "+\(newCount - oldCount)"
-        }
-        return "-\(oldCount - newCount)"
-    }
-
-    private func turnSummaryMarkdown(_ summary: TurnSummary) -> String {
+    private func toolCallGroupTitle(_ group: ToolCallGroup) -> String {
         var segments: [String] = [
-            "✓",
-            "\(summary.toolCallCount) tool call\(summary.toolCallCount == 1 ? "" : "s")",
-            summary.formattedDuration
+            "\(toolGroupStatusMarker(group)) \(group.toolCalls.count) call\(group.toolCalls.count == 1 ? "" : "s")"
         ]
-
-        if !summary.fileChanges.isEmpty {
-            let fileSegments = summary.fileChanges.prefix(3).map { change -> String in
-                let delta: String
-                if change.linesAdded > 0 || change.linesRemoved > 0 {
-                    delta = " +\(change.linesAdded)/-\(change.linesRemoved)"
-                } else {
-                    delta = ""
-                }
-                return "\(change.filename)\(delta)"
-            }
-            segments.append(contentsOf: fileSegments)
-
-            if summary.fileChanges.count > 3 {
-                segments.append("+\(summary.fileChanges.count - 3)")
-            }
+        if let duration = group.formattedDuration {
+            segments.append(duration)
         }
-
         return segments.joined(separator: " • ")
     }
 
-    private func planRequestMarkdown(_ request: RequestPermissionRequest) -> String {
-        var sections: [String] = ["**Plan approval requested**"]
-
-        if let message = request.message,
-           !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            sections.append(message)
-        }
-
-        if let toolCall = request.toolCall,
-           let rawInput = toolCall.rawInput?.value as? [String: Any],
-           let plan = rawInput["plan"] as? String,
-           !plan.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            sections.append(plan)
-        }
-
-        if let options = request.options, !options.isEmpty {
-            let optionLines = options.map { "- \($0.name)" }
-            sections.append(optionLines.joined(separator: "\n"))
-        }
-
-        return sections.joined(separator: "\n\n")
+    private func toolCallGroupMarkdown(_ group: ToolCallGroup, isExpanded: Bool) -> String {
+        ""
     }
 
-    private func primaryPath(for toolCall: ToolCall) -> String? {
-        if let path = toolCall.locations?.first?.path {
-            return path
-        }
-
-        for content in toolCall.content {
-            if case .diff(let diff) = content {
-                return diff.path
+    private func toolCallHumanAction(_ toolCall: ToolCall) -> String {
+        switch toolCall.kind {
+        case .read:
+            if let target = toolCallPrimaryTarget(toolCall) {
+                return "Read \(target)"
             }
+            return "Read a file"
+        case .edit:
+            if let target = toolCallPrimaryTarget(toolCall) {
+                return "Edited \(target)"
+            }
+            return "Edited a file"
+        case .delete:
+            if let target = toolCallPrimaryTarget(toolCall) {
+                return "Deleted \(target)"
+            }
+            return "Deleted a file"
+        case .move:
+            if let target = toolCallPrimaryTarget(toolCall) {
+                return "Moved \(target)"
+            }
+            return "Moved a file"
+        case .search:
+            if let target = toolCallPrimaryTarget(toolCall) {
+                if target.lowercased().hasPrefix("searched ") {
+                    return target
+                }
+                return "Searched \(target)"
+            }
+            return "Searched files"
+        case .execute:
+            return toolCallInputPreview(toolCall) ?? "Ran a shell command"
+        case .think:
+            return "Reasoned about the next step"
+        case .fetch:
+            return "Fetched data"
+        case .switchMode:
+            return "Switched mode"
+        case .plan:
+            return "Updated plan"
+        case .exitPlanMode:
+            return "Exited plan mode"
+        case .other:
+            if let titleAction = humanizedToolTitleAction(toolCall.title) {
+                return titleAction
+            }
+            return sanitizedToolTitle(toolCall.title) ?? "Ran a tool"
+        case nil:
+            if let titleAction = humanizedToolTitleAction(toolCall.title) {
+                return titleAction
+            }
+            return sanitizedToolTitle(toolCall.title) ?? "Ran a tool"
         }
+    }
 
-        if toolCall.title.contains("/") {
-            return toolCall.title
+    private func toolCallPrimaryTarget(_ toolCall: ToolCall) -> String? {
+        if let path = primaryPath(for: toolCall) {
+            return compactDisplayPath(path)
+        }
+        if let input = toolCallInputPreview(toolCall) {
+            return abbreviated(input, maxLength: 120)
+        }
+        return sanitizedToolTitle(toolCall.title)
+    }
+
+    private func toolCallInputPreview(_ toolCall: ToolCall) -> String? {
+        guard let raw = toolCall.rawInput?.value as? [String: Any] else { return nil }
+
+        if let command = nestedInputString(in: raw, preferredKeys: ["command", "cmd", "shellCommand"]) {
+            return humanizedCommandPreview(command)
+        }
+        if let query = nestedInputString(in: raw, preferredKeys: ["query", "pattern", "glob"]) {
+            return "Searched \(abbreviated(query, maxLength: 80))"
+        }
+        if let path = nestedInputString(in: raw, preferredKeys: ["path", "file", "filePath", "filepath"]) {
+            return compactDisplayPath(path)
         }
 
         return nil
     }
 
-    private func contentSnippets(for toolCall: ToolCall) -> [String] {
-        var snippets: [String] = []
-
-        for content in toolCall.content.prefix(4) {
-            switch content {
-            case .content(let block):
-                switch block {
-                case .text(let text):
-                    let trimmed = text.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty {
-                        snippets.append(abbreviated(trimmed, maxLength: 240))
-                    }
-                case .resource(let resource):
-                    if let uri = resource.resource.uri {
-                        snippets.append("Resource: \(uri)")
-                    }
-                case .resourceLink(let link):
-                    snippets.append("Link: \(link.name) (\(link.uri))")
-                case .image:
-                    snippets.append("Image output")
-                case .audio:
-                    snippets.append("Audio output")
-                }
-
-            case .diff(let diff):
-                let oldCount = diff.oldText?.components(separatedBy: "\n").count ?? 0
-                let newCount = diff.newText.components(separatedBy: "\n").count
-                snippets.append("Diff in \(diff.path) (\(oldCount) -> \(newCount) lines)")
-
-            case .terminal(let terminal):
-                snippets.append("Terminal session \(terminal.terminalId)")
-            }
-        }
-
-        return snippets
-    }
-
-    private func toolDiffContents(for toolCall: ToolCall) -> [ToolCallDiff] {
-        toolCall.content.compactMap { content in
-            if case .diff(let diff) = content {
-                return diff
-            }
-            return nil
-        }
-    }
-
-    private func isToolGroupEntryID(_ entryID: String) -> Bool {
-        visibleItems.contains { item in
-            if case .toolCallGroup = item {
-                return item.stableId == entryID
-            }
-            return false
-        }
-    }
-
-    private func toolCallForEntryID(_ entryID: String) -> ToolCall? {
-        if let groupedCallID = groupedToolCallID(from: entryID) {
-            for item in visibleItems {
-                guard case .toolCallGroup(let group) = item else { continue }
-                if let matched = group.toolCalls.first(where: { $0.id == groupedCallID }) {
-                    return matched
-                }
-            }
-            return nil
-        }
-
-        if let standaloneCallID = standaloneToolCallDetailID(from: entryID) {
-            for item in visibleItems {
-                guard case .toolCall(let call) = item else { continue }
-                if call.id == standaloneCallID {
-                    return call
-                }
-            }
-            return nil
-        }
-
-        for item in visibleItems {
-            switch item {
-            case .toolCall(let call):
-                if call.id == entryID {
-                    return call
-                }
-            case .toolCallGroup(let group):
-                if let matched = group.toolCalls.first(where: { $0.id == entryID }) {
-                    return matched
-                }
-            case .message, .turnSummary:
-                continue
+    private func nestedInputString(in dict: [String: Any], preferredKeys: [String]) -> String? {
+        for key in preferredKeys {
+            if let value = recursiveStringValue(dict[key], preferredKey: key) {
+                return value
             }
         }
         return nil
     }
 
-    private func groupedToolCallID(from entryID: String) -> String? {
-        let marker = "::call::"
-        guard let range = entryID.range(of: marker) else { return nil }
-        return String(entryID[range.upperBound...])
-    }
+    private func recursiveStringValue(_ value: Any?, preferredKey: String, depth: Int = 0) -> String? {
+        guard depth < 8, let value else { return nil }
 
-    private func standaloneToolCallDetailID(from entryID: String) -> String? {
-        let marker = "::detail"
-        guard let range = entryID.range(of: marker) else { return nil }
-        return String(entryID[..<range.lowerBound])
-    }
-
-    private func unifiedDiffDocument(for diff: ToolCallDiff) -> String {
-        let normalizedPath = normalizedDiffPath(diff.path)
-        let oldLines = (diff.oldText ?? "").split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let newLines = diff.newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-
-        if !oldLines.isEmpty && newLines.isEmpty {
-            return [
-                "diff --git a/\(normalizedPath) b/\(normalizedPath)",
-                "--- a/\(normalizedPath)",
-                "+++ /dev/null",
-                "@@ -1,\(oldLines.count) +0,0 @@",
-                "-[deleted file content omitted]"
-            ].joined(separator: "\n")
+        if let string = value as? String {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
         }
 
-        let linePairs = unifiedDiffLines(
-            oldLines: oldLines,
-            newLines: newLines,
-            contextLines: 3,
-            maxOutputLines: 8_000
-        )
-
-        var output: [String] = [
-            "diff --git a/\(normalizedPath) b/\(normalizedPath)",
-            "--- a/\(normalizedPath)",
-            "+++ b/\(normalizedPath)",
-            "@@ -1,1 +1,1 @@"
-        ]
-
-        if linePairs.isEmpty {
-            output.append(" ")
-            return output.joined(separator: "\n")
-        }
-
-        for line in linePairs {
-            switch line.type {
-            case .context:
-                output.append(" \(line.content)")
-            case .added:
-                output.append("+\(line.content)")
-            case .deleted:
-                output.append("-\(line.content)")
-            case .separator:
-                output.append("@@ -1,1 +1,1 @@")
+        if let dict = value as? [String: Any] {
+            if let nested = recursiveStringValue(dict[preferredKey], preferredKey: preferredKey, depth: depth + 1) {
+                return nested
             }
-        }
-
-        return output.joined(separator: "\n")
-    }
-
-    private func unifiedDiffPreview(for diff: ToolCallDiff) -> String {
-        let normalizedPath = normalizedDiffPath(diff.path)
-        let oldText = diff.oldText
-        let newText = diff.newText
-        let oldLines = (oldText ?? "").split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let newLines = newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-
-        if !oldLines.isEmpty && newLines.isEmpty {
-            return [
-                "diff --git a/\(normalizedPath) b/\(normalizedPath)",
-                "--- a/\(normalizedPath)",
-                "+++ /dev/null",
-                "@@ -1,\(oldLines.count) +0,0 @@",
-                "-[deleted file content omitted]"
-            ].joined(separator: "\n")
-        }
-
-        let linePairs = unifiedDiffLines(
-            oldLines: oldLines,
-            newLines: newLines,
-            contextLines: 2,
-            maxOutputLines: 520
-        )
-
-        var output: [String] = [
-            "diff --git a/\(normalizedPath) b/\(normalizedPath)",
-            "--- a/\(normalizedPath)",
-            "+++ b/\(normalizedPath)",
-            "@@ -1,1 +1,1 @@"
-        ]
-
-        if linePairs.isEmpty {
-            output.append(" ")
-            return output.joined(separator: "\n")
-        }
-
-        for line in linePairs {
-            switch line.type {
-            case .context:
-                output.append(" \(line.content)")
-            case .added:
-                output.append("+\(line.content)")
-            case .deleted:
-                output.append("-\(line.content)")
-            case .separator:
-                output.append("@@ -1,1 +1,1 @@")
-            }
-        }
-
-        return output.joined(separator: "\n")
-    }
-
-    private func normalizedDiffPath(_ rawPath: String) -> String {
-        let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "file" }
-
-        let expanded = (trimmed as NSString).expandingTildeInPath
-        if !expanded.hasPrefix("/") {
-            return expanded
-        }
-
-        let cwd = FileManager.default.currentDirectoryPath
-        if expanded.hasPrefix(cwd + "/") {
-            return String(expanded.dropFirst(cwd.count + 1))
-        }
-
-        let pathURL = URL(fileURLWithPath: expanded)
-        let components = pathURL.pathComponents.filter { $0 != "/" }
-        if components.count >= 3 {
-            return components.suffix(3).joined(separator: "/")
-        }
-        return pathURL.lastPathComponent.isEmpty ? expanded : pathURL.lastPathComponent
-    }
-
-    private func unifiedDiffLines(
-        oldLines: [String],
-        newLines: [String],
-        contextLines: Int,
-        maxOutputLines: Int
-    ) -> [ToolDiffPreviewLine] {
-        if oldLines == newLines {
-            return []
-        }
-
-        let complexityLimit = 350_000
-        let complexity = oldLines.count * newLines.count
-        if complexity > complexityLimit {
-            return fastUnifiedDiffLines(oldLines: oldLines, newLines: newLines, maxOutputLines: maxOutputLines)
-        }
-
-        let lcs = longestCommonSubsequence(oldLines, newLines)
-        var edits: [(type: ToolDiffPreviewLineType, content: String)] = []
-        edits.reserveCapacity(oldLines.count + newLines.count)
-
-        var oldIdx = 0
-        var newIdx = 0
-        var lcsIdx = 0
-
-        while oldIdx < oldLines.count || newIdx < newLines.count {
-            if lcsIdx < lcs.count && oldIdx < oldLines.count && newIdx < newLines.count &&
-                oldLines[oldIdx] == lcs[lcsIdx] && newLines[newIdx] == lcs[lcsIdx] {
-                edits.append((.context, oldLines[oldIdx]))
-                oldIdx += 1
-                newIdx += 1
-                lcsIdx += 1
-            } else if oldIdx < oldLines.count && (lcsIdx >= lcs.count || oldLines[oldIdx] != lcs[lcsIdx]) {
-                edits.append((.deleted, oldLines[oldIdx]))
-                oldIdx += 1
-            } else if newIdx < newLines.count {
-                edits.append((.added, newLines[newIdx]))
-                newIdx += 1
-            }
-        }
-
-        return hunkedDiffLines(edits: edits, contextLines: contextLines, maxOutputLines: maxOutputLines)
-    }
-
-    private func fastUnifiedDiffLines(
-        oldLines: [String],
-        newLines: [String],
-        maxOutputLines: Int
-    ) -> [ToolDiffPreviewLine] {
-        var result: [ToolDiffPreviewLine] = []
-        result.reserveCapacity(min(maxOutputLines + 1, oldLines.count + newLines.count))
-
-        let oldLimit = min(oldLines.count, maxOutputLines / 2)
-        let newLimit = min(newLines.count, maxOutputLines - oldLimit)
-
-        for line in oldLines.prefix(oldLimit) {
-            result.append(ToolDiffPreviewLine(type: .deleted, content: line))
-        }
-        for line in newLines.prefix(newLimit) {
-            result.append(ToolDiffPreviewLine(type: .added, content: line))
-        }
-
-        if oldLines.count > oldLimit || newLines.count > newLimit {
-            result.append(ToolDiffPreviewLine(type: .separator, content: "… truncated …"))
-        }
-
-        return result
-    }
-
-    private func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
-        guard !a.isEmpty, !b.isEmpty else { return [] }
-        let maxMatrixSize = 900
-        if a.count > maxMatrixSize || b.count > maxMatrixSize {
-            return simpleLCS(a, b)
-        }
-
-        let rows = a.count + 1
-        let cols = b.count + 1
-        var dp = Array(repeating: Array(repeating: 0, count: cols), count: rows)
-
-        for i in 1..<rows {
-            for j in 1..<cols {
-                if a[i - 1] == b[j - 1] {
-                    dp[i][j] = dp[i - 1][j - 1] + 1
-                } else {
-                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+            for fallback in ["value", "text", "path", "query", "pattern", "command"] {
+                if let nested = recursiveStringValue(dict[fallback], preferredKey: preferredKey, depth: depth + 1) {
+                    return nested
                 }
             }
         }
 
-        var result: [String] = []
-        var i = a.count
-        var j = b.count
-        while i > 0 && j > 0 {
-            if a[i - 1] == b[j - 1] {
-                result.append(a[i - 1])
-                i -= 1
-                j -= 1
-            } else if dp[i - 1][j] > dp[i][j - 1] {
-                i -= 1
-            } else {
-                j -= 1
-            }
-        }
-        return result.reversed()
-    }
-
-    private func simpleLCS(_ a: [String], _ b: [String]) -> [String] {
-        let bSet = Set(b)
-        return a.filter { bSet.contains($0) }
-    }
-
-    private func hunkedDiffLines(
-        edits: [(type: ToolDiffPreviewLineType, content: String)],
-        contextLines: Int,
-        maxOutputLines: Int
-    ) -> [ToolDiffPreviewLine] {
-        var changeIndices: [Int] = []
-        for (index, edit) in edits.enumerated() where edit.type != .context {
-            changeIndices.append(index)
-        }
-        guard !changeIndices.isEmpty else { return [] }
-
-        var hunks: [[Int]] = []
-        var current: [Int] = []
-        for index in changeIndices {
-            if current.isEmpty {
-                current = [index]
-            } else if index - (current.last ?? index) <= (contextLines * 2 + 1) {
-                current.append(index)
-            } else {
-                hunks.append(current)
-                current = [index]
-            }
-        }
-        if !current.isEmpty {
-            hunks.append(current)
-        }
-
-        var result: [ToolDiffPreviewLine] = []
-        result.reserveCapacity(min(maxOutputLines + hunks.count, edits.count))
-
-        for (hunkIndex, hunk) in hunks.enumerated() {
-            let start = max(0, (hunk.first ?? 0) - contextLines)
-            let end = min(edits.count - 1, (hunk.last ?? 0) + contextLines)
-
-            if hunkIndex > 0 {
-                result.append(ToolDiffPreviewLine(type: .separator, content: "···"))
-            }
-
-            for index in start...end {
-                result.append(ToolDiffPreviewLine(type: edits[index].type, content: edits[index].content))
-                if result.count >= maxOutputLines {
-                    result.append(ToolDiffPreviewLine(type: .separator, content: "… truncated …"))
-                    return result
+        if let array = value as? [Any] {
+            for item in array {
+                if let nested = recursiveStringValue(item, preferredKey: preferredKey, depth: depth + 1) {
+                    return nested
                 }
             }
         }
 
-        return result
+        return nil
+    }
+
+    private func humanizedCommandPreview(_ rawCommand: String) -> String {
+        let command = rawCommand.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !command.isEmpty else { return "Ran a shell command" }
+
+        let primary = command.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: true).first
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? command
+        let tokens = primary.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard let executable = tokens.first?.lowercased() else {
+            return "Ran a shell command"
+        }
+
+        switch executable {
+        case "ls":
+            let args = Array(tokens.dropFirst())
+            if let target = lastNonOptionToken(in: args) {
+                return "Listed \(compactDisplayPath(unquoted(target)))"
+            }
+            return "Listed files"
+        case "find":
+            if let target = tokens.dropFirst().first(where: { !$0.hasPrefix("-") }) {
+                return "Searched \(compactDisplayPath(unquoted(target)))"
+            }
+            return "Searched files"
+        case "cat", "head", "tail":
+            if let target = tokens.dropFirst().first(where: { !$0.hasPrefix("-") }) {
+                return "Read \(compactDisplayPath(unquoted(target)))"
+            }
+            return "Read command output"
+        case "rg", "grep":
+            return "Searched text"
+        default:
+            return "Ran shell command"
+        }
+    }
+
+    private func lastNonOptionToken(in tokens: [String]) -> String? {
+        tokens.reversed().first { !$0.hasPrefix("-") }
+    }
+
+    private func unquoted(_ value: String) -> String {
+        value.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+    }
+
+    private func humanizedToolTitleAction(_ rawTitle: String) -> String? {
+        let trimmed = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        guard let colon = trimmed.firstIndex(of: ":") else { return nil }
+        let kind = trimmed[..<colon].lowercased()
+        let rawTarget = trimmed[trimmed.index(after: colon)...].trimmingCharacters(in: .whitespacesAndNewlines)
+        let target = unquoted(rawTarget)
+
+        switch kind {
+        case "readfile", "read":
+            return target.isEmpty ? "Read a file" : "Read \(compactDisplayPath(target))"
+        case "strreplacefile", "editfile", "writefile", "replacefile", "edit":
+            return target.isEmpty ? "Edited a file" : "Edited \(compactDisplayPath(target))"
+        case "glob", "search", "find":
+            return target.isEmpty ? "Searched files" : "Searched \(abbreviated(target, maxLength: 80))"
+        case "shell", "exec", "command":
+            return target.isEmpty ? "Ran shell command" : humanizedCommandPreview(target)
+        case "list", "ls":
+            return target.isEmpty ? "Listed files" : "Listed \(compactDisplayPath(target))"
+        default:
+            return nil
+        }
+    }
+
+    private func sanitizedToolTitle(_ title: String) -> String? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") {
+            return nil
+        }
+        if trimmed.contains("\"command\"") || trimmed.contains("\"path\"") {
+            return nil
+        }
+        return abbreviated(trimmed, maxLength: 120)
     }
 
     private func abbreviated(_ text: String, maxLength: Int) -> String {
@@ -1711,7 +1876,7 @@ struct ChatMessageList: View {
     }
 
     private var dimmedMetaOpacity: Float {
-        colorScheme == .dark ? 0.72 : 0.76
+        colorScheme == .dark ? 0.60 : 0.67
     }
 
     private func revisionKey(_ value: String) -> Int {
@@ -1752,6 +1917,32 @@ private struct ToolDiffSheet: View {
 
     @AppStorage("editorFontFamily") private var editorFontFamily = "Menlo"
     @AppStorage("editorFontSize") private var editorFontSize = 12.0
+    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
+    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
+    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var effectiveThemeName: String {
+        guard usePerAppearanceTheme else { return editorTheme }
+        return colorScheme == .dark ? editorTheme : editorThemeLight
+    }
+
+    private var theme: VVTheme {
+        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
+            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
+    }
+
+    private var configuration: VVConfiguration {
+        let font = NSFont(name: editorFontFamily, size: max(editorFontSize - 1, 10))
+            ?? .monospacedSystemFont(ofSize: max(editorFontSize - 1, 10), weight: .regular)
+
+        return VVConfiguration.default
+            .with(font: font)
+            .with(showLineNumbers: true)
+            .with(showGutter: true)
+            .with(showGitGutter: false)
+            .with(wrapLines: true)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1767,11 +1958,12 @@ private struct ToolDiffSheet: View {
 
             Divider()
 
-            DiffView(
-                diffOutput: diff.unifiedDiff,
-                fontSize: editorFontSize,
-                fontFamily: editorFontFamily
-            )
+            VVDiffView(unifiedDiff: diff.unifiedDiff)
+                .theme(theme)
+                .configuration(configuration)
+                .renderStyle(.unifiedTable)
+                .syntaxHighlighting(true)
+                .background(Color(nsColor: .textBackgroundColor))
         }
     }
 }
