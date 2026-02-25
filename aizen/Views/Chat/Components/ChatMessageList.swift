@@ -75,6 +75,11 @@ struct ChatMessageList: View {
         let headerPointSize = max(basePointSize + 2, 16)
         let timestampPointSize = max(basePointSize - 0.25, 12.5)
         var theme = colorScheme == .dark ? MarkdownTheme.dark : MarkdownTheme.light
+        if colorScheme == .dark {
+            theme.codeColor = .rgba(0.98, 0.76, 0.48, 1.0)
+        } else {
+            theme.codeColor = .rgba(0.70, 0.34, 0.12, 1.0)
+        }
         theme.paragraphSpacing = 3
         theme.headingSpacing = 6
         theme.contentPadding = 0
