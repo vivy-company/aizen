@@ -25,6 +25,9 @@ struct ChatMessageList: View {
 
     @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
     @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
+    @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
+    @AppStorage("terminalUsePerAppearanceTheme") private var terminalUsePerAppearanceTheme = false
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var controller = VVChatTimelineController(style: .init(), renderWidth: 0)
@@ -75,11 +78,7 @@ struct ChatMessageList: View {
         let headerPointSize = max(basePointSize + 2, 16)
         let timestampPointSize = max(basePointSize - 0.25, 12.5)
         var theme = colorScheme == .dark ? MarkdownTheme.dark : MarkdownTheme.light
-        if colorScheme == .dark {
-            theme.codeColor = .rgba(0.98, 0.76, 0.48, 1.0)
-        } else {
-            theme.codeColor = .rgba(0.70, 0.34, 0.12, 1.0)
-        }
+        theme.codeColor = markdownInlineCodeColor
         theme.paragraphSpacing = 3
         theme.headingSpacing = 6
         theme.contentPadding = 0
@@ -170,6 +169,28 @@ struct ChatMessageList: View {
 
     private var timelineBackingScale: CGFloat {
         NSScreen.main?.backingScaleFactor ?? NSScreen.screens.map(\.backingScaleFactor).max() ?? 2
+    }
+
+    private var effectiveTerminalThemeName: String {
+        guard terminalUsePerAppearanceTheme else { return terminalThemeName }
+        return colorScheme == .dark ? terminalThemeName : terminalThemeNameLight
+    }
+
+    private var markdownInlineCodeColor: SIMD4<Float> {
+        if let theme = GhosttyThemeParser.loadVVTheme(named: effectiveTerminalThemeName) {
+            return simdColor(from: theme.cursorColor)
+        }
+        return simdColor(from: NSColor.controlAccentColor)
+    }
+
+    private func simdColor(from color: NSColor) -> SIMD4<Float> {
+        let resolved = color.usingColorSpace(.sRGB) ?? color
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        resolved.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return .rgba(Float(r), Float(g), Float(b), 1)
     }
 
     private func timelineFont(size: CGFloat, weight: NSFont.Weight = .regular) -> VVFont {
