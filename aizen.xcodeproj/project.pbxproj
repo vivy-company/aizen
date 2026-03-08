@@ -1234,14 +1234,6 @@
 				kind = branch;
 			};
 		};
-		A1D4A4A2B3C4D5E6F7A8B921 /* XCRemoteSwiftPackageReference "VVDevKit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/vivy-company/VVDevKit";
-			requirement = {
-				kind = revision;
-				revision = 07cf937d65f4b4dbe26f18367b29cc6e6ece7a50;
-			};
-		};
 		CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -1288,6 +1280,14 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.1.21;
+			};
+		};
+		A1D4A4A2B3C4D5E6F7A8B921 /* XCRemoteSwiftPackageReference "VVDevKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/vivy-company/VVDevKit";
+			requirement = {
+				kind = revision;
+				revision = d08c55800caaadbb9cc38b0b2c25d3582b59fc3e;
 			};
 		};
 		CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */ = {
