@@ -1,5 +1,5 @@
 {
-  "originHash" : "da599ab4e6514663774379333744631f9ceb89c42502d4b53050c582e5452b23",
+  "originHash" : "8efb0a63426d20a63297b872c499634f36de7c539f3d277bbc2737b2bd7467f8",
   "pins" : [
     {
       "identity" : "jsonrpc",
@@ -96,7 +96,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vivy-company/VVDevKit",
       "state" : {
-        "revision" : "d08c55800caaadbb9cc38b0b2c25d3582b59fc3e"
+        "revision" : "f160b35a295b324a13d18d9a5510b7bb6961425d"
       }
     }
   ],
