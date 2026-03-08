@@ -1358,6 +1358,14 @@
 				minimumVersion = 0.1.21;
 			};
 		};
+		A1D4A4A2B3C4D5E6F7A8B921 /* XCRemoteSwiftPackageReference "VVDevKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/vivy-company/VVDevKit";
+			requirement = {
+				kind = revision;
+				revision = d08c55800caaadbb9cc38b0b2c25d3582b59fc3e;
+			};
+		};
 		CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/wiedymi/swift-acp";
