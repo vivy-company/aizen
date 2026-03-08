@@ -99,14 +99,12 @@ struct GitStatusView: View {
                 Text("+\(additions)")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.green)
-                    .transition(.opacity)
             }
 
             if deletions > 0 {
                 Text("-\(deletions)")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.red)
-                    .transition(.opacity)
             }
 
             if untrackedFiles > 0 {
@@ -117,12 +115,8 @@ struct GitStatusView: View {
                         .font(.system(size: 11, weight: .medium))
                 }
                 .foregroundStyle(.orange)
-                .transition(.opacity)
             }
         }
         .padding(.horizontal, 8)
-        .animation(.easeInOut(duration: 0.2), value: additions)
-        .animation(.easeInOut(duration: 0.2), value: deletions)
-        .animation(.easeInOut(duration: 0.2), value: untrackedFiles)
     }
 }

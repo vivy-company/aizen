@@ -145,7 +145,6 @@ struct WorktreeDetailView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .animation(.easeInOut(duration: 0.2), value: selectedTab)
         }
     }
 
@@ -186,30 +185,32 @@ struct WorktreeDetailView: View {
     @ToolbarContentBuilder
     var sessionToolbarItems: some ToolbarContent {
         ToolbarItem(placement: .automatic) {
-            SessionTabsScrollView(
-                selectedTab: selectedTab,
-                chatSessions: sessionManager.chatSessions,
-                terminalSessions: sessionManager.terminalSessions,
-                selectedChatSessionId: $viewModel.selectedChatSessionId,
-                selectedTerminalSessionId: $viewModel.selectedTerminalSessionId,
-                onCloseChatSession: sessionManager.closeChatSession,
-                onCloseTerminalSession: sessionManager.closeTerminalSession,
-                onCreateChatSession: sessionManager.createNewChatSession,
-                onCreateTerminalSession: sessionManager.createNewTerminalSession,
-                onCreateChatWithAgent: { agentId in
-                    sessionManager.createNewChatSession(withAgent: agentId)
-                },
-                onCreateTerminalWithPreset: { preset in
-                    sessionManager.createNewTerminalSession(withPreset: preset)
-                }
-            )
+            if shouldShowSessionToolbar {
+                SessionTabsScrollView(
+                    selectedTab: selectedTab,
+                    chatSessions: sessionManager.chatSessions,
+                    terminalSessions: sessionManager.terminalSessions,
+                    selectedChatSessionId: $viewModel.selectedChatSessionId,
+                    selectedTerminalSessionId: $viewModel.selectedTerminalSessionId,
+                    onCloseChatSession: sessionManager.closeChatSession,
+                    onCloseTerminalSession: sessionManager.closeTerminalSession,
+                    onCreateChatSession: sessionManager.createNewChatSession,
+                    onCreateTerminalSession: sessionManager.createNewTerminalSession,
+                    onCreateChatWithAgent: { agentId in
+                        sessionManager.createNewChatSession(withAgent: agentId)
+                    },
+                    onCreateTerminalWithPreset: { preset in
+                        sessionManager.createNewTerminalSession(withPreset: preset)
+                    }
+                )
+            }
         }
     }
 
     @ToolbarContentBuilder
     var leadingToolbarItems: some ToolbarContent {
-        if showZenModeButton {
-            ToolbarItem(placement: .navigation) {
+        ToolbarItem(placement: .navigation) {
+            if showZenModeButton {
                 HStack(spacing: 12) {
                     zenModeButton
                 }
@@ -240,22 +241,22 @@ struct WorktreeDetailView: View {
     @ToolbarContentBuilder
     var trailingToolbarItems: some ToolbarContent {
         // Xcode build button (only if fully loaded and ready)
-        if showXcodeBuild, xcodeBuildManager.isReady {
-            ToolbarItem {
+        ToolbarItem {
+            if showXcodeBuild, xcodeBuildManager.isReady {
                 XcodeBuildButton(buildManager: xcodeBuildManager, worktree: worktree)
-            }
-
-            if #available(macOS 26.0, *) {
-                ToolbarSpacer(.fixed)
-            } else {
-                ToolbarItem(placement: .automatic) {
-                    Spacer().frame(width: 12).fixedSize()
-                }
             }
         }
 
-        if showOpenInApp {
-            ToolbarItem {
+        if #available(macOS 26.0, *) {
+            ToolbarSpacer(.fixed)
+        } else {
+            ToolbarItem(placement: .automatic) {
+                Spacer().frame(width: 12).fixedSize()
+            }
+        }
+
+        ToolbarItem {
+            if showOpenInApp {
                 OpenInAppButton(
                     lastOpenedApp: lastOpenedApp,
                     appDetector: appDetector,
@@ -273,11 +274,9 @@ struct WorktreeDetailView: View {
             }
         }
 
-        if showGitStatus {
-            ToolbarItem(placement: .automatic) {
-                if hasGitChanges {
-                    gitStatusView
-                }
+        ToolbarItem(placement: .automatic) {
+            if showGitStatus && hasGitChanges {
+                gitStatusView
             }
         }
 
@@ -288,17 +287,11 @@ struct WorktreeDetailView: View {
     
     @ViewBuilder
     private var gitStatusView: some View {
-        let view = GitStatusView(
+        GitStatusView(
             additions: gitRepositoryService.currentStatus.additions,
             deletions: gitRepositoryService.currentStatus.deletions,
             untrackedFiles: gitRepositoryService.currentStatus.untrackedFiles.count
         )
-        
-        if #available(macOS 14.0, *) {
-            view.symbolEffect(.pulse, options: .repeating, value: hasGitChanges)
-        } else {
-            view
-        }
     }
     
     private var showingGitChanges: Bool {
@@ -633,9 +626,7 @@ struct WorktreeDetailView: View {
 
                 tabPickerToolbarItem
 
-                if shouldShowSessionToolbar {
-                    sessionToolbarItems
-                }
+                sessionToolbarItems
 
                 if #available(macOS 26.0, *) {
                     ToolbarSpacer()
