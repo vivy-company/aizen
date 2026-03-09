@@ -26,7 +26,7 @@ struct CompanionPanelView: View {
             header
             content
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppSurfaceTheme.backgroundColor())
         .transaction { transaction in
             if isResizing {
                 transaction.disablesAnimations = true

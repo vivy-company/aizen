@@ -80,7 +80,7 @@ struct AgentSetupDialog: View {
             }
         }
         .frame(width: 300, height: 200)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(AppSurfaceTheme.backgroundColor())
         .task {
             if isBuiltInAgent && !isInstalling && errorMessage == nil {
                 installAgent()

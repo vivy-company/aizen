@@ -140,7 +140,7 @@ struct BranchSelectorView: View {
             }
         }
         .frame(width: 350, height: 400)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppSurfaceTheme.backgroundColor())
         .onAppear {
             loadBranches()
         }

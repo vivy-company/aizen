@@ -32,6 +32,7 @@ final class SettingsWindowManager {
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         window.toolbarStyle = .unified
+        window.backgroundColor = AppSurfaceTheme.backgroundNSColor()
         window.setContentSize(NSSize(width: 800, height: 600))
         window.minSize = NSSize(width: 750, height: 500)
 

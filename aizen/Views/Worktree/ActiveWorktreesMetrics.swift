@@ -223,7 +223,7 @@ struct MetricCard: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppSurfaceTheme.backgroundColor())
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(Color.secondary.opacity(0.15), lineWidth: 1)

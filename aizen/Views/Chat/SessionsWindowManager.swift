@@ -27,7 +27,7 @@ final class SessionsWindowManager {
             existing.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             existing.titlebarAppearsTransparent = true
             existing.toolbarStyle = .unified
-            existing.backgroundColor = .windowBackgroundColor
+            existing.backgroundColor = AppSurfaceTheme.backgroundNSColor()
             existing.makeKeyAndOrderFront(nil)
             return
         }
@@ -38,7 +38,7 @@ final class SessionsWindowManager {
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
-        window.backgroundColor = .windowBackgroundColor
+        window.backgroundColor = AppSurfaceTheme.backgroundNSColor()
         window.minSize = NSSize(width: 600, height: 400)
         window.isReleasedWhenClosed = false
         window.setContentSize(NSSize(width: 800, height: 600))

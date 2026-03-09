@@ -100,11 +100,11 @@ struct PlanApprovalDialog: View {
                     }
                 }
                 .padding(16)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .background(AppSurfaceTheme.backgroundColor())
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppSurfaceTheme.backgroundColor())
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)

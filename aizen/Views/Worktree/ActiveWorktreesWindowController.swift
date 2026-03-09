@@ -26,7 +26,7 @@ final class ActiveWorktreesWindowManager {
             existing.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             existing.titlebarAppearsTransparent = true
             existing.toolbarStyle = .unified
-            existing.backgroundColor = .windowBackgroundColor
+            existing.backgroundColor = AppSurfaceTheme.backgroundNSColor()
             existing.title = "Activity Monitor"
             existing.makeKeyAndOrderFront(nil)
             return
@@ -39,7 +39,7 @@ final class ActiveWorktreesWindowManager {
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         window.toolbarStyle = .unified
-        window.backgroundColor = .windowBackgroundColor
+        window.backgroundColor = AppSurfaceTheme.backgroundNSColor()
         window.setContentSize(NSSize(width: 980, height: 620))
         window.minSize = NSSize(width: 860, height: 540)
         window.center()

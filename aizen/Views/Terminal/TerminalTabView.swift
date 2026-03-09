@@ -92,7 +92,7 @@ struct TerminalTabView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppSurfaceTheme.backgroundColor())
     }
 
     private var terminalHeader: some View {

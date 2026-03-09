@@ -60,6 +60,10 @@ struct TranscriptionSettingsView: View {
         }
     }
 
+    private var surfaceColor: Color {
+        AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -76,7 +80,7 @@ struct TranscriptionSettingsView: View {
             }
             .padding(24)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(surfaceColor)
         .onAppear {
             whisperManager.modelId = whisperModelId
             parakeetManager.modelId = parakeetModelId

@@ -434,7 +434,7 @@ struct ChatTabView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppSurfaceTheme.backgroundColor())
         .onAppear {
             loadEnabledAgents()
         }

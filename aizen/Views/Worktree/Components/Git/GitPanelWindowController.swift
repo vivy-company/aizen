@@ -38,6 +38,7 @@ class GitPanelWindowController: NSWindowController {
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
         window.titlebarSeparatorStyle = .none
+        window.backgroundColor = GitPanelTheme.backgroundColor()
 
         let toolbar = NSToolbar(identifier: "GitPanelToolbar")
         toolbar.showsBaselineSeparator = false

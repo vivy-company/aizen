@@ -17,6 +17,7 @@ struct ChatMessageList: View {
     let timelineItems: [TimelineItem]
     let isSessionInitializing: Bool
     let pendingPlanRequest: RequestPermissionRequest?
+    let worktreePath: String?
     let selectedAgent: String
     let scrollRequest: ChatSessionViewModel.ScrollRequest?
     var isAutoScrollEnabled: () -> Bool = { true }
@@ -32,6 +33,9 @@ struct ChatMessageList: View {
 
     @State private var controller = VVChatTimelineController(style: .init(), renderWidth: 0)
     @State private var pendingSyncTask: Task<Void, Never>?
+    @State private var appliedVisibleItems: [TimelineItem] = []
+    @State private var appliedEntries: [VVChatTimelineEntry] = []
+    @State private var lastReportedPinnedToBottom: Bool?
     @State private var copiedUserMessageID: String?
     @State private var copiedUserMessageState: CopyFooterState = .idle
     @State private var hoveredCopyUserMessageID: String?
@@ -56,7 +60,7 @@ struct ChatMessageList: View {
         var hasher = Hasher()
         hasher.combine(visibleItems.count)
         for item in visibleItems {
-            hasher.combine(itemFingerprint(item))
+            hasher.combine(itemRevisionToken(item))
         }
         hasher.combine(planRequestIdentity)
         for groupID in expandedToolGroupIDs.sorted() {
@@ -79,8 +83,8 @@ struct ChatMessageList: View {
         let timestampPointSize = max(basePointSize - 0.25, 12.5)
         var theme = colorScheme == .dark ? MarkdownTheme.dark : MarkdownTheme.light
         theme.codeColor = markdownInlineCodeColor
-        theme.paragraphSpacing = 3
-        theme.headingSpacing = 6
+        theme.paragraphSpacing = 10
+        theme.headingSpacing = 22
         theme.contentPadding = 0
         var draftTheme = theme
         draftTheme.textColor = theme.textColor.withOpacity(theme.textColor.w * 0.72)
@@ -94,8 +98,8 @@ struct ChatMessageList: View {
             timestampFont: timelineFont(size: timestampPointSize, weight: .medium),
             headerTextColor: colorScheme == .dark ? .rgba(0.98, 0.98, 1.0, 1.0) : .rgba(0.14, 0.16, 0.20, 1.0),
             timestampTextColor: colorScheme == .dark ? .rgba(0.66, 0.69, 0.75, 1.0) : .rgba(0.45, 0.48, 0.54, 1.0),
-            userBubbleColor: colorScheme == .dark ? .rgba(0.20, 0.22, 0.25, 0.42) : .rgba(0.91, 0.93, 0.96, 0.62),
-            userBubbleBorderColor: colorScheme == .dark ? .rgba(0.64, 0.69, 0.76, 0.18) : .rgba(0.62, 0.66, 0.74, 0.16),
+            userBubbleColor: userBubbleFillColor,
+            userBubbleBorderColor: userBubbleStrokeColor,
             userBubbleBorderWidth: 0.6,
             userBubbleCornerRadius: 16,
             userBubbleInsets: .init(top: 8, left: 14, bottom: 8, right: 14),
@@ -139,25 +143,19 @@ struct ChatMessageList: View {
     }
 
     private var agentLaneIconURL: String? {
-        ChatTimelineHeaderIconStore.urlString(
-            for: agentLaneIconType,
-            fallbackAgentId: selectedAgent,
-            tintColor: headerIconTintColor,
-            targetPointSize: agentLaneIconSize,
-            backingScale: timelineBackingScale
-        )
+        nil
     }
 
     private var agentLaneIconSize: CGFloat {
-        max(30, CGFloat(chatFontSize) + 12)
+        0
     }
 
     private var agentLaneIconSpacing: CGFloat {
-        max(12, CGFloat(chatFontSize) * 0.5)
+        0
     }
 
     private var agentLaneWidth: CGFloat {
-        agentLaneIconSize + agentLaneIconSpacing
+        0
     }
 
     private var headerIconTintColor: NSColor {
@@ -176,11 +174,27 @@ struct ChatMessageList: View {
         return colorScheme == .dark ? terminalThemeName : terminalThemeNameLight
     }
 
+    private var activeTerminalVVTheme: VVTheme? {
+        GhosttyThemeParser.loadVVTheme(named: effectiveTerminalThemeName)
+    }
+
     private var markdownInlineCodeColor: SIMD4<Float> {
-        if let theme = GhosttyThemeParser.loadVVTheme(named: effectiveTerminalThemeName) {
+        if let theme = activeTerminalVVTheme {
             return simdColor(from: theme.cursorColor)
         }
         return simdColor(from: NSColor.controlAccentColor)
+    }
+
+    private var userBubbleFillColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.backgroundColor).withOpacity(colorScheme == .dark ? 0.78 : 0.92)
+        }
+        return colorScheme == .dark ? .rgba(0.20, 0.22, 0.25, 0.42) : .rgba(0.91, 0.93, 0.96, 0.62)
+    }
+
+    private var userBubbleStrokeColor: SIMD4<Float> {
+        let divider = GhosttyThemeParser.loadDividerColor(named: effectiveTerminalThemeName)
+        return simdColor(from: divider).withOpacity(colorScheme == .dark ? 0.32 : 0.18)
     }
 
     private func simdColor(from color: NSColor) -> SIMD4<Float> {
@@ -216,11 +230,12 @@ struct ChatMessageList: View {
                 VVChatTimelineViewSwiftUI(
                     controller: controller,
                     onStateChange: { state in
-                        onScrollPositionChange(state.isPinnedToBottom)
+                        reportScrollPositionChangeIfNeeded(state.isPinnedToBottom)
                     },
                     onUserMessageCopyAction: handleUserMessageCopyAction,
                     onUserMessageCopyHoverChange: handleUserMessageCopyHoverChange,
-                    onEntryActivate: handleEntryActivate
+                    onEntryActivate: handleEntryActivate,
+                    onLinkActivate: handleTimelineLinkActivate
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -233,7 +248,7 @@ struct ChatMessageList: View {
             onAppear()
             controller.updateStyle(timelineStyle)
             scheduleSyncTimeline(scrollToBottom: true, debounce: false)
-            onScrollPositionChange(controller.state.isPinnedToBottom)
+            reportScrollPositionChangeIfNeeded(controller.state.isPinnedToBottom)
         }
         .onChange(of: timelineSignature) { _, _ in
             scheduleSyncTimeline(scrollToBottom: isAutoScrollEnabled(), debounce: true)
@@ -262,15 +277,29 @@ struct ChatMessageList: View {
     private func handleScrollRequest() {
         guard scrollRequest != nil else { return }
         controller.jumpToLatest()
-        onScrollPositionChange(controller.state.isPinnedToBottom)
+        reportScrollPositionChangeIfNeeded(controller.state.isPinnedToBottom)
     }
 
     private func syncTimeline(scrollToBottom: Bool) {
-        controller.setEntries(
-            buildEntries(),
-            scrollToBottom: scrollToBottom,
-            customEntryMessageMapper: customEntryMessageMapper
-        )
+        let items = visibleItems
+
+        if pendingPlanRequest != nil || appliedVisibleItems.isEmpty {
+            rebuildEntries(from: items, scrollToBottom: scrollToBottom)
+            return
+        }
+
+        if let update = makeVisibleItemsUpdate(from: appliedVisibleItems, to: items) {
+            switch update {
+            case .append(let appendedItems):
+                appendTimelineItems(appendedItems, after: appliedVisibleItems, scrollToBottom: scrollToBottom)
+            case .updateLastAgentMessage(let item, let previousItems):
+                updateLastAgentMessage(item, after: previousItems, scrollToBottom: scrollToBottom)
+            }
+            appliedVisibleItems = items
+            return
+        }
+
+        rebuildEntries(from: items, scrollToBottom: scrollToBottom)
     }
 
     private func scheduleSyncTimeline(scrollToBottom: Bool, debounce: Bool) {
@@ -289,6 +318,275 @@ struct ChatMessageList: View {
             }
             guard !Task.isCancelled else { return }
             syncTimeline(scrollToBottom: scrollToBottom)
+        }
+    }
+
+    private func apply(entries newEntries: [VVChatTimelineEntry], scrollToBottom: Bool) {
+        defer { appliedEntries = newEntries }
+
+        if appliedEntries.isEmpty || !canApplyIncrementally(from: appliedEntries, to: newEntries) {
+            controller.setEntries(
+                newEntries,
+                scrollToBottom: scrollToBottom,
+                customEntryMessageMapper: customEntryMessageMapper
+            )
+            return
+        }
+
+        let oldCount = appliedEntries.count
+        let newCount = newEntries.count
+
+        if newCount > oldCount {
+            for entry in newEntries[oldCount...] {
+                append(entry, scrollToBottom: scrollToBottom)
+            }
+            return
+        }
+
+        if let update = makeStreamingDraftUpdate(from: appliedEntries, to: newEntries) {
+            applyStreamingDraftUpdate(update, scrollToBottom: scrollToBottom)
+            return
+        }
+
+        controller.setEntries(
+            newEntries,
+            scrollToBottom: scrollToBottom,
+            customEntryMessageMapper: customEntryMessageMapper
+        )
+    }
+
+    private func rebuildEntries(from items: [TimelineItem], scrollToBottom: Bool) {
+        let entries = buildEntries(from: items)
+        apply(entries: entries, scrollToBottom: scrollToBottom)
+        appliedVisibleItems = items
+    }
+
+    private enum VisibleItemsUpdate {
+        case append([TimelineItem])
+        case updateLastAgentMessage(TimelineItem, previousItems: [TimelineItem])
+    }
+
+    private func makeVisibleItemsUpdate(from oldItems: [TimelineItem], to newItems: [TimelineItem]) -> VisibleItemsUpdate? {
+        guard planRequestIdentity == "none" else { return nil }
+
+        let oldCount = oldItems.count
+        let newCount = newItems.count
+
+        if newCount > oldCount {
+            guard oldCount > 0 else { return nil }
+            for index in 0..<oldCount {
+                guard oldItems[index].stableId == newItems[index].stableId,
+                      oldItems[index].id == newItems[index].id else {
+                    return nil
+                }
+            }
+            return .append(Array(newItems.dropFirst(oldCount)))
+        }
+
+        guard newCount == oldCount, newCount > 0 else { return nil }
+
+        var changedIndex: Int?
+        for index in 0..<newCount {
+            guard oldItems[index].stableId == newItems[index].stableId else { return nil }
+            if oldItems[index].id != newItems[index].id {
+                if changedIndex != nil {
+                    return nil
+                }
+                changedIndex = index
+            }
+        }
+
+        guard let changedIndex else { return nil }
+        guard changedIndex == newCount - 1 else { return nil }
+        guard case .message(let oldMessage) = oldItems[changedIndex],
+              case .message(let newMessage) = newItems[changedIndex] else {
+            return nil
+        }
+        guard oldMessage.role == .agent, newMessage.role == .agent else { return nil }
+        return .updateLastAgentMessage(newItems[changedIndex], previousItems: Array(newItems.dropLast()))
+    }
+
+    private func appendTimelineItems(_ items: [TimelineItem], after previousItems: [TimelineItem], scrollToBottom: Bool) {
+        guard !items.isEmpty else { return }
+
+        var newEntries = appliedEntries
+        var hasRenderedAgentMessageInTurn = assistantLaneContinuationState(after: previousItems)
+
+        for item in items {
+            let startsAssistantLane = itemStartsAssistantLane(item, hasRenderedAgentMessageInTurn: hasRenderedAgentMessageInTurn)
+            let built = makeEntries(from: item, startsAssistantLane: startsAssistantLane)
+            if !built.isEmpty {
+                for entry in built {
+                    append(entry, scrollToBottom: scrollToBottom)
+                    newEntries.append(entry)
+                }
+            }
+            hasRenderedAgentMessageInTurn = nextAssistantLaneContinuationState(
+                afterAppending: item,
+                producedEntries: built,
+                current: hasRenderedAgentMessageInTurn
+            )
+        }
+
+        appliedEntries = newEntries
+    }
+
+    private func updateLastAgentMessage(_ item: TimelineItem, after previousItems: [TimelineItem], scrollToBottom: Bool) {
+        let startsAssistantLane = itemStartsAssistantLane(item, hasRenderedAgentMessageInTurn: assistantLaneContinuationState(after: previousItems))
+        let rebuiltEntries = makeEntries(from: item, startsAssistantLane: startsAssistantLane)
+
+        guard rebuiltEntries.count == 1,
+              case .message(let newMessage) = rebuiltEntries[0],
+              let lastApplied = appliedEntries.last,
+              case .message(let oldMessage) = lastApplied,
+              oldMessage.id == newMessage.id,
+              oldMessage.role == .assistant,
+              newMessage.role == .assistant else {
+            rebuildEntries(from: previousItems + [item], scrollToBottom: scrollToBottom)
+            return
+        }
+
+        applyStreamingDraftUpdate(
+            StreamingDraftUpdate(oldMessage: oldMessage, newMessage: newMessage),
+            scrollToBottom: scrollToBottom
+        )
+
+        if !appliedEntries.isEmpty {
+            appliedEntries[appliedEntries.count - 1] = rebuiltEntries[0]
+        }
+    }
+
+    private func assistantLaneContinuationState(after items: [TimelineItem]) -> Bool {
+        var hasRenderedAgentMessageInTurn = false
+        for item in items {
+            let startsAssistantLane = itemStartsAssistantLane(item, hasRenderedAgentMessageInTurn: hasRenderedAgentMessageInTurn)
+            let built = makeEntries(from: item, startsAssistantLane: startsAssistantLane)
+            hasRenderedAgentMessageInTurn = nextAssistantLaneContinuationState(
+                afterAppending: item,
+                producedEntries: built,
+                current: hasRenderedAgentMessageInTurn
+            )
+        }
+        return hasRenderedAgentMessageInTurn
+    }
+
+    private func itemStartsAssistantLane(_ item: TimelineItem, hasRenderedAgentMessageInTurn: Bool) -> Bool {
+        guard case .message(let message) = item else { return false }
+        return message.role == .agent && !hasRenderedAgentMessageInTurn
+    }
+
+    private func nextAssistantLaneContinuationState(
+        afterAppending item: TimelineItem,
+        producedEntries: [VVChatTimelineEntry],
+        current: Bool
+    ) -> Bool {
+        switch item {
+        case .message(let message):
+            if !producedEntries.isEmpty {
+                return message.role == .agent
+            }
+            if message.role != .agent {
+                return false
+            }
+            return current
+        case .toolCall, .toolCallGroup, .turnSummary:
+            return current
+        }
+    }
+
+    private func canApplyIncrementally(from oldEntries: [VVChatTimelineEntry], to newEntries: [VVChatTimelineEntry]) -> Bool {
+        guard !oldEntries.isEmpty else { return false }
+        guard newEntries.count >= oldEntries.count else { return false }
+
+        let prefixCount = min(oldEntries.count, newEntries.count)
+        for index in 0..<prefixCount {
+            if oldEntries[index].id != newEntries[index].id {
+                return false
+            }
+        }
+        return true
+    }
+
+    private func append(_ entry: VVChatTimelineEntry, scrollToBottom: Bool) {
+        switch entry {
+        case .message(let message):
+            controller.appendMessage(message)
+        case .custom(let custom):
+            controller.appendCustomEntry(custom)
+        }
+
+        if scrollToBottom {
+            controller.jumpToLatest()
+            reportScrollPositionChangeIfNeeded(controller.state.isPinnedToBottom)
+        }
+    }
+
+    private struct StreamingDraftUpdate {
+        let oldMessage: VVChatMessage
+        let newMessage: VVChatMessage
+    }
+
+    private func makeStreamingDraftUpdate(
+        from oldEntries: [VVChatTimelineEntry],
+        to newEntries: [VVChatTimelineEntry]
+    ) -> StreamingDraftUpdate? {
+        guard oldEntries.count == newEntries.count else { return nil }
+
+        var changedIndex: Int?
+        for index in oldEntries.indices {
+            if entryRevision(oldEntries[index]) != entryRevision(newEntries[index]) {
+                if changedIndex != nil {
+                    return nil
+                }
+                changedIndex = index
+            }
+        }
+
+        guard let changedIndex else { return nil }
+        guard changedIndex == oldEntries.count - 1 else { return nil }
+        guard case .message(let oldMessage) = oldEntries[changedIndex],
+              case .message(let newMessage) = newEntries[changedIndex] else {
+            return nil
+        }
+        guard oldMessage.id == newMessage.id else { return nil }
+        guard oldMessage.role == .assistant, newMessage.role == .assistant else { return nil }
+        guard oldMessage.presentation == newMessage.presentation else { return nil }
+        guard oldMessage.customContent == newMessage.customContent else { return nil }
+        guard oldMessage.timestamp == newMessage.timestamp else { return nil }
+        guard oldMessage.state == .draft else { return nil }
+        return StreamingDraftUpdate(oldMessage: oldMessage, newMessage: newMessage)
+    }
+
+    private func applyStreamingDraftUpdate(_ update: StreamingDraftUpdate, scrollToBottom: Bool) {
+        switch update.newMessage.state {
+        case .draft:
+            controller.updateDraftMessage(
+                id: update.newMessage.id,
+                content: update.newMessage.content,
+                throttle: false
+            )
+        case .final:
+            controller.finalizeMessage(id: update.newMessage.id, content: update.newMessage.content)
+        }
+
+        if scrollToBottom {
+            controller.jumpToLatest()
+            reportScrollPositionChangeIfNeeded(controller.state.isPinnedToBottom)
+        }
+    }
+
+    private func reportScrollPositionChangeIfNeeded(_ isPinnedToBottom: Bool) {
+        guard lastReportedPinnedToBottom != isPinnedToBottom else { return }
+        lastReportedPinnedToBottom = isPinnedToBottom
+        onScrollPositionChange(isPinnedToBottom)
+    }
+
+    private func entryRevision(_ entry: VVChatTimelineEntry) -> Int {
+        switch entry {
+        case .message(let message):
+            return message.revision
+        case .custom(let custom):
+            return custom.revision
         }
     }
 
@@ -339,6 +637,7 @@ struct ChatMessageList: View {
 
     private func handleEntryActivate(_ entryID: String) {
         if isToolGroupEntryID(entryID) {
+            controller.prepareLayoutTransition(anchorItemID: entryID)
             if expandedToolGroupIDs.contains(entryID) {
                 expandedToolGroupIDs.remove(entryID)
             } else {
@@ -350,6 +649,24 @@ struct ChatMessageList: View {
 
         if let call = toolCallForEntryID(entryID) {
             presentToolDiff(for: call, entryID: entryID)
+        }
+    }
+
+    private func handleTimelineLinkActivate(_ rawLink: String) {
+        guard let url = URL(string: rawLink) else { return }
+
+        switch url.scheme?.lowercased() {
+        case "aizen-file":
+            guard let path = destinationPath(from: url) else { return }
+            NotificationCenter.default.post(
+                name: .openFileInEditor,
+                object: nil,
+                userInfo: ["path": path]
+            )
+        case "aizen":
+            DeepLinkHandler.shared.handle(url)
+        default:
+            NSWorkspace.shared.open(url)
         }
     }
 
@@ -377,7 +694,6 @@ struct ChatMessageList: View {
     private func handleUserMessageCopyHoverChange(_ messageID: String?) {
         guard hoveredCopyUserMessageID != messageID else { return }
         hoveredCopyUserMessageID = messageID
-        scheduleSyncTimeline(scrollToBottom: false, debounce: false)
     }
 
     private func timelineMessage(withID messageID: String) -> MessageItem? {
@@ -399,16 +715,23 @@ struct ChatMessageList: View {
             let headerTitle = decoded?.title?.trimmingCharacters(in: .whitespacesAndNewlines)
             let headerIconURL = toolHeaderIconURL(for: decoded?.toolKind)
             var messageContent = content
+            var customContent: VVChatCustomContent?
+
+            let statusTintColor = toolGroupStatusNSColor(statusRawValue: decoded?.status)
 
             switch custom.kind {
             case "toolCall":
                 role = .assistant
                 messageContent = content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : content
+                let statusTintedIconURL = toolHeaderIconURL(for: decoded?.toolKind, tintColor: statusTintColor)
+                let vvBadges: [VVHeaderBadge]? = decoded?.badges?.map { badge in
+                    VVHeaderBadge(text: badge.text, color: SIMD4<Float>(badge.r, badge.g, badge.b, badge.a))
+                }
                 presentation = VVChatMessagePresentation(
                     bubbleStyle: nil,
                     showsHeader: headerTitle?.isEmpty == false,
                     headerTitle: headerTitle,
-                    headerIconURL: headerIconURL,
+                    headerIconURL: statusTintedIconURL ?? headerIconURL,
                     leadingLaneWidth: agentLaneWidth,
                     leadingIconURL: showsAgentLaneIcon ? agentLaneIconURL : nil,
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
@@ -416,8 +739,7 @@ struct ChatMessageList: View {
                     showsTimestamp: false,
                     contentFontScale: 0.70,
                     textOpacityMultiplier: dimmedMetaOpacity,
-                    prefixGlyphColor: toolGroupStatusColor(statusRawValue: decoded?.status),
-                    prefixGlyphCount: 1
+                    headerBadges: vvBadges
                 )
             case "toolCallDetail":
                 role = .assistant
@@ -426,61 +748,67 @@ struct ChatMessageList: View {
                     bubbleStyle: nil,
                     showsHeader: headerTitle?.isEmpty == false,
                     headerTitle: headerTitle,
-                    headerIconURL: headerIconURL,
+                    headerIconURL: toolHeaderIconURL(for: decoded?.toolKind, tintColor: statusTintColor) ?? headerIconURL,
                     leadingLaneWidth: agentLaneWidth,
                     showsTimestamp: false,
                     contentFontScale: 0.72,
-                    textOpacityMultiplier: dimmedMetaOpacity * 0.93,
-                    prefixGlyphColor: toolGroupStatusColor(statusRawValue: decoded?.status),
-                    prefixGlyphCount: 1
-                )
-            case "toolCallDiff":
-                role = .assistant
-                messageContent = ""
-                presentation = VVChatMessagePresentation(
-                    bubbleStyle: nil,
-                    showsHeader: headerTitle?.isEmpty == false,
-                    headerTitle: headerTitle,
-                    headerIconURL: symbolIconURL("doc.text", fallbackID: "tool-diff", tintColor: headerIconTintColor),
-                    leadingLaneWidth: agentLaneWidth,
-                    showsTimestamp: false,
-                    contentFontScale: 0.70,
-                    textOpacityMultiplier: dimmedMetaOpacity * 0.96,
-                    prefixGlyphColor: toolGroupStatusColor(statusRawValue: decoded?.status),
-                    prefixGlyphCount: 1
+                    textOpacityMultiplier: dimmedMetaOpacity * 0.93
                 )
             case "toolCallGroup":
                 role = .assistant
                 messageContent = ""
+                let isGroupExpanded = expandedToolGroupIDs.contains(custom.id)
+                let chevronSymbol = isGroupExpanded ? "chevron.down" : "chevron.right"
                 presentation = VVChatMessagePresentation(
                     bubbleStyle: nil,
                     showsHeader: headerTitle?.isEmpty == false,
                     headerTitle: headerTitle,
-                    headerIconURL: symbolIconURL("square.stack.3d.up", fallbackID: "tool-group", tintColor: headerIconTintColor),
+                    headerIconURL: symbolIconURL("square.stack.3d.up", fallbackID: "tool-group-\(decoded?.status ?? "default")", tintColor: statusTintColor),
+                    headerTrailingIconURL: symbolIconURL(chevronSymbol, fallbackID: "chevron-\(isGroupExpanded ? "down" : "right")", tintColor: headerIconTintColor),
                     leadingLaneWidth: agentLaneWidth,
                     leadingIconURL: showsAgentLaneIcon ? agentLaneIconURL : nil,
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
                     leadingIconSpacing: showsAgentLaneIcon ? agentLaneIconSpacing : nil,
                     showsTimestamp: false,
                     contentFontScale: 0.74,
-                    textOpacityMultiplier: dimmedMetaOpacity,
-                    prefixGlyphColor: toolGroupStatusColor(statusRawValue: decoded?.status),
-                    prefixGlyphCount: 1
+                    textOpacityMultiplier: dimmedMetaOpacity
                 )
             case "turnSummary":
                 role = .assistant
+                messageContent = ""
+                if let summaryCard = decoded?.summaryCard {
+                    customContent = .summaryCard(makeSummaryCard(from: summaryCard))
+                }
                 presentation = VVChatMessagePresentation(
-                    bubbleStyle: nil,
+                    bubbleStyle: turnSummaryBubbleStyle,
                     showsHeader: false,
                     leadingLaneWidth: agentLaneWidth,
                     leadingIconURL: showsAgentLaneIcon ? agentLaneIconURL : nil,
                     leadingIconSize: showsAgentLaneIcon ? agentLaneIconSize : nil,
                     leadingIconSpacing: showsAgentLaneIcon ? agentLaneIconSpacing : nil,
                     showsTimestamp: false,
-                    contentFontScale: 0.84,
-                    textOpacityMultiplier: dimmedMetaOpacity,
-                    prefixGlyphColor: toolGroupStatusColor(statusRawValue: "completed"),
-                    prefixGlyphCount: 1
+                    contentFontScale: 0.86,
+                    textOpacityMultiplier: colorScheme == .dark ? 0.86 : 0.90
+                )
+            case "turnSummaryFile":
+                role = .assistant
+                presentation = VVChatMessagePresentation(
+                    bubbleStyle: turnSummaryFileBubbleStyle,
+                    showsHeader: headerTitle?.isEmpty == false,
+                    headerTitle: headerTitle,
+                    headerIconURL: symbolIconURL(
+                        "doc.text",
+                        fallbackID: "turn-summary-file",
+                        tintColor: headerIconTintColor,
+                        pointSize: 13
+                    ),
+                    leadingLaneWidth: agentLaneWidth,
+                    leadingIconURL: nil,
+                    leadingIconSize: nil,
+                    leadingIconSpacing: nil,
+                    showsTimestamp: false,
+                    contentFontScale: 0.77,
+                    textOpacityMultiplier: dimmedMetaOpacity
                 )
             default:
                 role = .system
@@ -494,7 +822,8 @@ struct ChatMessageList: View {
                 content: messageContent,
                 revision: custom.revision,
                 timestamp: custom.timestamp,
-                presentation: presentation
+                presentation: presentation,
+                customContent: customContent
             )
         }
     }
@@ -507,12 +836,22 @@ struct ChatMessageList: View {
         )
     }
 
-    private func symbolIconURL(_ symbolName: String, fallbackID: String? = nil, tintColor: NSColor? = nil) -> String? {
+    private func toolHeaderIconURL(for kindRawValue: String?, tintColor: NSColor) -> String? {
+        let symbol = toolHeaderSymbol(for: kindRawValue)
+        return symbolIconURL(
+            symbol,
+            fallbackID: "tool-\(kindRawValue ?? "unknown")-\(tintColor.hashValue)",
+            tintColor: tintColor
+        )
+    }
+
+    private func symbolIconURL(_ symbolName: String, fallbackID: String? = nil, tintColor: NSColor? = nil, pointSize: CGFloat? = nil) -> String? {
         let resolvedTintColor = tintColor ?? headerIconTintColor
         return ChatTimelineHeaderIconStore.urlString(
             for: .sfSymbol(symbolName),
             fallbackAgentId: fallbackID ?? "symbol-\(symbolName)",
-            tintColor: resolvedTintColor
+            tintColor: resolvedTintColor,
+            targetPointSize: pointSize ?? 14
         )
     }
 
@@ -528,17 +867,58 @@ struct ChatMessageList: View {
             return "arrow.left.and.right.square"
         case "task":
             return "checklist"
+        case "execute":
+            return "terminal"
+        case "search":
+            return "magnifyingglass"
+        case "think":
+            return "brain.head.profile"
+        case "fetch":
+            return "globe"
+        case "plan":
+            return "list.bullet.clipboard"
+        case "switchMode":
+            return "arrow.triangle.swap"
         default:
             return "wrench.and.screwdriver"
         }
     }
 
-    private func buildEntries() -> [VVChatTimelineEntry] {
+    private var turnSummaryBubbleStyle: VVChatBubbleStyle {
+        let theme = activeTerminalVVTheme
+        let background = theme?.backgroundColor ?? GhosttyThemeParser.loadBackgroundColor(named: effectiveTerminalThemeName)
+        let divider = GhosttyThemeParser.loadDividerColor(named: effectiveTerminalThemeName)
+        return VVChatBubbleStyle(
+            isEnabled: true,
+            color: simdColor(from: background).withOpacity(colorScheme == .dark ? 0.92 : 0.98),
+            borderColor: simdColor(from: divider).withOpacity(colorScheme == .dark ? 0.34 : 0.18),
+            borderWidth: 0.8,
+            cornerRadius: 14,
+            insets: .init(top: 10, left: 14, bottom: 10, right: 14),
+            maxWidth: 920,
+            alignment: .leading
+        )
+    }
+
+    private var turnSummaryFileBubbleStyle: VVChatBubbleStyle {
+        VVChatBubbleStyle(
+            isEnabled: true,
+            color: colorScheme == .dark ? .rgba(0.12, 0.14, 0.17, 0.52) : .rgba(0.98, 0.985, 0.992, 0.95),
+            borderColor: colorScheme == .dark ? .rgba(0.52, 0.56, 0.62, 0.14) : .rgba(0.56, 0.60, 0.68, 0.12),
+            borderWidth: 0.7,
+            cornerRadius: 12,
+            insets: .init(top: 8, left: 12, bottom: 8, right: 12),
+            maxWidth: 740,
+            alignment: .leading
+        )
+    }
+
+    private func buildEntries(from sourceItems: [TimelineItem]) -> [VVChatTimelineEntry] {
         var entries: [VVChatTimelineEntry] = []
-        entries.reserveCapacity(visibleItems.count + (pendingPlanRequest == nil ? 0 : 1))
+        entries.reserveCapacity(sourceItems.count + (pendingPlanRequest == nil ? 0 : 1))
         var hasRenderedAgentMessageInTurn = false
 
-        for item in visibleItems {
+        for item in sourceItems {
             switch item {
             case .message(let message):
                 let startsAssistantLane = message.role == .agent && !hasRenderedAgentMessageInTurn
@@ -619,16 +999,20 @@ struct ChatMessageList: View {
             ))]
 
         case .toolCall(let toolCall):
-            let title = toolCallSummaryTitle(toolCall)
+            let title = toolCallHeaderTitle(toolCall)
             let markdown = toolCallMarkdown(toolCall)
+            let encodedBadges: [PayloadBadge]? = toolCallHeaderBadges(toolCall)?.map { badge in
+                PayloadBadge(text: badge.text, r: badge.color.x, g: badge.color.y, b: badge.color.z, a: badge.color.w)
+            }
             let payload = TimelineCustomPayload(
                 title: title,
                 body: markdown,
                 status: toolCall.status.rawValue,
                 toolKind: toolCall.kind?.rawValue,
-                showsAgentLaneIcon: startsAssistantLane
+                showsAgentLaneIcon: startsAssistantLane,
+                badges: encodedBadges
             )
-            let built: [VVChatTimelineEntry] = [.custom(
+            return [.custom(
                 VVCustomTimelineEntry(
                     id: item.stableId,
                     kind: "toolCall",
@@ -637,40 +1021,6 @@ struct ChatMessageList: View {
                     timestamp: toolCall.timestamp
                 )
             )]
-            let diffs = toolDiffContents(for: toolCall)
-            if diffs.isEmpty {
-                return built
-            }
-
-            var expanded = built
-            for (index, diff) in diffs.enumerated() {
-                let diffTitle = toolCallDiffRowTitle(
-                    diff,
-                    toolCall: toolCall,
-                    index: index,
-                    total: diffs.count,
-                    includeOpenHint: true
-                )
-                let diffPayload = TimelineCustomPayload(
-                    title: diffTitle,
-                    body: "",
-                    status: toolCall.status.rawValue,
-                    toolKind: toolCall.kind?.rawValue,
-                    showsAgentLaneIcon: false
-                )
-                expanded.append(
-                    .custom(
-                        VVCustomTimelineEntry(
-                            id: "\(item.stableId)::diff::\(index)",
-                            kind: "toolCallDiff",
-                            payload: encodeCustomPayload(diffPayload, fallback: diffTitle),
-                            revision: revisionKey(diffTitle + "\(toolCall.id)-\(index)-\(diff.path)-\(diff.newText.hashValue)-\(diff.oldText?.hashValue ?? 0)"),
-                            timestamp: toolCall.timestamp
-                        )
-                    )
-                )
-            }
-            return expanded
 
         case .toolCallGroup(let group):
             if group.toolCalls.count == 1, let only = group.toolCalls.first {
@@ -691,13 +1041,13 @@ struct ChatMessageList: View {
                     id: item.stableId,
                     kind: "toolCallGroup",
                     payload: encodeCustomPayload(payload, fallback: markdown),
-                    revision: revisionKey(markdown + group.id),
+                    revision: revisionKey(markdown + group.id + (isExpanded ? "-expanded" : "-collapsed")),
                     timestamp: group.timestamp
                 )
             )]
             if expandedToolGroupIDs.contains(item.stableId) {
                 for call in group.toolCalls {
-                    let callTitle = toolCallSummaryTitle(call)
+                    let callTitle = toolCallHeaderTitle(call)
                     let detailMarkdown = toolCallDetailMarkdown(call)
                     let detailPayload = TimelineCustomPayload(
                         title: callTitle,
@@ -718,69 +1068,42 @@ struct ChatMessageList: View {
                         )
                     )
 
-                    let callDiffs = toolDiffContents(for: call)
-                    if !callDiffs.isEmpty {
-                        for (diffIndex, diff) in callDiffs.enumerated() {
-                            let diffTitle = toolCallDiffRowTitle(
-                                diff,
-                                toolCall: call,
-                                index: diffIndex,
-                                total: callDiffs.count,
-                                includeOpenHint: true
-                            )
-                            let diffPayload = TimelineCustomPayload(
-                                title: diffTitle,
-                                body: "",
-                                status: call.status.rawValue,
-                                toolKind: call.kind?.rawValue,
-                                showsAgentLaneIcon: false
-                            )
-                            built.append(
-                                .custom(
-                                    VVCustomTimelineEntry(
-                                        id: "\(item.stableId)::call::\(call.id)::diff::\(diffIndex)",
-                                        kind: "toolCallDiff",
-                                        payload: encodeCustomPayload(diffPayload, fallback: diffTitle),
-                                        revision: revisionKey(diffTitle + "\(call.id)-\(diffIndex)-\(diff.path)-\(diff.newText.hashValue)-\(diff.oldText?.hashValue ?? 0)"),
-                                        timestamp: call.timestamp
-                                    )
-                                )
-                            )
-                        }
-                    }
+                    // Diff rows removed — clicking the tool call entry opens VVDiffView
                 }
             }
             return built
 
         case .turnSummary(let summary):
-            let markdown = turnSummaryMarkdown(summary)
+            let fallback = "\(summary.toolCallCount) tool call\(summary.toolCallCount == 1 ? "" : "s") • \(summary.formattedDuration)"
             let payload = TimelineCustomPayload(
                 title: nil,
-                body: markdown,
+                body: fallback,
                 status: "completed",
                 toolKind: nil,
-                showsAgentLaneIcon: startsAssistantLane
+                showsAgentLaneIcon: startsAssistantLane,
+                summaryCard: summaryPayloadCard(summary)
             )
             return [.custom(
                 VVCustomTimelineEntry(
                     id: item.stableId,
                     kind: "turnSummary",
-                    payload: encodeCustomPayload(payload, fallback: markdown),
-                    revision: revisionKey(markdown + summary.id),
+                    payload: encodeCustomPayload(payload, fallback: fallback),
+                    revision: revisionKey(fallback + summary.id),
                     timestamp: summary.timestamp
                 )
             )]
         }
     }
 
-    private func itemFingerprint(_ item: TimelineItem) -> Int {
+    private func itemRevisionToken(_ item: TimelineItem) -> Int {
         switch item {
         case .message(let message):
-            return revisionKey("\(message.id)|\(message.isComplete)|\(message.content)|\(message.contentBlocks.count)")
+            let suffix = String(message.content.suffix(96))
+            return revisionKey("\(message.id)|\(message.isComplete)|\(message.content.count)|\(suffix)|\(message.contentBlocks.count)")
         case .toolCall(let call):
             return revisionKey("\(call.id)|\(call.status.rawValue)|\(call.title)|\(call.content.count)")
         case .toolCallGroup(let group):
-            let calls = group.toolCalls.map { "\($0.id):\($0.status.rawValue):\($0.title)" }.joined(separator: "|")
+            let calls = group.toolCalls.map { "\($0.id):\($0.status.rawValue)" }.joined(separator: "|")
             return revisionKey("\(group.id)|\(group.summaryText)|\(group.hasFailed)|\(group.isInProgress)|\(calls)")
         case .turnSummary(let summary):
             let files = summary.fileChanges.map { "\($0.path):\($0.linesAdded):\($0.linesRemoved)" }.joined(separator: "|")
@@ -833,11 +1156,9 @@ struct ChatMessageList: View {
     private func presentationRevisionToken(for message: MessageItem, startsAssistantLane: Bool) -> String {
         switch message.role {
         case .user:
-            let hoverToken = hoveredCopyUserMessageID == message.id ? "hover" : "rest"
-            return "user-copy-\(copyFooterStateToken(for: message.id))-\(hoverToken)-v2"
+            return "user-copy-\(copyFooterStateToken(for: message.id))-v3"
         case .agent:
-            let hoverToken = hoveredCopyUserMessageID == message.id ? "hover" : "rest"
-            return "assistant-lane-\(startsAssistantLane ? "start" : "cont")-copy-\(copyFooterStateToken(for: message.id))-\(hoverToken)-v3"
+            return "assistant-lane-\(startsAssistantLane ? "start" : "cont")-copy-\(copyFooterStateToken(for: message.id))-v4"
         case .system:
             return "system"
         }
@@ -967,31 +1288,135 @@ struct ChatMessageList: View {
         return "…/" + components.suffix(4).joined(separator: "/")
     }
 
-    private func turnSummaryMarkdown(_ summary: TurnSummary) -> String {
-        var segments: [String] = [
-            "✓",
-            "\(summary.toolCallCount) tool call\(summary.toolCallCount == 1 ? "" : "s")",
-            summary.formattedDuration
-        ]
-
-        if !summary.fileChanges.isEmpty {
-            let fileSegments = summary.fileChanges.prefix(3).map { change -> String in
-                let delta: String
-                if change.linesAdded > 0 || change.linesRemoved > 0 {
-                    delta = " +\(change.linesAdded)/-\(change.linesRemoved)"
-                } else {
-                    delta = ""
-                }
-                return "\(change.filename)\(delta)"
-            }
-            segments.append(contentsOf: fileSegments)
-
-            if summary.fileChanges.count > 3 {
-                segments.append("+\(summary.fileChanges.count - 3)")
-            }
+    private func summaryPayloadCard(_ summary: TurnSummary) -> PayloadSummaryCard {
+        let rows = summary.fileChanges.map { change in
+            let filePath = resolveSummaryFilePath(change.path)
+            return PayloadSummaryRow(
+                id: change.id,
+                title: compactDisplayPath(change.path),
+                subtitle: nil,
+                iconURL: summaryFileIconURL(path: change.path),
+                actionURL: fileOpenURLString(path: filePath),
+                additionsText: "+\(change.linesAdded)",
+                deletionsText: "-\(change.linesRemoved)"
+            )
         }
 
-        return segments.joined(separator: " • ")
+        let subtitle: String
+        if rows.isEmpty {
+            subtitle = "\(summary.toolCallCount) tool call\(summary.toolCallCount == 1 ? "" : "s") • \(summary.formattedDuration) • no files modified"
+        } else {
+            subtitle = "\(summary.toolCallCount) tool call\(summary.toolCallCount == 1 ? "" : "s") • \(summary.formattedDuration)"
+        }
+
+        return PayloadSummaryCard(
+            title: "Turn Summary",
+            subtitle: subtitle,
+            rows: rows
+        )
+    }
+
+    private func makeSummaryCard(from payload: PayloadSummaryCard) -> VVChatSummaryCard {
+        let rows = payload.rows.map { row in
+            VVChatSummaryCardRow(
+                id: row.id,
+                title: row.title,
+                subtitle: row.subtitle,
+                iconURL: row.iconURL,
+                actionURL: row.actionURL,
+                titleColor: summaryRowTitleColor,
+                subtitleColor: summaryRowSubtitleColor,
+                additionsText: row.additionsText,
+                additionsColor: summaryAdditionsColor,
+                deletionsText: row.deletionsText,
+                deletionsColor: summaryDeletionsColor,
+                hoverFillColor: summaryRowHoverColor
+            )
+        }
+
+        return VVChatSummaryCard(
+            title: payload.title,
+            iconURL: symbolIconURL(
+                "checklist",
+                fallbackID: "turn-summary",
+                tintColor: headerIconTintColor,
+                pointSize: 12
+            ),
+            subtitle: payload.subtitle,
+            rows: rows,
+            titleColor: summaryTitleColor,
+            subtitleColor: summarySubtitleColor,
+            dividerColor: summaryDividerColor,
+            rowDividerColor: summaryRowDividerColor
+        )
+    }
+
+    private var summaryTitleColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.textColor)
+        }
+        return colorScheme == .dark ? .rgba(0.96, 0.97, 0.99, 1) : .rgba(0.12, 0.14, 0.18, 1)
+    }
+
+    private var summarySubtitleColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.textColor).withOpacity(0.74)
+        }
+        return colorScheme == .dark ? .rgba(0.83, 0.85, 0.90, 0.92) : .rgba(0.34, 0.38, 0.46, 0.92)
+    }
+
+    private var summaryDividerColor: SIMD4<Float> {
+        simdColor(from: GhosttyThemeParser.loadDividerColor(named: effectiveTerminalThemeName)).withOpacity(colorScheme == .dark ? 0.9 : 0.7)
+    }
+
+    private var summaryRowDividerColor: SIMD4<Float> {
+        summaryDividerColor.withOpacity(colorScheme == .dark ? 0.45 : 0.35)
+    }
+
+    private var summaryRowTitleColor: SIMD4<Float> {
+        summaryTitleColor.withOpacity(0.96)
+    }
+
+    private var summaryRowSubtitleColor: SIMD4<Float> {
+        summarySubtitleColor.withOpacity(0.9)
+    }
+
+    private var summaryAdditionsColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.gitAddedColor)
+        }
+        return colorScheme == .dark ? .rgba(0.50, 0.86, 0.62, 1) : .rgba(0.11, 0.60, 0.25, 1)
+    }
+
+    private var summaryDeletionsColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.gitDeletedColor)
+        }
+        return colorScheme == .dark ? .rgba(0.94, 0.69, 0.48, 1) : .rgba(0.78, 0.36, 0.08, 1)
+    }
+
+    private var summaryRowHoverColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.currentLineColor).withOpacity(colorScheme == .dark ? 0.18 : 0.10)
+        }
+        return colorScheme == .dark ? .rgba(0.86, 0.90, 0.98, 0.035) : .rgba(0.14, 0.20, 0.30, 0.03)
+    }
+
+    private func summaryFileIconURL(path: String) -> String? {
+        let iconPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        let iconName = FileIconMapper.iconName(for: iconPath) ?? "file_default"
+        guard let image = NSImage(named: iconName),
+              let data = image.tiffRepresentation else {
+            return nil
+        }
+        let cacheKey = "turn-summary-file-\(iconName)-\(revisionKey(iconPath))"
+        return ChatTimelineHeaderIconStore.urlString(
+            for: .customImage(data),
+            fallbackAgentId: cacheKey,
+            tintColor: nil,
+            targetPointSize: 16,
+            backingScale: timelineBackingScale
+        )
     }
 
     private func planRequestMarkdown(_ request: RequestPermissionRequest) -> String {
@@ -1051,6 +1476,71 @@ struct ChatMessageList: View {
             }
             return false
         }
+    }
+
+    private func summaryFilePath(for entryID: String) -> String? {
+        guard let selection = summaryFileSelection(from: entryID) else { return nil }
+
+        for item in visibleItems {
+            guard case .turnSummary(let summary) = item else { continue }
+            guard item.stableId == selection.summaryEntryID else { continue }
+            guard summary.fileChanges.indices.contains(selection.fileIndex) else { return nil }
+            return resolveSummaryFilePath(summary.fileChanges[selection.fileIndex].path)
+        }
+
+        return nil
+    }
+
+    private func summaryFileSelection(from entryID: String) -> (summaryEntryID: String, fileIndex: Int)? {
+        let marker = "::file::"
+        guard let range = entryID.range(of: marker, options: .backwards) else { return nil }
+        let summaryEntryID = String(entryID[..<range.lowerBound])
+        let trailing = entryID[range.upperBound...]
+        guard let fileIndex = Int(trailing) else { return nil }
+        return (summaryEntryID, fileIndex)
+    }
+
+    private func resolveSummaryFilePath(_ rawPath: String) -> String {
+        let expanded = (rawPath as NSString).expandingTildeInPath
+        if expanded.hasPrefix("/") {
+            return URL(fileURLWithPath: expanded).standardizedFileURL.path
+        }
+
+        if let worktreePath, !worktreePath.isEmpty {
+            return URL(fileURLWithPath: worktreePath)
+                .appendingPathComponent(expanded)
+                .standardizedFileURL
+                .path
+        }
+
+        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(expanded)
+            .standardizedFileURL
+            .path
+    }
+
+    private func fileOpenURLString(path: String) -> String {
+        var components = URLComponents()
+        components.scheme = "aizen-file"
+        components.queryItems = [URLQueryItem(name: "path", value: path)]
+        return components.url?.absoluteString ?? path
+    }
+
+    private func destinationPath(from url: URL) -> String? {
+        if url.scheme?.lowercased() == "aizen-file" {
+            guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  let rawPath = components.queryItems?.first(where: { $0.name == "path" })?.value,
+                  !rawPath.isEmpty else {
+                return nil
+            }
+            return resolveSummaryFilePath(rawPath)
+        }
+
+        if url.isFileURL {
+            return url.standardizedFileURL.path
+        }
+
+        return nil
     }
 
     private func toolCallForEntryID(_ entryID: String) -> ToolCall? {
@@ -1116,8 +1606,9 @@ struct ChatMessageList: View {
 
     private func unifiedDiffDocument(for diff: ToolCallDiff) -> String {
         let normalizedPath = normalizedDiffPath(diff.path)
-        let oldLines = (diff.oldText ?? "").split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let newLines = diff.newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let oldText = diff.oldText ?? ""
+        let oldLines = oldText.isEmpty ? [String]() : oldText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let newLines = diff.newText.isEmpty ? [String]() : diff.newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
 
         let linePairs = unifiedDiffLines(
             oldLines: oldLines,
@@ -1361,7 +1852,6 @@ struct ChatMessageList: View {
     }
 
     private func copySuffixIconURL(for messageID: String) -> String? {
-        let isHovered = hoveredCopyUserMessageID == messageID
         let isActive = copiedUserMessageID == messageID
         let symbolName: String
         let tintColor: NSColor
@@ -1370,7 +1860,7 @@ struct ChatMessageList: View {
             switch copiedUserMessageState {
             case .idle:
                 symbolName = "doc.on.doc"
-                tintColor = isHovered ? copyIconHoverTintColor : copyIconIdleTintColor
+                tintColor = copyIconIdleTintColor
             case .transition:
                 symbolName = "ellipsis"
                 tintColor = copyIconHoverTintColor
@@ -1380,12 +1870,12 @@ struct ChatMessageList: View {
             }
         } else {
             symbolName = "doc.on.doc"
-            tintColor = isHovered ? copyIconHoverTintColor : copyIconIdleTintColor
+            tintColor = copyIconIdleTintColor
         }
 
         return symbolIconURL(
             symbolName,
-            fallbackID: "copy-\(symbolName)-\(isHovered ? "hover" : "rest")-\(copyFooterStateToken(for: messageID))",
+            fallbackID: "copy-\(symbolName)-\(copyFooterStateToken(for: messageID))",
             tintColor: tintColor
         )
     }
@@ -1429,27 +1919,50 @@ struct ChatMessageList: View {
 
         var lines: [String] = []
         for block in message.contentBlocks {
-            switch block {
-            case .text(let text):
-                if !text.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    lines.append(text.text)
-                }
-            case .image:
-                lines.append("[Image attachment]")
-            case .audio:
-                lines.append("[Audio attachment]")
-            case .resource(let resource):
-                if let uri = resource.resource.uri {
-                    lines.append("[Resource](\(uri))")
-                } else {
-                    lines.append("[Resource attachment]")
-                }
-            case .resourceLink(let link):
-                lines.append("[\(link.name)](\(link.uri))")
+            if let markdown = attachmentMarkdown(for: block, role: message.role) {
+                lines.append(markdown)
             }
         }
 
         return normalizedMessageMarkdown(lines.joined(separator: "\n\n"), role: message.role)
+    }
+
+    private func attachmentMarkdown(for block: ContentBlock, role: MessageRole) -> String? {
+        switch block {
+        case .text(let text):
+            let trimmed = text.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : normalizedMessageMarkdown(text.text, role: role)
+        case .image:
+            return escapeMarkdownForPlainText("[Image attachment]")
+        case .audio:
+            return escapeMarkdownForPlainText("[Audio attachment]")
+        case .resource(let resource):
+            if role == .user {
+                let label = resourceLabel(from: resource.resource.uri, fallback: "Resource attachment")
+                return escapeMarkdownForPlainText(label)
+            }
+            if let uri = resource.resource.uri {
+                return "[Resource](\(uri))"
+            }
+            return "[Resource attachment]"
+        case .resourceLink(let link):
+            if role == .user {
+                return escapeMarkdownForPlainText(link.name)
+            }
+            return "[\(link.name)](\(link.uri))"
+        }
+    }
+
+    private func resourceLabel(from rawURI: String?, fallback: String) -> String {
+        guard let rawURI, !rawURI.isEmpty else { return fallback }
+        if let url = URL(string: rawURI) {
+            let component = url.lastPathComponent
+            if !component.isEmpty {
+                return component
+            }
+        }
+        let trimmed = rawURI.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
     }
 
     private func normalizedMessageMarkdown(_ content: String, role: MessageRole) -> String {
@@ -1458,6 +1971,10 @@ struct ChatMessageList: View {
             .replacingOccurrences(of: "\u{00A0}", with: " ")
         let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
+
+        if role == .user {
+            return escapeMarkdownForPlainText(trimmed)
+        }
 
         guard role == .agent else {
             return trimmed
@@ -1532,6 +2049,22 @@ struct ChatMessageList: View {
         return lines.joined(separator: "\n")
     }
 
+    private func escapeMarkdownForPlainText(_ content: String) -> String {
+        var escaped = ""
+        escaped.reserveCapacity(content.count)
+
+        let specialCharacters: Set<Character> = ["\\", "`", "*", "_", "{", "}", "[", "]", "(", ")", "#", "!", "|", ">"]
+
+        for character in content {
+            if specialCharacters.contains(character) {
+                escaped.append("\\")
+            }
+            escaped.append(character)
+        }
+
+        return escaped
+    }
+
     private func dropLeadingIndent(_ line: String, maxCount: Int) -> String {
         guard maxCount > 0, !line.isEmpty else { return line }
         var remaining = maxCount
@@ -1564,28 +2097,83 @@ struct ChatMessageList: View {
         toolCallSummaryBody(toolCall)
     }
 
-    private func toolCallSummaryTitle(_ toolCall: ToolCall) -> String {
-        var summary = toolCallHumanAction(toolCall)
-
-        if toolCall.kind != .edit {
-            if let delta = toolCallAggregateDeltaText(toolCall) {
-                summary += " • \(delta)"
-            } else if let outcome = toolCallCompactOutcome(toolCall),
-                      !summary.localizedCaseInsensitiveContains(outcome) {
-                summary += " • \(outcome)"
-            }
+    private func toolCallHeaderTitle(_ toolCall: ToolCall) -> String {
+        let base: String
+        switch toolCall.kind {
+        case .read:
+            base = "Read"
+        case .edit:
+            base = "Edited"
+        case .delete:
+            base = "Deleted"
+        case .move:
+            base = "Moved"
+        case .search:
+            base = "Searched"
+        case .execute:
+            base = toolCallInputPreview(toolCall) ?? "Ran"
+        case .think:
+            base = "Thought"
+        case .fetch:
+            base = "Fetched"
+        case .switchMode:
+            base = "Switched"
+        case .plan:
+            base = "Planned"
+        case .exitPlanMode:
+            base = "Exited plan"
+        case .other:
+            base = humanizedToolTitleAction(toolCall.title) ?? sanitizedToolTitle(toolCall.title) ?? "Ran a tool"
+        case nil:
+            base = humanizedToolTitleAction(toolCall.title) ?? sanitizedToolTitle(toolCall.title) ?? "Ran a tool"
         }
 
         switch toolCall.status.rawValue {
-        case "failed":
-            return "Failed: \(summary)"
         case "in_progress":
-            return "\(summary)…"
-        case "completed":
-            return summary
+            return "\(base)…"
         default:
-            return "\(summary) • \(toolCall.status.rawValue.replacingOccurrences(of: "_", with: " "))"
+            return base
         }
+    }
+
+    private func toolCallHeaderBadges(_ toolCall: ToolCall) -> [VVHeaderBadge]? {
+        var badges: [VVHeaderBadge] = []
+
+        if let path = toolCallHeaderPath(toolCall) {
+            badges.append(VVHeaderBadge(text: path, color: toolCallPathBadgeColor))
+        }
+
+        if let delta = toolCallAggregateDelta(toolCall) {
+            let green: SIMD4<Float> = colorScheme == .dark
+                ? .rgba(0.42, 0.82, 0.52, 1)
+                : .rgba(0.14, 0.64, 0.24, 1)
+            let red: SIMD4<Float> = colorScheme == .dark
+                ? .rgba(0.92, 0.42, 0.44, 1)
+                : .rgba(0.82, 0.24, 0.28, 1)
+            badges.append(VVHeaderBadge(text: "+\(delta.added)", color: green))
+            badges.append(VVHeaderBadge(text: "-\(delta.removed)", color: red))
+            if delta.fileCount > 1 {
+                let dimmed: SIMD4<Float> = colorScheme == .dark
+                    ? .rgba(0.7, 0.7, 0.7, 0.6)
+                    : .rgba(0.3, 0.3, 0.3, 0.6)
+                badges.append(VVHeaderBadge(text: "\(delta.fileCount) files", color: dimmed))
+            }
+        } else if toolCall.kind != .edit,
+                  let outcome = toolCallCompactOutcome(toolCall),
+                  !toolCallHeaderTitle(toolCall).localizedCaseInsensitiveContains(outcome) {
+            badges.append(VVHeaderBadge(text: outcome, color: toolCallPathBadgeColor))
+        }
+
+        return badges.isEmpty ? nil : badges
+    }
+
+    private func toolCallHeaderPath(_ toolCall: ToolCall) -> String? {
+        guard let path = primaryPath(for: toolCall) else { return nil }
+        return compactDisplayPath(path)
+    }
+
+    private var toolCallPathBadgeColor: SIMD4<Float> {
+        colorScheme == .dark ? .rgba(0.72, 0.74, 0.79, 0.72) : .rgba(0.38, 0.42, 0.50, 0.78)
     }
 
     private func toolCallDetailMarkdown(_ toolCall: ToolCall) -> String {
@@ -1593,33 +2181,60 @@ struct ChatMessageList: View {
     }
 
     private func toolCallSummaryBody(_ toolCall: ToolCall) -> String {
-        guard let delta = toolCallAggregateDelta(toolCall) else {
-            return ""
-        }
-
-        var lines: [String] = [
-            "```diff",
-            "+\(delta.added) lines added",
-            "-\(delta.removed) lines removed",
-            "```",
-            "Click to open full diff"
-        ]
-
-        if delta.fileCount > 1 {
-            lines.insert("Affects \(delta.fileCount) files", at: 0)
-        }
-
-        return lines.joined(separator: "\n")
+        ""
     }
 
     private func toolCallGroupTitle(_ group: ToolCallGroup) -> String {
         var segments: [String] = [
-            "\(toolGroupStatusMarker(group)) \(group.toolCalls.count) call\(group.toolCalls.count == 1 ? "" : "s")"
+            toolGroupActionSummary(group)
         ]
         if let duration = group.formattedDuration {
             segments.append(duration)
         }
         return segments.joined(separator: " • ")
+    }
+
+    private func toolGroupActionSummary(_ group: ToolCallGroup) -> String {
+        var kindCounts: [(label: String, count: Int)] = []
+        var counts: [String: Int] = [:]
+        // Preserve insertion order
+        var orderedLabels: [String] = []
+
+        for call in group.toolCalls {
+            let label = toolKindShortLabel(call.kind)
+            counts[label, default: 0] += 1
+            if !orderedLabels.contains(label) {
+                orderedLabels.append(label)
+            }
+        }
+
+        for label in orderedLabels {
+            kindCounts.append((label: label, count: counts[label]!))
+        }
+
+        if kindCounts.count == 1 {
+            let item = kindCounts[0]
+            return "\(item.label) \(item.count) file\(item.count == 1 ? "" : "s")"
+        }
+
+        return kindCounts.map { "\($0.label) \($0.count)" }.joined(separator: ", ")
+    }
+
+    private func toolKindShortLabel(_ kind: ToolKind?) -> String {
+        switch kind {
+        case .read: return "Read"
+        case .edit: return "Edited"
+        case .delete: return "Deleted"
+        case .move: return "Moved"
+        case .search: return "Searched"
+        case .execute: return "Ran"
+        case .think: return "Thought"
+        case .fetch: return "Fetched"
+        case .plan: return "Planned"
+        case .switchMode: return "Switched"
+        case .exitPlanMode: return "Exited plan"
+        case .other, nil: return "Ran"
+        }
     }
 
     private func toolCallGroupMarkdown(_ group: ToolCallGroup, isExpanded: Bool) -> String {
@@ -1833,12 +2448,38 @@ struct ChatMessageList: View {
         return String(text[..<index]) + "…"
     }
 
+    private struct PayloadBadge: Codable {
+        var text: String
+        var r: Float
+        var g: Float
+        var b: Float
+        var a: Float
+    }
+
+    private struct PayloadSummaryRow: Codable {
+        var id: String
+        var title: String
+        var subtitle: String?
+        var iconURL: String?
+        var actionURL: String?
+        var additionsText: String?
+        var deletionsText: String?
+    }
+
+    private struct PayloadSummaryCard: Codable {
+        var title: String
+        var subtitle: String?
+        var rows: [PayloadSummaryRow]
+    }
+
     private struct TimelineCustomPayload: Codable {
         var title: String?
         var body: String
         var status: String?
         var toolKind: String?
         var showsAgentLaneIcon: Bool?
+        var badges: [PayloadBadge]?
+        var summaryCard: PayloadSummaryCard?
     }
 
     private func encodeCustomPayload(_ payload: TimelineCustomPayload, fallback: String) -> Data {
@@ -1875,8 +2516,24 @@ struct ChatMessageList: View {
         }
     }
 
+    private func toolGroupStatusNSColor(statusRawValue: String?) -> NSColor {
+        switch statusRawValue {
+        case "failed":
+            return colorScheme == .dark
+                ? NSColor(red: 0.92, green: 0.42, blue: 0.44, alpha: 1)
+                : NSColor(red: 0.82, green: 0.24, blue: 0.28, alpha: 1)
+        case "in_progress":
+            return colorScheme == .dark
+                ? NSColor(red: 0.98, green: 0.78, blue: 0.36, alpha: 1)
+                : NSColor(red: 0.88, green: 0.62, blue: 0.06, alpha: 1)
+        default:
+            // Completed — use normal tint color at full opacity
+            return headerIconTintColor
+        }
+    }
+
     private var dimmedMetaOpacity: Float {
-        colorScheme == .dark ? 0.60 : 0.67
+        colorScheme == .dark ? 0.40 : 0.50
     }
 
     private func revisionKey(_ value: String) -> Int {
@@ -1952,18 +2609,36 @@ private struct ToolDiffSheet: View {
                 Text(diff.title.isEmpty ? "Tool Diff" : diff.title)
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
+                Spacer()
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(diff.unifiedDiff, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
 
             Divider()
 
-            VVDiffView(unifiedDiff: diff.unifiedDiff)
-                .theme(theme)
-                .configuration(configuration)
-                .renderStyle(.unifiedTable)
-                .syntaxHighlighting(true)
+            if diff.unifiedDiff.isEmpty {
+                Text("No diff content available")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                GeometryReader { geo in
+                    VVDiffView(unifiedDiff: diff.unifiedDiff)
+                        .theme(theme)
+                        .configuration(configuration)
+                        .renderStyle(.unifiedTable)
+                        .syntaxHighlighting(true)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                }
                 .background(Color(nsColor: .textBackgroundColor))
+            }
         }
     }
 }

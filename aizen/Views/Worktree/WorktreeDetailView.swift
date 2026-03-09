@@ -31,7 +31,6 @@ struct WorktreeDetailView: View {
     @AppStorage("showGitStatus") private var showGitStatus = true
     @AppStorage("showXcodeBuild") private var showXcodeBuild = true
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
-    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
     @State private var selectedTab = "chat"
     @State private var lastOpenedApp: DetectedApp?
     @StateObject private var gitRepositoryService: GitRepositoryService
@@ -43,6 +42,7 @@ struct WorktreeDetailView: View {
     @State private var fileToOpenFromSearch: String?
     @State private var cachedTerminalBackgroundColor: Color?
     @State private var hasLoadedTabState = false
+    @Environment(\.colorScheme) private var colorScheme
 
     init(
         worktree: Worktree,
@@ -95,11 +95,11 @@ struct WorktreeDetailView: View {
         if selectedTab == "terminal", let cachedTerminalBackgroundColor {
             return cachedTerminalBackgroundColor
         }
-        return Color(nsColor: .windowBackgroundColor)
+        return AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
     }
 
     private func getTerminalBackgroundColor() -> Color {
-        Color(nsColor: GhosttyThemeParser.loadBackgroundColor(named: terminalThemeName))
+        AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
     }
 
     @ViewBuilder
@@ -618,7 +618,7 @@ struct WorktreeDetailView: View {
             .onAppear {
                 cachedTerminalBackgroundColor = getTerminalBackgroundColor()
             }
-            .onChange(of: terminalThemeName) { _, _ in
+            .onChange(of: colorScheme) { _, _ in
                 cachedTerminalBackgroundColor = getTerminalBackgroundColor()
             }
             .toolbar {

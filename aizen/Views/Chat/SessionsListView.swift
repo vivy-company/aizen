@@ -15,7 +15,7 @@ struct SessionsListView: View {
     @Environment(\.dismiss) private var dismiss
     
     private var surfaceColor: Color {
-        Color(nsColor: .windowBackgroundColor)
+        AppSurfaceTheme.backgroundColor()
     }
 
     init(worktreeId: UUID? = nil) {

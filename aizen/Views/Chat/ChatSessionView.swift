@@ -84,6 +84,7 @@ struct ChatSessionView: View {
                         timelineItems: viewModel.timelineItems,
                         isSessionInitializing: viewModel.isSessionInitializing,
                         pendingPlanRequest: pendingPlanTimelineRequest,
+                        worktreePath: worktree.path,
                         selectedAgent: viewModel.selectedAgent,
                         scrollRequest: viewModel.scrollRequest,
                         isAutoScrollEnabled: { !viewModel.userScrolledUp },
@@ -491,6 +492,11 @@ struct ChatSessionView: View {
         let keyCodeReturn: UInt16 = 36
         let keyCodeC: UInt16 = 8
 
+        if event.keyCode == keyCodeEscape,
+           shouldLetPresentedSheetHandleEscape(event) {
+            return event
+        }
+
         if event.keyCode == keyCodeEscape, let permissionRequest = currentPermissionRequest {
             handlePermissionPickerEscape(request: permissionRequest)
             return nil
@@ -535,6 +541,18 @@ struct ChatSessionView: View {
         }
 
         return event
+    }
+
+    private func shouldLetPresentedSheetHandleEscape(_ event: NSEvent) -> Bool {
+        guard let eventWindow = event.window else { return false }
+
+        // When a sheet is frontmost, Escape should dismiss that sheet instead of
+        // leaking through to the chat-level "stop turn" shortcut.
+        if eventWindow.sheetParent != nil {
+            return true
+        }
+
+        return eventWindow.attachedSheet != nil
     }
 
     private func handlePermissionPickerEscape(request: RequestPermissionRequest) {
@@ -687,6 +705,7 @@ private struct ChatTimelineContainer: View, Equatable {
     let timelineItems: [TimelineItem]
     let isSessionInitializing: Bool
     let pendingPlanRequest: RequestPermissionRequest?
+    let worktreePath: String?
     let selectedAgent: String
     let scrollRequest: ChatSessionViewModel.ScrollRequest?
     let isAutoScrollEnabled: () -> Bool
@@ -702,6 +721,7 @@ private struct ChatTimelineContainer: View, Equatable {
             timelineItems: timelineItems,
             isSessionInitializing: isSessionInitializing,
             pendingPlanRequest: pendingPlanRequest,
+            worktreePath: worktreePath,
             selectedAgent: selectedAgent,
             scrollRequest: scrollRequest,
             isAutoScrollEnabled: isAutoScrollEnabled,

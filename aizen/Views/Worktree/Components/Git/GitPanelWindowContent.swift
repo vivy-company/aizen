@@ -9,6 +9,34 @@ import AppKit
 import SwiftUI
 import os.log
 
+enum GitPanelTheme {
+    static func effectiveThemeName(
+        colorScheme: ColorScheme? = nil,
+        defaults: UserDefaults = .standard
+    ) -> String {
+        let darkTheme = defaults.string(forKey: "terminalThemeName") ?? "Aizen Dark"
+        guard defaults.bool(forKey: "usePerAppearanceTheme") else {
+            return darkTheme
+        }
+
+        let lightTheme = defaults.string(forKey: "terminalThemeNameLight") ?? "Aizen Light"
+
+        if let colorScheme {
+            return colorScheme == .dark ? darkTheme : lightTheme
+        }
+
+        let bestMatch = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
+        return bestMatch == .darkAqua ? darkTheme : lightTheme
+    }
+
+    static func backgroundColor(
+        colorScheme: ColorScheme? = nil,
+        defaults: UserDefaults = .standard
+    ) -> NSColor {
+        GhosttyThemeParser.loadBackgroundColor(named: effectiveThemeName(colorScheme: colorScheme, defaults: defaults))
+    }
+}
+
 enum GitWindowDividerStyle {
     static func color(opacity: CGFloat = 1.0) -> Color {
         let base = contrastedBackgroundColor(strength: 0.06)
@@ -20,7 +48,8 @@ enum GitWindowDividerStyle {
     }
 
     private static func contrastedBackgroundColor(strength: CGFloat) -> NSColor {
-        let background = NSColor.windowBackgroundColor.usingColorSpace(.extendedSRGB) ?? NSColor.windowBackgroundColor
+        let themeBackground = GitPanelTheme.backgroundColor()
+        let background = themeBackground.usingColorSpace(.extendedSRGB) ?? themeBackground
 
         var red: CGFloat = 0
         var green: CGFloat = 0
@@ -157,6 +186,10 @@ struct GitPanelWindowContent: View {
 
     @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
     @AppStorage("diffFontSize") private var diffFontSize: Double = 11.0
+    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
+    @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
+    @AppStorage("usePerAppearanceTheme") private var usePerAppearanceTheme = false
+    @Environment(\.colorScheme) private var colorScheme
 
     private let minLeftPanelWidth: CGFloat = 280
     private let maxLeftPanelWidth: CGFloat = 500
@@ -190,6 +223,15 @@ struct GitPanelWindowContent: View {
         cachedChangedFiles
     }
 
+    private var effectiveThemeName: String {
+        guard usePerAppearanceTheme else { return terminalThemeName }
+        return colorScheme == .dark ? terminalThemeName : terminalThemeNameLight
+    }
+
+    private var surfaceColor: Color {
+        Color(nsColor: GhosttyThemeParser.loadBackgroundColor(named: effectiveThemeName))
+    }
+
     var body: some View {
         Group {
             if shouldShowInitializeGitView {
@@ -212,6 +254,9 @@ struct GitPanelWindowContent: View {
                 }
             }
         }
+        .background(surfaceColor)
+        .toolbarBackground(surfaceColor, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
         .onAppear {
             if let path = worktree.path {
                 gitRepositoryService.updateWorktreePath(path)

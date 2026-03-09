@@ -91,7 +91,7 @@ struct FileContentView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(Color(NSColor.windowBackgroundColor))
+            .background(AppSurfaceTheme.backgroundColor())
 
             Divider()
 

@@ -33,7 +33,7 @@ struct ActiveWorktreesView: View {
     ]
 
     private var surfaceColor: Color {
-        Color(nsColor: .windowBackgroundColor)
+        AppSurfaceTheme.backgroundColor()
     }
 
     private var activeWorktrees: [Worktree] {

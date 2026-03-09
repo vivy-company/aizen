@@ -68,7 +68,7 @@ struct AgentCommandEditorSheet: View {
                     )
                 }
             }
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(AppSurfaceTheme.backgroundColor())
 
             Divider()
 
@@ -135,7 +135,7 @@ struct AgentCommandEditorSheet: View {
                 .disabled(!hasChanges || !isValid || isSaving)
             }
             .padding()
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(AppSurfaceTheme.backgroundColor())
         }
         .frame(width: 700, height: 500)
         .task {

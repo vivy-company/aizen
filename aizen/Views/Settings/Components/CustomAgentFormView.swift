@@ -75,7 +75,7 @@ struct CustomAgentFormView: View {
                     onCancel()
                 }
             }
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(AppSurfaceTheme.backgroundColor())
 
             Divider()
 
@@ -199,7 +199,7 @@ struct CustomAgentFormView: View {
                 .disabled(!isValid)
             }
             .padding()
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(AppSurfaceTheme.backgroundColor())
         }
         .frame(width: 500, height: 600)
         .alert("Error", isPresented: .constant(errorMessage != nil)) {

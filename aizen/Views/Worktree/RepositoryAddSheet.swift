@@ -7,10 +7,21 @@
 
 import SwiftUI
 
-enum AddRepositoryMode {
+enum AddRepositoryMode: CaseIterable {
     case clone
     case existing
     case create
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .existing:
+            return "repository.openExisting"
+        case .clone:
+            return "repository.cloneFromURL"
+        case .create:
+            return "repository.createNew"
+        }
+    }
 }
 
 struct RepositoryAddSheet: View {
@@ -28,7 +39,6 @@ struct RepositoryAddSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             DetailHeaderBar(showsBackground: false) {
                 Text("repository.add.title", bundle: .main)
                     .font(.title2)
@@ -37,44 +47,39 @@ struct RepositoryAddSheet: View {
 
             Divider()
 
-            // Content
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Mode picker
-                    Picker(String(localized: "repository.mode"), selection: $mode) {
-                        Label(String(localized: "repository.openExisting"), systemImage: "folder")
-                            .tag(AddRepositoryMode.existing)
-                        Label(String(localized: "repository.cloneFromURL"), systemImage: "arrow.down.circle")
-                            .tag(AddRepositoryMode.clone)
-                        Label(String(localized: "repository.createNew"), systemImage: "plus.square")
-                            .tag(AddRepositoryMode.create)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.top)
+            Form {
+                modeSection
 
-                    if mode == .clone {
-                        cloneView
-                    } else if mode == .create {
-                        createView
-                    } else {
-                        existingView
-                    }
+                if mode == .clone {
+                    cloneSection
+                } else if mode == .create {
+                    createSection
+                } else {
+                    existingSection
+                }
 
-                    if let error = errorMessage {
-                        Text(error)
-                            .font(.callout)
-                            .foregroundStyle(.red)
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                if let error = errorMessage {
+                    Section {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .font(.callout)
+                                Text("Add project failed")
+                                    .font(.callout)
+                                    .fontWeight(.semibold)
+                            }
+                            Text(error)
+                                .font(.system(.caption, design: .monospaced))
+                        }
+                        .foregroundStyle(.red)
                     }
                 }
-                .padding()
             }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
 
             Divider()
 
-            // Footer
             HStack {
                 Spacer()
 
@@ -92,31 +97,39 @@ struct RepositoryAddSheet: View {
             }
             .padding()
         }
-        .frame(width: 550)
-        .frame(minHeight: 300, maxHeight: 500)
+        .frame(width: 520)
+        .frame(minHeight: 360, maxHeight: 560)
     }
 
-    private var cloneView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("repository.add.url", bundle: .main)
-                .font(.headline)
-
-            TextField(String(localized: "repository.add.urlPlaceholder"), text: $cloneURL)
-                .textFieldStyle(.roundedBorder)
-
-            Text("repository.cloneLocation", bundle: .main)
-                .font(.headline)
-                .padding(.top, 8)
-
-            HStack {
-                TextField(String(localized: "repository.selectDestination"), text: $selectedPath)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(true)
-
-                Button(String(localized: "repository.add.choose")) {
-                    selectCloneDestination()
+    @ViewBuilder
+    private var modeSection: some View {
+        Section("Project Source") {
+            Picker("Mode", selection: $mode) {
+                ForEach(AddRepositoryMode.allCases, id: \.self) { mode in
+                    Text(mode.title)
+                        .tag(mode)
                 }
             }
+            .pickerStyle(.radioGroup)
+            .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var cloneSection: some View {
+        Section("Clone") {
+            LabeledContent(String(localized: "repository.add.url", bundle: .main)) {
+                TextField(String(localized: "repository.add.urlPlaceholder"), text: $cloneURL)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 280, alignment: .leading)
+            }
+
+            pathPickerRow(
+                title: String(localized: "repository.cloneLocation", bundle: .main),
+                placeholder: String(localized: "repository.selectDestination"),
+                action: selectCloneDestination
+            )
 
             Text("repository.cloneDescription", bundle: .main)
                 .font(.caption)
@@ -124,69 +137,89 @@ struct RepositoryAddSheet: View {
         }
     }
 
-    private var existingView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("repository.selectLocation", bundle: .main)
-                .font(.headline)
-
-            HStack {
-                TextField(String(localized: "repository.selectFolder"), text: $selectedPath)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(true)
-
-                Button(String(localized: "repository.add.choose")) {
-                    selectExistingRepository()
-                }
-            }
+    @ViewBuilder
+    private var existingSection: some View {
+        Section("Existing Repository") {
+            pathPickerRow(
+                title: String(localized: "repository.selectLocation", bundle: .main),
+                placeholder: String(localized: "repository.selectFolder"),
+                action: selectExistingRepository
+            )
 
             Text("repository.selectGitFolder", bundle: .main)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             if !selectedPath.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("repository.add.selected", bundle: .main)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text(selectedPath)
-                        .font(.caption)
-                        .fontDesign(.monospaced)
-                        .foregroundStyle(.primary)
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                }
-                .padding(.top, 8)
+                selectedPathPreview
             }
         }
     }
 
-    private var createView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("repository.newLocation", bundle: .main)
-                .font(.headline)
+    @ViewBuilder
+    private var createSection: some View {
+        Section("Create Repository") {
+            pathPickerRow(
+                title: String(localized: "repository.newLocation", bundle: .main),
+                placeholder: String(localized: "repository.selectFolder"),
+                action: selectNewRepositoryLocation
+            )
 
-            HStack {
-                TextField(String(localized: "repository.selectFolder"), text: $selectedPath)
+            LabeledContent(String(localized: "repository.create.name", bundle: .main)) {
+                TextField(String(localized: "repository.create.namePlaceholder"), text: $repositoryName)
                     .textFieldStyle(.roundedBorder)
-                    .disabled(true)
-
-                Button(String(localized: "repository.add.choose")) {
-                    selectNewRepositoryLocation()
-                }
+                    .frame(width: 280, alignment: .leading)
             }
-
-            Text("repository.create.name", bundle: .main)
-                .font(.headline)
-                .padding(.top, 8)
-
-            TextField(String(localized: "repository.create.namePlaceholder"), text: $repositoryName)
-                .textFieldStyle(.roundedBorder)
 
             Text("repository.create.description", bundle: .main)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var selectedPathPreview: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("repository.add.selected", bundle: .main)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(selectedPath)
+                .font(.caption)
+                .fontDesign(.monospaced)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    @ViewBuilder
+    private func pathPickerRow(title: String, placeholder: String, action: @escaping () -> Void) -> some View {
+        LabeledContent(title) {
+            HStack(spacing: 8) {
+                Text(selectedPath.isEmpty ? placeholder : selectedPath)
+                    .font(selectedPath.isEmpty ? .body : .system(.body, design: .monospaced))
+                    .foregroundStyle(selectedPath.isEmpty ? .tertiary : .primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+                    .frame(width: 280, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 1)
+                    }
+
+                Button(String(localized: "repository.add.choose")) {
+                    action()
+                }
+            }
         }
     }
 

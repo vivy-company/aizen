@@ -139,7 +139,7 @@ struct MCPInstallConfigSheet: View {
                     }
                 }
             }
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(AppSurfaceTheme.backgroundColor())
 
             Divider()
 
@@ -232,7 +232,7 @@ struct MCPInstallConfigSheet: View {
                 .disabled(!canInstall || isInstalling)
             }
             .padding()
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(AppSurfaceTheme.backgroundColor())
         }
         .frame(width: 520, height: 520)
         .onAppear {

@@ -12,6 +12,7 @@ import SwiftUI
 
 struct MCPMarketplaceView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var mcpManager = MCPManager.shared
 
     let agentId: String
@@ -50,6 +51,10 @@ struct MCPMarketplaceView: View {
         }
     }
 
+    private var surfaceColor: Color {
+        AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             headerView
@@ -59,7 +64,7 @@ struct MCPMarketplaceView: View {
             contentView
         }
         .frame(width: 600, height: 520)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(surfaceColor)
         .task {
             await loadTransportSupport()
             await mcpManager.syncInstalled(agentId: agentId, agentPath: agentPath)
@@ -139,7 +144,7 @@ struct MCPMarketplaceView: View {
             .buttonStyle(.bordered)
         }
         .padding(12)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(surfaceColor)
     }
 
     // MARK: - Filter Tabs

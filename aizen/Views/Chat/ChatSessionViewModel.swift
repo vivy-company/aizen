@@ -213,14 +213,11 @@ class ChatSessionViewModel: ObservableObject {
         if self.isNearBottom != isNearBottom {
             self.isNearBottom = isNearBottom
         }
-        if isNearBottom {
-            if userScrolledUp {
-                userScrolledUp = false
-            }
-        } else if !isProcessing && autoScrollTask == nil {
-            if !userScrolledUp {
-                userScrolledUp = true
-            }
+        // Mark userScrolledUp when user scrolls away from bottom.
+        // Do NOT auto-clear it when near bottom — only cleared explicitly
+        // by scrollToBottom() (button click or new turn start).
+        if !isNearBottom && !userScrolledUp {
+            userScrolledUp = true
         }
     }
     

@@ -166,6 +166,7 @@ class RecentSymbolsManager: ObservableObject {
 struct SFSymbolPickerView: View {
     @Binding var selectedSymbol: String
     @Binding var isPresented: Bool
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var searchText = ""
     @State private var selectedCategory = "all"
@@ -176,6 +177,10 @@ struct SFSymbolPickerView: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 8)
     private let pageSize = 200
 
+    private var surfaceColor: Color {
+        AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             headerView
@@ -185,7 +190,7 @@ struct SFSymbolPickerView: View {
             symbolGridView
         }
         .frame(width: 540, height: 480)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(surfaceColor)
         .onChange(of: searchText) { _, _ in
             displayLimit = pageSize
         }
@@ -331,7 +336,7 @@ struct SFSymbolPickerView: View {
                 .background(
                     selectedSymbol == symbol ?
                     Color.accentColor :
-                    Color(NSColor.windowBackgroundColor)
+                    surfaceColor
                 )
                 .cornerRadius(8)
         }

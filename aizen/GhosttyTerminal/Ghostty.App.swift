@@ -355,6 +355,23 @@ extension Ghostty {
             }()
 
             switch action.tag {
+            // Ignore Ghostty app/window management actions for embedded terminals.
+            // Aizen owns the app window lifecycle and terminal actions should not
+            // hide, close, or otherwise alter global window visibility.
+            case GHOSTTY_ACTION_TOGGLE_VISIBILITY,
+                 GHOSTTY_ACTION_TOGGLE_QUICK_TERMINAL,
+                 GHOSTTY_ACTION_TOGGLE_COMMAND_PALETTE,
+                 GHOSTTY_ACTION_NEW_WINDOW,
+                 GHOSTTY_ACTION_NEW_TAB,
+                 GHOSTTY_ACTION_CLOSE_TAB,
+                 GHOSTTY_ACTION_CLOSE_WINDOW,
+                 GHOSTTY_ACTION_CLOSE_ALL_WINDOWS,
+                 GHOSTTY_ACTION_TOGGLE_FULLSCREEN,
+                 GHOSTTY_ACTION_TOGGLE_MAXIMIZE,
+                 GHOSTTY_ACTION_PRESENT_TERMINAL:
+                Ghostty.logger.notice("Ignoring embedded Ghostty window action: \(String(describing: action.tag))")
+                return true
+
             case GHOSTTY_ACTION_SET_TITLE:
                 // Window/tab title change
                 if let titlePtr = action.action.set_title.title {

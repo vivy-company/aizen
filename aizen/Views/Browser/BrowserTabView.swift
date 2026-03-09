@@ -289,7 +289,7 @@ struct BrowserTabView: View {
             .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppSurfaceTheme.backgroundColor())
     }
 }
 
@@ -348,7 +348,7 @@ struct EmptyTabStateView: View {
             urlTextField
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppSurfaceTheme.backgroundColor())
     }
 
     @ViewBuilder

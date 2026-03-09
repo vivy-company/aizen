@@ -37,6 +37,7 @@ struct SplitTerminalView: View {
     @State private var pendingCloseAction: CloseAction = .pane
     @State private var keyMonitor: Any?
     @State private var focusedPaneVoiceRecording = false
+    @State private var paneVoiceRecordingStates: [String: Bool] = [:]
     @State private var voiceAction: (paneId: String, action: VoiceAction)?
     @State private var focusRequestVersion: Int = 0
     @State private var splitActions = TerminalSplitActions()
@@ -80,6 +81,7 @@ struct SplitTerminalView: View {
             .onChange(of: focusedPaneId) { _, _ in
                 guard isSelected else { return }
                 guard !focusedPaneId.isEmpty else { return }
+                focusedPaneVoiceRecording = paneVoiceRecordingStates[focusedPaneId] ?? false
                 scheduleFocusSave()
                 applyTitleForFocusedPane()
             }
@@ -163,6 +165,7 @@ struct SplitTerminalView: View {
                     onProcessExit: { handleProcessExit(for: paneId) },
                     onTitleChange: { title in handleTitleChange(for: paneId, title: title) },
                     onVoiceRecordingChanged: { isRecording in
+                        paneVoiceRecordingStates[paneId] = isRecording
                         if focusedPaneId == paneId {
                             focusedPaneVoiceRecording = isRecording
                         }
@@ -224,6 +227,8 @@ struct SplitTerminalView: View {
     }
 
     private func handleProcessExit(for paneId: String) {
+        paneVoiceRecordingStates.removeValue(forKey: paneId)
+
         // Remove terminal from manager
         if let sessionId = session.id {
             sessionManager.removeTerminal(for: sessionId, paneId: paneId)
@@ -297,6 +302,7 @@ struct SplitTerminalView: View {
 
     private func executeClosePaneOnly() {
         let paneIdToClose = focusedPaneId
+        paneVoiceRecordingStates.removeValue(forKey: paneIdToClose)
 
         guard let newLayout = layout.removingPane(paneIdToClose) else {
             closeTab()
@@ -327,6 +333,10 @@ struct SplitTerminalView: View {
 
     private func closeTab() {
         let allPaneIds = layout.allPaneIds()
+        for paneId in allPaneIds {
+            paneVoiceRecordingStates.removeValue(forKey: paneId)
+        }
+        focusedPaneVoiceRecording = false
 
         // Remove all terminals for this session
         if let sessionId = session.id {

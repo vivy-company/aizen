@@ -10,6 +10,7 @@ import CoreData
 
 struct RootView: View {
     let context: NSManagedObjectContext
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var gitChangesContext: GitChangesContext?
     @State private var gitPanelController: GitPanelWindowController?
@@ -24,12 +25,22 @@ struct RootView: View {
         _repositoryManager = StateObject(wrappedValue: RepositoryManager(viewContext: context))
     }
 
+    private var surfaceColor: Color {
+        AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
+    }
+
+    private var surfaceNSColor: NSColor {
+        AppSurfaceTheme.backgroundNSColor(colorScheme: colorScheme)
+    }
+
     var body: some View {
         ContentView(
             context: context,
             repositoryManager: repositoryManager,
             gitChangesContext: $gitChangesContext
         )
+        .background(surfaceColor)
+        .background(WindowBackgroundSync(color: surfaceNSColor))
         .onAppear {
             restoreGitPanelIfNeeded()
             if LicenseManager.shared.hasPendingDeepLink {

@@ -67,7 +67,7 @@ struct WorktreeListView: View {
     }
 
     private var searchFieldFillFallback: Color {
-        colorScheme == .dark ? Color(nsColor: .windowBackgroundColor).opacity(0.58) : .white.opacity(0.78)
+        colorScheme == .dark ? AppSurfaceTheme.backgroundColor().opacity(0.58) : AppSurfaceTheme.backgroundColor().opacity(0.78)
     }
 
     @ViewBuilder
