@@ -202,6 +202,7 @@ struct CustomAgentFormView: View {
             .background(AppSurfaceTheme.backgroundColor())
         }
         .frame(width: 500, height: 600)
+        .settingsSheetChrome()
         .alert("Error", isPresented: .constant(errorMessage != nil)) {
             Button("OK") { errorMessage = nil }
         } message: {

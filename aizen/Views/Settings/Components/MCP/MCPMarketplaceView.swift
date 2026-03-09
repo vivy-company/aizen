@@ -64,7 +64,7 @@ struct MCPMarketplaceView: View {
             contentView
         }
         .frame(width: 600, height: 520)
-        .background(surfaceColor)
+        .settingsSheetChrome()
         .task {
             await loadTransportSupport()
             await mcpManager.syncInstalled(agentId: agentId, agentPath: agentPath)

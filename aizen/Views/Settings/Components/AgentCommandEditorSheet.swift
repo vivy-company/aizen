@@ -138,6 +138,7 @@ struct AgentCommandEditorSheet: View {
             .background(AppSurfaceTheme.backgroundColor())
         }
         .frame(width: 700, height: 500)
+        .settingsSheetChrome()
         .task {
             loadCommand()
         }

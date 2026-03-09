@@ -460,6 +460,7 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .settingsSurface()
         .onAppear {
             loadCurrentLanguage()
             refreshCLIStatus()

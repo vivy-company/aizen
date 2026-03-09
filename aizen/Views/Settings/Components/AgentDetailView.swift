@@ -424,6 +424,7 @@ struct AgentDetailView: View {
             }
         }
         .formStyle(.grouped)
+        .settingsSurface()
         .safeAreaInset(edge: .bottom) {
             if let result = testResult {
                 let isSuccess = result.contains("Success") || result.contains("Updated")

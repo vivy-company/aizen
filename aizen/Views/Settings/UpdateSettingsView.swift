@@ -45,6 +45,7 @@ struct UpdateSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .settingsSheetChrome()
         .frame(width: 450)
     }
 }

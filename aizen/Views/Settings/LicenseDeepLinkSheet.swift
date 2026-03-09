@@ -67,6 +67,7 @@ struct LicenseDeepLinkSheet: View {
         }
         .padding(24)
         .frame(width: 360)
+        .settingsSheetChrome()
         .onAppear {
             start()
         }

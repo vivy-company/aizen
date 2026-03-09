@@ -122,6 +122,7 @@ struct ChatSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .settingsSurface()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             if availableFonts.isEmpty {

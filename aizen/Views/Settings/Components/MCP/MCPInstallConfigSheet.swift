@@ -235,6 +235,7 @@ struct MCPInstallConfigSheet: View {
             .background(AppSurfaceTheme.backgroundColor())
         }
         .frame(width: 520, height: 520)
+        .settingsSheetChrome()
         .onAppear {
             setupInitialState()
         }

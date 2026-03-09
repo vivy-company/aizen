@@ -138,8 +138,7 @@ struct SettingsView: View {
             // Forces creation of an NSToolbar so the window's unified toolbar style applies.
             ToolbarItem(placement: .principal) { Text("") }
         }
-        .background(surfaceColor)
-        .background(WindowBackgroundSync(color: surfaceNSColor))
+        .settingsSheetChrome()
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 750, minHeight: 500)
         .onAppear {

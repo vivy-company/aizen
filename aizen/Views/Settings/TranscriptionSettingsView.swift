@@ -80,7 +80,7 @@ struct TranscriptionSettingsView: View {
             }
             .padding(24)
         }
-        .background(surfaceColor)
+        .settingsSurface()
         .onAppear {
             whisperManager.modelId = whisperModelId
             parakeetManager.modelId = parakeetModelId

@@ -38,7 +38,6 @@ class ChatSessionViewModel: ObservableObject {
     @Published var currentAgentSession: AgentSession?
     @Published var currentPermissionRequest: RequestPermissionRequest?
     @Published var attachments: [ChatAttachment] = []
-    @Published var timelineItems: [TimelineItem] = []
     @Published var timelineRenderEpoch: UInt64 = 0
 
     // Track previous IDs for incremental sync (avoids storing full duplicate arrays)
@@ -729,10 +728,9 @@ class ChatSessionViewModel: ObservableObject {
             sessionManager.removeAgentSession(for: sessionId)
         }
         currentAgentSession = nil
-        // Clear tracked IDs and timeline (messages/toolCalls are computed from session)
+        // Clear tracked IDs and bump timeline revision (messages/toolCalls are computed from session)
         previousMessageIds = []
         previousToolCallIds = []
-        timelineItems = []
         timelineRenderEpoch &+= 1
 
         setupAgentSession()
@@ -776,7 +774,6 @@ class ChatSessionViewModel: ObservableObject {
                 
                 previousMessageIds = []
                 previousToolCallIds = []
-                timelineItems = []
                 timelineRenderEpoch &+= 1
                 
                 setupSessionObservers(session: freshAgentSession)

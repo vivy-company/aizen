@@ -111,6 +111,7 @@ struct TerminalPresetFormView: View {
             .background(Color(NSColor.controlBackgroundColor))
         }
         .frame(width: 450, height: 360)
+        .settingsSheetChrome()
         .sheet(isPresented: $showingIconPicker) {
             SFSymbolPickerView(selectedSymbol: $selectedIcon, isPresented: $showingIconPicker)
         }

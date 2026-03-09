@@ -120,6 +120,7 @@ struct AizenProSettingsView: View {
             }
             .formStyle(.grouped)
         }
+        .settingsSurface()
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if licenseManager.hasActivePlan {

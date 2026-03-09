@@ -154,6 +154,7 @@ struct EditorSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .settingsSurface()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             if availableThemes.isEmpty {

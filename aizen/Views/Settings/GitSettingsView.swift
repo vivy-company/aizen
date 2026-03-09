@@ -68,6 +68,7 @@ struct GitSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .settingsSurface()
         .sheet(isPresented: $showingAddTemplate) {
             BranchTemplateFormView(
                 onSave: { _ in },

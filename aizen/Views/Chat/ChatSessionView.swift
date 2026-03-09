@@ -8,6 +8,7 @@
 import ACP
 import CoreData
 import SwiftUI
+import VVChatTimeline
 
 struct ChatSessionView: View {
     let worktree: Worktree
@@ -31,6 +32,7 @@ struct ChatSessionView: View {
     @State private var chatActions = ChatActions()
     @State private var isWindowResizing = false
     @State private var wasNearBottomBeforeResize = true
+    @State private var chatTimelineState = VVChatTimelineState()
 
     // Input state (local to avoid re-rendering entire view on keystroke)
     @State private var inputText = ""
@@ -81,7 +83,9 @@ struct ChatSessionView: View {
                 ZStack(alignment: .bottom) {
                     ChatTimelineContainer(
                         key: timelineRenderKey,
-                        timelineItems: viewModel.timelineItems,
+                        messages: viewModel.messages,
+                        toolCalls: viewModel.toolCalls,
+                        isStreaming: viewModel.currentAgentSession?.isStreaming ?? false,
                         isSessionInitializing: viewModel.isSessionInitializing,
                         pendingPlanRequest: pendingPlanTimelineRequest,
                         worktreePath: worktree.path,
@@ -89,9 +93,10 @@ struct ChatSessionView: View {
                         scrollRequest: viewModel.scrollRequest,
                         isAutoScrollEnabled: { !viewModel.userScrolledUp },
                         onAppear: viewModel.loadMessages,
-                        onScrollPositionChange: { isNearBottom in
+                        onTimelineStateChange: { state in
+                            chatTimelineState = state
                             viewModel.enqueueScrollPositionChange(
-                                isNearBottom,
+                                state.isPinnedToBottom,
                                 isLayoutResizing: isLayoutResizing
                             )
                         }
@@ -438,7 +443,8 @@ struct ChatSessionView: View {
     }
 
     private var shouldShowScrollToBottom: Bool {
-        !viewModel.isNearBottom && !viewModel.timelineItems.isEmpty
+        (!chatTimelineState.isPinnedToBottom || chatTimelineState.hasUnreadNewContent)
+            && (!viewModel.messages.isEmpty || !viewModel.toolCalls.isEmpty)
     }
 
     private func scrollToBottom() {
@@ -702,7 +708,9 @@ private struct ChatTimelineRenderKey: Equatable {
 
 private struct ChatTimelineContainer: View, Equatable {
     let key: ChatTimelineRenderKey
-    let timelineItems: [TimelineItem]
+    let messages: [MessageItem]
+    let toolCalls: [ToolCall]
+    let isStreaming: Bool
     let isSessionInitializing: Bool
     let pendingPlanRequest: RequestPermissionRequest?
     let worktreePath: String?
@@ -710,7 +718,7 @@ private struct ChatTimelineContainer: View, Equatable {
     let scrollRequest: ChatSessionViewModel.ScrollRequest?
     let isAutoScrollEnabled: () -> Bool
     let onAppear: () -> Void
-    let onScrollPositionChange: (Bool) -> Void
+    let onTimelineStateChange: (VVChatTimelineState) -> Void
 
     static func == (lhs: ChatTimelineContainer, rhs: ChatTimelineContainer) -> Bool {
         lhs.key == rhs.key
@@ -718,7 +726,9 @@ private struct ChatTimelineContainer: View, Equatable {
 
     var body: some View {
         ChatMessageList(
-            timelineItems: timelineItems,
+            messages: messages,
+            toolCalls: toolCalls,
+            isStreaming: isStreaming,
             isSessionInitializing: isSessionInitializing,
             pendingPlanRequest: pendingPlanRequest,
             worktreePath: worktreePath,
@@ -726,7 +736,7 @@ private struct ChatTimelineContainer: View, Equatable {
             scrollRequest: scrollRequest,
             isAutoScrollEnabled: isAutoScrollEnabled,
             onAppear: onAppear,
-            onScrollPositionChange: onScrollPositionChange
+            onTimelineStateChange: onTimelineStateChange
         )
     }
 }

@@ -104,6 +104,7 @@ struct BranchTemplateFormView: View {
             .background(Color(NSColor.controlBackgroundColor))
         }
         .frame(width: 400, height: 300)
+        .settingsSheetChrome()
         .sheet(isPresented: $showingIconPicker) {
             SFSymbolPickerView(selectedSymbol: $selectedIcon, isPresented: $showingIconPicker)
         }

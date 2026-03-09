@@ -348,6 +348,7 @@ struct PostCreateActionEditorSheet: View {
                 configSectionsForType
             }
             .formStyle(.grouped)
+            .settingsSurface()
 
             Divider()
 
@@ -371,6 +372,7 @@ struct PostCreateActionEditorSheet: View {
             .padding()
         }
         .frame(width: 480, height: 500)
+        .settingsSheetChrome()
         .onAppear {
             if let action = action {
                 loadAction(action)

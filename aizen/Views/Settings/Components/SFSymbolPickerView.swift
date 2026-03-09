@@ -190,7 +190,7 @@ struct SFSymbolPickerView: View {
             symbolGridView
         }
         .frame(width: 540, height: 480)
-        .background(surfaceColor)
+        .settingsSheetChrome()
         .onChange(of: searchText) { _, _ in
             displayLimit = pageSize
         }

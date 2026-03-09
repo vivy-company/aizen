@@ -14,7 +14,9 @@ import VVMarkdown
 import VVMetalPrimitives
 
 struct ChatMessageList: View {
-    let timelineItems: [TimelineItem]
+    let messages: [MessageItem]
+    let toolCalls: [ToolCall]
+    let isStreaming: Bool
     let isSessionInitializing: Bool
     let pendingPlanRequest: RequestPermissionRequest?
     let worktreePath: String?
@@ -22,7 +24,7 @@ struct ChatMessageList: View {
     let scrollRequest: ChatSessionViewModel.ScrollRequest?
     var isAutoScrollEnabled: () -> Bool = { true }
     let onAppear: () -> Void
-    var onScrollPositionChange: (Bool) -> Void = { _ in }
+    var onTimelineStateChange: (VVChatTimelineState) -> Void = { _ in }
 
     @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
     @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
@@ -32,10 +34,9 @@ struct ChatMessageList: View {
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var controller = VVChatTimelineController(style: .init(), renderWidth: 0)
-    @State private var pendingSyncTask: Task<Void, Never>?
-    @State private var appliedVisibleItems: [TimelineItem] = []
     @State private var appliedEntries: [VVChatTimelineEntry] = []
-    @State private var lastReportedPinnedToBottom: Bool?
+    @State private var lastBuildMetadata = TimelineBuildMetadata()
+    @State private var lastReportedTimelineState: VVChatTimelineState?
     @State private var copiedUserMessageID: String?
     @State private var copiedUserMessageState: CopyFooterState = .idle
     @State private var hoveredCopyUserMessageID: String?
@@ -44,25 +45,27 @@ struct ChatMessageList: View {
     @State private var presentedToolDiff: PresentedToolDiff?
 
     private var shouldShowLoading: Bool {
-        isSessionInitializing && timelineItems.isEmpty
+        isSessionInitializing && messages.isEmpty && toolCalls.isEmpty
     }
 
-    private var visibleItems: [TimelineItem] {
-        timelineItems.filter { item in
-            if case .toolCall(let call) = item {
-                return call.parentToolCallId == nil
-            }
-            return true
-        }
+    private var topLevelToolCalls: [ToolCall] {
+        toolCalls.filter { $0.parentToolCallId == nil }
     }
 
     private var timelineSignature: Int {
         var hasher = Hasher()
-        hasher.combine(visibleItems.count)
-        for item in visibleItems {
-            hasher.combine(itemRevisionToken(item))
+        hasher.combine(messages.count)
+        for message in messages {
+            hasher.combine(messageRevisionToken(message))
+        }
+        hasher.combine(topLevelToolCalls.count)
+        for toolCall in topLevelToolCalls {
+            hasher.combine(toolCallRevisionToken(toolCall))
         }
         hasher.combine(planRequestIdentity)
+        hasher.combine(isStreaming)
+        hasher.combine(copiedUserMessageID)
+        hasher.combine(copyFooterStateToken(for: copiedUserMessageID ?? ""))
         for groupID in expandedToolGroupIDs.sorted() {
             hasher.combine(groupID)
         }
@@ -227,11 +230,10 @@ struct ChatMessageList: View {
             if shouldShowLoading {
                 AgentLoadingView(agentName: selectedAgent)
             } else {
-                VVChatTimelineViewSwiftUI(
+                ChatTimelineHost(
                     controller: controller,
-                    onStateChange: { state in
-                        reportScrollPositionChangeIfNeeded(state.isPinnedToBottom)
-                    },
+                    scrollRequest: scrollRequest,
+                    onStateChange: reportTimelineStateIfNeeded,
                     onUserMessageCopyAction: handleUserMessageCopyAction,
                     onUserMessageCopyHoverChange: handleUserMessageCopyHoverChange,
                     onEntryActivate: handleEntryActivate,
@@ -247,78 +249,33 @@ struct ChatMessageList: View {
         .onAppear {
             onAppear()
             controller.updateStyle(timelineStyle)
-            scheduleSyncTimeline(scrollToBottom: true, debounce: false)
-            reportScrollPositionChangeIfNeeded(controller.state.isPinnedToBottom)
+            syncTimeline(scrollToBottom: true)
+            reportTimelineStateIfNeeded(controller.state)
         }
         .onChange(of: timelineSignature) { _, _ in
-            scheduleSyncTimeline(scrollToBottom: isAutoScrollEnabled(), debounce: true)
-        }
-        .onChange(of: scrollRequest?.id) { _, _ in
-            handleScrollRequest()
+            syncTimeline(scrollToBottom: isAutoScrollEnabled())
         }
         .onChange(of: colorScheme) { _, _ in
             controller.updateStyle(timelineStyle)
-            scheduleSyncTimeline(scrollToBottom: false, debounce: true)
+            syncTimeline(scrollToBottom: false)
         }
         .onChange(of: chatFontSize) { _, _ in
             controller.updateStyle(timelineStyle)
-            scheduleSyncTimeline(scrollToBottom: false, debounce: true)
+            syncTimeline(scrollToBottom: false)
         }
         .onChange(of: chatFontFamily) { _, _ in
             controller.updateStyle(timelineStyle)
-            scheduleSyncTimeline(scrollToBottom: false, debounce: true)
+            syncTimeline(scrollToBottom: false)
         }
         .onDisappear {
-            pendingSyncTask?.cancel()
             copyIndicatorResetTask?.cancel()
         }
     }
 
-    private func handleScrollRequest() {
-        guard scrollRequest != nil else { return }
-        controller.jumpToLatest()
-        reportScrollPositionChangeIfNeeded(controller.state.isPinnedToBottom)
-    }
-
     private func syncTimeline(scrollToBottom: Bool) {
-        let items = visibleItems
-
-        if pendingPlanRequest != nil || appliedVisibleItems.isEmpty {
-            rebuildEntries(from: items, scrollToBottom: scrollToBottom)
-            return
-        }
-
-        if let update = makeVisibleItemsUpdate(from: appliedVisibleItems, to: items) {
-            switch update {
-            case .append(let appendedItems):
-                appendTimelineItems(appendedItems, after: appliedVisibleItems, scrollToBottom: scrollToBottom)
-            case .updateLastAgentMessage(let item, let previousItems):
-                updateLastAgentMessage(item, after: previousItems, scrollToBottom: scrollToBottom)
-            }
-            appliedVisibleItems = items
-            return
-        }
-
-        rebuildEntries(from: items, scrollToBottom: scrollToBottom)
-    }
-
-    private func scheduleSyncTimeline(scrollToBottom: Bool, debounce: Bool) {
-        pendingSyncTask?.cancel()
-
-        if !debounce {
-            syncTimeline(scrollToBottom: scrollToBottom)
-            return
-        }
-
-        pendingSyncTask = Task { @MainActor in
-            do {
-                try await Task.sleep(for: .milliseconds(60))
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else { return }
-            syncTimeline(scrollToBottom: scrollToBottom)
-        }
+        let build = buildTimeline()
+        lastBuildMetadata = build.metadata
+        apply(entries: build.entries, scrollToBottom: scrollToBottom)
     }
 
     private func apply(entries newEntries: [VVChatTimelineEntry], scrollToBottom: Bool) {
@@ -338,13 +295,13 @@ struct ChatMessageList: View {
 
         if newCount > oldCount {
             for entry in newEntries[oldCount...] {
-                append(entry, scrollToBottom: scrollToBottom)
+                append(entry)
             }
             return
         }
 
         if let update = makeStreamingDraftUpdate(from: appliedEntries, to: newEntries) {
-            applyStreamingDraftUpdate(update, scrollToBottom: scrollToBottom)
+            applyStreamingDraftUpdate(update)
             return
         }
 
@@ -353,145 +310,6 @@ struct ChatMessageList: View {
             scrollToBottom: scrollToBottom,
             customEntryMessageMapper: customEntryMessageMapper
         )
-    }
-
-    private func rebuildEntries(from items: [TimelineItem], scrollToBottom: Bool) {
-        let entries = buildEntries(from: items)
-        apply(entries: entries, scrollToBottom: scrollToBottom)
-        appliedVisibleItems = items
-    }
-
-    private enum VisibleItemsUpdate {
-        case append([TimelineItem])
-        case updateLastAgentMessage(TimelineItem, previousItems: [TimelineItem])
-    }
-
-    private func makeVisibleItemsUpdate(from oldItems: [TimelineItem], to newItems: [TimelineItem]) -> VisibleItemsUpdate? {
-        guard planRequestIdentity == "none" else { return nil }
-
-        let oldCount = oldItems.count
-        let newCount = newItems.count
-
-        if newCount > oldCount {
-            guard oldCount > 0 else { return nil }
-            for index in 0..<oldCount {
-                guard oldItems[index].stableId == newItems[index].stableId,
-                      oldItems[index].id == newItems[index].id else {
-                    return nil
-                }
-            }
-            return .append(Array(newItems.dropFirst(oldCount)))
-        }
-
-        guard newCount == oldCount, newCount > 0 else { return nil }
-
-        var changedIndex: Int?
-        for index in 0..<newCount {
-            guard oldItems[index].stableId == newItems[index].stableId else { return nil }
-            if oldItems[index].id != newItems[index].id {
-                if changedIndex != nil {
-                    return nil
-                }
-                changedIndex = index
-            }
-        }
-
-        guard let changedIndex else { return nil }
-        guard changedIndex == newCount - 1 else { return nil }
-        guard case .message(let oldMessage) = oldItems[changedIndex],
-              case .message(let newMessage) = newItems[changedIndex] else {
-            return nil
-        }
-        guard oldMessage.role == .agent, newMessage.role == .agent else { return nil }
-        return .updateLastAgentMessage(newItems[changedIndex], previousItems: Array(newItems.dropLast()))
-    }
-
-    private func appendTimelineItems(_ items: [TimelineItem], after previousItems: [TimelineItem], scrollToBottom: Bool) {
-        guard !items.isEmpty else { return }
-
-        var newEntries = appliedEntries
-        var hasRenderedAgentMessageInTurn = assistantLaneContinuationState(after: previousItems)
-
-        for item in items {
-            let startsAssistantLane = itemStartsAssistantLane(item, hasRenderedAgentMessageInTurn: hasRenderedAgentMessageInTurn)
-            let built = makeEntries(from: item, startsAssistantLane: startsAssistantLane)
-            if !built.isEmpty {
-                for entry in built {
-                    append(entry, scrollToBottom: scrollToBottom)
-                    newEntries.append(entry)
-                }
-            }
-            hasRenderedAgentMessageInTurn = nextAssistantLaneContinuationState(
-                afterAppending: item,
-                producedEntries: built,
-                current: hasRenderedAgentMessageInTurn
-            )
-        }
-
-        appliedEntries = newEntries
-    }
-
-    private func updateLastAgentMessage(_ item: TimelineItem, after previousItems: [TimelineItem], scrollToBottom: Bool) {
-        let startsAssistantLane = itemStartsAssistantLane(item, hasRenderedAgentMessageInTurn: assistantLaneContinuationState(after: previousItems))
-        let rebuiltEntries = makeEntries(from: item, startsAssistantLane: startsAssistantLane)
-
-        guard rebuiltEntries.count == 1,
-              case .message(let newMessage) = rebuiltEntries[0],
-              let lastApplied = appliedEntries.last,
-              case .message(let oldMessage) = lastApplied,
-              oldMessage.id == newMessage.id,
-              oldMessage.role == .assistant,
-              newMessage.role == .assistant else {
-            rebuildEntries(from: previousItems + [item], scrollToBottom: scrollToBottom)
-            return
-        }
-
-        applyStreamingDraftUpdate(
-            StreamingDraftUpdate(oldMessage: oldMessage, newMessage: newMessage),
-            scrollToBottom: scrollToBottom
-        )
-
-        if !appliedEntries.isEmpty {
-            appliedEntries[appliedEntries.count - 1] = rebuiltEntries[0]
-        }
-    }
-
-    private func assistantLaneContinuationState(after items: [TimelineItem]) -> Bool {
-        var hasRenderedAgentMessageInTurn = false
-        for item in items {
-            let startsAssistantLane = itemStartsAssistantLane(item, hasRenderedAgentMessageInTurn: hasRenderedAgentMessageInTurn)
-            let built = makeEntries(from: item, startsAssistantLane: startsAssistantLane)
-            hasRenderedAgentMessageInTurn = nextAssistantLaneContinuationState(
-                afterAppending: item,
-                producedEntries: built,
-                current: hasRenderedAgentMessageInTurn
-            )
-        }
-        return hasRenderedAgentMessageInTurn
-    }
-
-    private func itemStartsAssistantLane(_ item: TimelineItem, hasRenderedAgentMessageInTurn: Bool) -> Bool {
-        guard case .message(let message) = item else { return false }
-        return message.role == .agent && !hasRenderedAgentMessageInTurn
-    }
-
-    private func nextAssistantLaneContinuationState(
-        afterAppending item: TimelineItem,
-        producedEntries: [VVChatTimelineEntry],
-        current: Bool
-    ) -> Bool {
-        switch item {
-        case .message(let message):
-            if !producedEntries.isEmpty {
-                return message.role == .agent
-            }
-            if message.role != .agent {
-                return false
-            }
-            return current
-        case .toolCall, .toolCallGroup, .turnSummary:
-            return current
-        }
     }
 
     private func canApplyIncrementally(from oldEntries: [VVChatTimelineEntry], to newEntries: [VVChatTimelineEntry]) -> Bool {
@@ -507,17 +325,12 @@ struct ChatMessageList: View {
         return true
     }
 
-    private func append(_ entry: VVChatTimelineEntry, scrollToBottom: Bool) {
+    private func append(_ entry: VVChatTimelineEntry) {
         switch entry {
         case .message(let message):
             controller.appendMessage(message)
         case .custom(let custom):
             controller.appendCustomEntry(custom)
-        }
-
-        if scrollToBottom {
-            controller.jumpToLatest()
-            reportScrollPositionChangeIfNeeded(controller.state.isPinnedToBottom)
         }
     }
 
@@ -557,7 +370,7 @@ struct ChatMessageList: View {
         return StreamingDraftUpdate(oldMessage: oldMessage, newMessage: newMessage)
     }
 
-    private func applyStreamingDraftUpdate(_ update: StreamingDraftUpdate, scrollToBottom: Bool) {
+    private func applyStreamingDraftUpdate(_ update: StreamingDraftUpdate) {
         switch update.newMessage.state {
         case .draft:
             controller.updateDraftMessage(
@@ -568,17 +381,12 @@ struct ChatMessageList: View {
         case .final:
             controller.finalizeMessage(id: update.newMessage.id, content: update.newMessage.content)
         }
-
-        if scrollToBottom {
-            controller.jumpToLatest()
-            reportScrollPositionChangeIfNeeded(controller.state.isPinnedToBottom)
-        }
     }
 
-    private func reportScrollPositionChangeIfNeeded(_ isPinnedToBottom: Bool) {
-        guard lastReportedPinnedToBottom != isPinnedToBottom else { return }
-        lastReportedPinnedToBottom = isPinnedToBottom
-        onScrollPositionChange(isPinnedToBottom)
+    private func reportTimelineStateIfNeeded(_ state: VVChatTimelineState) {
+        guard lastReportedTimelineState != state else { return }
+        lastReportedTimelineState = state
+        onTimelineStateChange(state)
     }
 
     private func entryRevision(_ entry: VVChatTimelineEntry) -> Int {
@@ -604,7 +412,7 @@ struct ChatMessageList: View {
             Clipboard.copy(copyText)
             copiedUserMessageID = messageID
             copiedUserMessageState = .transition
-            scheduleSyncTimeline(scrollToBottom: false, debounce: false)
+            syncTimeline(scrollToBottom: false)
 
             copyIndicatorResetTask?.cancel()
             copyIndicatorResetTask = Task { @MainActor in
@@ -615,7 +423,7 @@ struct ChatMessageList: View {
                 }
                 guard !Task.isCancelled, copiedUserMessageID == messageID else { return }
                 copiedUserMessageState = .confirmed
-                scheduleSyncTimeline(scrollToBottom: false, debounce: false)
+                syncTimeline(scrollToBottom: false)
 
                 do {
                     try await Task.sleep(for: .milliseconds(1110))
@@ -625,7 +433,7 @@ struct ChatMessageList: View {
                 guard !Task.isCancelled, copiedUserMessageID == messageID else { return }
                 copiedUserMessageID = nil
                 copiedUserMessageState = .idle
-                scheduleSyncTimeline(scrollToBottom: false, debounce: false)
+                syncTimeline(scrollToBottom: false)
             }
             return
         }
@@ -643,7 +451,7 @@ struct ChatMessageList: View {
             } else {
                 expandedToolGroupIDs.insert(entryID)
             }
-            scheduleSyncTimeline(scrollToBottom: false, debounce: false)
+            syncTimeline(scrollToBottom: false)
             return
         }
 
@@ -697,12 +505,7 @@ struct ChatMessageList: View {
     }
 
     private func timelineMessage(withID messageID: String) -> MessageItem? {
-        for item in visibleItems {
-            guard case .message(let message) = item else { continue }
-            guard message.id == messageID else { continue }
-            return message
-        }
-        return nil
+        lastBuildMetadata.messagesByID[messageID]
     }
 
     private var customEntryMessageMapper: VVChatTimelineController.CustomEntryMessageMapper {
@@ -913,7 +716,427 @@ struct ChatMessageList: View {
         )
     }
 
-    private func buildEntries(from sourceItems: [TimelineItem]) -> [VVChatTimelineEntry] {
+    private struct TimelineBuildResult {
+        let entries: [VVChatTimelineEntry]
+        let metadata: TimelineBuildMetadata
+    }
+
+    private struct TimelineBuildMetadata {
+        var messagesByID: [String: MessageItem] = [:]
+        var toolCallsByEntryID: [String: ToolCall] = [:]
+        var groupEntryIDs: Set<String> = []
+    }
+
+    private enum TimelineSourceItem {
+        case message(MessageItem)
+        case toolCall(ToolCall)
+        case toolCallGroup(ToolCallGroup)
+        case turnSummary(TurnSummary)
+    }
+
+    private struct FileChangeSummary: Identifiable {
+        let path: String
+        let isNew: Bool
+        var linesAdded: Int
+        var linesRemoved: Int
+
+        var id: String { path }
+    }
+
+    private struct TurnSummary: Identifiable {
+        let id: String
+        let timestamp: Date
+        let duration: TimeInterval
+        let toolCallCount: Int
+        let fileChanges: [FileChangeSummary]
+
+        var entryID: String { "summary-\(id)" }
+
+        var formattedDuration: String {
+            if duration < 1 {
+                return "<1s"
+            } else if duration < 60 {
+                return "\(Int(duration))s"
+            } else {
+                let minutes = Int(duration) / 60
+                let seconds = Int(duration) % 60
+                return "\(minutes)m \(seconds)s"
+            }
+        }
+    }
+
+    private struct ToolCallGroup: Identifiable {
+        let id: String
+        let toolCalls: [ToolCall]
+        let timestamp: Date
+
+        var entryID: String { "group-\(id)" }
+
+        init(toolCalls: [ToolCall]) {
+            self.id = toolCalls.map(\.id).sorted().joined(separator: "|")
+            self.toolCalls = toolCalls.sorted { $0.timestamp < $1.timestamp }
+            self.timestamp = self.toolCalls.first?.timestamp ?? .distantPast
+        }
+
+        var hasFailed: Bool {
+            toolCalls.contains { $0.status == .failed }
+        }
+
+        var isInProgress: Bool {
+            toolCalls.contains { $0.status == .inProgress || $0.status == .pending }
+        }
+
+        var formattedDuration: String? {
+            guard let start = toolCalls.map(\.timestamp).min() else { return nil }
+            guard let end = toolCalls
+                .filter({ $0.status == .completed || $0.status == .failed })
+                .map(\.timestamp)
+                .max() else { return nil }
+
+            let duration = end.timeIntervalSince(start)
+            if duration < 1 {
+                return "<1s"
+            } else if duration < 60 {
+                return "\(Int(duration))s"
+            } else {
+                let minutes = Int(duration) / 60
+                let seconds = Int(duration) % 60
+                return "\(minutes)m \(seconds)s"
+            }
+        }
+    }
+
+    private enum OrderedTimelineSource {
+        case message(MessageItem)
+        case toolCall(ToolCall)
+    }
+
+    private struct OrderedTimelineItem {
+        let source: OrderedTimelineSource
+        let timestamp: Date
+        let priority: Int
+        let sequence: Int
+    }
+
+    private func assembleTimelineSourceItems() -> [TimelineSourceItem] {
+        let orderedSources = orderedTimelineSources()
+
+        var items: [TimelineSourceItem] = []
+        var toolCallBuffer: [ToolCall] = []
+        var turnToolCalls: [ToolCall] = []
+        var pendingSystemMessages: [MessageItem] = []
+
+        for ordered in orderedSources {
+            switch ordered.source {
+            case .message(let message):
+                if message.role == .system {
+                    pendingSystemMessages.append(message)
+                    continue
+                }
+
+                if message.role == .user {
+                    if !toolCallBuffer.isEmpty {
+                        appendBufferedToolCalls(toolCallBuffer, into: &items)
+                        turnToolCalls.append(contentsOf: toolCallBuffer)
+                        toolCallBuffer.removeAll(keepingCapacity: true)
+                    }
+
+                    if !turnToolCalls.isEmpty {
+                        items.append(.turnSummary(makeTurnSummary(from: turnToolCalls)))
+                        turnToolCalls.removeAll(keepingCapacity: true)
+                    }
+
+                    for systemMessage in pendingSystemMessages {
+                        items.append(.message(systemMessage))
+                    }
+                    pendingSystemMessages.removeAll(keepingCapacity: true)
+                }
+
+                if message.role == .agent && !toolCallBuffer.isEmpty {
+                    appendBufferedToolCalls(toolCallBuffer, into: &items)
+                    turnToolCalls.append(contentsOf: toolCallBuffer)
+                    toolCallBuffer.removeAll(keepingCapacity: true)
+                }
+
+                items.append(.message(message))
+
+            case .toolCall(let toolCall):
+                toolCallBuffer.append(toolCall)
+            }
+        }
+
+        if !toolCallBuffer.isEmpty {
+            turnToolCalls.append(contentsOf: toolCallBuffer)
+            if isStreaming {
+                appendStreamingToolCallItems(from: toolCallBuffer, into: &items)
+            } else {
+                appendBufferedToolCalls(toolCallBuffer, into: &items)
+                items.append(.turnSummary(makeTurnSummary(from: turnToolCalls)))
+                for systemMessage in pendingSystemMessages {
+                    items.append(.message(systemMessage))
+                }
+                pendingSystemMessages.removeAll(keepingCapacity: true)
+            }
+        } else if !isStreaming && !turnToolCalls.isEmpty {
+            items.append(.turnSummary(makeTurnSummary(from: turnToolCalls)))
+            for systemMessage in pendingSystemMessages {
+                items.append(.message(systemMessage))
+            }
+            pendingSystemMessages.removeAll(keepingCapacity: true)
+        }
+
+        if !pendingSystemMessages.isEmpty {
+            for systemMessage in pendingSystemMessages {
+                items.append(.message(systemMessage))
+            }
+        }
+
+        return items
+    }
+
+    private func orderedTimelineSources() -> [OrderedTimelineItem] {
+        let anchoredTimestamps = anchoredToolCallTimestamps()
+        var sequence = 0
+        var items: [OrderedTimelineItem] = []
+        items.reserveCapacity(messages.count + topLevelToolCalls.count)
+
+        for message in messages {
+            let source = OrderedTimelineSource.message(message)
+            items.append(
+                OrderedTimelineItem(
+                    source: source,
+                    timestamp: message.timestamp,
+                    priority: sortPriority(for: source),
+                    sequence: sequence
+                )
+            )
+            sequence += 1
+        }
+
+        for toolCall in topLevelToolCalls {
+            let source = OrderedTimelineSource.toolCall(toolCall)
+            items.append(
+                OrderedTimelineItem(
+                    source: source,
+                    timestamp: anchoredTimestamps[toolCall.id] ?? toolCall.timestamp,
+                    priority: sortPriority(for: source),
+                    sequence: sequence
+                )
+            )
+            sequence += 1
+        }
+
+        items.sort { lhs, rhs in
+            if lhs.timestamp != rhs.timestamp {
+                return lhs.timestamp < rhs.timestamp
+            }
+            if lhs.priority != rhs.priority {
+                return lhs.priority < rhs.priority
+            }
+            return lhs.sequence < rhs.sequence
+        }
+
+        return items
+    }
+
+    private func anchoredToolCallTimestamps() -> [String: Date] {
+        var anchoredByID: [String: Date] = [:]
+
+        for message in messages {
+            let messageToolCalls = message.toolCalls.filter { $0.parentToolCallId == nil }
+            guard !messageToolCalls.isEmpty else { continue }
+
+            for (index, toolCall) in messageToolCalls.enumerated() {
+                let remaining = messageToolCalls.count - index
+                let anchored = message.timestamp.addingTimeInterval(-Double(remaining) * 0.000_001)
+                if let existing = anchoredByID[toolCall.id] {
+                    if anchored < existing {
+                        anchoredByID[toolCall.id] = anchored
+                    }
+                } else {
+                    anchoredByID[toolCall.id] = anchored
+                }
+            }
+        }
+
+        return anchoredByID
+    }
+
+    private func sortPriority(for source: OrderedTimelineSource) -> Int {
+        switch source {
+        case .toolCall:
+            return 1
+        case .message(let message):
+            switch message.role {
+            case .user:
+                return 0
+            case .agent:
+                return 2
+            case .system:
+                return 3
+            }
+        }
+    }
+
+    private func appendBufferedToolCalls(_ toolCalls: [ToolCall], into items: inout [TimelineSourceItem]) {
+        guard !toolCalls.isEmpty else { return }
+
+        if toolCalls.count == 1, let toolCall = toolCalls.first {
+            items.append(.toolCall(toolCall))
+            return
+        }
+
+        items.append(.toolCallGroup(makeToolCallGroup(from: toolCalls)))
+    }
+
+    private func appendStreamingToolCallItems(from toolCalls: [ToolCall], into items: inout [TimelineSourceItem]) {
+        var explorationBuffer: [ToolCall] = []
+
+        func flushExplorationBuffer() {
+            guard !explorationBuffer.isEmpty else { return }
+            appendBufferedToolCalls(explorationBuffer, into: &items)
+            explorationBuffer.removeAll(keepingCapacity: true)
+        }
+
+        for toolCall in toolCalls {
+            if isExplorationCandidate(toolCall) {
+                explorationBuffer.append(toolCall)
+                continue
+            }
+
+            flushExplorationBuffer()
+            items.append(.toolCall(toolCall))
+        }
+
+        flushExplorationBuffer()
+    }
+
+    private func makeToolCallGroup(from toolCalls: [ToolCall]) -> ToolCallGroup {
+        ToolCallGroup(toolCalls: toolCalls)
+    }
+
+    private func makeTurnSummary(from toolCalls: [ToolCall]) -> TurnSummary {
+        let timestamps = toolCalls.map(\.timestamp)
+        let start = timestamps.min() ?? Date()
+        let end = timestamps.max() ?? Date()
+        let duration = end.timeIntervalSince(start)
+        let key = toolCalls.map(\.id).joined(separator: "|")
+        let id = key.isEmpty ? UUID().uuidString : key
+
+        return TurnSummary(
+            id: id,
+            timestamp: end,
+            duration: duration,
+            toolCallCount: toolCalls.count,
+            fileChanges: turnSummaryFileChanges(from: toolCalls)
+        )
+    }
+
+    private func turnSummaryFileChanges(from toolCalls: [ToolCall]) -> [FileChangeSummary] {
+        var changes: [String: FileChangeSummary] = [:]
+
+        for toolCall in toolCalls where toolCall.kind == .some(.edit) {
+            let filePath: String?
+            if let path = toolCall.locations?.first?.path {
+                filePath = path
+            } else if !toolCall.title.isEmpty && toolCall.title.contains("/") {
+                filePath = toolCall.title
+            } else {
+                filePath = nil
+            }
+
+            guard let filePath else { continue }
+
+            var linesAdded = 0
+            var linesRemoved = 0
+            var isNewFile = false
+
+            for content in toolCall.content {
+                guard case .diff(let diff) = content else { continue }
+
+                isNewFile = diff.oldText == nil || diff.oldText?.isEmpty == true
+                let oldLines = diff.oldText?.components(separatedBy: "\n").count ?? 0
+                let newLines = diff.newText.components(separatedBy: "\n").count
+
+                if isNewFile {
+                    linesAdded += newLines
+                } else if newLines > oldLines {
+                    linesAdded += newLines - oldLines
+                } else {
+                    linesRemoved += oldLines - newLines
+                }
+            }
+
+            if let existing = changes[filePath] {
+                changes[filePath] = FileChangeSummary(
+                    path: filePath,
+                    isNew: existing.isNew || isNewFile,
+                    linesAdded: existing.linesAdded + linesAdded,
+                    linesRemoved: existing.linesRemoved + linesRemoved
+                )
+            } else {
+                changes[filePath] = FileChangeSummary(
+                    path: filePath,
+                    isNew: isNewFile,
+                    linesAdded: linesAdded,
+                    linesRemoved: linesRemoved
+                )
+            }
+        }
+
+        return changes.values.sorted { $0.path < $1.path }
+    }
+
+    private func isExplorationCandidate(_ toolCall: ToolCall) -> Bool {
+        if let kind = toolCall.kind {
+            let rawValue = kind.rawValue.lowercased()
+            if rawValue == "read" || rawValue == "search" || rawValue == "grep" || rawValue == "list" {
+                return true
+            }
+            if kind == .execute && hasListIntent(toolCall) {
+                return true
+            }
+        }
+
+        return hasListIntent(toolCall)
+    }
+
+    private func hasListIntent(_ toolCall: ToolCall) -> Bool {
+        let normalizedTitle = toolCall.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalizedTitle.hasPrefix("list ") || normalizedTitle == "list" {
+            return true
+        }
+
+        if let rawInput = toolCall.rawInput?.value as? [String: Any] {
+            if let command = rawInput["command"] as? String, isListCommand(command) {
+                return true
+            }
+            if let cmd = rawInput["cmd"] as? String, isListCommand(cmd) {
+                return true
+            }
+            if let args = rawInput["args"] as? [String], isListCommand(args.joined(separator: " ")) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private func isListCommand(_ command: String) -> Bool {
+        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return false }
+
+        let firstToken = trimmed.split(whereSeparator: \.isWhitespace).first.map(String.init) ?? ""
+        if ["ls", "find", "fd", "tree", "dir", "rg", "ripgrep", "grep", "glob"].contains(firstToken) {
+            return true
+        }
+
+        return trimmed.contains(" --files") || trimmed.hasPrefix("list ")
+    }
+
+    private func buildTimeline() -> TimelineBuildResult {
+        let sourceItems = assembleTimelineSourceItems()
+        var metadata = TimelineBuildMetadata()
         var entries: [VVChatTimelineEntry] = []
         entries.reserveCapacity(sourceItems.count + (pendingPlanRequest == nil ? 0 : 1))
         var hasRenderedAgentMessageInTurn = false
@@ -921,6 +1144,7 @@ struct ChatMessageList: View {
         for item in sourceItems {
             switch item {
             case .message(let message):
+                metadata.messagesByID[message.id] = message
                 let startsAssistantLane = message.role == .agent && !hasRenderedAgentMessageInTurn
                 let built = makeEntries(from: item, startsAssistantLane: startsAssistantLane)
                 if !built.isEmpty {
@@ -933,7 +1157,23 @@ struct ChatMessageList: View {
                 } else if message.role != .agent {
                     hasRenderedAgentMessageInTurn = false
                 }
-            case .toolCall, .toolCallGroup, .turnSummary:
+            case .toolCall(let toolCall):
+                metadata.toolCallsByEntryID[toolCall.id] = toolCall
+                let built = makeEntries(from: item, startsAssistantLane: false)
+                if !built.isEmpty {
+                    entries.append(contentsOf: built)
+                }
+            case .toolCallGroup(let group):
+                metadata.groupEntryIDs.insert(group.entryID)
+                for call in group.toolCalls {
+                    metadata.toolCallsByEntryID["\(group.entryID)::call::\(call.id)"] = call
+                    metadata.toolCallsByEntryID[call.id] = call
+                }
+                let built = makeEntries(from: item, startsAssistantLane: false)
+                if !built.isEmpty {
+                    entries.append(contentsOf: built)
+                }
+            case .turnSummary:
                 let built = makeEntries(from: item, startsAssistantLane: false)
                 if !built.isEmpty {
                     entries.append(contentsOf: built)
@@ -957,10 +1197,10 @@ struct ChatMessageList: View {
             )
         }
 
-        return entries
+        return TimelineBuildResult(entries: entries, metadata: metadata)
     }
 
-    private func makeEntries(from item: TimelineItem, startsAssistantLane: Bool) -> [VVChatTimelineEntry] {
+    private func makeEntries(from item: TimelineSourceItem, startsAssistantLane: Bool) -> [VVChatTimelineEntry] {
         switch item {
         case .message(let message):
             let content = messageMarkdown(message)
@@ -1014,7 +1254,7 @@ struct ChatMessageList: View {
             )
             return [.custom(
                 VVCustomTimelineEntry(
-                    id: item.stableId,
+                    id: toolCall.id,
                     kind: "toolCall",
                     payload: encodeCustomPayload(payload, fallback: markdown),
                     revision: revisionKey(markdown + toolCall.id + toolCall.status.rawValue),
@@ -1026,7 +1266,7 @@ struct ChatMessageList: View {
             if group.toolCalls.count == 1, let only = group.toolCalls.first {
                 return makeEntries(from: .toolCall(only), startsAssistantLane: startsAssistantLane)
             }
-            let isExpanded = expandedToolGroupIDs.contains(item.stableId)
+            let isExpanded = expandedToolGroupIDs.contains(group.entryID)
             let title = toolCallGroupTitle(group)
             let markdown = toolCallGroupMarkdown(group, isExpanded: isExpanded)
             let payload = TimelineCustomPayload(
@@ -1038,14 +1278,14 @@ struct ChatMessageList: View {
             )
             var built: [VVChatTimelineEntry] = [.custom(
                 VVCustomTimelineEntry(
-                    id: item.stableId,
+                    id: group.entryID,
                     kind: "toolCallGroup",
                     payload: encodeCustomPayload(payload, fallback: markdown),
                     revision: revisionKey(markdown + group.id + (isExpanded ? "-expanded" : "-collapsed")),
                     timestamp: group.timestamp
                 )
             )]
-            if expandedToolGroupIDs.contains(item.stableId) {
+            if expandedToolGroupIDs.contains(group.entryID) {
                 for call in group.toolCalls {
                     let callTitle = toolCallHeaderTitle(call)
                     let detailMarkdown = toolCallDetailMarkdown(call)
@@ -1059,7 +1299,7 @@ struct ChatMessageList: View {
                     built.append(
                         .custom(
                             VVCustomTimelineEntry(
-                                id: "\(item.stableId)::call::\(call.id)",
+                                id: "\(group.entryID)::call::\(call.id)",
                                 kind: "toolCallDetail",
                                 payload: encodeCustomPayload(detailPayload, fallback: detailMarkdown),
                                 revision: revisionKey(detailMarkdown + call.id + call.status.rawValue),
@@ -1085,7 +1325,7 @@ struct ChatMessageList: View {
             )
             return [.custom(
                 VVCustomTimelineEntry(
-                    id: item.stableId,
+                    id: summary.entryID,
                     kind: "turnSummary",
                     payload: encodeCustomPayload(payload, fallback: fallback),
                     revision: revisionKey(fallback + summary.id),
@@ -1095,20 +1335,52 @@ struct ChatMessageList: View {
         }
     }
 
-    private func itemRevisionToken(_ item: TimelineItem) -> Int {
-        switch item {
-        case .message(let message):
-            let suffix = String(message.content.suffix(96))
-            return revisionKey("\(message.id)|\(message.isComplete)|\(message.content.count)|\(suffix)|\(message.contentBlocks.count)")
-        case .toolCall(let call):
-            return revisionKey("\(call.id)|\(call.status.rawValue)|\(call.title)|\(call.content.count)")
-        case .toolCallGroup(let group):
-            let calls = group.toolCalls.map { "\($0.id):\($0.status.rawValue)" }.joined(separator: "|")
-            return revisionKey("\(group.id)|\(group.summaryText)|\(group.hasFailed)|\(group.isInProgress)|\(calls)")
-        case .turnSummary(let summary):
-            let files = summary.fileChanges.map { "\($0.path):\($0.linesAdded):\($0.linesRemoved)" }.joined(separator: "|")
-            return revisionKey("\(summary.id)|\(summary.toolCallCount)|\(summary.formattedDuration)|\(files)")
+    private func messageRevisionToken(_ message: MessageItem) -> Int {
+        let suffix = String(message.content.suffix(96))
+        return revisionKey("\(message.id)|\(message.role)|\(message.isComplete)|\(message.content.count)|\(suffix)|\(message.contentBlocks.count)")
+    }
+
+    private func toolCallRevisionToken(_ call: ToolCall) -> Int {
+        let location = call.locations?.first?.path ?? ""
+        let contentSignature = call.content.map(toolCallContentSignature).joined(separator: "|")
+        return revisionKey(
+            "\(call.id)|\(call.kind?.rawValue ?? "nil")|\(call.status.rawValue)|\(call.title)|\(location)|\(contentSignature)"
+        )
+    }
+
+    private func toolCallContentSignature(_ content: ToolCallContent) -> String {
+        switch content {
+        case .content(let block):
+            switch block {
+            case .text(let text):
+                return "text:\(text.text.count)"
+            case .image(let image):
+                return "image:\(image.mimeType):\(image.data.count)"
+            case .audio(let audio):
+                return "audio:\(audio.mimeType):\(audio.data.count)"
+            case .resource(let resource):
+                return "resource:\(resource.resource.uri ?? ""):\(resource.resource.mimeType ?? "")"
+            case .resourceLink(let link):
+                return "link:\(link.name):\(link.uri)"
+            }
+        case .diff(let diff):
+            return "diff:\(diff.path):\(diff.oldText?.count ?? 0):\(diff.newText.count)"
+        case .terminal(let terminal):
+            return "terminal:\(terminal.terminalId)"
         }
+    }
+
+    private static func formattedDuration(_ duration: TimeInterval) -> String {
+        if duration < 1 {
+            return "<1s"
+        }
+        if duration < 60 {
+            return "\(Int(duration))s"
+        }
+
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        return "\(minutes)m \(seconds)s"
     }
 
     private func mapRole(_ role: MessageRole) -> VVChatMessageRole {
@@ -1470,34 +1742,7 @@ struct ChatMessageList: View {
     }
 
     private func isToolGroupEntryID(_ entryID: String) -> Bool {
-        visibleItems.contains { item in
-            if case .toolCallGroup = item {
-                return item.stableId == entryID
-            }
-            return false
-        }
-    }
-
-    private func summaryFilePath(for entryID: String) -> String? {
-        guard let selection = summaryFileSelection(from: entryID) else { return nil }
-
-        for item in visibleItems {
-            guard case .turnSummary(let summary) = item else { continue }
-            guard item.stableId == selection.summaryEntryID else { continue }
-            guard summary.fileChanges.indices.contains(selection.fileIndex) else { return nil }
-            return resolveSummaryFilePath(summary.fileChanges[selection.fileIndex].path)
-        }
-
-        return nil
-    }
-
-    private func summaryFileSelection(from entryID: String) -> (summaryEntryID: String, fileIndex: Int)? {
-        let marker = "::file::"
-        guard let range = entryID.range(of: marker, options: .backwards) else { return nil }
-        let summaryEntryID = String(entryID[..<range.lowerBound])
-        let trailing = entryID[range.upperBound...]
-        guard let fileIndex = Int(trailing) else { return nil }
-        return (summaryEntryID, fileIndex)
+        lastBuildMetadata.groupEntryIDs.contains(entryID)
     }
 
     private func resolveSummaryFilePath(_ rawPath: String) -> String {
@@ -1544,56 +1789,7 @@ struct ChatMessageList: View {
     }
 
     private func toolCallForEntryID(_ entryID: String) -> ToolCall? {
-        if let groupedCallID = groupedToolCallID(from: entryID) {
-            for item in visibleItems {
-                guard case .toolCallGroup(let group) = item else { continue }
-                if let matched = group.toolCalls.first(where: { $0.id == groupedCallID }) {
-                    return matched
-                }
-            }
-            return nil
-        }
-
-        if let standaloneCallID = standaloneToolCallDetailID(from: entryID) {
-            for item in visibleItems {
-                guard case .toolCall(let call) = item else { continue }
-                if call.id == standaloneCallID {
-                    return call
-                }
-            }
-            return nil
-        }
-
-        for item in visibleItems {
-            switch item {
-            case .toolCall(let call):
-                if call.id == entryID {
-                    return call
-                }
-            case .toolCallGroup(let group):
-                if let matched = group.toolCalls.first(where: { $0.id == entryID }) {
-                    return matched
-                }
-            case .message, .turnSummary:
-                continue
-            }
-        }
-        return nil
-    }
-
-    private func groupedToolCallID(from entryID: String) -> String? {
-        let marker = "::call::"
-        guard let range = entryID.range(of: marker) else { return nil }
-        let trailing = String(entryID[range.upperBound...])
-        if let suffix = trailing.range(of: "::") {
-            return String(trailing[..<suffix.lowerBound])
-        }
-        return trailing
-    }
-
-    private func standaloneToolCallDetailID(from entryID: String) -> String? {
-        guard let range = entryID.range(of: "::") else { return nil }
-        return String(entryID[..<range.lowerBound])
+        lastBuildMetadata.toolCallsByEntryID[entryID]
     }
 
     private func diffIndexFromEntryID(_ entryID: String) -> Int? {
@@ -2238,7 +2434,9 @@ struct ChatMessageList: View {
     }
 
     private func toolCallGroupMarkdown(_ group: ToolCallGroup, isExpanded: Bool) -> String {
-        ""
+        _ = group
+        _ = isExpanded
+        return ""
     }
 
     private func toolCallHumanAction(_ toolCall: ToolCall) -> String {
@@ -2499,12 +2697,6 @@ struct ChatMessageList: View {
         return "completed"
     }
 
-    private func toolGroupStatusMarker(_ group: ToolCallGroup) -> String {
-        if group.hasFailed { return "✕" }
-        if group.isInProgress { return "◌" }
-        return "✓"
-    }
-
     private func toolGroupStatusColor(statusRawValue: String?) -> SIMD4<Float> {
         switch statusRawValue {
         case "failed":
@@ -2561,6 +2753,69 @@ private enum CopyFooterState {
     case idle
     case transition
     case confirmed
+}
+
+private struct ChatTimelineHost: NSViewRepresentable {
+    let controller: VVChatTimelineController
+    let scrollRequest: ChatSessionViewModel.ScrollRequest?
+    let onStateChange: (VVChatTimelineState) -> Void
+    let onUserMessageCopyAction: (String) -> Void
+    let onUserMessageCopyHoverChange: (String?) -> Void
+    let onEntryActivate: (String) -> Void
+    let onLinkActivate: (String) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> VVChatTimelineView {
+        let view = VVChatTimelineView(frame: .zero)
+        view.controller = controller
+        view.onStateChange = onStateChange
+        view.onUserMessageCopyAction = onUserMessageCopyAction
+        view.onUserMessageCopyHoverChange = onUserMessageCopyHoverChange
+        view.onEntryActivate = onEntryActivate
+        view.onLinkActivate = onLinkActivate
+        return view
+    }
+
+    func updateNSView(_ nsView: VVChatTimelineView, context: Context) {
+        if nsView.controller !== controller {
+            nsView.controller = controller
+        }
+        nsView.onStateChange = onStateChange
+        nsView.onUserMessageCopyAction = onUserMessageCopyAction
+        nsView.onUserMessageCopyHoverChange = onUserMessageCopyHoverChange
+        nsView.onEntryActivate = onEntryActivate
+        nsView.onLinkActivate = onLinkActivate
+
+        if context.coordinator.lastHandledScrollRequestID != scrollRequest?.id {
+            context.coordinator.lastHandledScrollRequestID = scrollRequest?.id
+            context.coordinator.handleScrollRequest(scrollRequest, in: nsView, controller: controller)
+        }
+    }
+
+    @MainActor
+    final class Coordinator {
+        var lastHandledScrollRequestID: UUID?
+
+        func handleScrollRequest(
+            _ request: ChatSessionViewModel.ScrollRequest?,
+            in view: VVChatTimelineView,
+            controller: VVChatTimelineController
+        ) {
+            guard let request else { return }
+
+            switch request.target {
+            case .bottom:
+                if request.animated {
+                    view.jumpToLatestAnimated()
+                } else {
+                    controller.jumpToLatest()
+                }
+            }
+        }
+    }
 }
 
 private struct PresentedToolDiff: Identifiable {

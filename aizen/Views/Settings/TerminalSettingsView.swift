@@ -242,6 +242,7 @@ struct TerminalSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .settingsSurface()
         .onAppear {
             if availableFonts.isEmpty {
                 availableFonts = loadSystemFonts()

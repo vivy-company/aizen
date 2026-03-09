@@ -55,7 +55,7 @@ struct OpenCodePluginsView: View {
             }
         }
         .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
+        .settingsSurface()
         .navigationTitle("OpenCode Plugins")
         .task {
             await loadPluginStatus(showLoading: true)
