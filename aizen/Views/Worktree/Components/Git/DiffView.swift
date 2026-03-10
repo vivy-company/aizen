@@ -143,7 +143,7 @@ struct DiffView: View {
                 VVDiffView(unifiedDiff: displayDiff)
                     .theme(theme)
                     .configuration(configuration)
-                    .renderStyle(.unifiedTable)
+                    .renderStyle(.inline)
                     .syntaxHighlighting(true)
                     .onFileHeaderActivate { path in
                         onOpenFile?(path)

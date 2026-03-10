@@ -123,7 +123,7 @@ struct InlineDiffView: View {
                     VVDiffView(unifiedDiff: previewUnifiedDiffText)
                         .theme(theme)
                         .configuration(configuration)
-                        .renderStyle(.unifiedTable)
+                        .renderStyle(.inline)
                         .syntaxHighlighting(true)
                         .frame(height: previewHeight)
 
@@ -453,7 +453,7 @@ private struct FullDiffSheet: View {
             VVDiffView(unifiedDiff: unifiedDiffText)
                 .theme(theme)
                 .configuration(configuration)
-                .renderStyle(.unifiedTable)
+                .renderStyle(.inline)
                 .syntaxHighlighting(true)
                 .background(Color(nsColor: .textBackgroundColor))
         }

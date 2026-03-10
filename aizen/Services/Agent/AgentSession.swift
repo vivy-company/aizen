@@ -106,9 +106,6 @@ class AgentSession: ObservableObject, ClientDelegate {
     private var pendingAgentBlocks: [ContentBlock] = []
     private var agentMessageFlushTask: Task<Void, Never>?
     private static let agentMessageFlushInterval: TimeInterval = 0.0
-    var pendingToolCallContentById: [String: [ToolCallContent]] = [:]
-    var toolCallContentFlushTasks: [String: Task<Void, Never>] = [:]
-    static let toolCallContentFlushInterval: TimeInterval = 0.1
 
     /// Currently pending Task tool calls (subagents) - used for parent tracking
     /// When only one Task is active, child tool calls are assigned to it
@@ -1094,12 +1091,7 @@ class AgentSession: ObservableObject, ClientDelegate {
         toolCallsById.removeAll()
         toolCallOrder.removeAll()
         pendingToolCallUpdatesById.removeAll()
-        pendingToolCallContentById.removeAll()
         persistedToolCallIds.removeAll()
-        for (_, task) in toolCallContentFlushTasks {
-            task.cancel()
-        }
-        toolCallContentFlushTasks.removeAll()
     }
 
     func loadPersistedToolCalls(_ toolCalls: [ToolCall]) {

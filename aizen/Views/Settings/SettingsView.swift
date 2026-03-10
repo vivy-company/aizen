@@ -38,20 +38,10 @@ struct SettingsView: View {
     @AppStorage("defaultACPAgent") private var defaultACPAgent = "claude"
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
-    @Environment(\.colorScheme) private var colorScheme
-
     @State private var selection: SettingsSelection? = .general
     @State private var agents: [AgentMetadata] = []
     @State private var showingAddCustomAgent = false
     @StateObject private var licenseManager = LicenseManager.shared
-
-    private var surfaceColor: Color {
-        AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
-    }
-
-    private var surfaceNSColor: NSColor {
-        AppSurfaceTheme.backgroundNSColor(colorScheme: colorScheme)
-    }
 
     var body: some View {
         NavigationSplitView {
@@ -139,6 +129,7 @@ struct SettingsView: View {
             ToolbarItem(placement: .principal) { Text("") }
         }
         .settingsSheetChrome()
+        .settingsNativeToolbarGlass()
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 750, minHeight: 500)
         .onAppear {

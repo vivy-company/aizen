@@ -137,7 +137,7 @@ extension AgentSession {
 
                 if let lastAgentMessage = lastAgentMessage,
                    !lastAgentMessage.isComplete {
-                    // Append to existing incomplete agent message (buffered to reduce UI churn)
+                    // Append to the active agent message immediately so the timeline can stream each chunk.
                     appendAgentMessageChunk(text: text, contentBlocks: blockContent)
                 } else {
                     let initialText = text
@@ -335,41 +335,6 @@ extension AgentSession {
         pendingToolCallUpdatesById[details.toolCallId, default: []].append(details)
     }
 
-    private func bufferToolCallContent(_ content: [ToolCallContent], for toolCallId: String) {
-        guard !content.isEmpty else { return }
-        pendingToolCallContentById[toolCallId, default: []].append(contentsOf: content)
-        scheduleToolCallContentFlush(for: toolCallId)
-    }
-
-    private func scheduleToolCallContentFlush(for toolCallId: String) {
-        guard toolCallContentFlushTasks[toolCallId] == nil else { return }
-        toolCallContentFlushTasks[toolCallId] = Task { @MainActor in
-            defer { toolCallContentFlushTasks[toolCallId] = nil }
-            try? await Task.sleep(for: .seconds(Self.toolCallContentFlushInterval))
-            flushToolCallContent(for: toolCallId)
-        }
-    }
-
-    private func flushToolCallContent(for toolCallId: String) {
-        let pending = popBufferedToolCallContent(for: toolCallId)
-        guard !pending.isEmpty else { return }
-
-        updateToolCallInPlace(id: toolCallId) { updated in
-            var allContent = updated.content
-            allContent.append(contentsOf: pending)
-            updated.content = coalesceAdjacentTextBlocks(allContent)
-        }
-    }
-
-    private func popBufferedToolCallContent(for toolCallId: String) -> [ToolCallContent] {
-        let pending = pendingToolCallContentById.removeValue(forKey: toolCallId) ?? []
-        if let task = toolCallContentFlushTasks[toolCallId] {
-            task.cancel()
-            toolCallContentFlushTasks[toolCallId] = nil
-        }
-        return pending
-    }
-
     private func applyBufferedToolCallUpdatesIfPresent(for toolCallId: String) {
         guard let pending = pendingToolCallUpdatesById.removeValue(forKey: toolCallId),
               !pending.isEmpty else {
@@ -445,33 +410,15 @@ extension AgentSession {
             updated.title = newTitle
         }
 
-        // Merge content with buffering to reduce heavy updates (especially for large file reads)
         var incomingContent = terminalOutputContent
         if let newContent = details.content, !newContent.isEmpty {
             incomingContent.append(contentsOf: newContent)
         }
 
-        let status = details.status ?? updated.status
         if !incomingContent.isEmpty {
-            let shouldFlushNow = status == .completed || status == .failed
-            if shouldFlushNow {
-                let buffered = popBufferedToolCallContent(for: details.toolCallId)
-                var allContent = updated.content
-                if !buffered.isEmpty {
-                    allContent.append(contentsOf: buffered)
-                }
-                allContent.append(contentsOf: incomingContent)
-                updated.content = coalesceAdjacentTextBlocks(allContent)
-            } else {
-                bufferToolCallContent(incomingContent, for: details.toolCallId)
-            }
-        } else if status == .completed || status == .failed {
-            let buffered = popBufferedToolCallContent(for: details.toolCallId)
-            if !buffered.isEmpty {
-                var allContent = updated.content
-                allContent.append(contentsOf: buffered)
-                updated.content = coalesceAdjacentTextBlocks(allContent)
-            }
+            var allContent = updated.content
+            allContent.append(contentsOf: incomingContent)
+            updated.content = coalesceAdjacentTextBlocks(allContent)
         }
     }
 

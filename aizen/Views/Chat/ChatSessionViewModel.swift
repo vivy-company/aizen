@@ -94,9 +94,6 @@ class ChatSessionViewModel: ObservableObject {
     let logger = Logger.forCategory("ChatSession")
     var autoScrollTask: Task<Void, Never>?
     var suppressNextAutoScroll: Bool = false
-    private var streamFlushTask: Task<Void, Never>?
-    private var pendingStreamMessages: [MessageItem]?
-    private let streamFlushInterval: Duration = .milliseconds(50)
     private var pendingStreamingRebuild: Bool = false
     private var pendingStreamingRebuildRequiresToolCallSync: Bool = false
     private var streamingRebuildTask: Task<Void, Never>?
@@ -858,7 +855,6 @@ class ChatSessionViewModel: ObservableObject {
         skipNextToolCallsEmission = true
 
         session.$messages
-            // Stream message updates as they arrive for smoother chunk rendering.
             .removeDuplicates(by: Self.hasEquivalentMessageEnvelope)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newMessages in
@@ -867,14 +863,7 @@ class ChatSessionViewModel: ObservableObject {
                     self.skipNextMessagesEmission = false
                     return
                 }
-                // AgentSession is @MainActor so we're already on main thread
-                if session.isStreaming {
-                    self.enqueueStreamingMessages(newMessages)
-                } else {
-                    self.flushStreamingMessagesIfNeeded()
-                    self.syncMessages(newMessages)
-                }
-
+                self.syncMessages(newMessages)
                 self.suppressNextAutoScroll = false
             }
             .store(in: &cancellables)
@@ -882,7 +871,6 @@ class ChatSessionViewModel: ObservableObject {
         // Observe toolCallsById changes (dictionary-based storage)
         session.$toolCallsById
             .receive(on: DispatchQueue.main)
-            .throttle(for: .milliseconds(60), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] _ in
                 guard let self = self, let session = self.currentAgentSession else { return }
                 if self.skipNextToolCallsEmission {
@@ -1059,10 +1047,6 @@ class ChatSessionViewModel: ObservableObject {
         cancelPendingAutoScroll()
         scrollRequest = nil
 
-        streamFlushTask?.cancel()
-        streamFlushTask = nil
-        pendingStreamMessages = nil
-
         streamingRebuildTask?.cancel()
         streamingRebuildTask = nil
         pendingStreamingRebuild = false
@@ -1080,33 +1064,6 @@ class ChatSessionViewModel: ObservableObject {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             rebuildTimelineWithGrouping(isStreaming: session.isStreaming)
-        }
-    }
-
-    private func enqueueStreamingMessages(_ newMessages: [MessageItem]) {
-        pendingStreamMessages = newMessages
-        scheduleStreamFlush()
-    }
-
-    private func scheduleStreamFlush() {
-        guard streamFlushTask == nil else { return }
-        streamFlushTask = Task { @MainActor in
-            defer { streamFlushTask = nil }
-            try? await Task.sleep(for: streamFlushInterval)
-            if Task.isCancelled {
-                return
-            }
-            flushStreamingMessagesIfNeeded()
-            if (currentAgentSession?.isStreaming ?? false), pendingStreamMessages != nil {
-                scheduleStreamFlush()
-            }
-        }
-    }
-
-    private func flushStreamingMessagesIfNeeded() {
-        if let pending = pendingStreamMessages {
-            pendingStreamMessages = nil
-            syncMessages(pending)
         }
     }
 
@@ -1131,7 +1088,6 @@ class ChatSessionViewModel: ObservableObject {
                 return
             }
         }
-        flushStreamingMessagesIfNeeded()
         rebuildTimelineWithGrouping(isStreaming: false)
         previousMessageIds = Set(messages.map { $0.id })
         if let session = currentAgentSession {

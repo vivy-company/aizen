@@ -46,4 +46,13 @@ extension View {
     func settingsSheetChrome() -> some View {
         modifier(SettingsSheetChromeModifier())
     }
+
+    @ViewBuilder
+    func settingsNativeToolbarGlass() -> some View {
+        if #available(macOS 15.0, *) {
+            self.toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        } else {
+            self
+        }
+    }
 }

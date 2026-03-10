@@ -42,7 +42,6 @@ struct ChatMessageList: View {
     @State private var hoveredCopyUserMessageID: String?
     @State private var copyIndicatorResetTask: Task<Void, Never>?
     @State private var expandedToolGroupIDs: Set<String> = []
-    @State private var presentedToolDiff: PresentedToolDiff?
 
     private var shouldShowLoading: Bool {
         isSessionInitializing && messages.isEmpty && toolCalls.isEmpty
@@ -84,13 +83,8 @@ struct ChatMessageList: View {
         let basePointSize = CGFloat(chatFontSize)
         let headerPointSize = max(basePointSize - 1.5, 11.5)
         let timestampPointSize = max(basePointSize - 0.25, 12.5)
-        var theme = colorScheme == .dark ? MarkdownTheme.dark : MarkdownTheme.light
-        theme.codeColor = markdownInlineCodeColor
-        theme.paragraphSpacing = 10
-        theme.headingSpacing = 22
-        theme.contentPadding = 0
-        var draftTheme = theme
-        draftTheme.textColor = theme.textColor.withOpacity(theme.textColor.w * 0.72)
+        let theme = timelineMarkdownTheme
+        let draftTheme = theme
 
         return VVChatTimelineStyle(
             theme: theme,
@@ -188,6 +182,63 @@ struct ChatMessageList: View {
         return simdColor(from: NSColor.controlAccentColor)
     }
 
+    private var timelineMarkdownTheme: MarkdownTheme {
+        var theme = colorScheme == .dark ? MarkdownTheme.dark : MarkdownTheme.light
+        theme.paragraphSpacing = 10
+        theme.headingSpacing = 22
+        theme.contentPadding = 0
+        theme.codeColor = markdownInlineCodeColor
+
+        guard let terminalTheme = activeTerminalVVTheme else {
+            return theme
+        }
+
+        let primaryText = simdColor(from: terminalTheme.textColor)
+        let secondaryText = primaryText.withOpacity(colorScheme == .dark ? 0.74 : 0.68)
+        let surface = simdColor(from: terminalTheme.backgroundColor).withOpacity(colorScheme == .dark ? 0.92 : 0.98)
+        let elevatedSurface = simdColor(from: terminalTheme.currentLineColor).withOpacity(colorScheme == .dark ? 0.88 : 0.94)
+        let divider = simdColor(from: GhosttyThemeParser.loadDividerColor(named: effectiveTerminalThemeName))
+            .withOpacity(colorScheme == .dark ? 0.34 : 0.18)
+        let accent = simdColor(from: terminalTheme.cursorColor)
+
+        theme.textColor = primaryText
+        theme.headingColor = primaryText
+        theme.linkColor = accent
+        theme.codeBackgroundColor = surface
+        theme.codeHeaderBackgroundColor = elevatedSurface
+        theme.codeHeaderTextColor = secondaryText
+        theme.codeHeaderDividerColor = divider.withOpacity(colorScheme == .dark ? 0.92 : 0.78)
+        theme.codeCopyButtonBackground = elevatedSurface
+        theme.codeCopyButtonTextColor = primaryText
+        theme.codeBorderColor = divider
+        theme.codeGutterBackgroundColor = elevatedSurface
+        theme.codeGutterTextColor = secondaryText
+        theme.blockQuoteColor = primaryText.withOpacity(0.9)
+        theme.blockQuoteBorderColor = divider.withOpacity(colorScheme == .dark ? 0.92 : 0.82)
+        theme.listBulletColor = secondaryText
+        theme.checkboxCheckedColor = accent
+        theme.checkboxUncheckedColor = secondaryText
+        theme.thematicBreakColor = divider.withOpacity(colorScheme == .dark ? 0.96 : 0.88)
+        theme.tableHeaderBackground = elevatedSurface
+        theme.tableBackground = surface
+        theme.tableBorderColor = divider
+        theme.diagramBackground = surface
+        theme.diagramNodeBackground = elevatedSurface
+        theme.diagramNodeBorder = divider
+        theme.diagramLineColor = divider.withOpacity(colorScheme == .dark ? 0.82 : 0.72)
+        theme.diagramTextColor = primaryText
+        theme.diagramNoteBackground = elevatedSurface
+        theme.diagramNoteBorder = divider
+        theme.diagramGroupBackground = surface.withOpacity(colorScheme == .dark ? 0.76 : 0.82)
+        theme.diagramGroupBorder = divider
+        theme.diagramActivationColor = elevatedSurface.withOpacity(colorScheme == .dark ? 0.9 : 0.94)
+        theme.diagramActivationBorder = divider
+        theme.mathColor = accent
+        theme.strikethroughColor = secondaryText
+
+        return theme
+    }
+
     private var userBubbleFillColor: SIMD4<Float> {
         if let theme = activeTerminalVVTheme {
             return simdColor(from: theme.backgroundColor).withOpacity(colorScheme == .dark ? 0.78 : 0.92)
@@ -242,10 +293,6 @@ struct ChatMessageList: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .sheet(item: $presentedToolDiff) { presented in
-            ToolDiffSheet(diff: presented)
-                .frame(minWidth: 960, minHeight: 620)
-        }
         .onAppear {
             onAppear()
             controller.updateStyle(timelineStyle)
@@ -292,24 +339,17 @@ struct ChatMessageList: View {
 
         let oldCount = appliedEntries.count
         let newCount = newEntries.count
+        let replacements = makeEntryReplacements(from: appliedEntries, to: newEntries)
+
+        if !replacements.isEmpty {
+            applyEntryReplacements(replacements, scrollToBottom: scrollToBottom)
+        }
 
         if newCount > oldCount {
             for entry in newEntries[oldCount...] {
                 append(entry)
             }
-            return
         }
-
-        if let update = makeStreamingDraftUpdate(from: appliedEntries, to: newEntries) {
-            applyStreamingDraftUpdate(update)
-            return
-        }
-
-        controller.setEntries(
-            newEntries,
-            scrollToBottom: scrollToBottom,
-            customEntryMessageMapper: customEntryMessageMapper
-        )
     }
 
     private func canApplyIncrementally(from oldEntries: [VVChatTimelineEntry], to newEntries: [VVChatTimelineEntry]) -> Bool {
@@ -326,6 +366,7 @@ struct ChatMessageList: View {
     }
 
     private func append(_ entry: VVChatTimelineEntry) {
+        prepareAppendTransition()
         switch entry {
         case .message(let message):
             controller.appendMessage(message)
@@ -334,53 +375,70 @@ struct ChatMessageList: View {
         }
     }
 
-    private struct StreamingDraftUpdate {
-        let oldMessage: VVChatMessage
-        let newMessage: VVChatMessage
+    private struct EntryReplacement {
+        let id: String
+        let oldEntry: VVChatTimelineEntry
+        let newEntry: VVChatTimelineEntry
     }
 
-    private func makeStreamingDraftUpdate(
+    private func prepareAppendTransition() {
+        let anchorID = controller.entries.last?.id ?? appliedEntries.last?.id
+        if let anchorID {
+            controller.prepareLayoutTransition(anchorItemID: anchorID)
+        }
+    }
+
+    private func makeEntryReplacements(
         from oldEntries: [VVChatTimelineEntry],
         to newEntries: [VVChatTimelineEntry]
-    ) -> StreamingDraftUpdate? {
-        guard oldEntries.count == newEntries.count else { return nil }
+    ) -> [EntryReplacement] {
+        let prefixCount = min(oldEntries.count, newEntries.count)
+        var replacements: [EntryReplacement] = []
+        replacements.reserveCapacity(prefixCount)
 
-        var changedIndex: Int?
-        for index in oldEntries.indices {
+        for index in 0..<prefixCount {
             if entryRevision(oldEntries[index]) != entryRevision(newEntries[index]) {
-                if changedIndex != nil {
-                    return nil
-                }
-                changedIndex = index
+                replacements.append(
+                    EntryReplacement(
+                        id: oldEntries[index].id,
+                        oldEntry: oldEntries[index],
+                        newEntry: newEntries[index]
+                    )
+                )
             }
         }
 
-        guard let changedIndex else { return nil }
-        guard changedIndex == oldEntries.count - 1 else { return nil }
-        guard case .message(let oldMessage) = oldEntries[changedIndex],
-              case .message(let newMessage) = newEntries[changedIndex] else {
-            return nil
-        }
-        guard oldMessage.id == newMessage.id else { return nil }
-        guard oldMessage.role == .assistant, newMessage.role == .assistant else { return nil }
-        guard oldMessage.presentation == newMessage.presentation else { return nil }
-        guard oldMessage.customContent == newMessage.customContent else { return nil }
-        guard oldMessage.timestamp == newMessage.timestamp else { return nil }
-        guard oldMessage.state == .draft else { return nil }
-        return StreamingDraftUpdate(oldMessage: oldMessage, newMessage: newMessage)
+        return replacements
     }
 
-    private func applyStreamingDraftUpdate(_ update: StreamingDraftUpdate) {
-        switch update.newMessage.state {
-        case .draft:
-            controller.updateDraftMessage(
-                id: update.newMessage.id,
-                content: update.newMessage.content,
-                throttle: false
+    private func applyEntryReplacements(_ replacements: [EntryReplacement], scrollToBottom: Bool) {
+        for replacement in replacements {
+            if applyDraftMessageUpdateIfPossible(replacement) {
+                continue
+            }
+            controller.prepareLayoutTransition(anchorItemID: replacement.id)
+            controller.replaceEntry(
+                id: replacement.id,
+                with: replacement.newEntry,
+                scrollToBottom: scrollToBottom
             )
-        case .final:
-            controller.finalizeMessage(id: update.newMessage.id, content: update.newMessage.content)
         }
+    }
+
+    private func applyDraftMessageUpdateIfPossible(_ replacement: EntryReplacement) -> Bool {
+        guard case .message(let oldMessage) = replacement.oldEntry,
+              case .message(let newMessage) = replacement.newEntry else {
+            return false
+        }
+        guard oldMessage.id == newMessage.id else { return false }
+        guard oldMessage.role == .assistant, newMessage.role == .assistant else { return false }
+        guard oldMessage.state == .draft, newMessage.state == .draft else { return false }
+        guard oldMessage.presentation == newMessage.presentation else { return false }
+        guard oldMessage.customContent == newMessage.customContent else { return false }
+        guard oldMessage.timestamp == newMessage.timestamp else { return false }
+
+        controller.updateDraftMessage(id: newMessage.id, content: newMessage.content, throttle: true)
+        return true
     }
 
     private func reportTimelineStateIfNeeded(_ state: VVChatTimelineState) {
@@ -438,9 +496,6 @@ struct ChatMessageList: View {
             return
         }
 
-        if let call = toolCallForEntryID(messageID) {
-            presentToolDiff(for: call, entryID: messageID)
-        }
     }
 
     private func handleEntryActivate(_ entryID: String) {
@@ -455,9 +510,6 @@ struct ChatMessageList: View {
             return
         }
 
-        if let call = toolCallForEntryID(entryID) {
-            presentToolDiff(for: call, entryID: entryID)
-        }
     }
 
     private func handleTimelineLinkActivate(_ rawLink: String) {
@@ -476,27 +528,6 @@ struct ChatMessageList: View {
         default:
             NSWorkspace.shared.open(url)
         }
-    }
-
-    private func presentToolDiff(for toolCall: ToolCall, entryID: String) {
-        let diffs = toolDiffContents(for: toolCall)
-        guard !diffs.isEmpty else { return }
-
-        let requestedIndex = diffIndexFromEntryID(entryID) ?? 0
-        let index = diffs.indices.contains(requestedIndex) ? requestedIndex : 0
-        let selected = diffs[index]
-
-        presentedToolDiff = PresentedToolDiff(
-            id: "diff-\(toolCall.id)-\(index)",
-            title: toolCallDiffRowTitle(
-                selected,
-                toolCall: toolCall,
-                index: index,
-                total: diffs.count,
-                includeOpenHint: false
-            ),
-            unifiedDiff: unifiedDiffDocument(for: selected)
-        )
     }
 
     private func handleUserMessageCopyHoverChange(_ messageID: String?) {
@@ -521,15 +552,15 @@ struct ChatMessageList: View {
             var customContent: VVChatCustomContent?
 
             let statusTintColor = toolGroupStatusNSColor(statusRawValue: decoded?.status)
+            let vvBadges: [VVHeaderBadge]? = decoded?.badges?.map { badge in
+                VVHeaderBadge(text: badge.text, color: SIMD4<Float>(badge.r, badge.g, badge.b, badge.a))
+            }
 
             switch custom.kind {
             case "toolCall":
                 role = .assistant
                 messageContent = content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : content
                 let statusTintedIconURL = toolHeaderIconURL(for: decoded?.toolKind, tintColor: statusTintColor)
-                let vvBadges: [VVHeaderBadge]? = decoded?.badges?.map { badge in
-                    VVHeaderBadge(text: badge.text, color: SIMD4<Float>(badge.r, badge.g, badge.b, badge.a))
-                }
                 presentation = VVChatMessagePresentation(
                     bubbleStyle: nil,
                     showsHeader: headerTitle?.isEmpty == false,
@@ -555,8 +586,21 @@ struct ChatMessageList: View {
                     leadingLaneWidth: agentLaneWidth,
                     showsTimestamp: false,
                     contentFontScale: 0.72,
-                    textOpacityMultiplier: dimmedMetaOpacity * 0.93
+                    textOpacityMultiplier: dimmedMetaOpacity * 0.93,
+                    headerBadges: vvBadges
                 )
+            case "toolCallInlineDiff":
+                role = .assistant
+                messageContent = ""
+                presentation = VVChatMessagePresentation(
+                    bubbleStyle: nil,
+                    showsHeader: false,
+                    leadingLaneWidth: agentLaneWidth,
+                    showsTimestamp: false,
+                    contentFontScale: 0.82,
+                    textOpacityMultiplier: 0.97
+                )
+                customContent = .inlineDiff(.init(unifiedDiff: content))
             case "toolCallGroup":
                 role = .assistant
                 messageContent = ""
@@ -1055,16 +1099,9 @@ struct ChatMessageList: View {
                 guard case .diff(let diff) = content else { continue }
 
                 isNewFile = diff.oldText == nil || diff.oldText?.isEmpty == true
-                let oldLines = diff.oldText?.components(separatedBy: "\n").count ?? 0
-                let newLines = diff.newText.components(separatedBy: "\n").count
-
-                if isNewFile {
-                    linesAdded += newLines
-                } else if newLines > oldLines {
-                    linesAdded += newLines - oldLines
-                } else {
-                    linesRemoved += oldLines - newLines
-                }
+                let delta = diffLineDelta(oldText: diff.oldText, newText: diff.newText)
+                linesAdded += delta.added
+                linesRemoved += delta.removed
             }
 
             if let existing = changes[filePath] {
@@ -1215,7 +1252,7 @@ struct ChatMessageList: View {
                 return [.message(VVChatMessage(
                     id: message.id,
                     role: .system,
-                    state: message.isComplete ? .final : .draft,
+                    state: .final,
                     content: compact,
                     revision: revisionKey(messageRevisionSeed + compact),
                     timestamp: nil,
@@ -1231,7 +1268,7 @@ struct ChatMessageList: View {
             return [.message(VVChatMessage(
                 id: message.id,
                 role: mapRole(message.role),
-                state: message.isComplete ? .final : .draft,
+                state: message.role == .agent && !message.isComplete ? .draft : .final,
                 content: content,
                 revision: revisionKey(messageRevisionSeed + "|" + presentationRevisionToken(for: message, startsAssistantLane: startsAssistantLane)),
                 timestamp: message.timestamp,
@@ -1260,7 +1297,7 @@ struct ChatMessageList: View {
                     revision: revisionKey(markdown + toolCall.id + toolCall.status.rawValue),
                     timestamp: toolCall.timestamp
                 )
-            )]
+            )] + inlineDiffEntries(for: toolCall, entryIDPrefix: toolCall.id)
 
         case .toolCallGroup(let group):
             if group.toolCalls.count == 1, let only = group.toolCalls.first {
@@ -1289,12 +1326,16 @@ struct ChatMessageList: View {
                 for call in group.toolCalls {
                     let callTitle = toolCallHeaderTitle(call)
                     let detailMarkdown = toolCallDetailMarkdown(call)
+                    let encodedBadges: [PayloadBadge]? = toolCallHeaderBadges(call)?.map { badge in
+                        PayloadBadge(text: badge.text, r: badge.color.x, g: badge.color.y, b: badge.color.z, a: badge.color.w)
+                    }
                     let detailPayload = TimelineCustomPayload(
                         title: callTitle,
                         body: detailMarkdown,
                         status: call.status.rawValue,
                         toolKind: call.kind?.rawValue,
-                        showsAgentLaneIcon: false
+                        showsAgentLaneIcon: false,
+                        badges: encodedBadges
                     )
                     built.append(
                         .custom(
@@ -1307,8 +1348,10 @@ struct ChatMessageList: View {
                             )
                         )
                     )
-
-                    // Diff rows removed — clicking the tool call entry opens VVDiffView
+                    built.append(contentsOf: inlineDiffEntries(
+                        for: call,
+                        entryIDPrefix: "\(group.entryID)::call::\(call.id)"
+                    ))
                 }
             }
             return built
@@ -1493,46 +1536,85 @@ struct ChatMessageList: View {
         return (added, removed, diffs.count)
     }
 
-    private func toolCallDiffRowTitle(
-        _ diff: ToolCallDiff,
-        toolCall: ToolCall,
-        index: Int,
-        total: Int,
-        includeOpenHint: Bool
-    ) -> String {
-        let delta = toolCallDiffDelta(diff)
-        let path = compactDisplayPath(diff.path)
-
-        var segments: [String] = ["Diff", path]
-        if total > 1 {
-            segments.append("\(index + 1)/\(total)")
-        }
-        segments.append("+\(delta.added) -\(delta.removed)")
-        if includeOpenHint {
-            segments.append("click to open")
-        }
-        if toolCall.status == .failed {
-            segments.append("failed")
-        }
-        return segments.joined(separator: " • ")
+    private func toolCallDiffDelta(_ diff: ToolCallDiff) -> (added: Int, removed: Int) {
+        diffLineDelta(oldText: diff.oldText, newText: diff.newText)
     }
 
-    private func toolCallDiffDelta(_ diff: ToolCallDiff) -> (added: Int, removed: Int) {
-        let oldLines = diff.oldText?.components(separatedBy: "\n") ?? []
-        let newLines = diff.newText.components(separatedBy: "\n")
-        let oldCount = oldLines.count
-        let newCount = newLines.count
+    private func inlineDiffEntries(for toolCall: ToolCall, entryIDPrefix: String) -> [VVChatTimelineEntry] {
+        let diffs = toolDiffContents(for: toolCall)
+        guard !diffs.isEmpty else { return [] }
 
-        if oldCount == 0 && newCount > 0 {
-            return (newCount, 0)
+        return diffs.enumerated().map { index, diff in
+            let unifiedDiff = inlineDiffPreviewDocument(for: diff)
+            let payload = TimelineCustomPayload(
+                title: nil,
+                body: unifiedDiff,
+                status: toolCall.status.rawValue,
+                toolKind: toolCall.kind?.rawValue,
+                showsAgentLaneIcon: false
+            )
+            return .custom(
+                VVCustomTimelineEntry(
+                    id: "\(entryIDPrefix)::diff::\(index)",
+                    kind: "toolCallInlineDiff",
+                    payload: encodeCustomPayload(payload, fallback: unifiedDiff),
+                    revision: revisionKey(unifiedDiff + diff.path + "\(index)" + toolCall.status.rawValue),
+                    timestamp: toolCall.timestamp
+                )
+            )
         }
-        if newCount == 0 && oldCount > 0 {
-            return (0, oldCount)
+    }
+
+    private func diffLineDelta(oldText: String?, newText: String) -> (added: Int, removed: Int) {
+        diffLineDelta(
+            oldLines: diffTextLines(oldText),
+            newLines: diffTextLines(newText)
+        )
+    }
+
+    private func diffTextLines(_ text: String?) -> [String] {
+        guard let text, !text.isEmpty else { return [] }
+        return text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    }
+
+    private func diffLineDelta(oldLines: [String], newLines: [String]) -> (added: Int, removed: Int) {
+        if oldLines.isEmpty && newLines.isEmpty {
+            return (0, 0)
         }
-        if newCount >= oldCount {
-            return (newCount - oldCount, 0)
+        if oldLines.isEmpty {
+            return (newLines.count, 0)
         }
-        return (0, oldCount - newCount)
+        if newLines.isEmpty {
+            return (0, oldLines.count)
+        }
+
+        let lcs = longestCommonSubsequence(oldLines, newLines)
+        var oldIndex = 0
+        var newIndex = 0
+        var lcsIndex = 0
+        var added = 0
+        var removed = 0
+
+        while oldIndex < oldLines.count || newIndex < newLines.count {
+            if lcsIndex < lcs.count,
+               oldIndex < oldLines.count,
+               newIndex < newLines.count,
+               oldLines[oldIndex] == lcs[lcsIndex],
+               newLines[newIndex] == lcs[lcsIndex] {
+                oldIndex += 1
+                newIndex += 1
+                lcsIndex += 1
+            } else if oldIndex < oldLines.count,
+                      lcsIndex >= lcs.count || oldLines[oldIndex] != lcs[lcsIndex] {
+                removed += 1
+                oldIndex += 1
+            } else if newIndex < newLines.count {
+                added += 1
+                newIndex += 1
+            }
+        }
+
+        return (added, removed)
     }
 
     private func firstTextContent(for toolCall: ToolCall) -> String? {
@@ -1788,19 +1870,15 @@ struct ChatMessageList: View {
         return nil
     }
 
-    private func toolCallForEntryID(_ entryID: String) -> ToolCall? {
-        lastBuildMetadata.toolCallsByEntryID[entryID]
-    }
-
-    private func diffIndexFromEntryID(_ entryID: String) -> Int? {
-        guard let range = entryID.range(of: "::diff::", options: .backwards) else {
-            return nil
-        }
-        let trailing = entryID[range.upperBound...]
-        return Int(trailing)
-    }
-
     private func unifiedDiffDocument(for diff: ToolCallDiff) -> String {
+        diffDocument(for: diff, contextLines: 3, maxOutputLines: 8_000)
+    }
+
+    private func inlineDiffPreviewDocument(for diff: ToolCallDiff) -> String {
+        diffDocument(for: diff, contextLines: 2, maxOutputLines: 16)
+    }
+
+    private func diffDocument(for diff: ToolCallDiff, contextLines: Int, maxOutputLines: Int) -> String {
         let normalizedPath = normalizedDiffPath(diff.path)
         let oldText = diff.oldText ?? ""
         let oldLines = oldText.isEmpty ? [String]() : oldText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
@@ -1809,8 +1887,8 @@ struct ChatMessageList: View {
         let linePairs = unifiedDiffLines(
             oldLines: oldLines,
             newLines: newLines,
-            contextLines: 3,
-            maxOutputLines: 8_000
+            contextLines: contextLines,
+            maxOutputLines: maxOutputLines
         )
 
         var output: [String] = [
@@ -2307,7 +2385,11 @@ struct ChatMessageList: View {
         case .search:
             base = "Searched"
         case .execute:
-            base = toolCallInputPreview(toolCall) ?? "Ran"
+            if toolCallRawCommand(toolCall) != nil {
+                base = "Ran"
+            } else {
+                base = toolCallInputPreview(toolCall) ?? sanitizedToolTitle(toolCall.title) ?? "Ran"
+            }
         case .think:
             base = "Thought"
         case .fetch:
@@ -2337,6 +2419,11 @@ struct ChatMessageList: View {
 
         if let path = toolCallHeaderPath(toolCall) {
             badges.append(VVHeaderBadge(text: path, color: toolCallPathBadgeColor))
+        }
+
+        if toolCall.kind == .execute,
+           let command = toolCallCommandBadgeText(toolCall) {
+            badges.append(VVHeaderBadge(text: command, color: toolCallPathBadgeColor))
         }
 
         if let delta = toolCallAggregateDelta(toolCall) {
@@ -2507,7 +2594,7 @@ struct ChatMessageList: View {
     private func toolCallInputPreview(_ toolCall: ToolCall) -> String? {
         guard let raw = toolCall.rawInput?.value as? [String: Any] else { return nil }
 
-        if let command = nestedInputString(in: raw, preferredKeys: ["command", "cmd", "shellCommand"]) {
+        if let command = toolCallRawCommand(toolCall) {
             return humanizedCommandPreview(command)
         }
         if let query = nestedInputString(in: raw, preferredKeys: ["query", "pattern", "glob"]) {
@@ -2517,6 +2604,35 @@ struct ChatMessageList: View {
             return compactDisplayPath(path)
         }
 
+        return nil
+    }
+
+    private func toolCallCommandBadgeText(_ toolCall: ToolCall) -> String? {
+        guard let command = toolCallRawCommand(toolCall) else { return nil }
+        return abbreviated(singleLineBadgeText(command), maxLength: 88)
+    }
+
+    private func toolCallRawCommand(_ toolCall: ToolCall) -> String? {
+        guard let raw = toolCall.rawInput?.value as? [String: Any] else { return nil }
+        return nestedCommandString(
+            in: raw,
+            preferredKeys: ["command", "cmd", "shellCommand", "commandLine", "command_line", "args", "argv"]
+        )
+    }
+
+    private func singleLineBadgeText(_ text: String) -> String {
+        text
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+            .joined(separator: " ")
+    }
+
+    private func nestedCommandString(in dict: [String: Any], preferredKeys: [String]) -> String? {
+        for key in preferredKeys {
+            if let value = recursiveCommandValue(dict[key], preferredKey: key) {
+                return value
+            }
+        }
         return nil
     }
 
@@ -2559,6 +2675,51 @@ struct ChatMessageList: View {
         return nil
     }
 
+    private func recursiveCommandValue(_ value: Any?, preferredKey: String, depth: Int = 0) -> String? {
+        guard depth < 8, let value else { return nil }
+
+        if let string = value as? String {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+
+        if let strings = value as? [String] {
+            let cleaned = strings
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            return cleaned.isEmpty ? nil : cleaned.joined(separator: " ")
+        }
+
+        if let dict = value as? [String: Any] {
+            if let nested = recursiveCommandValue(dict[preferredKey], preferredKey: preferredKey, depth: depth + 1) {
+                return nested
+            }
+            for fallback in ["value", "text", "command", "cmd", "shellCommand", "commandLine", "command_line", "args", "argv"] {
+                if let nested = recursiveCommandValue(dict[fallback], preferredKey: preferredKey, depth: depth + 1) {
+                    return nested
+                }
+            }
+        }
+
+        if let array = value as? [Any] {
+            let strings = array.compactMap { item -> String? in
+                guard let string = item as? String else { return nil }
+                let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }
+            if !strings.isEmpty {
+                return strings.joined(separator: " ")
+            }
+            for item in array {
+                if let nested = recursiveCommandValue(item, preferredKey: preferredKey, depth: depth + 1) {
+                    return nested
+                }
+            }
+        }
+
+        return nil
+    }
+
     private func humanizedCommandPreview(_ rawCommand: String) -> String {
         let command = rawCommand.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !command.isEmpty else { return "Ran a shell command" }
@@ -2591,7 +2752,7 @@ struct ChatMessageList: View {
         case "rg", "grep":
             return "Searched text"
         default:
-            return "Ran shell command"
+            return abbreviated(command, maxLength: 120)
         }
     }
 
@@ -2813,86 +2974,6 @@ private struct ChatTimelineHost: NSViewRepresentable {
                 } else {
                     controller.jumpToLatest()
                 }
-            }
-        }
-    }
-}
-
-private struct PresentedToolDiff: Identifiable {
-    let id: String
-    let title: String
-    let unifiedDiff: String
-}
-
-private struct ToolDiffSheet: View {
-    let diff: PresentedToolDiff
-
-    @AppStorage("editorFontFamily") private var editorFontFamily = "Menlo"
-    @AppStorage("editorFontSize") private var editorFontSize = 12.0
-    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
-    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
-    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var effectiveThemeName: String {
-        guard usePerAppearanceTheme else { return editorTheme }
-        return colorScheme == .dark ? editorTheme : editorThemeLight
-    }
-
-    private var theme: VVTheme {
-        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
-            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
-    }
-
-    private var configuration: VVConfiguration {
-        let font = NSFont(name: editorFontFamily, size: max(editorFontSize - 1, 10))
-            ?? .monospacedSystemFont(ofSize: max(editorFontSize - 1, 10), weight: .regular)
-
-        return VVConfiguration.default
-            .with(font: font)
-            .with(showLineNumbers: true)
-            .with(showGutter: true)
-            .with(showGitGutter: false)
-            .with(wrapLines: true)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "doc.text.magnifyingglass")
-                    .foregroundStyle(.secondary)
-                Text(diff.title.isEmpty ? "Tool Diff" : diff.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                Spacer()
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(diff.unifiedDiff, forType: .string)
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-
-            Divider()
-
-            if diff.unifiedDiff.isEmpty {
-                Text("No diff content available")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                GeometryReader { geo in
-                    VVDiffView(unifiedDiff: diff.unifiedDiff)
-                        .theme(theme)
-                        .configuration(configuration)
-                        .renderStyle(.unifiedTable)
-                        .syntaxHighlighting(true)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                }
-                .background(Color(nsColor: .textBackgroundColor))
             }
         }
     }
