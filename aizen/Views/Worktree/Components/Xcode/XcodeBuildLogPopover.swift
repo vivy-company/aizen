@@ -251,68 +251,6 @@ struct XcodeBuildLogPopover: View {
     }
 }
 
-// MARK: - Error Summary View
-
-struct BuildErrorSummaryView: View {
-    let errors: [BuildError]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(errors.prefix(5).enumerated()), id: \.offset) { _, error in
-                errorRow(error)
-            }
-
-            if errors.count > 5 {
-                Text("+ \(errors.count - 5) more errors")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func errorRow(_ error: BuildError) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: errorIcon(for: error.type))
-                .foregroundStyle(errorColor(for: error.type))
-                .font(.system(size: 10))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(error.message)
-                    .font(.system(size: 11))
-                    .lineLimit(2)
-
-                if let file = error.file {
-                    HStack(spacing: 4) {
-                        Text(file)
-                        if let line = error.line {
-                            Text(":\(line)")
-                        }
-                    }
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    private func errorIcon(for type: BuildError.ErrorType) -> String {
-        switch type {
-        case .error: return "xmark.circle.fill"
-        case .warning: return "exclamationmark.triangle.fill"
-        case .note: return "info.circle.fill"
-        }
-    }
-
-    private func errorColor(for type: BuildError.ErrorType) -> Color {
-        switch type {
-        case .error: return .red
-        case .warning: return .orange
-        case .note: return .blue
-        }
-    }
-}
-
 #Preview {
     XcodeBuildLogPopover(
         log: """

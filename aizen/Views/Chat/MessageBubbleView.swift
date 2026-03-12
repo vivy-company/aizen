@@ -329,25 +329,6 @@ struct UserBubble<Background: View>: View {
     }
 }
 
-// MARK: - Agent Badge
-
-struct AgentBadge: View {
-    let name: String
-
-    var body: some View {
-        PillBadge(
-            text: name,
-            color: .blue,
-            textColor: .white,
-            font: .caption,
-            fontWeight: .medium,
-            horizontalPadding: 8,
-            verticalPadding: 4,
-            backgroundOpacity: 1
-        )
-    }
-}
-
 // MARK: - Preview
 
 #Preview("User Message") {

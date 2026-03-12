@@ -200,38 +200,6 @@ extension UInt64 {
     }
 }
 
-struct MetricCard: View {
-    let title: String
-    let value: String
-    let subtitle: String
-    let lineColor: Color
-    let history: [Double]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.title3)
-                .fontWeight(.semibold)
-            Text(subtitle)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Sparkline(history: history, lineColor: lineColor)
-                .frame(height: 24)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppSurfaceTheme.backgroundColor())
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color.secondary.opacity(0.15), lineWidth: 1)
-        )
-        .cornerRadius(8)
-    }
-}
-
 struct Sparkline: View {
     let history: [Double]
     let lineColor: Color
@@ -260,38 +228,5 @@ struct Sparkline: View {
 
     private func normalized(_ values: [Double]) -> [Double] {
         values.map { min(max($0, 0), 1) }
-    }
-}
-
-struct ActivityMeter: View {
-    let score: Double
-
-    var body: some View {
-        GeometryReader { geo in
-            let width = geo.size.width
-            let height = geo.size.height
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.secondary.opacity(0.12))
-                    .frame(width: width, height: height)
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(color)
-                    .frame(width: width * CGFloat(score / 100.0), height: height)
-            }
-        }
-        .frame(height: 8)
-        .overlay(
-            Text("\(Int(score))")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.top, 12),
-            alignment: .topLeading
-        )
-    }
-
-    private var color: Color {
-        if score < 30 { return .green }
-        if score < 70 { return .orange }
-        return .red
     }
 }

@@ -450,43 +450,6 @@ struct StepRow: View {
     }
 }
 
-// MARK: - Liquid Glass Modifier with Fallback
-
-struct GlassBackgroundModifier: ViewModifier {
-    let fallbackColor: Color
-    let tint: Color?
-    let cornerRadius: CGFloat
-
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .glassEffect(
-                    tint.map { .regular.tint($0) } ?? .regular,
-                    in: RoundedRectangle(cornerRadius: cornerRadius)
-                )
-        } else {
-            content
-                .background(fallbackColor)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-        }
-    }
-}
-
-struct GlassPanelModifier: ViewModifier {
-    let cornerRadius: CGFloat
-
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius))
-        } else {
-            content
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-        }
-    }
-}
-
 struct JobRowSelectionModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     let isSelected: Bool

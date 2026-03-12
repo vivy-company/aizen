@@ -140,33 +140,6 @@ struct PRComment: Identifiable, Equatable, Sendable {
     }
 }
 
-// MARK: - PR File
-
-struct PRFile: Identifiable, Equatable, Sendable {
-    var id: String { path }
-    let path: String
-    let status: Status
-    let additions: Int
-    let deletions: Int
-    let patch: String?
-
-    enum Status: String, Sendable, Codable {
-        case added
-        case modified
-        case deleted
-        case renamed
-
-        var iconName: String {
-            switch self {
-            case .added: return "plus.circle.fill"
-            case .modified: return "pencil.circle.fill"
-            case .deleted: return "minus.circle.fill"
-            case .renamed: return "arrow.right.circle.fill"
-            }
-        }
-    }
-}
-
 // MARK: - PR Filter
 
 nonisolated enum PRFilter: String, CaseIterable, Sendable {

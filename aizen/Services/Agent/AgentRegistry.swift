@@ -13,16 +13,6 @@ extension Notification.Name {
     static let agentMetadataDidChange = Notification.Name("agentMetadataDidChange")
 }
 
-enum AgentRegistryError: Error, LocalizedError {
-    case agentNotFound
-    
-    var errorDescription: String? {
-        switch self {
-        case .agentNotFound: return "Agent not found"
-        }
-    }
-}
-
 /// Manages discovery and configuration of available ACP agents
 actor AgentRegistry {
     static let shared = AgentRegistry()

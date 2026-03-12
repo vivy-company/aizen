@@ -9,35 +9,6 @@ import ACP
 import Foundation
 import SwiftUI
 
-struct AgentActivityRowsView: View {
-    let stats: AgentUsageStats
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            usageRow("Sessions", value: String(stats.sessionsStarted))
-            usageRow("Prompts", value: String(stats.promptsSent))
-            usageRow("Responses", value: String(stats.agentMessages))
-            usageRow("Tool calls", value: String(stats.toolCalls))
-            usageRow("Attachments", value: String(stats.attachmentsSent))
-            usageRow("Last used", value: lastUsedText)
-        }
-    }
-
-    private var lastUsedText: String {
-        guard let lastUsedAt = stats.lastUsedAt else { return "Never" }
-        return RelativeDateFormatter.shared.string(from: lastUsedAt)
-    }
-
-    private func usageRow(_ title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text(value)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
 struct AgentUsageSummaryView: View {
     let report: AgentUsageReport
     let refreshState: UsageRefreshState

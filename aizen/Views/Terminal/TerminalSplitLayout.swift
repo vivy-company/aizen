@@ -27,11 +27,6 @@ indirect enum SplitNode: Codable, Equatable {
         let right: SplitNode  // Right (horizontal) or bottom (vertical)
     }
 
-    // Legacy support for old hsplit/vsplit format
-    private enum LegacyNode: String, Codable {
-        case leaf, hsplit, vsplit
-    }
-
     enum CodingKeys: String, CodingKey {
         case type, paneId, direction, ratio, left, right
     }
