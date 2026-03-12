@@ -8,6 +8,7 @@
 import AppKit
 import SwiftUI
 import os.log
+import VVCode
 
 class GitPanelWindowController: NSWindowController {
     private var windowDelegate: GitPanelWindowDelegate?
@@ -102,6 +103,8 @@ struct GitPanelWindowContentWithToolbar: View {
     @State private var showCLIInstallAlert: Bool = false
     @State private var prOperationInProgress: Bool = false
     @State private var hostingInfoTask: Task<Void, Never>?
+    @AppStorage(AppearanceSettings.gitDiffRenderStyleKey)
+    private var diffRenderStyleRawValue: String = AppearanceSettings.defaultGitDiffRenderStyleRawValue
 
     @ObservedObject private var gitRepositoryService: GitRepositoryService
 
@@ -111,6 +114,17 @@ struct GitPanelWindowContentWithToolbar: View {
     private var gitStatus: GitStatus { gitRepositoryService.currentStatus }
     private var isOperationPending: Bool { gitRepositoryService.isOperationPending }
     private var gitFeaturesAvailable: Bool { gitRepositoryService.repositoryState == .ready }
+
+    private var diffRenderStyleBinding: Binding<VVDiffRenderStyle> {
+        Binding(
+            get: {
+                AppearanceSettings.gitDiffRenderStyle(from: diffRenderStyleRawValue)
+            },
+            set: { newValue in
+                diffRenderStyleRawValue = AppearanceSettings.gitDiffRenderStyleRawValue(for: newValue)
+            }
+        )
+    }
 
     init(context: GitChangesContext, repositoryManager: RepositoryManager, onClose: @escaping () -> Void) {
         self.context = context
@@ -143,6 +157,7 @@ struct GitPanelWindowContentWithToolbar: View {
             context: context,
             repositoryManager: repositoryManager,
             selectedTab: $selectedTab,
+            diffRenderStyle: diffRenderStyleBinding,
             onClose: onClose
         )
         .toolbar {

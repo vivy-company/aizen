@@ -19,6 +19,7 @@ struct DiffView: View {
     let fontSize: Double
     let fontFamily: String
     let repoPath: String
+    let renderStyle: VVDiffRenderStyle
     let showFileHeaders: Bool
     let scrollToFile: String?
     let onFileVisible: ((String) -> Void)?
@@ -34,6 +35,7 @@ struct DiffView: View {
         fontSize: Double,
         fontFamily: String,
         repoPath: String = "",
+        renderStyle: VVDiffRenderStyle = .inline,
         scrollToFile: String? = nil,
         onFileVisible: ((String) -> Void)? = nil,
         onOpenFile: ((String) -> Void)? = nil,
@@ -45,6 +47,7 @@ struct DiffView: View {
         self.fontSize = fontSize
         self.fontFamily = fontFamily
         self.repoPath = repoPath
+        self.renderStyle = renderStyle
         self.showFileHeaders = true
         self.scrollToFile = scrollToFile
         self.onFileVisible = onFileVisible
@@ -59,6 +62,7 @@ struct DiffView: View {
         fontSize: Double,
         fontFamily: String,
         repoPath: String = "",
+        renderStyle: VVDiffRenderStyle = .inline,
         showFileHeaders: Bool = false,
         commentedLines: Set<String> = [],
         onAddComment: ((DiffLine, String) -> Void)? = nil
@@ -68,6 +72,7 @@ struct DiffView: View {
         self.fontSize = fontSize
         self.fontFamily = fontFamily
         self.repoPath = repoPath
+        self.renderStyle = renderStyle
         self.showFileHeaders = showFileHeaders
         self.scrollToFile = nil
         self.onFileVisible = nil
@@ -135,7 +140,7 @@ struct DiffView: View {
                 VVDiffView(unifiedDiff: displayDiff)
                     .theme(theme)
                     .configuration(configuration)
-                    .renderStyle(.inline)
+                    .renderStyle(renderStyle)
                     .syntaxHighlighting(true)
                     .onFileHeaderActivate { path in
                         onOpenFile?(path)

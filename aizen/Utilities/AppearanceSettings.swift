@@ -20,6 +20,7 @@ enum AppearanceSettings {
     static let codeFontFamilyKey = "editorFontFamily"
     static let codeFontSizeKey = "editorFontSize"
     static let diffFontSizeKey = "diffFontSize"
+    static let gitDiffRenderStyleKey = "gitDiffRenderStyle"
 
     static let markdownFontFamilyKey = "chatFontFamily"
     static let markdownFontSizeKey = "chatFontSize"
@@ -36,6 +37,7 @@ enum AppearanceSettings {
     static let defaultCodeFontFamily = "Menlo"
     static let defaultCodeFontSize = 12.0
     static let defaultDiffFontSize = 11.0
+    static let defaultGitDiffRenderStyleRawValue = "inline"
 
     static let systemFontFamily = "System Font"
     static let defaultMarkdownFontFamily = systemFontFamily
@@ -217,6 +219,19 @@ enum AppearanceSettings {
         return .custom(family, size: size).weight(weight)
     }
 
+    static func gitDiffRenderStyle(from rawValue: String) -> VVDiffRenderStyle {
+        rawValue == "sideBySide" ? .sideBySide : .inline
+    }
+
+    static func gitDiffRenderStyleRawValue(for style: VVDiffRenderStyle) -> String {
+        switch style {
+        case .inline:
+            return "inline"
+        case .sideBySide:
+            return "sideBySide"
+        }
+    }
+
     static func reset(defaults: UserDefaults = .standard) {
         defaults.set(defaultDarkTheme, forKey: themeNameKey)
         defaults.set(defaultLightTheme, forKey: lightThemeNameKey)
@@ -228,6 +243,7 @@ enum AppearanceSettings {
         defaults.set(defaultCodeFontFamily, forKey: codeFontFamilyKey)
         defaults.set(defaultCodeFontSize, forKey: codeFontSizeKey)
         defaults.set(defaultDiffFontSize, forKey: diffFontSizeKey)
+        defaults.set(defaultGitDiffRenderStyleRawValue, forKey: gitDiffRenderStyleKey)
 
         defaults.set(defaultMarkdownFontFamily, forKey: markdownFontFamilyKey)
         defaults.set(defaultMarkdownFontSize, forKey: markdownFontSizeKey)

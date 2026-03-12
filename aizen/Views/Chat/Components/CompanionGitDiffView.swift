@@ -169,7 +169,11 @@ struct CompanionGitDiffView: View {
     private func reloadDiffNow() {
         let path = worktreePath
         guard !path.isEmpty else {
-            diffOutput = ""
+            diffLoadTask?.cancel()
+            diffLoadTask = nil
+            if !diffOutput.isEmpty {
+                diffOutput = ""
+            }
             isLoadingDiff = false
             return
         }
@@ -181,7 +185,9 @@ struct CompanionGitDiffView: View {
             let output = await Self.loadWorkingDiff(path: path)
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                diffOutput = output
+                if diffOutput != output {
+                    diffOutput = output
+                }
                 isLoadingDiff = false
             }
         }

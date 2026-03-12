@@ -8,6 +8,7 @@
 import AppKit
 import SwiftUI
 import os.log
+import VVCode
 
 enum GitPanelTheme {
     static func effectiveThemeName(
@@ -150,6 +151,7 @@ struct GitPanelWindowContent: View {
     let context: GitChangesContext
     let repositoryManager: RepositoryManager
     @Binding var selectedTab: GitPanelTab
+    @Binding var diffRenderStyle: VVDiffRenderStyle
     let onClose: () -> Void
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitPanelWindow")
@@ -164,6 +166,7 @@ struct GitPanelWindowContent: View {
     @State private var cachedChangedFiles: [String] = []
     @State private var gitIndexWatchToken: UUID?
     @State private var diffReloadTask: Task<Void, Never>?
+    @State private var diffLoadTask: Task<Void, Never>?
 
     @StateObject private var reviewManager = ReviewSessionManager()
     @StateObject private var workflowService = WorkflowService()
@@ -261,6 +264,10 @@ struct GitPanelWindowContent: View {
                 }
             }
             gitIndexWatchToken = nil
+            diffReloadTask?.cancel()
+            diffReloadTask = nil
+            diffLoadTask?.cancel()
+            diffLoadTask = nil
             workflowService.stopAutoRefresh()
             // Ensure any workflow log polling stops when the window closes.
             workflowService.clearSelection()
@@ -272,9 +279,7 @@ struct GitPanelWindowContent: View {
             }
         }
         .onChange(of: selectedHistoryCommit) { _, commit in
-            Task {
-                await loadDiff(for: commit)
-            }
+            scheduleDiffLoad(for: commit)
         }
         .sheet(item: $commentPopoverLine) { line in
             CommentPopover(
@@ -504,6 +509,35 @@ struct GitPanelWindowContent: View {
 
     // MARK: - Diff Panel
 
+    private var diffRenderStylePicker: some View {
+        Picker("Diff Layout", selection: $diffRenderStyle) {
+            Text("Inline").tag(VVDiffRenderStyle.inline)
+            Text("Split").tag(VVDiffRenderStyle.sideBySide)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
+        .frame(width: 128)
+        .help("Switch between inline and side-by-side diff layouts")
+    }
+
+    private func changesDiffHeader() -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: GitPanelTab.git.icon)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+
+            Text(GitPanelTab.git.displayName)
+                .font(.system(size: 13, weight: .medium))
+
+            Spacer()
+
+            diffRenderStylePicker
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 44)
+    }
+
     private func diffPanelHeader(for commit: GitCommit) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "arrow.triangle.branch")
@@ -521,6 +555,8 @@ struct GitPanelWindowContent: View {
 
             Spacer()
 
+            diffRenderStylePicker
+
             Button(String(localized: "git.panel.backToChanges")) {
                 selectedHistoryCommit = nil
             }
@@ -535,6 +571,8 @@ struct GitPanelWindowContent: View {
         VStack(spacing: 0) {
             if let commit = selectedHistoryCommit {
                 diffPanelHeader(for: commit)
+            } else {
+                changesDiffHeader()
             }
 
             if selectedHistoryCommit == nil && allChangedFiles.isEmpty {
@@ -557,6 +595,7 @@ struct GitPanelWindowContent: View {
                     fontSize: diffFontSize,
                     fontFamily: editorFontFamily,
                     repoPath: worktreePath,
+                    renderStyle: diffRenderStyle,
                     scrollToFile: scrollToFile,
                     onFileVisible: { file in
                         visibleFile = file
@@ -579,7 +618,7 @@ struct GitPanelWindowContent: View {
             }
         }
         .task {
-            await loadDiff(for: nil)
+            scheduleDiffLoad(for: nil)
         }
         .onChange(of: diffOutput) { _, _ in
             validateCommentsAgainstDiff()
@@ -709,36 +748,77 @@ struct GitPanelWindowContent: View {
         }
     }
 
-    private func loadDiff(for commit: GitCommit?) async {
+    private func scheduleDiffLoad(for commit: GitCommit?) {
         let path = worktreePath
+        guard !path.isEmpty else {
+            diffLoadTask?.cancel()
+            diffLoadTask = nil
+            applyDiffOutput("")
+            return
+        }
 
-        guard !path.isEmpty else { return }
-
-        if let commit = commit {
-            // Load diff for specific commit using async ProcessExecutor
-            do {
-                let result = try await ProcessExecutor.shared.executeWithOutput(
-                    executable: "/usr/bin/git",
-                    arguments: ["show", "--format=", commit.id],
-                    workingDirectory: path
-                )
-                diffOutput = result.stdout
-            } catch {
-                logger.error("Failed to load commit diff: \(error.localizedDescription)")
+        let commitID = commit?.id
+        diffLoadTask?.cancel()
+        diffLoadTask = Task {
+            let output: String
+            if let commitID {
+                output = await Self.loadCommitDiff(path: path, commitID: commitID)
+            } else {
+                output = await Self.loadWorkingDiff(path: path)
             }
-        } else {
-            // Load working changes diff
-            await loadWorkingDiff()
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard worktreePath == path else { return }
+                guard selectedHistoryCommit?.id == commitID else { return }
+                applyDiffOutput(output)
+            }
         }
     }
 
-    private func loadWorkingDiff() async {
-        let path = worktreePath
+    private func reloadDiff() {
+        scheduleDiffLoad(for: selectedHistoryCommit)
+    }
 
-        guard !path.isEmpty else { return }
+    private func reloadDiffDebounced() {
+        // Cancel any pending reload
+        diffReloadTask?.cancel()
 
-        // Use libgit2 for working directory diff
-        let result = await Task.detached {
+        // Debounce by 300ms to avoid rapid reloads
+        diffReloadTask = Task {
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+            } catch {
+                return  // Cancelled
+            }
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                scheduleDiffLoad(for: selectedHistoryCommit)
+            }
+        }
+    }
+
+    private func applyDiffOutput(_ output: String) {
+        if diffOutput != output {
+            diffOutput = output
+        }
+    }
+
+    nonisolated private static func loadCommitDiff(path: String, commitID: String) async -> String {
+        do {
+            let result = try await ProcessExecutor.shared.executeWithOutput(
+                executable: "/usr/bin/git",
+                arguments: ["show", "--format=", commitID],
+                workingDirectory: path
+            )
+            return result.stdout
+        } catch {
+            return ""
+        }
+    }
+
+    nonisolated private static func loadWorkingDiff(path: String) async -> String {
+        await Task.detached {
             do {
                 let repo = try Libgit2Repository(path: path)
 
@@ -775,30 +855,6 @@ struct GitPanelWindowContent: View {
                 return ""
             }
         }.value
-
-        diffOutput = result
-    }
-
-    private func reloadDiff() {
-        Task {
-            await loadDiff(for: selectedHistoryCommit)
-        }
-    }
-
-    private func reloadDiffDebounced() {
-        // Cancel any pending reload
-        diffReloadTask?.cancel()
-
-        // Debounce by 300ms to avoid rapid reloads
-        diffReloadTask = Task {
-            do {
-                try await Task.sleep(for: .milliseconds(300))
-            } catch {
-                return  // Cancelled
-            }
-            guard !Task.isCancelled else { return }
-            await loadDiff(for: selectedHistoryCommit)
-        }
     }
 
     nonisolated private static func buildFileDiff(file: String, basePath: String) -> String {
