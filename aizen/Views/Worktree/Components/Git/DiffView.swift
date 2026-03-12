@@ -81,8 +81,9 @@ struct DiffView: View {
     }
 
     private var configuration: VVConfiguration {
-        let font = NSFont(name: fontFamily, size: fontSize)
-            ?? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        // Match the upstream VVDevKit diff playground, which renders with the
+        // system monospace font and avoids file-header glyph corruption.
+        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
 
         return VVConfiguration.default
             .with(font: font)

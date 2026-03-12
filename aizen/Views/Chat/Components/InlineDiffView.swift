@@ -62,8 +62,7 @@ struct InlineDiffView: View {
     }
 
     private var configuration: VVConfiguration {
-        let font = NSFont(name: codeFontFamily, size: max(diffFontSize, 10))
-            ?? .monospacedSystemFont(ofSize: max(diffFontSize, 10), weight: .regular)
+        let font = NSFont.monospacedSystemFont(ofSize: max(diffFontSize, 10), weight: .regular)
 
         return VVConfiguration.default
             .with(font: font)
@@ -400,8 +399,7 @@ private struct FullDiffSheet: View {
     }
 
     private var configuration: VVConfiguration {
-        let font = NSFont(name: fontFamily, size: max(fontSize, 10))
-            ?? .monospacedSystemFont(ofSize: max(fontSize, 10), weight: .regular)
+        let font = NSFont.monospacedSystemFont(ofSize: max(fontSize, 10), weight: .regular)
 
         return VVConfiguration.default
             .with(font: font)

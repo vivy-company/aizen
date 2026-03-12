@@ -44,10 +44,26 @@ actor AgentInstaller {
     }
 
     func installAgent(_ agentName: String) async throws {
-        guard let metadata = AgentRegistry.shared.getMetadata(for: agentName) else {
-            throw AgentInstallError.installFailed(message: "Unknown agent: \(agentName)")
+        if let metadata = AgentRegistry.shared.getMetadata(for: agentName) {
+            if metadata.isRegistry {
+                try await installAgent(metadata)
+                return
+            }
+
+            throw AgentInstallError.installFailed(
+                message: "\(metadata.name) cannot be installed automatically. Configure its executable in Settings."
+            )
         }
-        try await installAgent(metadata)
+
+        if let registryAgent = try await ACPRegistryService.shared.agent(id: agentName, forceRefresh: true) {
+            let metadata = try await ACPRegistryService.shared.addAgent(registryAgent)
+            try await installAgent(metadata)
+            return
+        }
+
+        throw AgentInstallError.installFailed(
+            message: "This session's agent is no longer available. Choose another agent or add it again from the registry."
+        )
     }
 
     func updateAgent(_ metadata: AgentMetadata) async throws {

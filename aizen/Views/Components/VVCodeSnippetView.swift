@@ -63,8 +63,12 @@ struct VVCodeSnippetView: View {
     private var configuration: VVConfiguration {
         let family = fontFamily ?? editorFontFamily
         let size = fontSize ?? editorFontSize
-        let font = NSFont(name: family, size: size)
-            ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+        let font = AppearanceSettings.resolvedNSFont(
+            family: family,
+            size: size,
+            monospacedFallback: true,
+            requireFixedPitch: true
+        )
 
         return VVConfiguration.default
             .with(font: font)

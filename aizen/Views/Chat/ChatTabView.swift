@@ -23,7 +23,6 @@ struct ChatTabView: View {
     private let sessionManager = ChatSessionManager.shared
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ChatTabView")
     @State private var enabledAgents: [AgentMetadata] = []
-    @State private var showingRegistryPicker = false
     @State private var cachedSessionIds: [UUID] = []
     // Keep only the active chat session mounted to avoid hidden view layout churn.
     private let maxCachedSessions = 1
@@ -126,12 +125,7 @@ struct ChatTabView: View {
                     }
                     .onChange(of: sessions.count) { _, _ in
                         syncSelectionAndCache()
-                    }
-            }
-        }
-        .sheet(isPresented: $showingRegistryPicker) {
-            RegistryAgentPickerView {
-                loadEnabledAgents()
+                }
             }
         }
     }
@@ -518,10 +512,10 @@ struct ChatTabView: View {
 
     private var registryButton: some View {
         Button {
-            showingRegistryPicker = true
+            RegistryAgentsWindowManager.shared.show()
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 16, weight: .semibold))
+            Image(systemName: "plus.square.on.square")
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 54, height: 54)
                 .background {
@@ -529,7 +523,10 @@ struct ChatTabView: View {
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(emptyStateItemStrokeColor, lineWidth: 1)
+                        .stroke(
+                            emptyStateItemStrokeColor,
+                            style: StrokeStyle(lineWidth: 1, dash: [5, 4])
+                        )
                 }
         }
         .buttonStyle(.plain)

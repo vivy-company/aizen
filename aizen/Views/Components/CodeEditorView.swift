@@ -40,8 +40,12 @@ struct CodeEditorView: View {
     }
 
     private var editorConfiguration: VVConfiguration {
-        let font = NSFont(name: editorFontFamily, size: editorFontSize)
-            ?? .monospacedSystemFont(ofSize: editorFontSize, weight: .regular)
+        let font = AppearanceSettings.resolvedNSFont(
+            family: editorFontFamily,
+            size: editorFontSize,
+            monospacedFallback: true,
+            requireFixedPitch: true
+        )
 
         return VVConfiguration.default
             .with(font: font)

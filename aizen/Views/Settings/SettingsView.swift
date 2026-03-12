@@ -38,7 +38,6 @@ struct SettingsView: View {
     @AppStorage("defaultACPAgent") private var defaultACPAgent = AgentRegistry.defaultAgentID
     @State private var selection: SettingsSelection? = .general
     @State private var agents: [AgentMetadata] = []
-    @State private var showingRegistryPicker = false
     @State private var showingAddCustomAgent = false
     @StateObject private var licenseManager = LicenseManager.shared
 
@@ -89,7 +88,7 @@ struct SettingsView: View {
                         }
 
                         Button {
-                            showingRegistryPicker = true
+                            RegistryAgentsWindowManager.shared.show()
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "plus.square.on.square")
@@ -151,11 +150,6 @@ struct SettingsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSettingsPro)) { _ in
             selection = .pro
-        }
-        .sheet(isPresented: $showingRegistryPicker) {
-            RegistryAgentPickerView {
-                loadAgents()
-            }
         }
         .sheet(isPresented: $showingAddCustomAgent) {
             CustomAgentFormView(

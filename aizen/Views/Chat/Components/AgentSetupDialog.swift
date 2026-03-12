@@ -14,14 +14,6 @@ struct AgentSetupDialog: View {
     @State private var isInstalling = false
     @State private var errorMessage: String?
 
-    private var canInstallAgent: Bool {
-        guard let agentName = session.missingAgentName,
-              let metadata = AgentRegistry.shared.getMetadata(for: agentName) else {
-            return false
-        }
-        return metadata.requiresInstall
-    }
-
     private var agentDisplayName: String {
         guard let agentName = session.missingAgentName else { return "Agent" }
         return AgentRegistry.shared.getMetadata(for: agentName)?.name ?? agentName.capitalized
@@ -48,7 +40,7 @@ struct AgentSetupDialog: View {
                         .font(.system(size: 36))
                         .foregroundStyle(.red)
 
-                    Text("Installation Failed")
+                    Text("Setup Failed")
                         .font(.headline)
 
                     Text(error)
@@ -58,7 +50,8 @@ struct AgentSetupDialog: View {
                         .padding(.horizontal)
 
                     HStack(spacing: 12) {
-                        Button("Cancel") {
+                        Button("Close") {
+                            session.dismissSetupPrompt()
                             dismiss()
                         }
                         .keyboardShortcut(.escape)
@@ -73,20 +66,10 @@ struct AgentSetupDialog: View {
                 .padding(24)
             } else {
                 VStack(spacing: 12) {
-                    if canInstallAgent {
-                        ProgressView()
-                        Text("Preparing...")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Image(systemName: "square.and.arrow.down")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.secondary)
-                        Text("Install this agent from the registry or verify its command dependencies.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
+                    ProgressView()
+                    Text("Preparing \(agentDisplayName)...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(40)
             }
@@ -94,7 +77,7 @@ struct AgentSetupDialog: View {
         .frame(width: 300, height: 200)
         .background(AppSurfaceTheme.backgroundColor())
         .task {
-            if canInstallAgent && !isInstalling && errorMessage == nil {
+            if !isInstalling && errorMessage == nil {
                 installAgent()
             }
         }

@@ -7,98 +7,62 @@ import ACPRegistry
 import SwiftUI
 
 struct RegistryAgentPickerView: View {
-    @Environment(\.dismiss) private var dismiss
-
-    let onAgentAdded: (() -> Void)?
-
     @State private var searchText = ""
     @State private var agents: [RegistryAgent] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var addingAgentIDs: Set<String> = []
 
-    init(onAgentAdded: (() -> Void)? = nil) {
-        self.onAgentAdded = onAgentAdded
+    private var surfaceColor: Color {
+        AppSurfaceTheme.backgroundColor()
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            DetailHeaderBar(showsBackground: false) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Add From Registry")
-                        .font(.headline)
-                    Text("Discover ACP-compatible agents from the official registry.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } trailing: {
-                HStack(spacing: 8) {
-                    Button {
-                        Task { await loadAgents(forceRefresh: true) }
-                    } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
-                    .disabled(isLoading)
-
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-            .background(AppSurfaceTheme.backgroundColor())
-
+            headerView
             Divider()
-
-            searchBar
-
-            Divider()
-
             content
-
-            if let errorMessage, !agents.isEmpty {
-                Divider()
-
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.yellow)
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
+        }
+        .frame(minWidth: 700, idealWidth: 860, maxWidth: .infinity, minHeight: 520, idealHeight: 720, maxHeight: .infinity)
+        .background(surfaceColor)
+        .toolbarBackground(surfaceColor, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    Task { await loadAgents(forceRefresh: true) }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(AppSurfaceTheme.backgroundColor())
+                .disabled(isLoading)
             }
         }
-        .frame(width: 620, height: 760)
-        .settingsSheetChrome()
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search registry agents")
         .task {
             guard agents.isEmpty else { return }
             await loadAgents(forceRefresh: false)
         }
     }
 
-    private var searchBar: some View {
+    private var headerView: some View {
         HStack(spacing: 12) {
-            SearchField(
-                placeholder: "Search registry agents",
-                text: $searchText,
-                iconColor: .secondary,
-                onClear: {}
-            ) {
-                EmptyView()
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Add From Registry")
+                    .font(.headline)
+                Text("Discover ACP-compatible agents from the official registry.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .padding(10)
-            .background(Color(NSColor.textBackgroundColor))
-            .cornerRadius(10)
 
-            Text("\(filteredAgents.count) shown")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Spacer()
+
+            if !agents.isEmpty {
+                TagBadge(text: "\(filteredAgents.count) shown", color: .secondary, cornerRadius: 6)
+            }
         }
-        .padding(16)
-        .background(AppSurfaceTheme.backgroundColor())
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(surfaceColor)
     }
 
     @ViewBuilder
@@ -110,7 +74,7 @@ struct RegistryAgentPickerView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppSurfaceTheme.backgroundColor())
+            .background(surfaceColor)
         } else if let errorMessage, agents.isEmpty {
             VStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle")
@@ -129,10 +93,26 @@ struct RegistryAgentPickerView: View {
                 .buttonStyle(.borderedProminent)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppSurfaceTheme.backgroundColor())
+            .background(surfaceColor)
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(spacing: 0) {
+                    if let errorMessage {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.yellow)
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Divider()
+                    }
+
                     if filteredAgents.isEmpty {
                         VStack(spacing: 10) {
                             Image(systemName: "magnifyingglass")
@@ -145,6 +125,8 @@ struct RegistryAgentPickerView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, minHeight: 320)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 16)
                     } else {
                         ForEach(filteredAgents) { agent in
                             RegistryAgentRow(
@@ -153,12 +135,14 @@ struct RegistryAgentPickerView: View {
                                 isAdding: addingAgentIDs.contains(agent.id),
                                 onAdd: { add(agent) }
                             )
+
+                            Divider()
                         }
                     }
                 }
-                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .background(AppSurfaceTheme.backgroundColor())
+            .background(surfaceColor)
         }
     }
 
@@ -187,12 +171,11 @@ struct RegistryAgentPickerView: View {
             do {
                 _ = try await ACPRegistryService.shared.addAgent(agent)
                 await MainActor.run {
-                    addingAgentIDs.remove(agent.id)
-                    onAgentAdded?()
+                    _ = addingAgentIDs.remove(agent.id)
                 }
             } catch {
                 await MainActor.run {
-                    addingAgentIDs.remove(agent.id)
+                    _ = addingAgentIDs.remove(agent.id)
                     errorMessage = error.localizedDescription
                 }
             }
@@ -225,6 +208,8 @@ private struct RegistryAgentRow: View {
     let isAdded: Bool
     let isAdding: Bool
     let onAdd: () -> Void
+
+    @State private var isHovered = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -275,9 +260,19 @@ private struct RegistryAgentRow: View {
 
             actionView
         }
-        .padding(14)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.35))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .modifier(SelectableRowModifier(
+            isSelected: false,
+            isHovered: isHovered,
+            showsIdleBackground: false,
+            cornerRadius: 0
+        ))
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 
     @ViewBuilder

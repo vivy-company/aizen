@@ -903,6 +903,11 @@ class AgentSession: ObservableObject, ClientDelegate {
         missingAgentName = nil
     }
 
+    func dismissSetupPrompt() {
+        needsAgentSetup = false
+        setupError = nil
+    }
+
     // MARK: - ClientDelegate Methods
 
     // File operations are nonisolated to avoid blocking MainActor during large file I/O

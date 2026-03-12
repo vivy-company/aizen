@@ -177,7 +177,8 @@ enum AppearanceSettings {
     static func resolvedNSFont(
         family: String,
         size: Double,
-        monospacedFallback: Bool = false
+        monospacedFallback: Bool = false,
+        requireFixedPitch: Bool = false
     ) -> NSFont {
         if family == systemFontFamily {
             return monospacedFallback
@@ -185,8 +186,15 @@ enum AppearanceSettings {
                 : .systemFont(ofSize: size)
         }
 
-        if let custom = NSFont(name: family, size: size) {
+        if let custom = NSFont(name: family, size: size), !requireFixedPitch || custom.isFixedPitch {
             return custom
+        }
+
+        if monospacedFallback,
+           family != defaultCodeFontFamily,
+           let defaultCodeFont = NSFont(name: defaultCodeFontFamily, size: size),
+           !requireFixedPitch || defaultCodeFont.isFixedPitch {
+            return defaultCodeFont
         }
 
         return monospacedFallback
