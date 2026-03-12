@@ -29,7 +29,9 @@ struct ContentView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var zenModeBeforeCrossProjectSelection: Bool?
     @AppStorage("hasShownOnboarding") private var hasShownOnboarding = false
+    @AppStorage("hasShownCrossProjectOnboarding") private var hasShownCrossProjectOnboarding = false
     @State private var showingOnboarding = false
+    @State private var showingCrossProjectOnboarding = false
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
 
     // Command palette state
@@ -150,6 +152,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingOnboarding) {
             OnboardingView()
+        }
+        .sheet(isPresented: $showingCrossProjectOnboarding) {
+            CrossProjectOnboardingView()
         }
         .onAppear {
             if isCrossProjectSelected && crossProjectWorktree == nil {
@@ -303,6 +308,7 @@ struct ContentView: View {
                 selectedRepository = nil
                 selectedWorktree = nil
                 prepareCrossProjectWorkspaceIfNeeded()
+                presentCrossProjectOnboardingIfNeeded()
             } else {
                 if let previousZenMode = zenModeBeforeCrossProjectSelection {
                     zenModeEnabled = previousZenMode
@@ -464,6 +470,15 @@ struct ContentView: View {
         } catch {
             crossProjectWorktree = nil
         }
+    }
+
+    private func presentCrossProjectOnboardingIfNeeded() {
+        guard !hasShownCrossProjectOnboarding else {
+            return
+        }
+
+        hasShownCrossProjectOnboarding = true
+        showingCrossProjectOnboarding = true
     }
 
     private func navigateToChatSession(chatSessionId: UUID) {
