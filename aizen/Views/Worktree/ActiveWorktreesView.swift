@@ -12,6 +12,7 @@ import os.log
 @MainActor
 struct ActiveWorktreesView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var metrics = ActiveWorktreesMetrics()
 
     @FetchRequest(
@@ -33,7 +34,11 @@ struct ActiveWorktreesView: View {
     ]
 
     private var surfaceColor: Color {
-        AppSurfaceTheme.backgroundColor()
+        AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
+    }
+
+    private var surfaceNSColor: NSColor {
+        AppSurfaceTheme.backgroundNSColor(colorScheme: colorScheme)
     }
 
     private var activeWorktrees: [Worktree] {
@@ -233,7 +238,9 @@ struct ActiveWorktreesView: View {
             footer
         }
         .frame(minWidth: 940, minHeight: 560)
+        .scrollContentBackground(.hidden)
         .background(surfaceColor)
+        .background(WindowBackgroundSync(color: surfaceNSColor))
         .toolbarBackground(surfaceColor, for: .windowToolbar)
         .toolbarBackground(.visible, for: .windowToolbar)
         .toolbar {

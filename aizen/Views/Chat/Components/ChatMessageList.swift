@@ -54,6 +54,13 @@ struct ChatMessageList: View {
         toolCalls.filter { $0.parentToolCallId == nil }
     }
 
+    private var latestCopyableAgentMessageID: String? {
+        messages.reversed().first { message in
+            guard message.role == .agent else { return false }
+            return hasCopyableMessageContent(message)
+        }?.id
+    }
+
     private var timelineSignature: Int {
         var hasher = Hasher()
         hasher.combine(messages.count)
@@ -1413,6 +1420,7 @@ struct ChatMessageList: View {
         case .user:
             return userMessagePresentation(for: message)
         case .agent:
+            let showsCopyAction = latestCopyableAgentMessageID == message.id
             return VVChatMessagePresentation(
                 bubbleStyle: VVChatBubbleStyle(
                     isEnabled: true,
@@ -1430,7 +1438,7 @@ struct ChatMessageList: View {
                 leadingIconSize: startsAssistantLane ? agentLaneIconSize : nil,
                 leadingIconSpacing: startsAssistantLane ? agentLaneIconSpacing : nil,
                 showsTimestamp: false,
-                timestampSuffixIconURL: copySuffixIconURL(for: message.id),
+                timestampSuffixIconURL: showsCopyAction ? copySuffixIconURL(for: message.id) : nil,
                 timestampIconSize: max(13, CGFloat(markdownFontSize) - 1),
                 timestampIconSpacing: 0
             )
@@ -1442,9 +1450,12 @@ struct ChatMessageList: View {
     private func presentationRevisionToken(for message: MessageItem, startsAssistantLane: Bool) -> String {
         switch message.role {
         case .user:
-            return "user-copy-\(copyFooterStateToken(for: message.id))-v3"
+            return "user-v4"
         case .agent:
-            return "assistant-lane-\(startsAssistantLane ? "start" : "cont")-copy-\(copyFooterStateToken(for: message.id))-v4"
+            let copyToken = latestCopyableAgentMessageID == message.id
+                ? copyFooterStateToken(for: message.id)
+                : "hidden"
+            return "assistant-lane-\(startsAssistantLane ? "start" : "cont")-copy-\(copyToken)-v5"
         case .system:
             return "system"
         }
@@ -2075,13 +2086,22 @@ struct ChatMessageList: View {
     }
 
     private func userMessagePresentation(for message: MessageItem) -> VVChatMessagePresentation {
-        let copyIconURL = copySuffixIconURL(for: message.id)
         return VVChatMessagePresentation(
             timestampPrefixIconURL: timestampClockIconURL(),
-            timestampSuffixIconURL: copyIconURL,
+            timestampSuffixIconURL: nil,
             timestampIconSize: timestampSymbolSize,
             timestampIconSpacing: 6
         )
+    }
+
+    private func hasCopyableMessageContent(_ message: MessageItem) -> Bool {
+        let trimmedContent = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedContent.isEmpty {
+            return true
+        }
+
+        let markdown = messageMarkdown(message).trimmingCharacters(in: .whitespacesAndNewlines)
+        return !markdown.isEmpty
     }
 
     private var timestampSymbolSize: CGFloat {
