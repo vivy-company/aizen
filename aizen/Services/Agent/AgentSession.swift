@@ -595,6 +595,7 @@ class AgentSession: ObservableObject, ClientDelegate {
         }
         
         let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
+        let launchEnvironment = AgentRegistry.shared.getAgentLaunchEnvironment(for: agentName)
         let launchArgCandidates = launchArgCandidates(for: agentName, primary: launchArgs)
         var lastFailure: (stage: String, error: Error)?
         
@@ -607,7 +608,8 @@ class AgentSession: ObservableObject, ClientDelegate {
                 try await client.launch(
                     agentPath: agentPath,
                     arguments: args,
-                    workingDirectory: workingDir
+                    workingDirectory: workingDir,
+                    environment: launchEnvironment.isEmpty ? nil : launchEnvironment
                 )
             } catch {
                 lastFailure = (stage: "launch", error: error)

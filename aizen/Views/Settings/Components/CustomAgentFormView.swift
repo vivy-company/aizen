@@ -16,6 +16,7 @@ struct CustomAgentFormView: View {
     @State private var description: String
     @State private var executablePath: String
     @State private var launchArgsText: String
+    @State private var environmentVariables: [AgentEnvironmentVariable]
     @State private var selectedSFSymbol: String
     @State private var showingSFSymbolPicker = false
     @State private var errorMessage: String?
@@ -45,6 +46,7 @@ struct CustomAgentFormView: View {
             _description = State(initialValue: metadata.description ?? "")
             _executablePath = State(initialValue: metadata.executablePath ?? "")
             _launchArgsText = State(initialValue: metadata.launchArgs.joined(separator: " "))
+            _environmentVariables = State(initialValue: metadata.environmentVariables)
 
             switch metadata.iconType {
             case .sfSymbol(let symbol):
@@ -59,6 +61,7 @@ struct CustomAgentFormView: View {
             _description = State(initialValue: "")
             _executablePath = State(initialValue: "")
             _launchArgsText = State(initialValue: "")
+            _environmentVariables = State(initialValue: [])
             _selectedSFSymbol = State(initialValue: "brain.head.profile")
         }
     }
@@ -157,6 +160,11 @@ struct CustomAgentFormView: View {
                     }
                 }
 
+                AgentEnvironmentVariablesEditor(
+                    variables: $environmentVariables,
+                    helperText: "Merged on top of your shell environment during validation and when the agent launches."
+                )
+
                 Section("Icon") {
                     HStack(spacing: 12) {
                         Image(systemName: selectedSFSymbol)
@@ -201,7 +209,7 @@ struct CustomAgentFormView: View {
             .padding()
             .background(AppSurfaceTheme.backgroundColor())
         }
-        .frame(width: 500, height: 600)
+        .frame(width: 520, height: 720)
         .settingsSheetChrome()
         .alert("Error", isPresented: .constant(errorMessage != nil)) {
             Button("OK") { errorMessage = nil }
@@ -212,6 +220,9 @@ struct CustomAgentFormView: View {
         }
         .sheet(isPresented: $showingSFSymbolPicker) {
             SFSymbolPickerView(selectedSymbol: $selectedSFSymbol, isPresented: $showingSFSymbolPicker)
+        }
+        .onChange(of: environmentVariables) { _, _ in
+            pathValidationResult = nil
         }
     }
 
@@ -281,10 +292,12 @@ struct CustomAgentFormView: View {
         // Test ACP protocol
         do {
             let tempClient = Client()
+            let environment = environmentVariables.launchEnvironment
 
             try await tempClient.launch(
                 agentPath: trimmedPath,
-                arguments: launchArgs
+                arguments: launchArgs,
+                environment: environment.isEmpty ? nil : environment
             )
 
             let capabilities = ClientCapabilities(
@@ -356,6 +369,7 @@ struct CustomAgentFormView: View {
 
         // Use SF Symbol for icon
         let iconType = AgentIconType.sfSymbol(selectedSFSymbol)
+        let persistedEnvironmentVariables = environmentVariables.persistedVariables
 
         Task {
             if let existing = existingMetadata {
@@ -366,6 +380,7 @@ struct CustomAgentFormView: View {
                 updated.executablePath = trimmedPath
                 updated.launchArgs = launchArgs
                 updated.iconType = iconType
+                updated.environmentVariables = persistedEnvironmentVariables
 
                 await AgentRegistry.shared.updateAgent(updated)
                 await MainActor.run {
@@ -379,7 +394,8 @@ struct CustomAgentFormView: View {
                     description: trimmedDescription.isEmpty ? nil : trimmedDescription,
                     iconType: iconType,
                     executablePath: trimmedPath,
-                    launchArgs: launchArgs
+                    launchArgs: launchArgs,
+                    environmentVariables: persistedEnvironmentVariables
                 )
                 await MainActor.run {
                     onSave(metadata)

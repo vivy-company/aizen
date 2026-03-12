@@ -40,6 +40,8 @@ struct AgentDetailView: View {
     @State private var mcpServerToRemove: MCPInstalledServer?
     @State private var showingMCPRemoveConfirmation = false
     @State private var showingUsageDetails = false
+    @State private var environmentSaveTask: Task<Void, Never>?
+    @State private var environmentVariablesDraft: [AgentEnvironmentVariable] = []
     @ObservedObject private var mcpManager = MCPManager.shared
     @ObservedObject private var usageMetricsStore = AgentUsageMetricsStore.shared
 
@@ -214,7 +216,20 @@ struct AgentDetailView: View {
                             .foregroundColor(.green)
                     }
                 }
+            }
 
+            AgentEnvironmentVariablesEditor(
+                variables: Binding(
+                    get: { environmentVariablesDraft },
+                    set: { newValue in
+                        environmentVariablesDraft = newValue
+                        metadata.environmentVariables = newValue
+                        scheduleEnvironmentSave()
+                    }
+                )
+            )
+
+            if metadata.isEnabled {
                 // MARK: - Usage
 
                 if supportsUsageMetrics {
@@ -619,8 +634,15 @@ struct AgentDetailView: View {
                 Text("Remove \(server.displayName) from \(metadata.name)?")
             }
         }
+        .onAppear {
+            loadEnvironmentDraft()
+        }
+        .onChange(of: metadata.id) { _, _ in
+            loadEnvironmentDraft()
+        }
         .onDisappear {
             testTask?.cancel()
+            flushEnvironmentSaveIfNeeded()
         }
     }
 
@@ -720,7 +742,10 @@ struct AgentDetailView: View {
 
                 try await tempClient.launch(
                     agentPath: path,
-                    arguments: metadata.launchArgs
+                    arguments: metadata.launchArgs,
+                    environment: environmentVariablesDraft.launchEnvironment.isEmpty
+                        ? nil
+                        : environmentVariablesDraft.launchEnvironment
                 )
 
                 let capabilities = ClientCapabilities(
@@ -762,6 +787,32 @@ struct AgentDetailView: View {
     private func loadAuthStatus() {
         authMethodName = AgentRegistry.shared.getAuthMethodName(for: metadata.id)
         showingAuthClearedMessage = false
+    }
+
+    private func scheduleEnvironmentSave() {
+        environmentSaveTask?.cancel()
+        var updatedMetadata = metadata
+        updatedMetadata.environmentVariables = environmentVariablesDraft
+        environmentSaveTask = Task {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            await AgentRegistry.shared.updateAgent(updatedMetadata)
+        }
+    }
+
+    private func loadEnvironmentDraft() {
+        environmentVariablesDraft = metadata.environmentVariables
+    }
+
+    private func flushEnvironmentSaveIfNeeded() {
+        environmentSaveTask?.cancel()
+
+        var updatedMetadata = metadata
+        updatedMetadata.environmentVariables = environmentVariablesDraft
+
+        Task {
+            await AgentRegistry.shared.updateAgent(updatedMetadata)
+        }
     }
 
     private func loadVersion() async {

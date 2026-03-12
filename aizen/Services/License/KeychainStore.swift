@@ -8,7 +8,7 @@
 import Foundation
 import Security
 
-final class KeychainStore {
+nonisolated final class KeychainStore {
     private let service: String
 
     init(service: String) {
@@ -69,6 +69,6 @@ final class KeychainStore {
     }
 }
 
-enum KeychainError: Error {
+nonisolated enum KeychainError: Error {
     case unhandled(OSStatus)
 }

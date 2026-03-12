@@ -128,7 +128,9 @@ actor AgentRegistry {
     /// Get all agents (enabled and disabled)
     nonisolated func getAllAgents() -> [AgentMetadata] {
         let metadata = loadMetadataFromDefaults()
-        return Array(metadata.values).sorted { $0.name < $1.name }
+        return Array(metadata.values)
+            .map { AgentEnvironmentStore.shared.hydrate($0) }
+            .sorted { $0.name < $1.name }
     }
 
     /// Get only enabled agents
@@ -139,7 +141,8 @@ actor AgentRegistry {
     /// Get metadata for specific agent
     nonisolated func getMetadata(for agentId: String) -> AgentMetadata? {
         let metadata = loadMetadataFromDefaults()
-        return metadata[agentId]
+        guard let stored = metadata[agentId] else { return nil }
+        return AgentEnvironmentStore.shared.hydrate(stored)
     }
 
     /// Add custom agent
@@ -148,9 +151,15 @@ actor AgentRegistry {
         description: String?,
         iconType: AgentIconType,
         executablePath: String,
-        launchArgs: [String]
+        launchArgs: [String],
+        environmentVariables: [AgentEnvironmentVariable] = []
     ) -> AgentMetadata {
         let id = "custom-\(UUID().uuidString)"
+        let storedEnvironmentVariables = AgentEnvironmentStore.shared.persistedVariables(
+            from: environmentVariables,
+            previous: [],
+            agentId: id
+        )
         let metadata = AgentMetadata(
             id: id,
             name: name,
@@ -160,20 +169,31 @@ actor AgentRegistry {
             isEnabled: true,
             executablePath: executablePath,
             launchArgs: launchArgs,
-            installMethod: nil
+            installMethod: nil,
+            environmentVariables: storedEnvironmentVariables
         )
 
         var store = agentMetadata
         store[id] = metadata
         agentMetadata = store
 
-        return metadata
+        return AgentEnvironmentStore.shared.hydrate(metadata)
     }
 
     /// Update agent metadata
     func updateAgent(_ metadata: AgentMetadata) {
+        let previousStoredMetadata = agentMetadata[metadata.id]
+        let storedEnvironmentVariables = AgentEnvironmentStore.shared.persistedVariables(
+            from: metadata.environmentVariables,
+            previous: previousStoredMetadata?.environmentVariables ?? [],
+            agentId: metadata.id
+        )
+
+        var storedMetadata = metadata
+        storedMetadata.environmentVariables = storedEnvironmentVariables
+
         var store = agentMetadata
-        store[metadata.id] = metadata
+        store[storedMetadata.id] = storedMetadata
         agentMetadata = store
     }
 
@@ -183,6 +203,8 @@ actor AgentRegistry {
             return
         }
 
+        AgentEnvironmentStore.shared.deleteSecrets(for: metadata.environmentVariables, agentId: metadata.id)
+
         var store = agentMetadata
         store.removeValue(forKey: id)
         agentMetadata = store
@@ -190,15 +212,12 @@ actor AgentRegistry {
 
     /// Toggle agent enabled status
     func toggleEnabled(for agentId: String) {
-        guard var metadata = agentMetadata[agentId] else {
+        guard var metadata = getMetadata(for: agentId) else {
             return
         }
 
         metadata.isEnabled = !metadata.isEnabled
-
-        var store = agentMetadata
-        store[agentId] = metadata
-        agentMetadata = store
+        updateAgent(metadata)
     }
 
     // MARK: - Agent Path Management
@@ -215,9 +234,19 @@ actor AgentRegistry {
         return metadata[agentName]?.launchArgs ?? []
     }
 
+    /// Get environment overrides for a specific agent launch
+    nonisolated func getAgentLaunchEnvironment(for agentName: String) -> [String: String] {
+        let metadata = loadMetadataFromDefaults()
+        guard let storedMetadata = metadata[agentName] else { return [:] }
+        return AgentEnvironmentStore.shared.launchEnvironment(
+            from: storedMetadata.environmentVariables,
+            agentId: storedMetadata.id
+        )
+    }
+
     /// Set executable path for a specific agent
     func setAgentPath(_ path: String, for agentName: String) {
-        guard var metadata = agentMetadata[agentName] else {
+        guard var metadata = getMetadata(for: agentName) else {
             return
         }
 

@@ -131,7 +131,7 @@ struct SettingsView: View {
         .settingsSheetChrome()
         .settingsNativeToolbarGlass()
         .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 750, minHeight: 500)
+        .frame(minWidth: 860, minHeight: 500)
         .onAppear {
             loadAgents()
         }

@@ -60,7 +60,11 @@ extension AgentRegistry {
             if !agent.isBuiltIn {
                 return true
             }
-            return Self.builtInExecutableNames.keys.contains(id)
+            let shouldKeep = Self.builtInExecutableNames.keys.contains(id)
+            if !shouldKeep {
+                AgentEnvironmentStore.shared.deleteSecrets(for: agent.environmentVariables, agentId: agent.id)
+            }
+            return shouldKeep
         }
 
         // Create or update default built-in agents

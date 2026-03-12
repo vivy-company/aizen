@@ -410,7 +410,10 @@ struct AgentListItemView: View {
                 // Launch the process with proper arguments
                 try await tempClient.launch(
                     agentPath: path,
-                    arguments: metadata.launchArgs
+                    arguments: metadata.launchArgs,
+                    environment: metadata.environmentVariables.launchEnvironment.isEmpty
+                        ? nil
+                        : metadata.environmentVariables.launchEnvironment
                 )
 
                 // Try to initialize - this is the real ACP validation
