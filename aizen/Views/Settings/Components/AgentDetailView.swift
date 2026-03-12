@@ -752,7 +752,7 @@ struct AgentDetailView: View {
                 let tempClient = Client()
 
                 let arguments = AgentRegistry.shared.getAgentLaunchArgs(for: metadata.id)
-                let environment = AgentRegistry.shared.getAgentLaunchEnvironment(for: metadata.id)
+                let environment = await AgentRegistry.shared.resolvedAgentLaunchEnvironment(for: metadata.id)
 
                 try await tempClient.launch(
                     agentPath: path,

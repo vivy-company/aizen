@@ -465,7 +465,7 @@ struct MCPMarketplaceView: View {
         }
 
         let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentId)
-        let launchEnvironment = AgentRegistry.shared.getAgentLaunchEnvironment(for: agentId)
+        let launchEnvironment = await AgentRegistry.shared.resolvedAgentLaunchEnvironment(for: agentId)
         let tempClient = Client()
 
         do {

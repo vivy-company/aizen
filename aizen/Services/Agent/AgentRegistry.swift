@@ -287,24 +287,31 @@ actor AgentRegistry {
         return launchEnvironment
     }
 
-    /// Set executable path for a specific agent
-    func setAgentPath(_ path: String, for agentName: String) {
-        guard var metadata = getMetadata(for: agentName) else {
-            return
+    /// Get the full launch environment for a specific agent, merged with the user's login-shell environment.
+    nonisolated func resolvedAgentLaunchEnvironment(for agentName: String) async -> [String: String] {
+        let metadata = loadMetadataFromDefaults()
+        guard let storedMetadata = metadata[agentName] else { return [:] }
+
+        var launchEnvironment = await ShellEnvironmentLoader.loadShellEnvironment()
+
+        for (key, value) in storedMetadata.baseEnvironment {
+            launchEnvironment[key] = value
         }
 
-        metadata.executablePath = path
-        updateAgent(metadata)
+        let userEnvironment = AgentEnvironmentStore.shared.launchEnvironment(
+            from: storedMetadata.environmentVariables,
+            agentId: storedMetadata.id
+        )
+        for (key, value) in userEnvironment {
+            launchEnvironment[key] = value
+        }
+
+        return launchEnvironment
     }
 
     /// Remove agent configuration
     func removeAgent(named agentName: String) {
         deleteAgent(id: agentName)
-    }
-
-    /// Get list of all available agent names
-    func getAvailableAgents() -> [String] {
-        return agentMetadata.keys.sorted()
     }
 
     // MARK: - Auth Preferences

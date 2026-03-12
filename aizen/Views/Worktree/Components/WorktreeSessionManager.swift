@@ -126,7 +126,7 @@ struct WorktreeSessionManager {
 
         let session = ChatSession(context: context)
         session.id = UUID()
-        let agent = agentId ?? AgentRouter().defaultAgent
+        let agent = agentId ?? resolvedDefaultAgentID()
         let displayName = AgentRegistry.shared.getMetadata(for: agent)?.name ?? agent.capitalized
         session.title = displayName
         session.agentName = agent
@@ -176,5 +176,19 @@ struct WorktreeSessionManager {
         } catch {
             logger.error("Failed to create terminal session: \(error.localizedDescription)")
         }
+    }
+
+    private func resolvedDefaultAgentID() -> String {
+        if let configuredDefault = UserDefaults.standard.string(forKey: "defaultACPAgent"),
+           let metadata = AgentRegistry.shared.getMetadata(for: configuredDefault),
+           metadata.isEnabled {
+            return configuredDefault
+        }
+
+        if let fallback = AgentRegistry.shared.getEnabledAgents().first?.id {
+            return fallback
+        }
+
+        return AgentRegistry.defaultAgentID
     }
 }

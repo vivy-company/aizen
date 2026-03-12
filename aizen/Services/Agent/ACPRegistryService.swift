@@ -134,7 +134,6 @@ actor ACPRegistryService {
             launchArgs: launchArgs,
             baseEnvironment: baseEnvironment,
             registryVersion: agent.version,
-            registryRepositoryURL: agent.repository,
             registryIconURL: agent.icon,
             registryDistributionType: distributionType
         )

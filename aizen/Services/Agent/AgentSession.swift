@@ -595,7 +595,7 @@ class AgentSession: ObservableObject, ClientDelegate {
         }
 
         let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
-        let launchEnvironment = AgentRegistry.shared.getAgentLaunchEnvironment(for: agentName)
+        let launchEnvironment = await AgentRegistry.shared.resolvedAgentLaunchEnvironment(for: agentName)
         let client = Client()
         await client.setDelegate(self)
 

@@ -27,14 +27,6 @@ actor AgentInstaller {
 
     private init() {}
 
-    func canInstall(_ metadata: AgentMetadata) -> Bool {
-        metadata.requiresInstall
-    }
-
-    func isInstalled(_ agentName: String) -> Bool {
-        AgentRegistry.shared.validateAgent(named: agentName)
-    }
-
     func canUpdate(_ metadata: AgentMetadata) async -> Bool {
         guard metadata.isRegistry else { return false }
         let versionInfo = await AgentVersionChecker.shared.checkVersion(for: metadata.id)
@@ -69,16 +61,5 @@ actor AgentInstaller {
         if refreshed.requiresInstall {
             _ = try await ACPRegistryService.shared.installAgent(refreshed)
         }
-    }
-
-    func uninstallAgent(_ agentName: String) async throws {
-        let agentDir = URL(fileURLWithPath: AgentRegistry.managedAgentsBasePath, isDirectory: true)
-            .appendingPathComponent(agentName, isDirectory: true)
-
-        if FileManager.default.fileExists(atPath: agentDir.path) {
-            try FileManager.default.removeItem(at: agentDir)
-        }
-
-        await AgentRegistry.shared.removeAgent(named: agentName)
     }
 }

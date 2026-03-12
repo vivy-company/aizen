@@ -20,7 +20,6 @@ nonisolated struct AgentMetadata: Codable, Identifiable, Sendable {
     var launchArgs: [String]
     var baseEnvironment: [String: String]
     var registryVersion: String?
-    var registryRepositoryURL: String?
     var registryIconURL: String?
     var registryDistributionType: RegistryDistributionType?
     var environmentVariables: [AgentEnvironmentVariable]
@@ -53,7 +52,6 @@ nonisolated struct AgentMetadata: Codable, Identifiable, Sendable {
         launchArgs: [String] = [],
         baseEnvironment: [String: String] = [:],
         registryVersion: String? = nil,
-        registryRepositoryURL: String? = nil,
         registryIconURL: String? = nil,
         registryDistributionType: RegistryDistributionType? = nil,
         environmentVariables: [AgentEnvironmentVariable] = []
@@ -69,7 +67,6 @@ nonisolated struct AgentMetadata: Codable, Identifiable, Sendable {
         self.launchArgs = launchArgs
         self.baseEnvironment = baseEnvironment
         self.registryVersion = registryVersion
-        self.registryRepositoryURL = registryRepositoryURL
         self.registryIconURL = registryIconURL
         self.registryDistributionType = registryDistributionType
         self.environmentVariables = environmentVariables
@@ -87,7 +84,6 @@ nonisolated struct AgentMetadata: Codable, Identifiable, Sendable {
         case launchArgs
         case baseEnvironment
         case registryVersion
-        case registryRepositoryURL
         case registryIconURL
         case registryDistributionType
         case environmentVariables
@@ -106,7 +102,6 @@ nonisolated struct AgentMetadata: Codable, Identifiable, Sendable {
         launchArgs = try container.decodeIfPresent([String].self, forKey: .launchArgs) ?? []
         baseEnvironment = try container.decodeIfPresent([String: String].self, forKey: .baseEnvironment) ?? [:]
         registryVersion = try container.decodeIfPresent(String.self, forKey: .registryVersion)
-        registryRepositoryURL = try container.decodeIfPresent(String.self, forKey: .registryRepositoryURL)
         registryIconURL = try container.decodeIfPresent(String.self, forKey: .registryIconURL)
         registryDistributionType = try container.decodeIfPresent(RegistryDistributionType.self, forKey: .registryDistributionType)
         environmentVariables =
@@ -126,7 +121,6 @@ nonisolated struct AgentMetadata: Codable, Identifiable, Sendable {
         try container.encode(launchArgs, forKey: .launchArgs)
         try container.encode(baseEnvironment, forKey: .baseEnvironment)
         try container.encodeIfPresent(registryVersion, forKey: .registryVersion)
-        try container.encodeIfPresent(registryRepositoryURL, forKey: .registryRepositoryURL)
         try container.encodeIfPresent(registryIconURL, forKey: .registryIconURL)
         try container.encodeIfPresent(registryDistributionType, forKey: .registryDistributionType)
         try container.encode(environmentVariables, forKey: .environmentVariables)

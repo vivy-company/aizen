@@ -25,7 +25,7 @@ nonisolated enum ShellEnvironmentLoader {
         process.executableURL = URL(fileURLWithPath: shell)
 
         // Use login + interactive shell to load all profile files (.zshrc, .bashrc, etc.)
-        // This is critical for nvm/fnm/asdf which are typically initialized in interactive shell configs
+        // This is critical for nvm/fnm/asdf which are typically initialized in interactive shell configs.
         let arguments: [String]
         switch shellName {
         case "fish":

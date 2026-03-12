@@ -4,7 +4,6 @@ import os.log
 
 struct TranscriptionSettingsView: View {
     private let logger = Logger.settings
-    @Environment(\.colorScheme) private var colorScheme
 
     @AppStorage(TranscriptionSettingsKeys.provider) private var providerRaw = TranscriptionSettingsDefaults.provider.rawValue
     @AppStorage(TranscriptionSettingsKeys.mlxWhisperModelId) private var whisperModelId = TranscriptionSettingsDefaults.mlxWhisperModelId
@@ -12,7 +11,6 @@ struct TranscriptionSettingsView: View {
 
     @StateObject private var whisperManager: MLXModelManager
     @StateObject private var parakeetManager: MLXModelManager
-    @State private var showMoreModels = false
 
     init() {
         let whisperId = TranscriptionSettingsStore.currentWhisperModelId()
@@ -60,26 +58,121 @@ struct TranscriptionSettingsView: View {
         }
     }
 
-    private var surfaceColor: Color {
-        AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
+    private var selectedPreset: MLXModelOption? {
+        guard let configuration = activeConfiguration else { return nil }
+        return configuration.presets.first(where: { $0.id == configuration.modelId.wrappedValue })
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                engineCard
+        Form {
+            Section {
+                Picker("Provider", selection: $providerRaw) {
+                    Text("System (Apple Speech)").tag(TranscriptionProvider.system.rawValue)
+                    Text("MLX Whisper").tag(TranscriptionProvider.mlxWhisper.rawValue)
+                    Text("MLX Parakeet").tag(TranscriptionProvider.mlxParakeet.rawValue)
+                }
+                .disabled(!mlxSupported && provider != .system)
+            } header: {
+                Text("Engine")
+            } footer: {
+                Text(engineDescription)
+            }
 
-                if let configuration = activeConfiguration {
-                    modelCard(configuration)
-                    storageCard(manager: configuration.manager)
-                } else {
-                    modelPlaceholderCard
+            if let configuration = activeConfiguration {
+                Section {
+                    Picker("Model", selection: configuration.modelId) {
+                        ForEach(configuration.presets) { preset in
+                            Text(modelPickerTitle(for: preset)).tag(preset.id)
+                        }
+                    }
+
+                    if let selectedPreset {
+                        infoRow("Model", selectedPreset.title)
+                        infoRow("Details", modelMetaLine(for: selectedPreset))
+                        if let sizeText = downloadSizeText(for: configuration.manager) {
+                            infoRow("Estimated Download", sizeText)
+                        }
+                        infoRow("Status", modelStatusText(for: configuration.manager))
+                    }
+
+                    if case .downloading(let progress) = configuration.manager.state {
+                        ProgressView(value: progress)
+                        Text(String(format: "%.0f%% downloaded", progress * 100))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 12) {
+                        Button(modelActionTitle(for: configuration.manager)) {
+                            handleModelAction(configuration)
+                        }
+                        .disabled(modelActionDisabled(for: configuration.manager))
+
+                        Button(configuration.resetTitle) {
+                            configuration.modelId.wrappedValue = configuration.resetModelId
+                        }
+
+                        Spacer()
+                    }
+
+                    if let url = URL(string: "https://huggingface.co/\(configuration.modelId.wrappedValue)") {
+                        Link("Open Selected Model on Hugging Face", destination: url)
+                    }
+
+                    if let collectionURL = configuration.collectionURL {
+                        Link("Browse the Model Collection", destination: collectionURL)
+                    }
+                } header: {
+                    Text(configuration.title)
+                } footer: {
+                    Text(configurationFooter(configuration))
                 }
 
-                fallbackCard
+                Section {
+                    HStack {
+                        Text("Location")
+                        Spacer()
+                        Button("Reveal in Finder") {
+                            revealModelFolder(directory: MLXModelManager.modelsRoot)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Path")
+                            .foregroundStyle(.secondary)
+                        Text(MLXModelManager.modelsRoot.path)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                    }
+
+                    infoRow(
+                        "Selected Model Size",
+                        configuration.manager.isModelAvailable ? formatBytes(configuration.manager.localStorageBytes) : "Not downloaded"
+                    )
+                    infoRow(
+                        "All MLX Models",
+                        configuration.manager.totalStorageBytes > 0 ? formatBytes(configuration.manager.totalStorageBytes) : "Empty"
+                    )
+                } header: {
+                    Text("Storage")
+                }
+            } else {
+                Section {
+                    Text("Switch to an MLX engine to pick a model, download it, and manage storage.")
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Models")
+                }
             }
-            .padding(24)
+
+            Section {
+                Text("If MLX models can't run or are missing, transcription keeps working via Apple Speech.")
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Fallback")
+            }
         }
+        .formStyle(.grouped)
         .settingsSurface()
         .onAppear {
             whisperManager.modelId = whisperModelId
@@ -97,7 +190,7 @@ struct TranscriptionSettingsView: View {
                 providerRaw = TranscriptionProvider.system.rawValue
                 return
             }
-            showMoreModels = false
+
             if newValue == TranscriptionProvider.mlxWhisper.rawValue {
                 whisperManager.refreshStatus()
             } else if newValue == TranscriptionProvider.mlxParakeet.rawValue {
@@ -114,329 +207,88 @@ struct TranscriptionSettingsView: View {
         }
     }
 
-    private var engineCard: some View {
-        SettingsCard(
-            title: "Engine",
-            subtitle: "Pick how Aizen transcribes your audio."
-        ) {
-            VStack(spacing: 12) {
-                engineOption(
-                    title: "System (Apple Speech)",
-                    subtitle: "Fast setup, uses macOS speech recognition.",
-                    systemImage: "mic.fill",
-                    tag: TranscriptionProvider.system.rawValue,
-                    isDisabled: false
-                )
-                engineOption(
-                    title: "MLX Whisper",
-                    subtitle: "On-device Whisper with MLX acceleration.",
-                    systemImage: "waveform.circle.fill",
-                    tag: TranscriptionProvider.mlxWhisper.rawValue,
-                    isDisabled: !mlxSupported
-                )
-                engineOption(
-                    title: "MLX Parakeet",
-                    subtitle: "On-device Parakeet TDT (larger model, high accuracy).",
-                    systemImage: "waveform.badge.mic",
-                    tag: TranscriptionProvider.mlxParakeet.rawValue,
-                    isDisabled: !mlxSupported
-                )
-            }
+    private var engineDescription: String {
+        switch provider {
+        case .system:
+            return "Uses macOS speech recognition for the fastest setup."
+        case .mlxWhisper:
+            return mlxSupported
+                ? "Runs Whisper on-device with MLX acceleration."
+                : "MLX models require Apple Silicon. Apple Speech will be used on this Mac."
+        case .mlxParakeet:
+            return mlxSupported
+                ? "Runs Parakeet TDT on-device with MLX acceleration."
+                : "MLX models require Apple Silicon. Apple Speech will be used on this Mac."
         }
     }
 
-    private func modelCard(_ configuration: ModelConfiguration) -> some View {
-        let option = MLXModelCatalog.option(for: configuration.modelId.wrappedValue, kind: configuration.manager.kind)
-        let customInfo = option?.summary ?? configuration.infoText
-
-        return SettingsCard(title: configuration.title, subtitle: configuration.subtitle) {
-            VStack(alignment: .leading, spacing: 16) {
-                modelSelectionSection(
-                    presets: configuration.presets,
-                    selection: configuration.modelId
-                )
-
-                HStack(spacing: 12) {
-                    Button(configuration.resetTitle) {
-                        configuration.modelId.wrappedValue = configuration.resetModelId
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-
-                    if let url = URL(string: "https://huggingface.co/\(configuration.modelId.wrappedValue)") {
-                        Link("Open on Hugging Face", destination: url)
-                            .font(.caption)
-                    }
-                    if let collectionURL = configuration.collectionURL {
-                        Link("Browse the collection", destination: collectionURL)
-                            .font(.caption)
-                    }
-                    Spacer()
-                }
-
-                Text(customInfo)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                if !mlxSupported {
-                    Text("MLX models require Apple Silicon. Apple Speech will be used on Intel Macs.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .disabled(!mlxSupported)
-        }
-    }
-
-    private var modelPlaceholderCard: some View {
-        SettingsCard(
-            title: "Models",
-            subtitle: "Pick MLX Whisper or Parakeet to manage downloadable models."
-        ) {
-            HStack(spacing: 10) {
-                Image(systemName: "square.stack.3d.down.forward.fill")
-                    .foregroundStyle(.secondary)
-                Text("Switch to an MLX engine to pick a model, download it, and manage storage.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var fallbackCard: some View {
-        SettingsCard(
-            title: "Fallback",
-            subtitle: ""
-        ) {
-            HStack(spacing: 10) {
-                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
-                    .foregroundStyle(.secondary)
-                Text("If MLX models can't run or are missing, transcription keeps working via Apple Speech.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func modelSelectionSection(presets: [MLXModelOption], selection: Binding<String>) -> some View {
-        let primary = presets.filter { $0.isPrimary }
-        let secondary = presets.filter { !$0.isPrimary }
-
-        return VStack(alignment: .leading, spacing: 12) {
-            modelList(presets: primary.isEmpty ? presets : primary, selection: selection)
-
-            if !secondary.isEmpty {
-                DisclosureGroup(isExpanded: $showMoreModels) {
-                    modelList(presets: secondary, selection: selection)
-                        .padding(.top, 8)
-                } label: {
-                    HStack {
-                        Text("More models")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                        Text("EN-only + quantized")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-    }
-
-    private func modelList(presets: [MLXModelOption], selection: Binding<String>) -> some View {
-        LazyVStack(spacing: 8) {
-            ForEach(presets) { preset in
-                modelOptionRow(preset, selection: selection)
-            }
-        }
-    }
-
-    private func modelOptionRow(_ preset: MLXModelOption, selection: Binding<String>) -> some View {
-        let isSelected = selection.wrappedValue == preset.id
-        let isAvailable = MLXModelManager.isModelAvailable(kind: preset.kind, modelId: preset.id)
-        let canSelect = isAvailable || isSelected
-        let isDownloading: Bool = {
-            guard isSelected else { return false }
-            if case .downloading = activeManagerState(for: preset.kind) { return true }
-            return false
-        }()
-        let isFailed: Bool = {
-            guard isSelected else { return false }
-            if case .failed = activeManagerState(for: preset.kind) { return true }
-            return false
-        }()
-
-        return HStack(alignment: .center, spacing: 12) {
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isSelected ? Color.accentColor : .secondary.opacity(0.5))
-                .frame(width: 18, height: 18)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(preset.title)
-                    .font(.headline)
-                Text(preset.summary)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Text(modelMetaLine(for: preset))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                ModelSizeBadge(modelId: preset.id)
-            }
-
+    @ViewBuilder
+    private func infoRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
             Spacer()
-
-            if isDownloading, let progress = activeProgress(for: preset.kind) {
-                VStack(alignment: .trailing, spacing: 4) {
-                    ProgressView(value: progress)
-                        .progressViewStyle(.linear)
-                        .frame(width: 90)
-                    Text(String(format: "%.0f%%", progress * 100))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            } else if isAvailable {
-                PillBadge(text: "Ready", color: .green, fontWeight: .semibold, backgroundOpacity: 0.18)
-            } else if isFailed {
-                Button {
-                    let manager = activeManager(for: preset.kind)
-                    manager.modelId = preset.id
-                    selection.wrappedValue = preset.id
-                    Task { await manager.downloadModel() }
-                } label: {
-                    Label("Retry", systemImage: "arrow.clockwise")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            } else {
-                Button {
-                    let manager = activeManager(for: preset.kind)
-                    manager.modelId = preset.id
-                    selection.wrappedValue = preset.id
-                    Task { await manager.downloadModel() }
-                } label: {
-                    Label("Download", systemImage: "arrow.down.circle")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-            }
-        }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.12) : cardFillColor)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(isSelected ? Color.accentColor.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .onTapGesture {
-            if canSelect {
-                selection.wrappedValue = preset.id
-            }
-        }
-        .opacity(canSelect ? 1 : 0.65)
-    }
-
-    private func engineOption(
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        tag: String,
-        isDisabled: Bool
-    ) -> some View {
-        Button {
-            providerRaw = tag
-        } label: {
-            HStack(alignment: .center, spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 20))
-                    .foregroundStyle(isDisabled ? .secondary : .primary)
-                    .frame(width: 28, height: 28, alignment: .center)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                    Text(subtitle)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: providerRaw == tag ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 18))
-                    .foregroundStyle(providerRaw == tag ? Color.accentColor : .secondary.opacity(0.5))
-                    .frame(width: 24, height: 24, alignment: .center)
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(providerRaw == tag ? Color.accentColor.opacity(0.12) : cardFillColor)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(providerRaw == tag ? Color.accentColor.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(isDisabled)
-        .opacity(isDisabled ? 0.55 : 1)
-    }
-
-    private func storageCard(manager: MLXModelManager) -> some View {
-        SettingsCard(
-            title: "Storage",
-            subtitle: ""
-        ) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Label("Location", systemImage: "internaldrive")
-                        .font(.subheadline)
-                    Spacer()
-                    Button("Reveal in Finder") {
-                        revealModelFolder(directory: MLXModelManager.modelsRoot)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-
-                Text(MLXModelManager.modelsRoot.path)
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
-
-                HStack {
-                    Label("Selected model", systemImage: "externaldrive")
-                        .font(.subheadline)
-                    Spacer()
-                    Text(manager.isModelAvailable ? formatBytes(manager.localStorageBytes) : "Not downloaded")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Label("All MLX models", systemImage: "internaldrive.fill")
-                        .font(.subheadline)
-                    Spacer()
-                    Text(manager.totalStorageBytes > 0 ? formatBytes(manager.totalStorageBytes) : "Empty")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            Text(value)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
         }
     }
 
-    private var cardFillColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.04)
+    private func configurationFooter(_ configuration: ModelConfiguration) -> String {
+        if !mlxSupported {
+            return "MLX models require Apple Silicon. Apple Speech will be used on Intel Macs."
+        }
+        return configuration.infoText
+    }
+
+    private func modelPickerTitle(for preset: MLXModelOption) -> String {
+        var suffixes: [String] = []
+        if let language = preset.languageLabel {
+            suffixes.append(language)
+        }
+        suffixes.append(preset.precisionLabel)
+        return suffixes.isEmpty ? preset.title : "\(preset.title) (\(suffixes.joined(separator: ", ")))"
+    }
+
+    private func modelActionTitle(for manager: MLXModelManager) -> String {
+        switch manager.state {
+        case .downloading:
+            return "Downloading…"
+        case .failed:
+            return "Retry Download"
+        default:
+            return manager.isModelAvailable ? "Download Again" : "Download"
+        }
+    }
+
+    private func modelActionDisabled(for manager: MLXModelManager) -> Bool {
+        if !mlxSupported { return true }
+        if case .downloading = manager.state { return true }
+        return false
+    }
+
+    private func handleModelAction(_ configuration: ModelConfiguration) {
+        configuration.manager.modelId = configuration.modelId.wrappedValue
+        Task {
+            await configuration.manager.downloadModel()
+        }
+    }
+
+    private func modelStatusText(for manager: MLXModelManager) -> String {
+        switch manager.state {
+        case .idle:
+            return manager.isModelAvailable ? "Ready" : "Not downloaded"
+        case .downloading:
+            return "Downloading"
+        case .ready:
+            return "Ready"
+        case .failed(let message):
+            return "Failed: \(message)"
+        }
+    }
+
+    private func downloadSizeText(for manager: MLXModelManager) -> String? {
+        guard let repoSizeBytes = manager.repoSizeBytes else { return nil }
+        return formatBytes(repoSizeBytes)
     }
 
     private func revealModelFolder(directory: URL) {
@@ -462,28 +314,6 @@ struct TranscriptionSettingsView: View {
         }
         return parts.joined(separator: " • ")
     }
-
-    private func activeManager(for kind: MLXModelKind) -> MLXModelManager {
-        switch kind {
-        case .whisper:
-            return whisperManager
-        case .parakeetTDT:
-            return parakeetManager
-        }
-    }
-
-    private func activeManagerState(for kind: MLXModelKind) -> MLXModelManager.DownloadState {
-        activeManager(for: kind).state
-    }
-
-    private func activeProgress(for kind: MLXModelKind) -> Double? {
-        switch activeManagerState(for: kind) {
-        case .downloading(let progress):
-            return progress
-        default:
-            return nil
-        }
-    }
 }
 
 private struct ModelConfiguration {
@@ -496,87 +326,4 @@ private struct ModelConfiguration {
     let resetModelId: String
     let infoText: String
     let collectionURL: URL?
-}
-
-private struct ModelSizeBadge: View {
-    let modelId: String
-    @State private var sizeBytes: Int64?
-    @State private var isLoading = true
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .task(id: modelId) {
-            isLoading = true
-            sizeBytes = await MLXModelSizeCache.shared.size(for: modelId)
-            isLoading = false
-        }
-    }
-
-    private var label: String {
-        if isLoading {
-            return "Estimated download size: calculating..."
-        }
-        guard let sizeBytes else { return "Estimated download size: unavailable" }
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        formatter.allowedUnits = [.useMB, .useGB]
-        let pretty = formatter.string(fromByteCount: sizeBytes)
-        return "Estimated download size: \(pretty)"
-    }
-}
-
-private struct SettingsCard<Content: View>: View {
-    let title: String
-    let subtitle: String
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            content()
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-    }
-}
-
-private struct GlassButton: View {
-    let title: String
-    let systemImage: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.plain)
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.accentColor.opacity(0.15))
-        )
-    }
 }

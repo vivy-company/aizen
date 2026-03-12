@@ -8,13 +8,10 @@
 import Foundation
 
 enum AgentUpdateError: Error, LocalizedError {
-    case updateFailed(String)
     case agentNotFound
 
     var errorDescription: String? {
         switch self {
-        case .updateFailed(let message):
-            return "Update failed: \(message)"
         case .agentNotFound:
             return "Agent not found"
         }
@@ -27,23 +24,6 @@ actor AgentUpdater {
     private var updatingAgents: Set<String> = []
 
     private init() {}
-
-    func isUpdating(agentName: String) -> Bool {
-        return updatingAgents.contains(agentName)
-    }
-
-    /// Update an agent to the latest version
-    func updateAgent(agentName: String) async throws {
-        guard let metadata = AgentRegistry.shared.getMetadata(for: agentName) else {
-            throw AgentUpdateError.agentNotFound
-        }
-
-        // Use AgentInstaller which handles all install methods
-        try await AgentInstaller.shared.updateAgent(metadata)
-
-        // Clear version cache after update
-        await AgentVersionChecker.shared.clearCache(for: agentName)
-    }
 
     /// Update agent with progress tracking
     func updateAgentWithProgress(
