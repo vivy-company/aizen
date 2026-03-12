@@ -23,29 +23,20 @@ struct CodeEditorView: View {
     @State private var diffReloadTask: Task<Void, Never>?
 
     // Editor settings from AppStorage
-    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
-    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
-    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
-    @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
-    @AppStorage("editorFontSize") private var editorFontSize: Double = 12.0
+    @AppStorage(AppearanceSettings.codeFontFamilyKey) private var editorFontFamily: String = AppearanceSettings.defaultCodeFontFamily
+    @AppStorage(AppearanceSettings.codeFontSizeKey) private var editorFontSize: Double = AppearanceSettings.defaultCodeFontSize
     @AppStorage("editorWrapLines") private var editorWrapLines: Bool = true
     @AppStorage("editorShowMinimap") private var editorShowMinimap: Bool = false
     @AppStorage("editorShowGutter") private var editorShowGutter: Bool = true
     @AppStorage("editorIndentSpaces") private var editorIndentSpaces: Int = 4
     @Environment(\.colorScheme) private var colorScheme
 
-    private var effectiveThemeName: String {
-        guard usePerAppearanceTheme else { return editorTheme }
-        return colorScheme == .dark ? editorTheme : editorThemeLight
-    }
-
     private var detectedLanguage: VVLanguage? {
         VVLanguageBridge.language(from: language)
     }
 
     private var editorThemeValue: VVTheme {
-        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
-            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
+        AppearanceSettings.resolvedTheme(colorScheme: colorScheme)
     }
 
     private var editorConfiguration: VVConfiguration {

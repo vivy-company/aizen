@@ -25,6 +25,9 @@ extension Repository {
         set {
             do {
                 postCreateActionsData = try JSONEncoder().encode(newValue)
+                if let managedObjectContext, managedObjectContext.hasChanges {
+                    try managedObjectContext.save()
+                }
             } catch {
                 logger.error("Failed to encode post-create actions: \(error.localizedDescription)")
             }

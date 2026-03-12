@@ -75,6 +75,8 @@ struct aizenApp: App {
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
     @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
+    @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
+    @AppStorage("terminalUsePerAppearanceTheme") private var terminalUsePerAppearanceTheme = false
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
 
     init() {
@@ -117,7 +119,7 @@ struct aizenApp: App {
                 .task {
                     LicenseManager.shared.start()
                 }
-                .task(id: "\(terminalFontName)\(terminalFontSize)\(terminalThemeName)") {
+                .task(id: "\(terminalFontName)\(terminalFontSize)\(terminalThemeName)\(terminalThemeNameLight)\(terminalUsePerAppearanceTheme)") {
                     ghosttyApp.reloadConfig()
                     await TmuxSessionManager.shared.updateConfig()
                 }

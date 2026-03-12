@@ -678,7 +678,7 @@ class AgentSession: ObservableObject, ClientDelegate {
     }
 
     func resolveMCPServers() async -> [MCPServerConfig] {
-        let servers = await MCPConfigManager.shared.listServers(agentId: agentName)
+        let servers = await MCPServerStore.shared.servers(for: agentName, sessionId: chatSessionId)
         guard !servers.isEmpty else { return [] }
 
         let mcpCapabilities = agentCapabilities?.mcpCapabilities
@@ -687,44 +687,47 @@ class AgentSession: ObservableObject, ClientDelegate {
 
         var configs: [MCPServerConfig] = []
         var skippedRemote: [String] = []
+        var skippedACP: [String] = []
         for name in servers.keys.sorted() {
-            guard let entry = servers[name] else { continue }
-            switch entry.type {
-            case "stdio":
-                guard let command = entry.command else {
+            guard let definition = servers[name] else { continue }
+            let headers = (definition.headers ?? []).map { HTTPHeader(name: $0.name, value: $0.value, _meta: nil) }
+
+            switch definition.transport {
+            case .stdio:
+                guard let command = definition.command else {
                     continue
                 }
-                let env = (entry.env ?? [:]).sorted { $0.key < $1.key }.map { EnvVariable(name: $0.key, value: $0.value, _meta: nil) }
+                let env = (definition.env ?? [:]).sorted { $0.key < $1.key }.map { EnvVariable(name: $0.key, value: $0.value, _meta: nil) }
                 let config = StdioServerConfig(
                     name: name,
                     command: command,
-                    args: entry.args ?? [],
+                    args: definition.args ?? [],
                     env: env,
                     _meta: nil
                 )
                 configs.append(.stdio(config))
-            case "http":
+            case .http:
                 guard allowHTTP else {
                     skippedRemote.append(name)
                     continue
                 }
-                guard let url = entry.url else {
+                guard let url = definition.url else {
                     continue
                 }
-                let config = HTTPServerConfig(name: name, url: url, headers: [], _meta: nil)
+                let config = HTTPServerConfig(name: name, url: url, headers: headers, _meta: nil)
                 configs.append(.http(config))
-            case "sse":
+            case .sse:
                 guard allowSSE else {
                     skippedRemote.append(name)
                     continue
                 }
-                guard let url = entry.url else {
+                guard let url = definition.url else {
                     continue
                 }
-                let config = SSEServerConfig(name: name, url: url, headers: [], _meta: nil)
+                let config = SSEServerConfig(name: name, url: url, headers: headers, _meta: nil)
                 configs.append(.sse(config))
-            default:
-                break
+            case .acp:
+                skippedACP.append(name)
             }
         }
 
@@ -736,6 +739,15 @@ class AgentSession: ObservableObject, ClientDelegate {
                 } else {
                     addSystemMessage("⚠️ \(agentName) does not support HTTP/SSE MCP servers. Skipping: \(serverList)")
                 }
+            }
+        }
+
+        if !skippedACP.isEmpty {
+            let serverList = skippedACP.joined(separator: ", ")
+            await MainActor.run {
+                addSystemMessage(
+                    "⚠️ Aizen has ACP-routed MCP servers configured, but the bundled ACP client only supports stdio/HTTP/SSE MCP transports today. Skipping: \(serverList)"
+                )
             }
         }
 

@@ -343,28 +343,6 @@ struct AgentDetailView: View {
                     }
                 }
 
-                // MARK: - Plugins (OpenCode only)
-
-                if metadata.id == "opencode" {
-                    Section {
-                        NavigationLink(destination: OpenCodePluginsView()) {
-                            Label {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Plugins")
-                                    Text("Oh My OpenCode, auth plugins, and more")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            } icon: {
-                                Image(systemName: "puzzlepiece.extension")
-                                    .foregroundStyle(.blue)
-                            }
-                        }
-                    } header: {
-                        Text("Plugins")
-                    }
-                }
-
                 // MARK: - Custom Commands
 
                 if configSpec.commandsDirectory != nil {
@@ -434,14 +412,14 @@ struct AgentDetailView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "plus.circle.fill")
                                     .foregroundStyle(Color.accentColor)
-                                Text("Browse MCP Servers")
+                                Text("Add MCP Servers")
                             }
                         }
                         .buttonStyle(.plain)
                     } header: {
                         Text("MCP Servers")
                     } footer: {
-                        Text("Extend agent capabilities with MCP servers")
+                        Text("Attach MCP servers to new ACP sessions from Aizen without editing agent config files")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -605,7 +583,7 @@ struct AgentDetailView: View {
             await loadVersion()
             loadRulesPreview()
             loadCommands()
-            await mcpManager.syncInstalled(agentId: metadata.id, agentPath: AgentRegistry.shared.getAgentPath(for: metadata.id))
+            await mcpManager.syncInstalled(agentId: metadata.id)
         }
         .task(id: metadata.id) {
             if supportsUsageMetrics {
@@ -656,8 +634,7 @@ struct AgentDetailView: View {
                     Task {
                         try? await mcpManager.remove(
                             serverName: server.serverName,
-                            agentId: metadata.id,
-                            agentPath: AgentRegistry.shared.getAgentPath(for: metadata.id)
+                            agentId: metadata.id
                         )
                         mcpServerToRemove = nil
                     }
@@ -665,7 +642,7 @@ struct AgentDetailView: View {
             }
         } message: {
             if let server = mcpServerToRemove {
-                Text("Remove \(server.displayName) from \(metadata.name)?")
+                Text("Remove \(server.displayName) from Aizen's MCP defaults for \(metadata.name)?")
             }
         }
         .onAppear {

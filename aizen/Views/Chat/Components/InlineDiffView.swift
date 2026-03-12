@@ -13,11 +13,8 @@ struct InlineDiffView: View {
     let diff: ToolCallDiff
     var allowCompute: Bool = true
 
-    @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
-    @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
-    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
-    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
-    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
+    @AppStorage(AppearanceSettings.codeFontFamilyKey) private var codeFontFamily = AppearanceSettings.defaultCodeFontFamily
+    @AppStorage(AppearanceSettings.diffFontSizeKey) private var diffFontSize = AppearanceSettings.defaultDiffFontSize
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var cachedDiffLines: [ChatDiffLine]?
@@ -56,23 +53,17 @@ struct InlineDiffView: View {
     }
 
     private var previewHeight: CGFloat {
-        let rowHeight = max(15, CGFloat(terminalFontSize + 4))
+        let rowHeight = max(15, CGFloat(diffFontSize + 4))
         return CGFloat(previewLineCount) * rowHeight + 26
     }
 
-    private var effectiveThemeName: String {
-        guard usePerAppearanceTheme else { return editorTheme }
-        return colorScheme == .dark ? editorTheme : editorThemeLight
-    }
-
     private var theme: VVTheme {
-        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
-            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
+        AppearanceSettings.resolvedTheme(colorScheme: colorScheme)
     }
 
     private var configuration: VVConfiguration {
-        let font = NSFont(name: terminalFontName, size: max(terminalFontSize - 1, 10))
-            ?? .monospacedSystemFont(ofSize: max(terminalFontSize - 1, 10), weight: .regular)
+        let font = NSFont(name: codeFontFamily, size: max(diffFontSize, 10))
+            ?? .monospacedSystemFont(ofSize: max(diffFontSize, 10), weight: .regular)
 
         return VVConfiguration.default
             .with(font: font)
@@ -157,8 +148,8 @@ struct InlineDiffView: View {
                 FullDiffSheet(
                     diff: diff,
                     unifiedDiffText: unifiedDiffText,
-                    terminalFontName: terminalFontName,
-                    fontSize: terminalFontSize
+                    fontFamily: codeFontFamily,
+                    fontSize: diffFontSize
                 )
             }
     }
@@ -399,27 +390,18 @@ private struct FullDiffSheet: View {
 
     let diff: ToolCallDiff
     let unifiedDiffText: String
-    let terminalFontName: String
+    let fontFamily: String
     let fontSize: Double
 
-    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
-    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
-    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
     @Environment(\.colorScheme) private var colorScheme
 
-    private var effectiveThemeName: String {
-        guard usePerAppearanceTheme else { return editorTheme }
-        return colorScheme == .dark ? editorTheme : editorThemeLight
-    }
-
     private var theme: VVTheme {
-        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
-            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
+        AppearanceSettings.resolvedTheme(colorScheme: colorScheme)
     }
 
     private var configuration: VVConfiguration {
-        let font = NSFont(name: terminalFontName, size: max(fontSize - 1, 10))
-            ?? .monospacedSystemFont(ofSize: max(fontSize - 1, 10), weight: .regular)
+        let font = NSFont(name: fontFamily, size: max(fontSize, 10))
+            ?? .monospacedSystemFont(ofSize: max(fontSize, 10), weight: .regular)
 
         return VVConfiguration.default
             .with(font: font)

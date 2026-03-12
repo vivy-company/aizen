@@ -13,7 +13,6 @@ struct MCPInstallConfigSheet: View {
 
     let server: MCPServer
     let agentId: String
-    let agentPath: String?
     let agentName: String
     let onInstalled: () -> Void
 
@@ -112,7 +111,7 @@ struct MCPInstallConfigSheet: View {
                             }
                         }
 
-                        Text("Installing to \(agentName)")
+                        Text("Adding to Aizen MCP defaults for \(agentName)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -163,9 +162,9 @@ struct MCPInstallConfigSheet: View {
 
                     Divider()
 
-                    // Install type picker (if both available)
+                    // Source picker (if both are available)
                     if hasPackages && hasRemotes {
-                        Picker("Install Type", selection: $installType) {
+                        Picker("Source", selection: $installType) {
                             ForEach(InstallType.allCases, id: \.self) { type in
                                 Text(type.rawValue).tag(type)
                             }
@@ -224,7 +223,7 @@ struct MCPInstallConfigSheet: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Text("Install")
+                        Text("Add")
                     }
                 }
                 .keyboardShortcut(.defaultAction)
@@ -471,7 +470,6 @@ struct MCPInstallConfigSheet: View {
                     server: server,
                     package: package,
                     agentId: agentId,
-                    agentPath: agentPath,
                     env: envValues.filter { !$0.value.isEmpty }
                 )
             } else if installType == .remote, let remote = selectedRemote {
@@ -479,7 +477,6 @@ struct MCPInstallConfigSheet: View {
                     server: server,
                     remote: remote,
                     agentId: agentId,
-                    agentPath: agentPath,
                     env: [:]
                 )
             }

@@ -26,11 +26,14 @@ struct ChatMessageList: View {
     let onAppear: () -> Void
     var onTimelineStateChange: (VVChatTimelineState) -> Void = { _ in }
 
-    @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
-    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
-    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
-    @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
-    @AppStorage("terminalUsePerAppearanceTheme") private var terminalUsePerAppearanceTheme = false
+    @AppStorage(AppearanceSettings.markdownFontFamilyKey) private var markdownFontFamily = AppearanceSettings.defaultMarkdownFontFamily
+    @AppStorage(AppearanceSettings.markdownFontSizeKey) private var markdownFontSize = AppearanceSettings.defaultMarkdownFontSize
+    @AppStorage(AppearanceSettings.markdownParagraphSpacingKey) private var markdownParagraphSpacing = AppearanceSettings.defaultMarkdownParagraphSpacing
+    @AppStorage(AppearanceSettings.markdownHeadingSpacingKey) private var markdownHeadingSpacing = AppearanceSettings.defaultMarkdownHeadingSpacing
+    @AppStorage(AppearanceSettings.markdownContentPaddingKey) private var markdownContentPadding = AppearanceSettings.defaultMarkdownContentPadding
+    @AppStorage(AppearanceSettings.themeNameKey) private var terminalThemeName = AppearanceSettings.defaultDarkTheme
+    @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
+    @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var terminalUsePerAppearanceTheme = false
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var controller = VVChatTimelineController(style: .init(), renderWidth: 0)
@@ -80,7 +83,7 @@ struct ChatMessageList: View {
 
     private var timelineStyle: VVChatTimelineStyle {
         let horizontalInset: CGFloat = 10
-        let basePointSize = CGFloat(chatFontSize)
+        let basePointSize = CGFloat(markdownFontSize)
         let headerPointSize = max(basePointSize - 1.5, 11.5)
         let timestampPointSize = max(basePointSize - 0.25, 12.5)
         let theme = timelineMarkdownTheme
@@ -168,7 +171,7 @@ struct ChatMessageList: View {
 
     private var effectiveTerminalThemeName: String {
         guard terminalUsePerAppearanceTheme else { return terminalThemeName }
-        return colorScheme == .dark ? terminalThemeName : terminalThemeNameLight
+        return AppearanceSettings.effectiveThemeName(colorScheme: colorScheme)
     }
 
     private var activeTerminalVVTheme: VVTheme? {
@@ -183,59 +186,11 @@ struct ChatMessageList: View {
     }
 
     private var timelineMarkdownTheme: MarkdownTheme {
-        var theme = colorScheme == .dark ? MarkdownTheme.dark : MarkdownTheme.light
-        theme.paragraphSpacing = 10
-        theme.headingSpacing = 22
-        theme.contentPadding = 0
+        _ = markdownParagraphSpacing
+        _ = markdownHeadingSpacing
+        _ = markdownContentPadding
+        var theme = AppearanceSettings.resolvedMarkdownTheme(colorScheme: colorScheme)
         theme.codeColor = markdownInlineCodeColor
-
-        guard let terminalTheme = activeTerminalVVTheme else {
-            return theme
-        }
-
-        let primaryText = simdColor(from: terminalTheme.textColor)
-        let secondaryText = primaryText.withOpacity(colorScheme == .dark ? 0.74 : 0.68)
-        let surface = simdColor(from: terminalTheme.backgroundColor).withOpacity(colorScheme == .dark ? 0.92 : 0.98)
-        let elevatedSurface = simdColor(from: terminalTheme.currentLineColor).withOpacity(colorScheme == .dark ? 0.88 : 0.94)
-        let divider = simdColor(from: GhosttyThemeParser.loadDividerColor(named: effectiveTerminalThemeName))
-            .withOpacity(colorScheme == .dark ? 0.34 : 0.18)
-        let accent = simdColor(from: terminalTheme.cursorColor)
-
-        theme.textColor = primaryText
-        theme.headingColor = primaryText
-        theme.linkColor = accent
-        theme.codeBackgroundColor = surface
-        theme.codeHeaderBackgroundColor = elevatedSurface
-        theme.codeHeaderTextColor = secondaryText
-        theme.codeHeaderDividerColor = divider.withOpacity(colorScheme == .dark ? 0.92 : 0.78)
-        theme.codeCopyButtonBackground = elevatedSurface
-        theme.codeCopyButtonTextColor = primaryText
-        theme.codeBorderColor = divider
-        theme.codeGutterBackgroundColor = elevatedSurface
-        theme.codeGutterTextColor = secondaryText
-        theme.blockQuoteColor = primaryText.withOpacity(0.9)
-        theme.blockQuoteBorderColor = divider.withOpacity(colorScheme == .dark ? 0.92 : 0.82)
-        theme.listBulletColor = secondaryText
-        theme.checkboxCheckedColor = accent
-        theme.checkboxUncheckedColor = secondaryText
-        theme.thematicBreakColor = divider.withOpacity(colorScheme == .dark ? 0.96 : 0.88)
-        theme.tableHeaderBackground = elevatedSurface
-        theme.tableBackground = surface
-        theme.tableBorderColor = divider
-        theme.diagramBackground = surface
-        theme.diagramNodeBackground = elevatedSurface
-        theme.diagramNodeBorder = divider
-        theme.diagramLineColor = divider.withOpacity(colorScheme == .dark ? 0.82 : 0.72)
-        theme.diagramTextColor = primaryText
-        theme.diagramNoteBackground = elevatedSurface
-        theme.diagramNoteBorder = divider
-        theme.diagramGroupBackground = surface.withOpacity(colorScheme == .dark ? 0.76 : 0.82)
-        theme.diagramGroupBorder = divider
-        theme.diagramActivationColor = elevatedSurface.withOpacity(colorScheme == .dark ? 0.9 : 0.94)
-        theme.diagramActivationBorder = divider
-        theme.mathColor = accent
-        theme.strikethroughColor = secondaryText
-
         return theme
     }
 
@@ -262,10 +217,10 @@ struct ChatMessageList: View {
     }
 
     private func timelineFont(size: CGFloat, weight: NSFont.Weight = .regular) -> VVFont {
-        if chatFontFamily == ChatSettings.defaultFontFamily || chatFontFamily == "System Font" {
+        if markdownFontFamily == AppearanceSettings.defaultMarkdownFontFamily || markdownFontFamily == AppearanceSettings.systemFontFamily {
             return .systemFont(ofSize: size, weight: weight)
         }
-        guard let custom = NSFont(name: chatFontFamily, size: size) else {
+        guard let custom = NSFont(name: markdownFontFamily, size: size) else {
             return .systemFont(ofSize: size, weight: weight)
         }
         switch weight {
@@ -306,11 +261,27 @@ struct ChatMessageList: View {
             controller.updateStyle(timelineStyle)
             syncTimeline(scrollToBottom: false)
         }
-        .onChange(of: chatFontSize) { _, _ in
+        .onChange(of: markdownFontSize) { _, _ in
             controller.updateStyle(timelineStyle)
             syncTimeline(scrollToBottom: false)
         }
-        .onChange(of: chatFontFamily) { _, _ in
+        .onChange(of: markdownFontFamily) { _, _ in
+            controller.updateStyle(timelineStyle)
+            syncTimeline(scrollToBottom: false)
+        }
+        .onChange(of: markdownParagraphSpacing) { _, _ in
+            controller.updateStyle(timelineStyle)
+            syncTimeline(scrollToBottom: false)
+        }
+        .onChange(of: markdownHeadingSpacing) { _, _ in
+            controller.updateStyle(timelineStyle)
+            syncTimeline(scrollToBottom: false)
+        }
+        .onChange(of: markdownContentPadding) { _, _ in
+            controller.updateStyle(timelineStyle)
+            syncTimeline(scrollToBottom: false)
+        }
+        .onChange(of: effectiveTerminalThemeName) { _, _ in
             controller.updateStyle(timelineStyle)
             syncTimeline(scrollToBottom: false)
         }
@@ -1460,7 +1431,7 @@ struct ChatMessageList: View {
                 leadingIconSpacing: startsAssistantLane ? agentLaneIconSpacing : nil,
                 showsTimestamp: false,
                 timestampSuffixIconURL: copySuffixIconURL(for: message.id),
-                timestampIconSize: max(13, CGFloat(chatFontSize) - 1),
+                timestampIconSize: max(13, CGFloat(markdownFontSize) - 1),
                 timestampIconSpacing: 0
             )
         case .system:
@@ -2114,7 +2085,7 @@ struct ChatMessageList: View {
     }
 
     private var timestampSymbolSize: CGFloat {
-        max(14, CGFloat(chatFontSize) - 0.5)
+        max(14, CGFloat(markdownFontSize) - 0.5)
     }
 
     private func timestampClockIconURL() -> String? {

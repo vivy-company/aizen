@@ -32,7 +32,7 @@ struct MCPServerRowView: View {
                     }
 
                     if isInstalled {
-                        TagBadge(text: "Installed", color: .green, cornerRadius: 4, backgroundOpacity: 0.2)
+                        TagBadge(text: "Added", color: .green, cornerRadius: 4, backgroundOpacity: 0.2)
                     }
                 }
 
@@ -65,7 +65,7 @@ struct MCPServerRowView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             } else {
-                Button("Install") {
+                Button("Add") {
                     onInstall()
                 }
                 .buttonStyle(.borderedProminent)

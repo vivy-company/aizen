@@ -65,27 +65,18 @@ extension Ghostty {
 
         // MARK: - Terminal Settings from AppStorage
 
-        @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
-        @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
-        @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
-        @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
-        @AppStorage("terminalUsePerAppearanceTheme") private var usePerAppearanceTheme = false
+        @AppStorage(AppearanceSettings.terminalFontFamilyKey) private var terminalFontName = AppearanceSettings.defaultTerminalFontFamily
+        @AppStorage(AppearanceSettings.terminalFontSizeKey) private var terminalFontSize = AppearanceSettings.defaultTerminalFontSize
+        @AppStorage(AppearanceSettings.themeNameKey) private var terminalThemeName = AppearanceSettings.defaultDarkTheme
+        @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
+        @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var usePerAppearanceTheme = false
         @AppStorage("appearanceMode") private var appearanceMode = "system"
 
         private var effectiveThemeName: String {
-            guard usePerAppearanceTheme else { return terminalThemeName }
-
-            // Check in-app appearance setting first
-            switch appearanceMode {
-            case "light":
-                return terminalThemeNameLight
-            case "dark":
+            if !usePerAppearanceTheme {
                 return terminalThemeName
-            default:
-                // System mode - follow actual system appearance
-                let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                return isDark ? terminalThemeName : terminalThemeNameLight
             }
+            return AppearanceSettings.effectiveThemeName(appearanceMode: appearanceMode)
         }
 
         // MARK: - Initialization

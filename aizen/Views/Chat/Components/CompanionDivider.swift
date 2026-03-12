@@ -18,13 +18,21 @@ struct CompanionDivider: View {
     @Binding var isDragging: Bool
     var onDragEnd: (() -> Void)?
 
-    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(AppearanceSettings.themeNameKey) private var terminalThemeName = AppearanceSettings.defaultDarkTheme
+    @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
+    @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var usePerAppearanceTheme = false
     @State private var didPushCursor = false
     @State private var cachedDividerColor: Color = Color(
         nsColor: GhosttyThemeParser.loadDividerColor(named: "Aizen Dark")
     )
     private let lineWidth: CGFloat = 1
     private let hitWidth: CGFloat = 14
+
+    private var effectiveThemeName: String {
+        guard usePerAppearanceTheme else { return terminalThemeName }
+        return AppearanceSettings.effectiveThemeName(colorScheme: colorScheme)
+    }
 
     var body: some View {
         ZStack {
@@ -68,10 +76,10 @@ struct CompanionDivider: View {
                 }
         )
             .onAppear {
-                cachedDividerColor = Color(nsColor: GhosttyThemeParser.loadDividerColor(named: terminalThemeName))
+                cachedDividerColor = Color(nsColor: GhosttyThemeParser.loadDividerColor(named: effectiveThemeName))
             }
-            .onChange(of: terminalThemeName) { _, _ in
-                cachedDividerColor = Color(nsColor: GhosttyThemeParser.loadDividerColor(named: terminalThemeName))
+            .onChange(of: effectiveThemeName) { _, _ in
+                cachedDividerColor = Color(nsColor: GhosttyThemeParser.loadDividerColor(named: effectiveThemeName))
             }
             .onDisappear {
                 if didPushCursor {

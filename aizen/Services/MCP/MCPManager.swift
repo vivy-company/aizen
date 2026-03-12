@@ -2,8 +2,7 @@
 //  MCPManager.swift
 //  aizen
 //
-//  Orchestrates MCP server installation, removal, and status tracking
-//  Uses config file-based management for all agents
+//  Orchestrates Aizen-managed MCP server defaults for ACP sessions
 //
 
 import Combine
@@ -19,9 +18,8 @@ class MCPManager: ObservableObject {
     @Published var isSyncing: Set<String> = []
     @Published var isInstalling = false
     @Published var isRemoving = false
-    @Published var lastError: MCPManagerError?
 
-    private let configManager = MCPConfigManager.shared
+    private let serverStore = MCPServerStore.shared
 
     private init() {}
 
@@ -31,23 +29,20 @@ class MCPManager: ObservableObject {
         server: MCPServer,
         package: MCPPackage,
         agentId: String,
-        agentPath: String?,
         env: [String: String]
     ) async throws {
         isInstalling = true
-        lastError = nil
         defer { isInstalling = false }
 
         let serverName = extractServerName(from: server.name)
 
         // Build stdio config for package
         let (command, args) = runtimeCommand(for: package)
-        let config = MCPServerEntry.stdio(command: command, args: args, env: env)
+        let serverDefinition = MCPServerDefinition.stdio(command: command, args: args, env: env)
 
-        try await configManager.addServer(name: serverName, config: config, agentId: agentId)
+        try await serverStore.saveDefaultServer(serverDefinition, named: serverName, agentId: agentId)
 
-        // Refresh installed list
-        await syncInstalled(agentId: agentId, agentPath: agentPath)
+        await syncInstalled(agentId: agentId)
     }
 
     // MARK: - Install Remote
@@ -56,58 +51,60 @@ class MCPManager: ObservableObject {
         server: MCPServer,
         remote: MCPRemote,
         agentId: String,
-        agentPath: String?,
-        env: [String: String]
+        env _: [String: String]
     ) async throws {
         isInstalling = true
-        lastError = nil
         defer { isInstalling = false }
 
         let serverName = extractServerName(from: server.name)
 
-        // Build http/sse config for remote
-        let config: MCPServerEntry
+        let headers = remote.headers?.compactMap { header -> MCPHeaderDefinition? in
+            guard let value = header.value, !value.isEmpty else { return nil }
+            return MCPHeaderDefinition(name: header.name, value: value)
+        } ?? []
+
+        let serverDefinition: MCPServerDefinition
         if remote.type == "sse" {
-            config = MCPServerEntry.sse(url: remote.url)
+            serverDefinition = MCPServerDefinition.sse(url: remote.url, headers: headers)
         } else {
-            config = MCPServerEntry.http(url: remote.url)
+            serverDefinition = MCPServerDefinition.http(url: remote.url, headers: headers)
         }
 
-        try await configManager.addServer(name: serverName, config: config, agentId: agentId)
+        try await serverStore.saveDefaultServer(serverDefinition, named: serverName, agentId: agentId)
 
-        // Refresh installed list
-        await syncInstalled(agentId: agentId, agentPath: agentPath)
+        await syncInstalled(agentId: agentId)
     }
 
     // MARK: - Remove
 
-    func remove(serverName: String, agentId: String, agentPath: String?) async throws {
+    func remove(serverName: String, agentId: String) async throws {
         isRemoving = true
-        lastError = nil
         defer { isRemoving = false }
 
-        try await configManager.removeServer(name: serverName, agentId: agentId)
+        try await serverStore.removeDefaultServer(named: serverName, agentId: agentId)
 
-        // Refresh installed list
-        await syncInstalled(agentId: agentId, agentPath: agentPath)
+        await syncInstalled(agentId: agentId)
     }
 
     // MARK: - Sync
 
-    func syncInstalled(agentId: String, agentPath: String?) async {
+    func syncInstalled(agentId: String) async {
         isSyncing.insert(agentId)
         defer { isSyncing.remove(agentId) }
 
-        let servers = await configManager.listServers(agentId: agentId)
+        let servers = await serverStore.defaultServers(for: agentId)
 
-        let installed = servers.map { (name, config) in
+        let installed = servers.map { (name, definition) in
             MCPInstalledServer(
                 serverName: name,
                 displayName: name,
                 agentId: agentId,
-                packageType: config.command != nil ? "stdio" : nil,
-                transportType: config.type,
-                configuredEnv: config.env ?? [:]
+                packageType: definition.transport == .stdio ? "stdio" : nil,
+                transportType: definition.transport.rawValue,
+                configuredEnv: definition.env ?? [:],
+                configuredHeaders: Dictionary(
+                    uniqueKeysWithValues: (definition.headers ?? []).map { ($0.name, $0.value) }
+                )
             )
         }
 
@@ -132,12 +129,7 @@ class MCPManager: ObservableObject {
     // MARK: - Support Check
 
     static func supportsMCPManagement(agentId: String) -> Bool {
-        switch agentId {
-        case "claude-acp", "codex-acp", "gemini", "opencode", "kimi", "mistral-vibe", "qwen-code":
-            return true
-        default:
-            return false
-        }
+        !agentId.isEmpty
     }
 
     // MARK: - Private Helpers
@@ -184,22 +176,6 @@ class MCPManager: ObservableObject {
                 args.append(contentsOf: runtimeArgs.flatMap { $0.toCommandLineArgs() })
             }
             return (package.runtimeHint, args)
-        }
-    }
-}
-
-// MARK: - Errors
-
-enum MCPManagerError: LocalizedError {
-    case configError(String)
-    case agentNotFound(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .configError(let reason):
-            return "Config error: \(reason)"
-        case .agentNotFound(let agentId):
-            return "Agent not found: \(agentId)"
         }
     }
 }

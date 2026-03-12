@@ -154,15 +154,6 @@ if [ -d "${MERMAID_SRC}" ]; then
     echo "Mermaid resources copied"
 fi
 
-# Copy OpenCode plugin registry if present
-OPENCODE_REGISTRY_SRC="${SRCROOT}/aizen/Resources/OpenCodePlugins.json"
-if [ -f "${OPENCODE_REGISTRY_SRC}" ]; then
-    cp -a "${OPENCODE_REGISTRY_SRC}" "${RESOURCES_DIR}/" || {
-        echo "Warning: Failed to copy OpenCode plugin registry" >&2
-    }
-    echo "OpenCode plugin registry copied"
-fi
-
 # Build and bundle VVDevKit tree-sitter grammar dylibs.
 # VVHighlighting loads these at runtime via dlopen.
 bundle_vvdevkit_grammar_dylibs() {

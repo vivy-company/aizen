@@ -22,12 +22,12 @@ private extension View {
 
 enum SettingsSelection: Hashable {
     case general
+    case appearance
     case transcription
     case pro
     case git
     case terminal
     case editor
-    case chat
     case agent(String) // agent id
 }
 
@@ -36,8 +36,6 @@ enum SettingsSelection: Hashable {
 struct SettingsView: View {
     @AppStorage("defaultEditor") private var defaultEditor = "code"
     @AppStorage("defaultACPAgent") private var defaultACPAgent = AgentRegistry.defaultAgentID
-    @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
-    @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
     @State private var selection: SettingsSelection? = .general
     @State private var agents: [AgentMetadata] = []
     @State private var showingRegistryPicker = false
@@ -52,6 +50,9 @@ struct SettingsView: View {
                     Label("General", systemImage: "gear")
                         .tag(SettingsSelection.general)
 
+                    Label("Appearance", systemImage: "paintpalette")
+                        .tag(SettingsSelection.appearance)
+
                     Label("Transcription", systemImage: "waveform")
                         .tag(SettingsSelection.transcription)
 
@@ -63,9 +64,6 @@ struct SettingsView: View {
 
                     Label("Editor", systemImage: "doc.text")
                         .tag(SettingsSelection.editor)
-
-                    Label("Chat", systemImage: "bubble.left.and.bubble.right")
-                        .tag(SettingsSelection.chat)
 
                     // Agents section
                     Section("Agents") {
@@ -176,6 +174,10 @@ struct SettingsView: View {
             GeneralSettingsView(defaultEditor: $defaultEditor)
                 .navigationTitle("General")
                 .navigationSubtitle("Default apps, layout, and toolbar")
+        case .appearance:
+            AppearanceSettingsView()
+                .navigationTitle("Appearance")
+                .navigationSubtitle("Shared theme, typography, and markdown")
         case .transcription:
             TranscriptionSettingsView()
                 .navigationTitle("Transcription")
@@ -189,20 +191,13 @@ struct SettingsView: View {
                 .navigationTitle("Git")
                 .navigationSubtitle("Branch templates and preferences")
         case .terminal:
-            TerminalSettingsView(
-                fontName: $terminalFontName,
-                fontSize: $terminalFontSize
-            )
+            TerminalSettingsView()
             .navigationTitle("Terminal")
-            .navigationSubtitle("Font, theme, and session settings")
+            .navigationSubtitle("Session behavior, copy processing, and presets")
         case .editor:
             EditorSettingsView()
                 .navigationTitle("Editor")
-                .navigationSubtitle("Theme, font, and display options")
-        case .chat:
-            ChatSettingsView()
-                .navigationTitle("Chat")
-                .navigationSubtitle("Font size and markdown spacing")
+                .navigationSubtitle("Editor behavior and file browser options")
         case .agent(let agentId):
             if let index = agents.firstIndex(where: { $0.id == agentId }) {
                 AgentDetailView(

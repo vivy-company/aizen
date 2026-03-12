@@ -37,7 +37,7 @@ struct MCPMarketplaceView: View {
 
     private enum ServerFilter: String, CaseIterable {
         case all = "All"
-        case installed = "Installed"
+        case installed = "Added"
         case remote = "Remote"
         case package = "Package"
 
@@ -67,7 +67,7 @@ struct MCPMarketplaceView: View {
         .settingsSheetChrome()
         .task {
             await loadTransportSupport()
-            await mcpManager.syncInstalled(agentId: agentId, agentPath: agentPath)
+            await mcpManager.syncInstalled(agentId: agentId)
             await loadServers()
         }
         .sheet(isPresented: $showingInstallSheet) {
@@ -75,7 +75,6 @@ struct MCPMarketplaceView: View {
                 MCPInstallConfigSheet(
                     server: server,
                     agentId: agentId,
-                    agentPath: agentPath,
                     agentName: agentName,
                     onInstalled: {
                         selectedServer = nil
@@ -94,7 +93,7 @@ struct MCPMarketplaceView: View {
             }
         } message: {
             if let server = serverToRemove {
-                Text("Remove \(server.displayName) from \(agentName)?")
+                Text("Remove \(server.displayName) from Aizen's MCP defaults for \(agentName)?")
             }
         }
     }
@@ -284,7 +283,7 @@ struct MCPMarketplaceView: View {
         }
         switch selectedFilter {
         case .installed:
-            return "No MCP servers installed"
+            return "No MCP servers added"
         case .remote:
             return "No remote servers found"
         case .package:
@@ -302,7 +301,7 @@ struct MCPMarketplaceView: View {
         VStack(spacing: 0) {
             // Count label
             HStack {
-                Text("\(installedServers.count) installed")
+                Text("\(installedServers.count) added")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -326,7 +325,7 @@ struct MCPMarketplaceView: View {
                     Image(systemName: "checkmark.circle")
                         .font(.system(size: 32))
                         .foregroundColor(.secondary)
-                    Text("No MCP servers installed")
+                    Text("No MCP servers added")
                         .font(.callout)
                         .foregroundColor(.secondary)
                     Spacer()
@@ -340,8 +339,7 @@ struct MCPMarketplaceView: View {
                                 do {
                                     try await mcpManager.remove(
                                         serverName: server.serverName,
-                                        agentId: agentId,
-                                        agentPath: agentPath
+                                        agentId: agentId
                                     )
                                 } catch {
                                     errorMessage = error.localizedDescription
@@ -606,7 +604,7 @@ struct MCPMarketplaceView: View {
     private func removeServer(_ server: MCPServer) async {
         let serverName = extractServerName(from: server.name)
         do {
-            try await mcpManager.remove(serverName: serverName, agentId: agentId, agentPath: agentPath)
+            try await mcpManager.remove(serverName: serverName, agentId: agentId)
             serverToRemove = nil
         } catch {
             errorMessage = error.localizedDescription

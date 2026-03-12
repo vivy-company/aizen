@@ -19,7 +19,7 @@ nonisolated struct ANSIColorProvider {
 
     /// Get the current theme's palette, with caching
     mutating func getPalette() -> [Int: NSColor] {
-        let themeName = UserDefaults.standard.string(forKey: "editorTheme") ?? "Aizen Dark"
+        let themeName = UserDefaults.standard.string(forKey: "terminalThemeName") ?? "Aizen Dark"
 
         // Return cached palette if theme hasn't changed
         if themeName == cachedThemeName, let palette = cachedPalette {

@@ -8,40 +8,76 @@ import CoreData
 
 struct PostCreateActionsView: View {
     @ObservedObject var repository: Repository
-    var showHeader: Bool = true
+    @Binding var addActionRequested: Bool
     @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var templateManager = PostCreateTemplateManager.shared
 
-    @State private var actions: [PostCreateAction] = []
     @State private var showingAddAction = false
     @State private var showingTemplates = false
     @State private var editingAction: PostCreateAction?
     @State private var showGeneratedScript = false
+    @State private var pendingTemplate: PostCreateTemplate?
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if showHeader {
-                headerSection
-            } else {
-                inlineAddMenu
-            }
-            actionsListSection
-            if !actions.isEmpty {
-                scriptPreviewSection
-            }
-        }
-        .onAppear {
-            actions = repository.postCreateActions
-        }
-        .onChange(of: actions) { _, newValue in
+    private var actions: [PostCreateAction] {
+        get { repository.postCreateActions }
+        nonmutating set {
             repository.postCreateActions = newValue
             try? viewContext.save()
+        }
+    }
+
+    private var enabledCount: Int {
+        actions.filter(\.enabled).count
+    }
+
+    private var disabledCount: Int {
+        actions.count - enabledCount
+    }
+
+    var body: some View {
+        Form {
+            overviewSection
+            configuredActionsSection
+            templatesSection
+
+            if !actions.isEmpty {
+                advancedSection
+            }
+        }
+        .formStyle(.grouped)
+        .settingsSurface()
+        .onChange(of: addActionRequested) { _, requested in
+            guard requested else { return }
+            showingAddAction = true
+            addActionRequested = false
+        }
+        .alert("Replace current actions?", isPresented: Binding(
+            get: { pendingTemplate != nil },
+            set: { newValue in
+                if !newValue {
+                    pendingTemplate = nil
+                }
+            }
+        )) {
+            Button("Cancel", role: .cancel) {
+                pendingTemplate = nil
+            }
+            Button("Replace", role: .destructive) {
+                if let pendingTemplate {
+                    actions = pendingTemplate.actions
+                }
+                pendingTemplate = nil
+            }
+        } message: {
+            if let pendingTemplate {
+                Text("Applying \"\(pendingTemplate.name)\" will replace the current action list.")
+            }
         }
         .sheet(isPresented: $showingAddAction) {
             PostCreateActionEditorSheet(
                 action: nil,
                 onSave: { action in
-                    actions.append(action)
+                    actions = actions + [action]
                 },
                 onCancel: {},
                 repositoryPath: repository.path
@@ -51,8 +87,10 @@ struct PostCreateActionsView: View {
             PostCreateActionEditorSheet(
                 action: action,
                 onSave: { updated in
-                    if let index = actions.firstIndex(where: { $0.id == updated.id }) {
-                        actions[index] = updated
+                    var updatedActions = actions
+                    if let index = updatedActions.firstIndex(where: { $0.id == updated.id }) {
+                        updatedActions[index] = updated
+                        actions = updatedActions
                     }
                 },
                 onCancel: {},
@@ -62,181 +100,227 @@ struct PostCreateActionsView: View {
         .sheet(isPresented: $showingTemplates) {
             PostCreateTemplatesSheet(
                 onSelect: { template in
-                    actions = template.actions
+                    applyTemplate(template)
                 }
             )
         }
     }
 
-    private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Post-Create Actions")
-                    .font(.headline)
-                Text("Run after creating new worktrees")
-                    .font(.caption)
+    private var overviewSection: some View {
+        Section("Overview") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Configure follow-up steps that run automatically after a new environment is created.")
                     .foregroundStyle(.secondary)
-            }
 
-            Spacer()
-
-            addMenuButton
-        }
-    }
-
-    private var inlineAddMenu: some View {
-        HStack {
-            Spacer()
-            addMenuButton
-        }
-    }
-
-    private var addMenuButton: some View {
-        Menu {
-            Button {
-                showingAddAction = true
-            } label: {
-                Label("Add Action", systemImage: "plus")
-            }
-
-            Divider()
-
-            Button {
-                showingTemplates = true
-            } label: {
-                Label("Apply Template", systemImage: "doc.on.doc")
-            }
-
-            if !actions.isEmpty {
-                Divider()
-
-                Button(role: .destructive) {
-                    actions.removeAll()
-                } label: {
-                    Label("Clear All", systemImage: "trash")
+                HStack(spacing: 12) {
+                    summaryMetric(title: "Total", value: actions.count, systemImage: "list.bullet.rectangle")
+                    summaryMetric(title: "Enabled", value: enabledCount, systemImage: "checkmark.circle")
+                    summaryMetric(title: "Disabled", value: disabledCount, systemImage: "pause.circle")
                 }
             }
-        } label: {
-            Image(systemName: "plus.circle.fill")
-                .font(.title2)
-                .foregroundStyle(Color.accentColor)
+            .padding(.vertical, 4)
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
     }
 
-    private var actionsListSection: some View {
-        Group {
+    private var configuredActionsSection: some View {
+        Section("Configured Actions") {
             if actions.isEmpty {
                 emptyStateView
             } else {
-                actionsList
+                ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
+                    actionRow(action, at: index)
+                }
+
+                Button {
+                    showingAddAction = true
+                } label: {
+                    Label("Add Action", systemImage: "plus")
+                }
+
+                Button(role: .destructive) {
+                    actions = []
+                } label: {
+                    Label("Clear All Actions", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private var templatesSection: some View {
+        Section("Templates") {
+            Button {
+                showingTemplates = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.on.doc")
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 18)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Apply Template")
+                            .foregroundStyle(.primary)
+                        Text(actions.isEmpty ? "Start from a built-in or custom action set." : "Replaces the current action list.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var advancedSection: some View {
+        Section("Advanced") {
+            DisclosureGroup(isExpanded: $showGeneratedScript) {
+                ScrollView {
+                    Text(PostCreateScriptGenerator.generateScript(from: actions))
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                }
+                .frame(height: 180)
+                .background(Color(.textBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .padding(.top, 6)
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Generated Script", systemImage: "scroll")
+                    Text("Preview the shell script Aizen will run for enabled actions.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "gearshape.2")
-                .font(.system(size: 32))
-                .foregroundStyle(.tertiary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "gearshape.2")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
 
-            Text("No Actions Configured")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("No actions configured")
+                        .fontWeight(.medium)
+                    Text("Add individual steps or start from a template.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
 
-            HStack(spacing: 12) {
-                Button("Add Action") {
+            HStack(spacing: 10) {
+                Button {
                     showingAddAction = true
+                } label: {
+                    Label("Add Action", systemImage: "plus")
                 }
                 .buttonStyle(.bordered)
 
-                Button("Use Template") {
+                Button {
                     showingTemplates = true
+                } label: {
+                    Label("Use Template", systemImage: "doc.on.doc")
                 }
                 .buttonStyle(.borderedProminent)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
-        .background(Color(.controlBackgroundColor).opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private var actionsList: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
-                actionRow(action, at: index)
-
-                if index < actions.count - 1 {
-                    Divider()
-                        .padding(.leading, 44)
-                }
-            }
-        }
-        .background(Color(.controlBackgroundColor).opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(.vertical, 6)
     }
 
     private func actionRow(_ action: PostCreateAction, at index: Int) -> some View {
-        HStack(spacing: 12) {
-            // Drag handle
-            Image(systemName: "line.3.horizontal")
-                .foregroundStyle(.tertiary)
-                .font(.system(size: 12))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                Toggle("", isOn: Binding(
+                    get: { action.enabled },
+                    set: { newValue in
+                        var updatedActions = actions
+                        var updated = action
+                        updated.enabled = newValue
+                        updatedActions[index] = updated
+                        actions = updatedActions
+                    }
+                ))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .padding(.top, 2)
 
-            // Toggle
-            Toggle("", isOn: Binding(
-                get: { action.enabled },
-                set: { newValue in
-                    var updated = action
-                    updated.enabled = newValue
-                    actions[index] = updated
+                Image(systemName: action.type.icon)
+                    .frame(width: 20)
+                    .foregroundStyle(action.enabled ? Color.accentColor : .secondary)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(action.type.displayName)
+                            .fontWeight(.medium)
+
+                        if !action.enabled {
+                            Text("Disabled")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.secondary.opacity(0.14), in: Capsule())
+                        }
+                    }
+
+                    Text(actionDescription(action))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+
+                    if let metadata = actionMetadata(action) {
+                        Text(metadata)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
-            ))
-            .toggleStyle(.checkbox)
-            .labelsHidden()
 
-            // Icon
-            Image(systemName: action.type.icon)
-                .frame(width: 20)
-                .foregroundStyle(action.enabled ? .primary : .tertiary)
+                Spacer()
 
-            // Content
-            VStack(alignment: .leading, spacing: 2) {
-                Text(action.type.displayName)
-                    .fontWeight(.medium)
-                    .foregroundStyle(action.enabled ? .primary : .secondary)
+                HStack(spacing: 6) {
+                    Button {
+                        moveAction(from: index, direction: -1)
+                    } label: {
+                        Image(systemName: "arrow.up")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(index == 0)
 
-                Text(actionDescription(action))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+                    Button {
+                        moveAction(from: index, direction: 1)
+                    } label: {
+                        Image(systemName: "arrow.down")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(index == actions.count - 1)
 
-            Spacer()
+                    Button {
+                        editingAction = action
+                    } label: {
+                        Image(systemName: "pencil")
+                    }
+                    .buttonStyle(.borderless)
 
-            // Actions
-            HStack(spacing: 8) {
-                Button {
-                    editingAction = action
-                } label: {
-                    Image(systemName: "pencil")
+                    Button {
+                        removeAction(at: index)
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.red)
+                    }
+                    .buttonStyle(.borderless)
                 }
-                .buttonStyle(.borderless)
-
-                Button {
-                    actions.remove(at: index)
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red)
-                }
-                .buttonStyle(.borderless)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .contentShape(Rectangle())
+        .padding(.vertical, 4)
     }
 
     private func actionDescription(_ action: PostCreateAction) -> String {
@@ -253,22 +337,56 @@ struct PostCreateActionsView: View {
         }
     }
 
-    @ViewBuilder
-    private var scriptPreviewSection: some View {
-        DisclosureGroup(isExpanded: $showGeneratedScript) {
-            ScrollView {
-                Text(PostCreateScriptGenerator.generateScript(from: actions))
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(8)
-            }
-            .frame(height: 150)
-            .background(Color(.textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-        } label: {
-            Label("Generated Script", systemImage: "scroll")
-                .font(.subheadline)
+    private func actionMetadata(_ action: PostCreateAction) -> String? {
+        switch action.config {
+        case .copyFiles(let config):
+            let count = config.patterns.count
+            return "\(count) pattern\(count == 1 ? "" : "s")"
+        case .runCommand(let config):
+            return "Runs in \(config.workingDirectory.displayName)"
+        case .symlink(let config):
+            return "Links \(config.source) into \(config.target)"
+        case .customScript(let config):
+            let lineCount = config.script.split(whereSeparator: \.isNewline).count
+            return "\(max(lineCount, 1)) line\(lineCount == 1 ? "" : "s")"
+        }
+    }
+
+    private func summaryMetric(title: String, value: Int, systemImage: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: systemImage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("\(value)")
+                .font(.title3)
+                .fontWeight(.semibold)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(.controlBackgroundColor).opacity(0.55), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func moveAction(from index: Int, direction: Int) {
+        let destination = index + direction
+        guard actions.indices.contains(index), actions.indices.contains(destination) else { return }
+        var updatedActions = actions
+        let item = updatedActions.remove(at: index)
+        updatedActions.insert(item, at: destination)
+        actions = updatedActions
+    }
+
+    private func removeAction(at index: Int) {
+        guard actions.indices.contains(index) else { return }
+        var updatedActions = actions
+        updatedActions.remove(at: index)
+        actions = updatedActions
+    }
+
+    private func applyTemplate(_ template: PostCreateTemplate) {
+        if actions.isEmpty {
+            actions = template.actions
+        } else {
+            pendingTemplate = template
         }
     }
 }
@@ -901,6 +1019,7 @@ struct PostCreateTemplatesSheet: View {
             .padding()
         }
         .frame(width: 400, height: 450)
+        .settingsSheetChrome()
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -965,23 +1084,33 @@ struct PostCreateActionsSheet: View {
     @ObservedObject var repository: Repository
     @Environment(\.dismiss) private var dismiss
     @Environment(\.managedObjectContext) private var viewContext
+    @State private var addActionRequested = false
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             DetailHeaderBar(showsBackground: false) {
-                Text("Post-Create Actions")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Post-Create Actions")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("Run automatically after environment creation")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } trailing: {
+                Button {
+                    addActionRequested = true
+                } label: {
+                    Label("Add Action", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
             }
 
             Divider()
 
             // Content
-            ScrollView {
-                PostCreateActionsView(repository: repository, showHeader: false)
-                    .padding()
-            }
+            PostCreateActionsView(repository: repository, addActionRequested: $addActionRequested)
 
             Divider()
 
@@ -1001,7 +1130,8 @@ struct PostCreateActionsSheet: View {
             }
             .padding()
         }
-        .frame(width: 500, height: 420)
+        .frame(width: 620, height: 620)
+        .settingsSheetChrome()
         .environment(\.managedObjectContext, viewContext)
     }
 }

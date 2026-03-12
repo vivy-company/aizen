@@ -15,7 +15,11 @@ struct MarkdownView: View {
     var basePath: String? = nil
     var onOpenFileInEditor: ((String) -> Void)? = nil
 
-    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+    @AppStorage(AppearanceSettings.markdownFontFamilyKey) private var markdownFontFamily = AppearanceSettings.defaultMarkdownFontFamily
+    @AppStorage(AppearanceSettings.markdownFontSizeKey) private var markdownFontSize = AppearanceSettings.defaultMarkdownFontSize
+    @AppStorage(AppearanceSettings.markdownParagraphSpacingKey) private var markdownParagraphSpacing = AppearanceSettings.defaultMarkdownParagraphSpacing
+    @AppStorage(AppearanceSettings.markdownHeadingSpacingKey) private var markdownHeadingSpacing = AppearanceSettings.defaultMarkdownHeadingSpacing
+    @AppStorage(AppearanceSettings.markdownContentPaddingKey) private var markdownContentPadding = AppearanceSettings.defaultMarkdownContentPadding
     @Environment(\.colorScheme) private var colorScheme
 
     private var resolvedBasePath: String? {
@@ -30,9 +34,10 @@ struct MarkdownView: View {
     }
 
     private var theme: MarkdownTheme {
-        var resolvedTheme = colorScheme == .dark ? MarkdownTheme.dark : MarkdownTheme.light
-        resolvedTheme.contentPadding = 14
-        return resolvedTheme
+        _ = markdownParagraphSpacing
+        _ = markdownHeadingSpacing
+        _ = markdownContentPadding
+        return AppearanceSettings.resolvedMarkdownTheme(colorScheme: colorScheme)
     }
 
     private var resolvedBaseURL: URL? {
@@ -44,7 +49,10 @@ struct MarkdownView: View {
         VVMarkdownView(
             content: content,
             theme: theme,
-            font: .systemFont(ofSize: CGFloat(chatFontSize)),
+            font: AppearanceSettings.resolvedNSFont(
+                family: markdownFontFamily,
+                size: markdownFontSize
+            ),
             baseURL: resolvedBaseURL,
             linkHandler: handleLink
         )

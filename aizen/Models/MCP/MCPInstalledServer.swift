@@ -2,7 +2,7 @@
 //  MCPInstalledServer.swift
 //  aizen
 //
-//  Represents an installed MCP server from agent's mcp list
+//  Represents an Aizen-managed MCP server attached to ACP sessions
 //
 
 import Foundation
@@ -15,6 +15,7 @@ struct MCPInstalledServer: Identifiable {
     let packageType: String?
     let transportType: String?
     let configuredEnv: [String: String]
+    let configuredHeaders: [String: String]
 
     init(
         serverName: String,
@@ -22,7 +23,8 @@ struct MCPInstalledServer: Identifiable {
         agentId: String,
         packageType: String? = nil,
         transportType: String? = nil,
-        configuredEnv: [String: String] = [:]
+        configuredEnv: [String: String] = [:],
+        configuredHeaders: [String: String] = [:]
     ) {
         self.id = "\(agentId):\(serverName)"
         self.serverName = serverName
@@ -31,5 +33,6 @@ struct MCPInstalledServer: Identifiable {
         self.packageType = packageType
         self.transportType = transportType
         self.configuredEnv = configuredEnv
+        self.configuredHeaders = configuredHeaders
     }
 }

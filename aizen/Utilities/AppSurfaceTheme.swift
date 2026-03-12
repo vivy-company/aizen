@@ -11,19 +11,7 @@ enum AppSurfaceTheme {
         colorScheme: ColorScheme? = nil,
         defaults: UserDefaults = .standard
     ) -> String {
-        let darkTheme = defaults.string(forKey: "terminalThemeName") ?? "Aizen Dark"
-        guard defaults.bool(forKey: "usePerAppearanceTheme") else {
-            return darkTheme
-        }
-
-        let lightTheme = defaults.string(forKey: "terminalThemeNameLight") ?? "Aizen Light"
-
-        if let colorScheme {
-            return colorScheme == .dark ? darkTheme : lightTheme
-        }
-
-        let bestMatch = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
-        return bestMatch == .darkAqua ? darkTheme : lightTheme
+        AppearanceSettings.effectiveThemeName(colorScheme: colorScheme, defaults: defaults)
     }
 
     static func backgroundNSColor(

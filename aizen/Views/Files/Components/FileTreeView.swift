@@ -61,7 +61,7 @@ struct FileTreeItem: View {
     let onOpenFile: (String) -> Void
     let viewModel: FileBrowserViewModel
 
-    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
     @State private var showingDialog: FileInputDialogType?
     @State private var showingDeleteAlert = false
@@ -71,7 +71,7 @@ struct FileTreeItem: View {
     }
 
     private var gitColors: GitStatusColors {
-        GhosttyThemeParser.loadGitStatusColors(named: editorTheme)
+        GhosttyThemeParser.loadGitStatusColors(named: AppearanceSettings.effectiveThemeName(colorScheme: colorScheme))
     }
 
     private func textColor(for item: FileItem) -> Color {

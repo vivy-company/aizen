@@ -191,11 +191,11 @@ struct UserBubble<Background: View>: View {
     let copyAction: () -> Void
     @ViewBuilder let backgroundView: () -> Background
 
-    @AppStorage(ChatSettings.fontFamilyKey) private var chatFontFamily = ChatSettings.defaultFontFamily
-    @AppStorage(ChatSettings.fontSizeKey) private var chatFontSize = ChatSettings.defaultFontSize
+    @AppStorage(AppearanceSettings.markdownFontFamilyKey) private var chatFontFamily = AppearanceSettings.defaultMarkdownFontFamily
+    @AppStorage(AppearanceSettings.markdownFontSizeKey) private var chatFontSize = AppearanceSettings.defaultMarkdownFontSize
 
     private var chatFont: Font {
-        chatFontFamily == "System Font" ? .system(size: chatFontSize) : .custom(chatFontFamily, size: chatFontSize)
+        AppearanceSettings.resolvedFont(family: chatFontFamily, size: chatFontSize)
     }
 
     private let maxContentWidth: CGFloat = 420

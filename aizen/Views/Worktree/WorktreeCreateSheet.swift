@@ -36,6 +36,7 @@ struct WorktreeCreateSheet: View {
     @State private var showingBranchSelector = false
     @State private var selectedTemplateIndex: Int?
     @State private var showingPostCreateActions = false
+    @State private var shouldRunPostCreateActions = true
     @State private var independentMethod: RepositoryManager.IndependentEnvironmentMethod = .clone
     @State private var detectedSubmodules: [GitSubmoduleInfo] = []
     @State private var loadingSubmodules = false
@@ -501,10 +502,23 @@ struct WorktreeCreateSheet: View {
             .buttonStyle(.plain)
 
             if enabledCount > 0 {
-                Text("\(enabledCount) action\(enabledCount == 1 ? "" : "s") will run after creation")
+                Toggle("Run configured actions after creation", isOn: $shouldRunPostCreateActions)
+
+                Text(
+                    shouldRunPostCreateActions
+                        ? "\(enabledCount) action\(enabledCount == 1 ? "" : "s") will run after creation"
+                        : "Configured actions will be skipped for this environment"
+                )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if !actions.isEmpty {
+                Text("All configured actions are disabled. They won't run until you enable them.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+        .onAppear {
+            shouldRunPostCreateActions = enabledCount > 0
         }
     }
 
@@ -625,7 +639,8 @@ struct WorktreeCreateSheet: View {
                         branch: branchName,
                         createBranch: true,
                         baseBranch: baseBranchName,
-                        submoduleOptions: submoduleOptions
+                        submoduleOptions: submoduleOptions,
+                        runPostCreateActions: shouldRunPostCreateActions
                     )
                 case .independent:
                     guard let source else {
@@ -636,7 +651,8 @@ struct WorktreeCreateSheet: View {
                         to: repository,
                         path: destinationPath,
                         sourcePath: source,
-                        method: method
+                        method: method,
+                        runPostCreateActions: shouldRunPostCreateActions
                     )
                 }
 

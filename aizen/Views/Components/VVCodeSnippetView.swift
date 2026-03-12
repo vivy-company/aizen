@@ -22,11 +22,8 @@ struct VVCodeSnippetView: View {
 
     @State private var document: VVDocument
 
-    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
-    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
-    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
-    @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
-    @AppStorage("editorFontSize") private var editorFontSize: Double = 12.0
+    @AppStorage(AppearanceSettings.codeFontFamilyKey) private var editorFontFamily: String = AppearanceSettings.defaultCodeFontFamily
+    @AppStorage(AppearanceSettings.codeFontSizeKey) private var editorFontSize: Double = AppearanceSettings.defaultCodeFontSize
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -55,14 +52,8 @@ struct VVCodeSnippetView: View {
         _document = State(initialValue: VVDocument(text: text, language: language))
     }
 
-    private var effectiveThemeName: String {
-        guard usePerAppearanceTheme else { return editorTheme }
-        return colorScheme == .dark ? editorTheme : editorThemeLight
-    }
-
     private var theme: VVTheme {
-        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
-            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
+        AppearanceSettings.resolvedTheme(colorScheme: colorScheme)
     }
 
     private var resolvedLanguage: VVLanguage? {

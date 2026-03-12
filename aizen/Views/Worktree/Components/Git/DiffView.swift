@@ -26,9 +26,6 @@ struct DiffView: View {
     let commentedLines: Set<String>
     let onAddComment: ((DiffLine, String) -> Void)?
 
-    @AppStorage("editorTheme") private var editorTheme: String = "Aizen Dark"
-    @AppStorage("editorThemeLight") private var editorThemeLight: String = "Aizen Light"
-    @AppStorage("editorUsePerAppearanceTheme") private var usePerAppearanceTheme = false
     @Environment(\.colorScheme) private var colorScheme
 
     // Init for raw diff output (used by GitChangesOverlayView)
@@ -79,14 +76,8 @@ struct DiffView: View {
         self.onAddComment = onAddComment
     }
 
-    private var effectiveThemeName: String {
-        guard usePerAppearanceTheme else { return editorTheme }
-        return colorScheme == .dark ? editorTheme : editorThemeLight
-    }
-
     private var theme: VVTheme {
-        GhosttyThemeParser.loadVVTheme(named: effectiveThemeName)
-            ?? (colorScheme == .dark ? .defaultDark : .defaultLight)
+        AppearanceSettings.resolvedTheme(colorScheme: colorScheme)
     }
 
     private var configuration: VVConfiguration {

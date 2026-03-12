@@ -353,14 +353,8 @@ struct CustomTextEditor: NSViewRepresentable {
         }
 
         private func mentionHighlightColor(for textView: NSTextView) -> NSColor {
-            let defaults = UserDefaults.standard
-            let terminalThemeName = defaults.string(forKey: "terminalThemeName") ?? "Aizen Dark"
-            let terminalThemeNameLight = defaults.string(forKey: "terminalThemeNameLight") ?? "Aizen Light"
-            let usePerAppearanceTheme = defaults.bool(forKey: "terminalUsePerAppearanceTheme")
             let isDarkAppearance = textView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            let effectiveThemeName = usePerAppearanceTheme
-                ? (isDarkAppearance ? terminalThemeName : terminalThemeNameLight)
-                : terminalThemeName
+            let effectiveThemeName = AppearanceSettings.effectiveThemeName(isDarkAppearance: isDarkAppearance)
             if let theme = GhosttyThemeParser.loadVVTheme(named: effectiveThemeName) {
                 return theme.cursorColor
             }

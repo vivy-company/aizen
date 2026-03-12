@@ -439,7 +439,8 @@ class RepositoryManager: ObservableObject {
         branch: String,
         createBranch: Bool,
         baseBranch: String? = nil,
-        submoduleOptions: LinkedEnvironmentSubmoduleOptions = .disabled
+        submoduleOptions: LinkedEnvironmentSubmoduleOptions = .disabled,
+        runPostCreateActions: Bool = true
     ) async throws -> Worktree {
         guard let repoPath = repository.path else {
             throw Libgit2Error.invalidPath("Project path is nil")
@@ -498,19 +499,28 @@ class RepositoryManager: ObservableObject {
 
         try viewContext.save()
 
-        // Execute post-create actions if configured
-        await executePostCreateActions(for: repository, newWorktreePath: normalizedEnvironmentPath)
+        if runPostCreateActions {
+            await executePostCreateActions(for: repository, newWorktreePath: normalizedEnvironmentPath)
+        }
 
         return worktree
     }
 
-    func addWorktree(to repository: Repository, path: String, branch: String, createBranch: Bool, baseBranch: String? = nil) async throws -> Worktree {
+    func addWorktree(
+        to repository: Repository,
+        path: String,
+        branch: String,
+        createBranch: Bool,
+        baseBranch: String? = nil,
+        runPostCreateActions: Bool = true
+    ) async throws -> Worktree {
         try await addLinkedEnvironment(
             to: repository,
             path: path,
             branch: branch,
             createBranch: createBranch,
-            baseBranch: baseBranch
+            baseBranch: baseBranch,
+            runPostCreateActions: runPostCreateActions
         )
     }
 
@@ -518,7 +528,8 @@ class RepositoryManager: ObservableObject {
         to repository: Repository,
         path: String,
         sourcePath: String,
-        method: IndependentEnvironmentMethod
+        method: IndependentEnvironmentMethod,
+        runPostCreateActions: Bool = true
     ) async throws -> Worktree {
         let source = normalizedPath(sourcePath)
         let destination = normalizedPath(path)
@@ -577,7 +588,9 @@ class RepositoryManager: ObservableObject {
         environment.lastAccessed = Date()
 
         try viewContext.save()
-        await executePostCreateActions(for: repository, newWorktreePath: destination)
+        if runPostCreateActions {
+            await executePostCreateActions(for: repository, newWorktreePath: destination)
+        }
         return environment
     }
 

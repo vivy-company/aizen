@@ -14,19 +14,7 @@ enum GitPanelTheme {
         colorScheme: ColorScheme? = nil,
         defaults: UserDefaults = .standard
     ) -> String {
-        let darkTheme = defaults.string(forKey: "terminalThemeName") ?? "Aizen Dark"
-        guard defaults.bool(forKey: "usePerAppearanceTheme") else {
-            return darkTheme
-        }
-
-        let lightTheme = defaults.string(forKey: "terminalThemeNameLight") ?? "Aizen Light"
-
-        if let colorScheme {
-            return colorScheme == .dark ? darkTheme : lightTheme
-        }
-
-        let bestMatch = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
-        return bestMatch == .darkAqua ? darkTheme : lightTheme
+        AppearanceSettings.effectiveThemeName(colorScheme: colorScheme, defaults: defaults)
     }
 
     static func backgroundColor(
@@ -88,9 +76,9 @@ struct GitResizableDivider: View {
     let onDragChanged: (DragGesture.Value) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
-    @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
-    @AppStorage("usePerAppearanceTheme") private var usePerAppearanceTheme = false
+    @AppStorage(AppearanceSettings.themeNameKey) private var terminalThemeName = AppearanceSettings.defaultDarkTheme
+    @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
+    @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var usePerAppearanceTheme = false
 
     @State private var didPushCursor = false
     private let lineWidth: CGFloat = 1
@@ -98,7 +86,7 @@ struct GitResizableDivider: View {
 
     private var effectiveThemeName: String {
         guard usePerAppearanceTheme else { return terminalThemeName }
-        return colorScheme == .dark ? terminalThemeName : terminalThemeNameLight
+        return AppearanceSettings.effectiveThemeName(colorScheme: colorScheme)
     }
 
     var body: some View {
@@ -184,11 +172,11 @@ struct GitPanelWindowContent: View {
     @State private var isInitializingGit = false
     @State private var gitInitializationError: String?
 
-    @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
-    @AppStorage("diffFontSize") private var diffFontSize: Double = 11.0
-    @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
-    @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
-    @AppStorage("usePerAppearanceTheme") private var usePerAppearanceTheme = false
+    @AppStorage(AppearanceSettings.codeFontFamilyKey) private var editorFontFamily: String = AppearanceSettings.defaultCodeFontFamily
+    @AppStorage(AppearanceSettings.diffFontSizeKey) private var diffFontSize: Double = AppearanceSettings.defaultDiffFontSize
+    @AppStorage(AppearanceSettings.themeNameKey) private var terminalThemeName = AppearanceSettings.defaultDarkTheme
+    @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
+    @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var usePerAppearanceTheme = false
     @Environment(\.colorScheme) private var colorScheme
 
     private let minLeftPanelWidth: CGFloat = 280
@@ -225,7 +213,7 @@ struct GitPanelWindowContent: View {
 
     private var effectiveThemeName: String {
         guard usePerAppearanceTheme else { return terminalThemeName }
-        return colorScheme == .dark ? terminalThemeName : terminalThemeNameLight
+        return AppearanceSettings.effectiveThemeName(colorScheme: colorScheme)
     }
 
     private var surfaceColor: Color {
