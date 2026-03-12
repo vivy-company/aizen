@@ -99,7 +99,7 @@ struct FileContentView: View {
             if isMarkdown && showPreview {
                 // Markdown preview - pass directory of file as basePath for relative image URLs
                 let fileDirectory = (file.path as NSString).deletingLastPathComponent
-                MarkdownView(content: file.content, isStreaming: false, basePath: fileDirectory)
+                MarkdownView(content: file.content, basePath: fileDirectory)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 // Code editor

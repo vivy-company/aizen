@@ -17,12 +17,10 @@
 		A1D4A4A2B3C4D5E6F7A8B902 /* VVDevKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1D4A4A2B3C4D5E6F7A8B912 /* VVDevKit */; };
 		CC1234572EA241B30007DBB1 /* libghostty.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* libghostty.a */; };
 		CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC128B1A2EAF8DD600EA9A50 /* Sparkle */; };
-		CC2917D02EFBDAE300440062 /* SwiftTreeSitter in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917B92EFBDAE300440062 /* SwiftTreeSitter */; };
 		CC2917D32EFBDAE300440062 /* libghostty.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* libghostty.a */; };
 		CC2917D42EFBDAE300440062 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917B52EFBDAE300440062 /* Markdown */; };
 		CC2917D52EFBDAE300440062 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917B72EFBDAE300440062 /* Sparkle */; };
 		CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = CCB04B732EA241B60007DBB1 /* Markdown */; };
-		CC8001752EC989600037DA4C /* SwiftTreeSitter in Frameworks */ = {isa = PBXBuildFile; productRef = CCFE00062EBF000000000006 /* SwiftTreeSitter */; };
 		CCACP0001000000000000001 /* ACP in Frameworks */ = {isa = PBXBuildFile; productRef = CCACP0002000000000000001 /* ACP */; };
 		CCACP0001000000000000002 /* ACP in Frameworks */ = {isa = PBXBuildFile; productRef = CCACP0002000000000000002 /* ACP */; };
 		CCACP0001000000000000003 /* ACPRegistry in Frameworks */ = {isa = PBXBuildFile; productRef = CCACP0002000000000000003 /* ACPRegistry */; };
@@ -153,7 +151,6 @@
 				CCACP0001000000000000004 /* ACPRegistry in Frameworks */,
 				A1D4A4A2B3C4D5E6F7A8B902 /* VVDevKit in Frameworks */,
 				89C3A37FB37B4F8A8E0CE8B4 /* AppIntents.framework in Frameworks */,
-				CC2917D02EFBDAE300440062 /* SwiftTreeSitter in Frameworks */,
 				CC2917D32EFBDAE300440062 /* libghostty.a in Frameworks */,
 				CC2917D42EFBDAE300440062 /* Markdown in Frameworks */,
 				CC2917D52EFBDAE300440062 /* Sparkle in Frameworks */,
@@ -171,7 +168,6 @@
 				CCACP0001000000000000003 /* ACPRegistry in Frameworks */,
 				A1D4A4A2B3C4D5E6F7A8B901 /* VVDevKit in Frameworks */,
 				98D8F68E63ED4B66AB2B8651 /* AppIntents.framework in Frameworks */,
-				CC8001752EC989600037DA4C /* SwiftTreeSitter in Frameworks */,
 				CC1234572EA241B30007DBB1 /* libghostty.a in Frameworks */,
 				CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */,
 				CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */,
@@ -267,7 +263,6 @@
 				A1D4A4A2B3C4D5E6F7A8B912 /* VVDevKit */,
 				CC2917B52EFBDAE300440062 /* Markdown */,
 				CC2917B72EFBDAE300440062 /* Sparkle */,
-				CC2917B92EFBDAE300440062 /* SwiftTreeSitter */,
 				F9A93A2E8948A4831C8E4835 /* MLX */,
 				8A569477FDE9E6427210C021 /* MLXNN */,
 				2CE06D116E3316BF792222D8 /* MLXFFT */,
@@ -301,7 +296,6 @@
 				A1D4A4A2B3C4D5E6F7A8B911 /* VVDevKit */,
 				CCB04B732EA241B60007DBB1 /* Markdown */,
 				CC128B1A2EAF8DD600EA9A50 /* Sparkle */,
-				CCFE00062EBF000000000006 /* SwiftTreeSitter */,
 				F9A93A2E8948A4831C8E4835 /* MLX */,
 				8A569477FDE9E6427210C021 /* MLXNN */,
 				2CE06D116E3316BF792222D8 /* MLXFFT */,
@@ -412,7 +406,6 @@
 				CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */,
 				CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */,
-				CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */,
 				79EC426B0DCDB46C628589C2 /* XCRemoteSwiftPackageReference "mlx-swift" */,
 				A1D4A4A2B3C4D5E6F7A8B921 /* XCRemoteSwiftPackageReference "VVDevKit" */,
 			);
@@ -1264,30 +1257,6 @@
 				minimumVersion = 2.0.0;
 			};
 		};
-		CC2917BA2EFBDAE300440062 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ChimeHQ/SwiftTreeSitter";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.8.0;
-			};
-		};
-		CC2917C52EFBDAE300440062 /* XCRemoteSwiftPackageReference "CodeEditLanguages" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/CodeEditApp/CodeEditLanguages.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.21;
-			};
-		};
-		CCA56A0E2ECB203200955D13 /* XCRemoteSwiftPackageReference "CodeEditLanguages" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/CodeEditApp/CodeEditLanguages.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.21;
-			};
-		};
 		A1D4A4A2B3C4D5E6F7A8B921 /* XCRemoteSwiftPackageReference "VVDevKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/vivy-company/VVDevKit";
@@ -1310,14 +1279,6 @@
 			requirement = {
 				branch = main;
 				kind = branch;
-			};
-		};
-		CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ChimeHQ/SwiftTreeSitter";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.8.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -1358,11 +1319,6 @@
 			package = CC2917B82EFBDAE300440062 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
-		CC2917B92EFBDAE300440062 /* SwiftTreeSitter */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CC2917BA2EFBDAE300440062 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */;
-			productName = SwiftTreeSitter;
-		};
 		CCACP0002000000000000001 /* ACP */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */;
@@ -1387,11 +1343,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */;
 			productName = Markdown;
-		};
-		CCFE00062EBF000000000006 /* SwiftTreeSitter */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CCFE00032EBF000000000003 /* XCRemoteSwiftPackageReference "SwiftTreeSitter" */;
-			productName = SwiftTreeSitter;
 		};
 		F9A93A2E8948A4831C8E4835 /* MLX */ = {
 			isa = XCSwiftPackageProductDependency;

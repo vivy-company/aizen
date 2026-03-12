@@ -12,7 +12,7 @@ struct PlanContentView: View {
     let content: String
 
     var body: some View {
-        MarkdownView(content: content, isStreaming: false)
+        MarkdownView(content: content)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

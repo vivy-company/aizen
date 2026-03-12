@@ -11,7 +11,6 @@ import VVMarkdown
 
 struct MarkdownView: View {
     let content: String
-    var isStreaming: Bool = false
     var basePath: String? = nil
     var onOpenFileInEditor: ((String) -> Void)? = nil
 

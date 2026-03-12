@@ -156,8 +156,7 @@ aizen/
 │   ├── Audio/              # Voice recording, transcription
 │   ├── MCP/                # MCP server management
 │   ├── Workflow/           # GitHub Actions / GitLab CI integration
-│   ├── Xcode/              # Xcode build and device integration
-│   └── Highlighting/       # Tree-sitter integration
+│   └── Xcode/              # Xcode build and device integration
 ├── Views/
 │   ├── Chat/               # Sessions, input, markdown, tool calls
 │   ├── Worktree/           # List, detail, Git, workflow, review

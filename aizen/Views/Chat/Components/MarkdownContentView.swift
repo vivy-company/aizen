@@ -12,14 +12,12 @@ import SwiftUI
 /// Uses the high-performance NSTextView-based MarkdownView
 struct MessageContentView: View {
     let content: String
-    var isStreaming: Bool = false
     var basePath: String? = nil
     var onOpenFileInEditor: ((String) -> Void)? = nil
 
     var body: some View {
         MarkdownView(
             content: content,
-            isStreaming: isStreaming,
             basePath: basePath,
             onOpenFileInEditor: onOpenFileInEditor
         )

@@ -92,7 +92,6 @@ struct MessageBubbleView: View {
                             if !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 MessageContentView(
                                     content: message.content,
-                                    isStreaming: !message.isComplete,
                                     basePath: markdownBasePath,
                                     onOpenFileInEditor: onOpenFileInEditor
                                 )

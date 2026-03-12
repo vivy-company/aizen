@@ -26,7 +26,6 @@ struct CodeEditorView: View {
     @AppStorage(AppearanceSettings.codeFontFamilyKey) private var editorFontFamily: String = AppearanceSettings.defaultCodeFontFamily
     @AppStorage(AppearanceSettings.codeFontSizeKey) private var editorFontSize: Double = AppearanceSettings.defaultCodeFontSize
     @AppStorage("editorWrapLines") private var editorWrapLines: Bool = true
-    @AppStorage("editorShowMinimap") private var editorShowMinimap: Bool = false
     @AppStorage("editorShowGutter") private var editorShowGutter: Bool = true
     @AppStorage("editorIndentSpaces") private var editorIndentSpaces: Int = 4
     @Environment(\.colorScheme) private var colorScheme

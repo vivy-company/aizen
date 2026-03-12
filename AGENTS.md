@@ -23,7 +23,6 @@ aizen/
 │   ├── Agent/              # ACP client, session, installers, delegates
 │   ├── Git/                # Repository, libgit2, domain services
 │   ├── Audio/              # Voice recording and speech recognition
-│   ├── Highlighting/       # Tree-sitter syntax highlighting
 │   ├── License/            # License management
 │   ├── MCP/                # MCP server management
 │   ├── Workflow/           # GitHub/GitLab CI/CD integration
@@ -158,7 +157,6 @@ aizen/
 - libghostty: GPU-accelerated terminal with Metal.
 - libgit2: Native git operations.
 - swift-markdown: Markdown parsing (Apple official).
-- HighlightSwift: Syntax highlighting (highlight.js wrapper).
 - VVDevKit highlighting: Tree-sitter syntax highlighting.
 - Sparkle: Auto-update framework.
 
