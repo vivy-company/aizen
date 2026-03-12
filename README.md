@@ -11,52 +11,57 @@
 
 > **Early Access** — Aizen is under active development with near-daily updates. Expect breaking changes and new features frequently.
 
+A native macOS workspace for developers working across multiple repos and branches at once.
+
 Bring order to your repos. Switch worktrees, not windows.
 
 ![Aizen Demo](https://r2.aizen.win/demo.png)
 
 ## What is Aizen?
 
-Aizen is a macOS workspace for developers who work on multiple branches in parallel. Each worktree gets its own terminal, file browser, web browser, and agent session — so you switch worktrees, not windows.
+Aizen is a worktree-first developer workspace for macOS. It keeps the tools that usually spill across separate apps attached to each worktree: terminal, files, browser, agent chat, Git context, and review state.
 
-## Features
+## Current Highlights
 
-### Core
+### Worktree-first workspace
 - **Workspaces** — Organize repositories into color-coded groups
 - **Worktrees** — Create and manage Git worktrees with visual UI
 - **Per-worktree sessions** — Each worktree has its own terminal, files, browser, and chat
 
-### Terminal
+### Terminal and CLI
 - **GPU-accelerated** — Powered by [libghostty](https://github.com/ghostty-org/ghostty)
-- **Split panes** — Horizontal and vertical splits
-- **Themes** — Catppuccin, Dracula, Nord, Gruvbox, TokyoNight, and more
+- **Split panes and tabs** — Horizontal and vertical splits with presets and themes
+- **Persistence** — Optional tmux-backed terminal session restore
+- **CLI companion** — Open repos, manage workspaces, and attach to persistent terminals with `aizen`
 
-### Agents
-- **Supported** — Claude, Codex, Gemini, Kimi, and custom agents
-- **Protocol** — Agent Client Protocol (ACP)
-- **Auto-install** — From NPM or GitHub releases
-- **Voice input** — On-device speech-to-text with waveform visualization
+### Agents and MCP
+- **ACP registry-first** — Add registry agents or bring your own custom command/binary
+- **Supported agents** — Works with Claude Code, Codex, OpenCode, Gemini, and other ACP-compatible agents
+- **MCP marketplace** — Browse and add MCP servers from inside the app
+- **Rich input** — File attachments, tool calls, and on-device voice input with waveform visualization
 
-### Git
-- **Operations** — Stage, commit, push, pull, merge, branch
-- **Diff viewer** — Full-window diff with syntax highlighting
-- **Status** — Real-time file status indicators
+### Git, Review, and Delivery
+- **Git operations** — Stage, commit, push, pull, merge, and branch from the UI
+- **Diff and review** — Syntax-highlighted diffs, review comments, and PR/MR detail views
+- **Workflow visibility** — GitHub Actions and GitLab CI runs from the worktree sidebar
+- **Apple workflows** — Xcode build integration for `.xcodeproj` and `.xcworkspace` projects
 
-### File Browser
-- **Tree view** — Hierarchical directory navigation
-- **Syntax highlighting** — Tree-sitter for 50+ languages
-- **Multi-tab** — Open multiple files
-
-### Web Browser
-- **Per-worktree** — Embedded browser for docs and previews
-- **Multi-tab** — Session persistence
+### Files and Browser
+- **File browser** — Tree view, search, syntax highlighting, inline diffs, and multiple tabs
+- **Built-in browser** — Per-worktree tabs for docs, previews, auth flows, and local apps
 
 ## Requirements
 
 - macOS 13.5+
 - Apple Silicon or Intel Mac
 
-### Building from Source
+## Installation
+
+Download from [aizen.win](https://aizen.win)
+
+Signed and notarized with an Apple Developer certificate.
+
+## Build from Source
 
 - Xcode 16.0+
 - Swift 5.0+
@@ -80,37 +85,44 @@ To rebuild libghostty at a specific commit:
 ./scripts/build-libghostty.sh <commit-sha>
 ```
 
-## Installation
+## Agent Setup
 
-Download from [aizen.win](https://aizen.win)
+Aizen now uses ACP registry agents as the default path.
 
-Signed and notarized with an Apple Developer certificate.
+- Seeded defaults include Claude Code, Codex, and OpenCode
+- Add more agents from **Settings > Agents**
+- Bring your own custom agent with a command or executable path
+- Add MCP servers per agent from the built-in marketplace
+
+## CLI
+
+Install the bundled CLI from **Settings > General**, then use commands like:
+
+```bash
+aizen open .
+aizen workspace list
+aizen terminal . --attach
+aizen attach
+```
+
+The CLI can add or open repositories, inspect tracked workspaces, create persistent terminals, and attach to tmux-backed sessions created in the app.
 
 ## Configuration
-
-### Agents
-
-Settings > Agents:
-
-| Agent | Install Method | Package |
-|-------|---------------|---------|
-| Claude | NPM | `@anthropic-ai/claude-code` |
-| Codex | GitHub | `openai/codex` |
-| Gemini | NPM | `@anthropic-ai/claude-code` |
-| Kimi | GitHub | `MoonshotAI/kimi-cli` |
-
-Agents can be auto-discovered and installed, or manually configured.
 
 ### Terminal
 
 Settings > Terminal:
 - Font family and size
-- Color theme
+- Color themes and presets
+- Voice input button
+- tmux session persistence
 
-### Editor
+### General
 
 Settings > General:
 - Default external editor (VS Code, Cursor, Sublime Text)
+- CLI install and status
+- Optional Xcode build button for Apple projects
 
 ## Keyboard Shortcuts
 
@@ -126,6 +138,7 @@ Settings > General:
 ## Dependencies
 
 - [libghostty](https://github.com/ghostty-org/ghostty) — Terminal emulator
+- [libgit2](https://libgit2.org/) — Native Git operations
 - [VVDevKit](https://github.com/vivy-company/VVDevKit) — Editor/markdown/timeline/diff + Tree-sitter highlighting
 - [Sparkle](https://github.com/sparkle-project/Sparkle) — Auto-updates
 
@@ -134,32 +147,37 @@ Settings > General:
 ```
 aizen/
 ├── App/                    # Entry point
-├── Models/                 # Data models, ACP types
+├── Models/                 # Data models, ACP, Git, MCP, Tab, Terminal
 ├── Services/
-│   ├── Agent/              # ACP client, installers, session management
-│   ├── Git/                # Worktree, branch, staging, diff services
+│   ├── Agent/              # ACP client, registry, installers, session management
+│   ├── Git/                # Worktree, branch, staging, diff, review, hosting
 │   ├── Audio/              # Voice recording, transcription
+│   ├── MCP/                # MCP server management
+│   ├── Workflow/           # GitHub Actions / GitLab CI integration
+│   ├── Xcode/              # Xcode build and device integration
 │   └── Highlighting/       # Tree-sitter integration
 ├── Views/
-│   ├── Workspace/          # Sidebar, create/edit sheets
-│   ├── Worktree/           # List, detail, git sidebar
-│   ├── Terminal/           # Tabs, split layout, panes
 │   ├── Chat/               # Sessions, input, markdown, tool calls
+│   ├── Worktree/           # List, detail, Git, workflow, review
+│   ├── Terminal/           # Tabs, split layout, panes
 │   ├── Files/              # Tree view, content tabs
 │   ├── Browser/            # Tabs, controls
-│   └── Settings/           # All settings panels
+│   ├── Search/             # Search UI
+│   ├── CommandPalette/     # Command palette
+│   └── Settings/           # Settings panels and installers
 ├── GhosttyTerminal/        # libghostty wrapper
+├── Managers/               # Shared state managers
 └── Utilities/              # Helpers
 ```
 
 **Patterns:**
-- MVVM with `@ObservableObject`
-- Actor model for concurrency
+- MVVM with observable models
+- Actor-based services for concurrency-sensitive work
 - Core Data for persistence
-- SwiftUI + async/await
+- SwiftUI + async/await + `AsyncStream`
 
 ## License
 
 GNU General Public License v3.0
 
-Copyright © 2025 Vivy Technologies Co., Limited
+Copyright © 2026 Vivy Technologies Co., Limited

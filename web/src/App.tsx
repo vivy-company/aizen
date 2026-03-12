@@ -194,15 +194,15 @@ function AppContent() {
       <section className="py-20 px-6">
         <div className="max-w-[1200px] mx-auto">
           <h2 className="text-[56px] font-semibold text-center mb-4 tracking-tight">Pricing</h2>
-          <p className="text-[#86868b] text-center text-lg mb-16">Start free, upgrade when you need more</p>
+          <p className="text-[#86868b] text-center text-lg mb-16">Use the full core app for free. Pro helps fund the next wave of features.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Free Tier */}
             <div className="bg-white/[0.03] border border-white/8 rounded-3xl p-8 flex flex-col">
               <h3 className="text-2xl font-semibold mb-2">Free</h3>
-              <p className="text-[#86868b] mb-6">Full-featured, forever free</p>
+              <p className="text-[#86868b] mb-6">The full core workspace</p>
               <div className="text-4xl font-bold mb-6">$0<span className="text-lg font-normal text-[#86868b]">/forever</span></div>
               <ul className="space-y-3 mb-8 flex-1">
-                {["Unlimited workspaces & worktrees", "Agents (via ACP)", "GPU terminal (libghostty)", "File & Web browser", "Voice input", "Visual Git interface", "GitHub Actions & GitLab CI", "Xcode integration"].map((feature) => (
+                {["Unlimited workspaces & worktrees", "ACP agents and MCP servers", "GPU terminal with tmux persistence", "File and web browser", "Voice input and attachments", "Visual Git diff and review", "GitHub Actions & GitLab CI", "Xcode integration", "CLI companion"].map((feature) => (
                   <li key={feature} className="flex items-center gap-3 text-[#86868b]">
                     <Check size={18} className="text-green-500 flex-shrink-0" />
                     {feature}
@@ -219,7 +219,7 @@ function AppContent() {
             {/* Pro */}
             <div className="bg-white/[0.03] border border-white/8 rounded-3xl p-8 flex flex-col">
               <h3 className="text-2xl font-semibold mb-2">Pro</h3>
-              <p className="text-[#86868b] mb-4">Support the developer</p>
+              <p className="text-[#86868b] mb-4">Fund ongoing development</p>
               {/* Billing Toggle */}
               <div className="flex bg-white/[0.05] rounded-full p-1 mb-6">
                 <button
@@ -241,7 +241,7 @@ function AppContent() {
                 <span className="text-lg font-normal text-[#86868b]">{billingCycle === "monthly" ? "/mo" : "/yr"}</span>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
-                {["Everything in Free", "Support continued development", "Priority support", "Future exclusive features"].map((feature) => (
+                {["Everything in Free", "Support continued development", "Priority support", "Future paid extras"].map((feature) => (
                   <li key={feature} className="flex items-center gap-3 text-[#86868b]">
                     <Check size={18} className="text-blue-500 flex-shrink-0" />
                     {feature}
@@ -264,7 +264,7 @@ function AppContent() {
               <p className="text-[#86868b] mb-6">One-time purchase</p>
               <div className="text-4xl font-bold mb-6">$179<span className="text-lg font-normal text-[#86868b]"></span></div>
               <ul className="space-y-3 mb-8 flex-1">
-                {["Everything in Free", "Support continued development", "Priority support forever", "Future exclusive features"].map((feature) => (
+                {["Everything in Free", "Support continued development", "Priority support forever", "Future paid extras"].map((feature) => (
                   <li key={feature} className="flex items-center gap-3 text-[#86868b]">
                     <Check size={18} className="text-blue-500 flex-shrink-0" />
                     {feature}

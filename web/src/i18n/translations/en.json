@@ -1,11 +1,11 @@
 {
   "hero": {
     "title": "Aizen",
-    "subtitle": "Bring order to your repos. Switch worktrees, not windows.",
+    "subtitle": "A worktree-first macOS workspace with terminal, files, browser, agents, workflows, and CLI.",
     "earlyAccess": "Early Access",
     "download": "Download",
     "viewOnGithub": "View on GitHub",
-    "requirements": "Requires macOS 13.5 Ventura or later (Apple Silicon & Intel)"
+    "requirements": "macOS 13.5+ on Apple Silicon or Intel. Signed and notarized builds available."
   },
   "showcase": {
     "agents": "Agents",
@@ -14,60 +14,60 @@
     "browser": "Browser"
   },
   "features": {
-    "title": "Worktrees. Terminal. Agents.",
+    "title": "One Window for Parallel Development",
     "workspaces": {
       "title": "Workspace Management",
-      "desc": "Organize repositories into color-coded workspaces. Group related projects together."
+      "desc": "Group repositories into color-coded workspaces, then jump between active projects without losing your place."
     },
     "worktrees": {
       "title": "Git Worktrees",
-      "desc": "Work on multiple branches simultaneously without switching contexts. Git LFS support included."
+      "desc": "Create and manage multiple branches in parallel. Each worktree keeps its own terminal, files, browser, and chat."
     },
     "agents": {
-      "title": "Agents",
-      "desc": "Claude, Codex, Gemini, Kimi, and custom agents via ACP. Auto-install from NPM or GitHub."
+      "title": "Agents and MCP",
+      "desc": "Run Claude, Codex, OpenCode, Gemini, and other ACP agents. Add MCP servers from the built-in marketplace."
     },
     "terminal": {
-      "title": "Integrated Terminal",
-      "desc": "GPU-accelerated terminal powered by libghostty. Split panes, multiple tabs, custom themes."
+      "title": "Persistent Terminal",
+      "desc": "GPU-accelerated terminal powered by libghostty with split panes, presets, themes, and optional tmux persistence."
     },
     "git": {
-      "title": "Git Operations",
-      "desc": "Stage, commit, push, pull, merge branches. Full-window diff viewer with syntax highlighting."
+      "title": "Git, Review, and CI",
+      "desc": "Stage, commit, diff, review pull requests, and keep GitHub Actions or GitLab CI runs within reach."
     },
     "voice": {
-      "title": "Voice Input",
-      "desc": "Talk to your agents with voice commands. Real-time transcription with waveform visualization."
+      "title": "Chat Context",
+      "desc": "Use voice input, file attachments, and per-worktree chat history to keep agent context tied to the branch."
     },
     "fileBrowser": {
       "title": "File Browser",
-      "desc": "Browse files with directory tree view. Fuzzy search, syntax highlighting, multi-tab editing."
+      "desc": "Browse, search, and inspect files with syntax highlighting, multi-tab editing, and inline diff support."
     },
     "webBrowser": {
       "title": "Web Browser",
-      "desc": "Embedded browser for documentation and previews. Multiple tabs with session persistence."
+      "desc": "Use the built-in browser for docs, previews, auth flows, and local apps. Tabs stay with each worktree session."
     }
   },
   "howItWorks": {
-    "title": "How it works",
+    "title": "How Teams Actually Use It",
     "step1": {
-      "title": "Organize your repos",
-      "desc": "Group repositories into workspaces. Add repos, create worktrees for branches you're working on. Everything in one place."
+      "title": "Group repos and spin up worktrees",
+      "desc": "Bring related repositories into one workspace, then create worktrees for the branches or tasks that are active right now."
     },
     "step2": {
-      "title": "Switch worktrees, not windows",
-      "desc": "Each worktree has its own terminal, file browser, web browser, and chat session. Click to switch. Your context stays exactly where you left it."
+      "title": "Keep every branch stateful",
+      "desc": "Each worktree carries its own terminal panes, file tabs, browser tabs, chat history, and review context."
     },
     "step3": {
-      "title": "Work in parallel",
-      "desc": "Run agents on one branch while reviewing code on another. No stashing, no juggling windows. Just parallel work."
+      "title": "Ship without context switching",
+      "desc": "Kick off agents, watch workflow runs, review diffs, or open the same repo from the CLI without rebuilding your setup."
     }
   },
   "faq": {
     "title": "Frequently asked questions",
     "q1": {
       "question": "What problem does Aizen solve?",
-      "answer": "Developers working on multiple branches typically juggle editor windows, terminal tabs, and browser windows. Aizen gives each worktree its own dedicated workspace — terminal, files, browser, agents — so you switch worktrees, not windows."
+      "answer": "Developers shipping across multiple branches or repositories usually juggle terminals, editor windows, docs, CI dashboards, and agent chats. Aizen keeps that stack attached to each worktree so the context moves with the branch."
     },
     "q2": {
       "question": "What are Git worktrees?",
@@ -75,19 +75,19 @@
     },
     "q3": {
       "question": "How is this different from VS Code or other editors?",
-      "answer": "Editors focus on one project at a time. Aizen is built around worktrees — you manage multiple repos and branches in one window, each with its own terminal, browser, and agent session. It's a workspace for parallel development, not an editor."
+      "answer": "Editors focus on one project at a time. Aizen is built around worktrees and repo-level context: persistent terminal panes, built-in browser tabs, agent sessions, diffs, and workflow visibility. It's a workspace for parallel development, not just a text editor."
     },
     "q4": {
       "question": "Which agents are supported?",
-      "answer": "Aizen supports Claude, Codex (OpenAI), Gemini, Kimi, and any custom agent compatible with the Agent Client Protocol (ACP). Agents can be auto-installed from NPM or GitHub."
+      "answer": "Aizen is ACP-first. You can add registry-backed agents such as Claude, Codex, OpenCode, Gemini, and other ACP-compatible tools, or configure your own custom command. MCP servers can be added per agent from inside the app."
     },
     "q5": {
       "question": "Is Aizen free?",
-      "answer": "Yes! Aizen is fully free and open source under the GPL-3.0 license. All features — workspaces, worktrees, agents, terminal, file browser, web browser, voice input — are included for free."
+      "answer": "Yes. The app is free to download and open source under the GPL-3.0 license. The current core experience — workspaces, worktrees, agents, terminal, file browser, browser, CLI, and workflow views — is available without paying."
     },
     "q6": {
       "question": "What's Aizen Pro?",
-      "answer": "Aizen Pro is a way to support continued development. Pro subscribers get priority support and will receive exclusive features as they're added. All current app features remain free — Pro is about keeping Aizen alive and growing. Available as monthly ($5.99/mo), yearly ($59/yr), or lifetime ($179)."
+      "answer": "Aizen Pro funds ongoing development. Pro subscribers get priority support and will receive paid extras as they ship, while the free app remains usable on its own. Available as monthly ($5.99/mo), yearly ($59/yr), or lifetime ($179)."
     },
     "q7": {
       "question": "Can I use one license on multiple Macs?",
@@ -99,11 +99,11 @@
     },
     "q9": {
       "question": "What are the requirements?",
-      "answer": "macOS 13.5 Ventura or later. Apple Silicon and Intel Macs supported."
+      "answer": "macOS 13.5 or later. Apple Silicon and Intel Macs are both supported."
     }
   },
   "footer": {
-    "copyright": "© 2025 Vivy Technologies Co., Limited",
+    "copyright": "© 2026 Vivy Technologies Co., Limited",
     "discord": "Discord",
     "twitter": "Twitter",
     "github": "GitHub"

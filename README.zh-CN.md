@@ -11,52 +11,57 @@
 
 > **早期体验** — Aizen 正在积极开发中，几乎每天都有更新。预计会有频繁的破坏性更改和新功能。
 
+一个面向同时处理多个仓库和分支的开发者的原生 macOS 工作区。
+
 让你的仓库井然有序。切换 worktree，而非窗口。
 
 ![Aizen Demo](https://r2.aizen.win/demo.png)
 
 ## Aizen 是什么？
 
-Aizen 是一个面向需要并行处理多个分支的开发者的 macOS 工作区。每个 worktree 都有独立的终端、文件浏览器、网页浏览器和代理会话 — 让你切换 worktree，而非窗口。
+Aizen 是一个以 worktree 为核心的 macOS 开发工作区。它把原本散落在多个应用里的工具都绑定到每个 worktree 上：终端、文件、浏览器、代理聊天、Git 上下文和评审状态。
 
-## 功能特性
+## 当前亮点
 
-### 核心
+### Worktree 优先的工作区
 - **工作区** — 将仓库组织到带颜色标记的分组中
 - **Worktree** — 通过可视化界面创建和管理 Git worktree
 - **独立会话** — 每个 worktree 拥有独立的终端、文件、浏览器和聊天
 
-### 终端
+### 终端与 CLI
 - **GPU 加速** — 基于 [libghostty](https://github.com/ghostty-org/ghostty)
-- **分屏** — 水平和垂直分屏
-- **主题** — Catppuccin、Dracula、Nord、Gruvbox、TokyoNight 等
+- **分屏与标签** — 支持水平/垂直分屏、预设和主题
+- **会话持久化** — 可选 tmux 持久化，重启后恢复终端状态
+- **CLI 配套** — 通过 `aizen` 命令打开仓库、管理工作区、连接持久终端
 
-### 代理
-- **支持** — Claude、Codex、Gemini、Kimi 及自定义代理
-- **协议** — Agent Client Protocol (ACP)
-- **自动安装** — 从 NPM 或 GitHub releases 安装
-- **语音输入** — 本地语音转文字，带波形可视化
+### 代理与 MCP
+- **ACP 注册表优先** — 可直接添加注册表代理，也可配置自定义命令或二进制
+- **支持代理** — 兼容 Claude Code、Codex、OpenCode、Gemini 及其他 ACP 代理
+- **MCP 市场** — 在应用内浏览并添加 MCP 服务器
+- **丰富输入** — 文件附件、工具调用，以及带波形可视化的本地语音输入
 
-### Git
-- **操作** — 暂存、提交、推送、拉取、合并、分支
-- **差异查看器** — 全窗口差异对比，带语法高亮
-- **状态** — 实时文件状态指示
+### Git、评审与交付
+- **Git 操作** — 在界面中完成暂存、提交、推送、拉取、合并和分支管理
+- **Diff 与评审** — 带语法高亮的差异查看、评审评论和 PR/MR 详情
+- **工作流可见性** — 在 worktree 侧边栏查看 GitHub Actions 与 GitLab CI
+- **Apple 项目支持** — 为 `.xcodeproj` 和 `.xcworkspace` 提供 Xcode 构建集成
 
-### 文件浏览器
-- **树形视图** — 层级目录导航
-- **语法高亮** — Tree-sitter 支持 50+ 种语言
-- **多标签** — 打开多个文件
-
-### 网页浏览器
-- **独立浏览器** — 每个 worktree 内嵌浏览器，用于文档和预览
-- **多标签** — 会话持久化
+### 文件与浏览器
+- **文件浏览器** — 树形视图、搜索、语法高亮、内联 diff 和多标签
+- **内置浏览器** — 每个 worktree 独立保存文档、预览、认证流程和本地应用标签页
 
 ## 系统要求
 
 - macOS 13.5+
 - Apple Silicon 或 Intel Mac
 
-### 从源码构建
+## 安装
+
+从 [aizen.win](https://aizen.win) 下载
+
+已使用 Apple 开发者证书签名并完成公证。
+
+## 从源码构建
 
 - Xcode 16.0+
 - Swift 5.0+
@@ -80,37 +85,44 @@ open aizen.xcodeproj
 ./scripts/build-libghostty.sh <commit-sha>
 ```
 
-## 安装
+## 代理设置
 
-从 [aizen.win](https://aizen.win) 下载
+Aizen 现在默认采用 ACP 注册表代理方案。
 
-已使用 Apple 开发者证书签名和公证。
+- 默认预置 Claude Code、Codex 和 OpenCode
+- 在 **设置 > 代理** 中添加更多代理
+- 也可以手动配置自定义命令或可执行文件
+- 每个代理都可以通过内置市场添加 MCP 服务器
+
+## CLI
+
+在 **设置 > 通用** 中安装内置 CLI，然后可以使用：
+
+```bash
+aizen open .
+aizen workspace list
+aizen terminal . --attach
+aizen attach
+```
+
+CLI 可以添加或打开仓库、查看工作区、创建持久终端，并连接到应用中创建的 tmux 会话。
 
 ## 配置
-
-### 代理
-
-设置 > 代理：
-
-| 代理 | 安装方式 | 包名 |
-|------|---------|------|
-| Claude | NPM | `@anthropic-ai/claude-code` |
-| Codex | GitHub | `openai/codex` |
-| Gemini | NPM | `@anthropic-ai/claude-code` |
-| Kimi | GitHub | `MoonshotAI/kimi-cli` |
-
-代理可自动发现和安装，也可手动配置。
 
 ### 终端
 
 设置 > 终端：
 - 字体和大小
-- 配色主题
+- 配色主题和预设
+- 语音输入按钮
+- tmux 会话持久化
 
-### 编辑器
+### 通用
 
 设置 > 通用：
 - 默认外部编辑器（VS Code、Cursor、Sublime Text）
+- CLI 安装与状态
+- Apple 项目的 Xcode 构建按钮开关
 
 ## 快捷键
 
@@ -126,6 +138,7 @@ open aizen.xcodeproj
 ## 依赖项
 
 - [libghostty](https://github.com/ghostty-org/ghostty) — 终端模拟器
+- [libgit2](https://libgit2.org/) — 原生 Git 操作
 - [VVDevKit](https://github.com/vivy-company/VVDevKit) — 编辑器/Markdown/时间线/Diff 与 Tree-sitter 高亮
 - [Sparkle](https://github.com/sparkle-project/Sparkle) — 自动更新
 
@@ -134,32 +147,37 @@ open aizen.xcodeproj
 ```
 aizen/
 ├── App/                    # 入口
-├── Models/                 # 数据模型、ACP 类型
+├── Models/                 # 数据模型、ACP、Git、MCP、Tab、Terminal
 ├── Services/
-│   ├── Agent/              # ACP 客户端、安装器、会话管理
-│   ├── Git/                # Worktree、分支、暂存、差异服务
+│   ├── Agent/              # ACP 客户端、注册表、安装器、会话管理
+│   ├── Git/                # Worktree、分支、暂存、差异、评审、托管服务
 │   ├── Audio/              # 语音录制、转写
+│   ├── MCP/                # MCP 服务器管理
+│   ├── Workflow/           # GitHub Actions / GitLab CI 集成
+│   ├── Xcode/              # Xcode 构建与设备集成
 │   └── Highlighting/       # Tree-sitter 集成
 ├── Views/
-│   ├── Workspace/          # 侧边栏、创建/编辑弹窗
-│   ├── Worktree/           # 列表、详情、Git 侧边栏
-│   ├── Terminal/           # 标签、分屏布局、面板
 │   ├── Chat/               # 会话、输入、Markdown、工具调用
+│   ├── Worktree/           # 列表、详情、Git、工作流、评审
+│   ├── Terminal/           # 标签、分屏布局、面板
 │   ├── Files/              # 树形视图、内容标签
 │   ├── Browser/            # 标签、控件
-│   └── Settings/           # 所有设置面板
+│   ├── Search/             # 搜索界面
+│   ├── CommandPalette/     # 命令面板
+│   └── Settings/           # 设置面板与安装器
 ├── GhosttyTerminal/        # libghostty 封装
+├── Managers/               # 共享状态管理器
 └── Utilities/              # 工具函数
 ```
 
 **设计模式：**
-- MVVM 配合 `@ObservableObject`
-- Actor 模型处理并发
+- MVVM 配合可观察模型
+- 使用 Actor 处理并发敏感逻辑
 - Core Data 持久化
-- SwiftUI + async/await
+- SwiftUI + async/await + `AsyncStream`
 
 ## 许可证
 
 GNU General Public License v3.0
 
-版权所有 © 2025 Vivy Technologies Co., Limited
+版权所有 © 2026 Vivy Technologies Co., Limited
