@@ -96,7 +96,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vivy-company/VVDevKit",
       "state" : {
-        "revision" : "1c6474b1649e8171091adcbcb97b87f8747c6efb"
+        "revision" : "0ac991ff5d9bc7fa4b4946d93f6b442aa58f9841"
       }
     }
   ],
