@@ -43,7 +43,7 @@
       "location" : "https://github.com/wiedymi/swift-acp",
       "state" : {
         "branch" : "main",
-        "revision" : "8af0b188926fc436e119fc82aca7ac1dc54a77b5"
+        "revision" : "c22dc706b8b985f7d140f245ba5de36a7a2a7493"
       }
     },
     {
@@ -96,7 +96,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vivy-company/VVDevKit",
       "state" : {
-        "revision" : "31f78ba8cd8d5a8365a85bb0749f10d32c676285"
+        "revision" : "3e881a9ef7a6ea8d892a93ce22d266ee5490ccfb"
       }
     }
   ],

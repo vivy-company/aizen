@@ -25,6 +25,18 @@ struct AgentListItemView: View {
     @State private var showingAuthClearedMessage = false
     @State private var installedVersion: String?
 
+    private var resolvedAgentPath: String? {
+        AgentRegistry.shared.getAgentPath(for: metadata.id)
+    }
+
+    private var resolvedLaunchArgs: [String] {
+        AgentRegistry.shared.getAgentLaunchArgs(for: metadata.id)
+    }
+
+    private var resolvedLaunchEnvironment: [String: String] {
+        AgentRegistry.shared.getAgentLaunchEnvironment(for: metadata.id)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
@@ -42,7 +54,7 @@ struct AgentListItemView: View {
                                 .foregroundColor(.secondary)
                         }
 
-                        if !metadata.isBuiltIn {
+                        if metadata.isCustom {
                             TagBadge(
                                 text: "Custom",
                                 color: .blue,
@@ -72,7 +84,7 @@ struct AgentListItemView: View {
 
                             // If we're disabling the current default agent, pick a new default
                             if wasEnabled && !newValue {
-                                let defaultAgent = UserDefaults.standard.string(forKey: "defaultACPAgent") ?? "claude"
+                                let defaultAgent = UserDefaults.standard.string(forKey: "defaultACPAgent") ?? AgentRegistry.defaultAgentID
                                 if defaultAgent == metadata.id {
                                     // Find first enabled agent that's not this one
                                     if let newDefault = AgentRegistry.shared.getEnabledAgents().first {
@@ -90,7 +102,7 @@ struct AgentListItemView: View {
                 .help(metadata.isEnabled ? "Disable agent" : "Enable agent")
 
                 // Edit button for custom agents
-                if !metadata.isBuiltIn {
+                if metadata.isCustom {
                     Button(action: { showingEditSheet = true }) {
                         Image(systemName: "pencil")
                     }
@@ -172,8 +184,7 @@ struct AgentListItemView: View {
                     HStack(spacing: 8) {
                         // Install button (only for built-in with install method)
                         // Don't show install button while updating
-                        if metadata.isBuiltIn,
-                           metadata.installMethod != nil,
+                        if metadata.requiresInstall,
                            !isAgentValid,
                            !isUpdating {
                             if isInstalling {
@@ -239,7 +250,7 @@ struct AgentListItemView: View {
                         Spacer()
 
                         // Delete button for custom agents
-                        if !metadata.isBuiltIn {
+                        if metadata.isCustom || metadata.isRegistry {
                             Button(role: .destructive, action: {
                                 Task {
                                     await AgentRegistry.shared.deleteAgent(id: metadata.id)
@@ -249,7 +260,7 @@ struct AgentListItemView: View {
                             }
                             .buttonStyle(.plain)
                             .foregroundColor(.red)
-                            .help("Delete custom agent")
+                            .help(metadata.isCustom ? "Delete custom agent" : "Remove registry agent")
                         }
                     }
                 }
@@ -292,7 +303,7 @@ struct AgentListItemView: View {
                 Text(error)
             }
         }
-        .task(id: metadata.executablePath) {
+        .task(id: metadata.executablePath ?? metadata.command ?? metadata.id) {
             // Validate and check for updates when path changes
             await validateAgent()
             canUpdate = await AgentInstaller.shared.canUpdate(metadata)
@@ -324,11 +335,10 @@ struct AgentListItemView: View {
             // Update directly without discovery - we want to update our managed installation
             try await AgentInstaller.shared.updateAgent(metadata)
 
-            // Get the path from registry (installer already set it during update)
-            let updatedPath = AgentRegistry.shared.getAgentPath(for: metadata.id)
+            let refreshedMetadata = AgentRegistry.shared.getMetadata(for: metadata.id)
             await MainActor.run {
-                if let path = updatedPath {
-                    metadata.executablePath = path
+                if let refreshedMetadata {
+                    metadata = refreshedMetadata
                 }
                 testResult = "Updated to latest version"
             }
@@ -363,10 +373,10 @@ struct AgentListItemView: View {
         do {
             // Install to managed .aizen/agents directory
             try await AgentInstaller.shared.installAgent(metadata)
-            let path = AgentRegistry.shared.getAgentPath(for: metadata.id)
+            let refreshedMetadata = AgentRegistry.shared.getMetadata(for: metadata.id)
             await MainActor.run {
-                if let execPath = path {
-                    metadata.executablePath = execPath
+                if let refreshedMetadata {
+                    metadata = refreshedMetadata
                 }
             }
 
@@ -396,7 +406,7 @@ struct AgentListItemView: View {
         isTesting = true
         testResult = nil
 
-        guard let path = metadata.executablePath else {
+        guard let path = resolvedAgentPath else {
             testResult = "No executable path set"
             isTesting = false
             return
@@ -410,10 +420,10 @@ struct AgentListItemView: View {
                 // Launch the process with proper arguments
                 try await tempClient.launch(
                     agentPath: path,
-                    arguments: metadata.launchArgs,
-                    environment: metadata.environmentVariables.launchEnvironment.isEmpty
+                    arguments: resolvedLaunchArgs,
+                    environment: resolvedLaunchEnvironment.isEmpty
                         ? nil
-                        : metadata.environmentVariables.launchEnvironment
+                        : resolvedLaunchEnvironment
                 )
 
                 // Try to initialize - this is the real ACP validation

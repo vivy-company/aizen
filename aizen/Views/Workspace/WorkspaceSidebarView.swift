@@ -708,6 +708,7 @@ struct MissingRepositorySheet: View {
         }
         .padding(24)
         .frame(width: 420)
+        .settingsSheetChrome()
         .interactiveDismissDisabled()
         .fileImporter(
             isPresented: $showingFilePicker,
@@ -1201,6 +1202,7 @@ struct RepositoryRemoveSheet: View {
         }
         .padding(24)
         .frame(width: 340)
+        .settingsSheetChrome()
     }
 }
 
@@ -1328,6 +1330,7 @@ struct SupportSheet: View {
             .buttonStyle(.plain)
         }
         .frame(width: 340)
+        .settingsSheetChrome()
     }
 }
 

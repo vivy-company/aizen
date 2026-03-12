@@ -90,6 +90,7 @@ struct WorkspaceSwitcherSheet: View {
             }
         }
         .frame(width: 400, height: 500)
+        .settingsSheetChrome()
         .sheet(item: $workspaceToEdit) { workspace in
             WorkspaceEditSheet(workspace: workspace, repositoryManager: repositoryManager)
         }

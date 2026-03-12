@@ -19,13 +19,13 @@ nonisolated enum UsageProvider: String, Codable, CaseIterable, Sendable {
 
     static func fromAgentId(_ agentId: String) -> UsageProvider {
         switch agentId.lowercased() {
-        case "codex": return .codex
-        case "claude": return .claude
+        case "codex-acp": return .codex
+        case "claude-acp": return .claude
         case "gemini": return .gemini
         case "kimi": return .kimi
         case "opencode": return .opencode
-        case "vibe": return .vibe
-        case "qwen": return .qwen
+        case "mistral-vibe": return .vibe
+        case "qwen-code": return .qwen
         default: return .custom
         }
     }

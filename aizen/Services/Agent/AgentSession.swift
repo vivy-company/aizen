@@ -593,115 +593,74 @@ class AgentSession: ObservableObject, ClientDelegate {
             sessionState = .failed("Agent not configured")
             throw AgentSessionError.custom("Agent not configured")
         }
-        
+
         let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
         let launchEnvironment = AgentRegistry.shared.getAgentLaunchEnvironment(for: agentName)
-        let launchArgCandidates = launchArgCandidates(for: agentName, primary: launchArgs)
-        var lastFailure: (stage: String, error: Error)?
-        
-        for (index, args) in launchArgCandidates.enumerated() {
-            let isLastAttempt = index == launchArgCandidates.count - 1
-            let client = Client()
-            await client.setDelegate(self)
-            
-            do {
-                try await client.launch(
-                    agentPath: agentPath,
-                    arguments: args,
-                    workingDirectory: workingDir,
-                    environment: launchEnvironment.isEmpty ? nil : launchEnvironment
-                )
-            } catch {
-                lastFailure = (stage: "launch", error: error)
-                await client.terminate()
-                if !isLastAttempt {
-                    continue
-                }
-                break
-            }
-            
-            let initResponse: InitializeResponse
-            do {
-                initResponse = try await client.initialize(
-                    protocolVersion: 1,
-                    capabilities: ClientCapabilities(
-                        fs: FileSystemCapabilities(
-                            readTextFile: true,
-                            writeTextFile: true
-                        ),
-                        terminal: true,
-                        meta: [
-                            "terminal_output": AnyCodable(true),
-                            "terminal-auth": AnyCodable(true)
-                        ]
-                    ),
-                    timeout: 120.0
-                )
-            } catch {
-                lastFailure = (stage: "initialize", error: error)
-                await client.terminate()
-                if !isLastAttempt {
-                    continue
-                }
-                break
-            }
-            
-            self.acpClient = client
-            startNotificationListener(client: client)
-            
-            if args != launchArgs, var metadata = AgentRegistry.shared.getMetadata(for: agentName) {
-                metadata.launchArgs = args
-                await AgentRegistry.shared.updateAgent(metadata)
-            }
-            
-            self.agentCapabilities = initResponse.agentCapabilities
-            
-            versionCheckTask = Task { [weak self] in
-                guard let self = self else { return }
-                let versionInfo = await AgentVersionChecker.shared.checkVersion(for: agentName)
-                await MainActor.run {
-                    self.versionInfo = versionInfo
-                    if versionInfo.isOutdated {
-                        self.needsUpdate = true
-                        self.addSystemMessage(
-                            "⚠️ Update available: \(agentName) v\(versionInfo.current ?? "?") → v\(versionInfo.latest ?? "?")"
-                        )
-                    }
-                }
-            }
-            
-            return (client, initResponse)
-        }
-        
-        if let failure = lastFailure {
+        let client = Client()
+        await client.setDelegate(self)
+
+        do {
+            try await client.launch(
+                agentPath: agentPath,
+                arguments: launchArgs,
+                workingDirectory: workingDir,
+                environment: launchEnvironment.isEmpty ? nil : launchEnvironment
+            )
+        } catch {
             isActive = false
-            if failure.stage == "initialize" {
-                sessionState = .failed("Initialize failed: \(failure.error.localizedDescription)")
-            } else {
-                sessionState = .failed(failure.error.localizedDescription)
-            }
+            sessionState = .failed(error.localizedDescription)
             self.agentName = previousAgentName
             self.workingDirectory = previousWorkingDir
             self.acpClient = nil
-            throw failure.error
+            throw error
         }
-        
-        throw AgentSessionError.custom("Agent failed to start")
-        
-        
-    }
 
-    private func launchArgCandidates(for agentName: String, primary: [String]) -> [[String]] {
-        var candidates: [[String]] = [primary]
+        let initResponse: InitializeResponse
+        do {
+            initResponse = try await client.initialize(
+                protocolVersion: 1,
+                capabilities: ClientCapabilities(
+                    fs: FileSystemCapabilities(
+                        readTextFile: true,
+                        writeTextFile: true
+                    ),
+                    terminal: true,
+                    meta: [
+                        "terminal_output": AnyCodable(true),
+                        "terminal-auth": AnyCodable(true)
+                    ]
+                ),
+                timeout: 120.0
+            )
+        } catch {
+            await client.terminate()
+            isActive = false
+            sessionState = .failed("Initialize failed: \(error.localizedDescription)")
+            self.agentName = previousAgentName
+            self.workingDirectory = previousWorkingDir
+            self.acpClient = nil
+            throw error
+        }
 
-        if agentName.lowercased() == "kimi" {
-            let fallbacks = [["acp"], ["--acp"]]
-            for args in fallbacks where !candidates.contains(where: { $0 == args }) {
-                candidates.append(args)
+        self.acpClient = client
+        startNotificationListener(client: client)
+        self.agentCapabilities = initResponse.agentCapabilities
+
+        versionCheckTask = Task { [weak self] in
+            guard let self = self else { return }
+            let versionInfo = await AgentVersionChecker.shared.checkVersion(for: agentName)
+            await MainActor.run {
+                self.versionInfo = versionInfo
+                if versionInfo.isOutdated {
+                    self.needsUpdate = true
+                    self.addSystemMessage(
+                        "⚠️ Update available: \(agentName) v\(versionInfo.current ?? "?") → v\(versionInfo.latest ?? "?")"
+                    )
+                }
             }
         }
 
-        return candidates
+        return (client, initResponse)
     }
     
     func persistSessionId(chatSessionId: UUID) async throws {
@@ -868,6 +827,24 @@ class AgentSession: ObservableObject, ClientDelegate {
             }
 
             addSystemMessage("Config '\(optionName)' changed to '\(valueName)'")
+        }
+    }
+
+    func setConfigOption(configId: String, value: Bool) async throws {
+        guard let sessionId = sessionId, let acpClient = acpClient else {
+            throw AgentSessionError.sessionNotActive
+        }
+
+        let response = try await acpClient.setConfigOption(
+            sessionId: sessionId,
+            configId: SessionConfigId(configId),
+            value: value
+        )
+
+        self.availableConfigOptions = response.configOptions
+
+        if let option = response.configOptions.first(where: { $0.id.value == configId }) {
+            addSystemMessage("Config '\(option.name)' changed to '\(value ? "On" : "Off")'")
         }
     }
 

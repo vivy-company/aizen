@@ -90,15 +90,15 @@ struct AgentLoadingView: View {
 
     private var agentColor: Color {
         switch agentName.lowercased() {
-        case "claude":
+        case "claude-acp":
             return Color(red: 0.85, green: 0.55, blue: 0.35)  // Claude orange/tan
         case "gemini":
             return Color(red: 0.4, green: 0.5, blue: 0.9)  // Gemini blue
-        case "codex", "openai":
+        case "codex-acp":
             return Color(red: 0.3, green: 0.75, blue: 0.65)  // OpenAI teal
-        case "copilot":
+        case "github-copilot-cli":
             return Color(red: 0.25, green: 0.6, blue: 0.9)  // Copilot blue
-        case "droid":
+        case "factory-droid":
             return Color(red: 0.933, green: 0.376, blue: 0.094)  // Droid orange (#EE6018)
         case "kimi":
             return Color(red: 0.6, green: 0.4, blue: 0.8)  // Kimi purple

@@ -212,6 +212,7 @@ struct WorktreeCreateSheet: View {
         }
         .frame(width: 520)
         .frame(minHeight: 420, maxHeight: 560)
+        .settingsSheetChrome()
         .sheet(isPresented: $showingBranchSelector) {
             BranchSelectorView(
                 repository: repository,

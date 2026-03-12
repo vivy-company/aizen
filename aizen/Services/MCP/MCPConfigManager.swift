@@ -82,17 +82,17 @@ actor MCPConfigManager {
 
     private func configSpec(for agentId: String) -> AgentMCPConfigSpec? {
         switch agentId {
-        case "claude":
+        case "claude-acp":
             return AgentMCPConfigSpec(
-                agentId: "claude",
+                agentId: agentId,
                 configPath: "~/.claude.json",
                 serverPath: ["mcpServers"],  // Global MCP servers
                 format: .json
             )
-        case "codex":
+        case "codex-acp":
             // Codex uses TOML with [mcp_servers.<name>] tables
             return AgentMCPConfigSpec(
-                agentId: "codex",
+                agentId: agentId,
                 configPath: "~/.codex/config.toml",
                 serverPath: ["mcp_servers"],
                 format: .toml,
@@ -122,19 +122,19 @@ actor MCPConfigManager {
                 serverPath: ["mcpServers"],
                 format: .json
             )
-        case "vibe":
+        case "mistral-vibe":
             // Vibe uses TOML config with [[mcp_servers]] array
             return AgentMCPConfigSpec(
-                agentId: "vibe",
+                agentId: agentId,
                 configPath: "~/.vibe/config.toml",
                 serverPath: ["mcp_servers"],
                 format: .toml,
                 tomlStyle: .arrayOfTables
             )
-        case "qwen":
+        case "qwen-code":
             // Qwen uses settings.json with mcpServers (same format as Gemini)
             return AgentMCPConfigSpec(
-                agentId: "qwen",
+                agentId: agentId,
                 configPath: "~/.qwen/settings.json",
                 serverPath: ["mcpServers"],
                 format: .json

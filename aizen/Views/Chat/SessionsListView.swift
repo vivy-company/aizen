@@ -328,7 +328,7 @@ struct SessionRowView: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            AgentIconView(agent: session.agentName ?? "claude", size: 18)
+            AgentIconView(agent: session.agentName ?? AgentRegistry.defaultAgentID, size: 18)
                 .frame(width: 22, height: 22)
 
             VStack(alignment: .leading, spacing: 6) {

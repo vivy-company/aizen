@@ -55,9 +55,13 @@ actor AgentRegistry {
             do {
                 let decoder = JSONDecoder()
                 let decoded = try decoder.decode([String: AgentMetadata].self, from: data)
-                metadataCache = decoded
-                Self.updateNonisolatedCache(decoded)
-                return decoded
+                let validated = Self.validStoredMetadata(decoded)
+                if validated.count != decoded.count {
+                    persistValidatedMetadata(validated)
+                }
+                metadataCache = validated
+                Self.updateNonisolatedCache(validated)
+                return validated
             } catch {
                 Self.updateNonisolatedCache([:])
                 return [:]
@@ -81,9 +85,8 @@ actor AgentRegistry {
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        // Initialize agents in background task
         Task {
-            await self.initializeDefaultAgents()
+            await initializeDefaultAgents()
         }
     }
 
@@ -103,11 +106,23 @@ actor AgentRegistry {
         do {
             let decoder = JSONDecoder()
             let decoded = try decoder.decode([String: AgentMetadata].self, from: data)
-            Self.updateNonisolatedCache(decoded)
-            return decoded
+            let validated = Self.validStoredMetadata(decoded)
+            if validated.count != decoded.count {
+                persistValidatedMetadata(validated)
+            }
+            Self.updateNonisolatedCache(validated)
+            return validated
         } catch {
             Self.updateNonisolatedCache([:])
             return [:]
+        }
+    }
+
+    private nonisolated func persistValidatedMetadata(_ metadata: [String: AgentMetadata]) {
+        do {
+            let data = try JSONEncoder().encode(metadata)
+            defaults.set(data, forKey: metadataStoreKey)
+        } catch {
         }
     }
 
@@ -123,6 +138,17 @@ actor AgentRegistry {
         cachedMetadata = metadata
         cacheLoaded = true
         cacheLock.unlock()
+    }
+
+    private nonisolated static func validStoredMetadata(_ metadata: [String: AgentMetadata]) -> [String: AgentMetadata] {
+        metadata.filter { _, agent in
+            switch agent.source {
+            case .custom:
+                return true
+            case .registry:
+                return agent.registryDistributionType != nil
+            }
+        }
     }
 
     /// Get all agents (enabled and disabled)
@@ -165,11 +191,11 @@ actor AgentRegistry {
             name: name,
             description: description,
             iconType: iconType,
-            isBuiltIn: false,
+            source: .custom,
             isEnabled: true,
             executablePath: executablePath,
+            command: nil,
             launchArgs: launchArgs,
-            installMethod: nil,
             environmentVariables: storedEnvironmentVariables
         )
 
@@ -178,6 +204,10 @@ actor AgentRegistry {
         agentMetadata = store
 
         return AgentEnvironmentStore.shared.hydrate(metadata)
+    }
+
+    func upsertRegistryAgent(_ metadata: AgentMetadata) {
+        updateAgent(metadata)
     }
 
     /// Update agent metadata
@@ -199,7 +229,7 @@ actor AgentRegistry {
 
     /// Delete custom agent
     func deleteAgent(id: String) {
-        guard let metadata = agentMetadata[id], !metadata.isBuiltIn else {
+        guard let metadata = agentMetadata[id], metadata.isCustom || metadata.isRegistry else {
             return
         }
 
@@ -225,23 +255,36 @@ actor AgentRegistry {
     /// Get executable path for a specific agent by name
     nonisolated func getAgentPath(for agentName: String) -> String? {
         let metadata = loadMetadataFromDefaults()
-        return metadata[agentName]?.executablePath
+        guard let metadata = metadata[agentName] else { return nil }
+        if metadata.command != nil {
+            return "/usr/bin/env"
+        }
+        return metadata.executablePath
     }
 
     /// Get launch arguments for a specific agent
     nonisolated func getAgentLaunchArgs(for agentName: String) -> [String] {
         let metadata = loadMetadataFromDefaults()
-        return metadata[agentName]?.launchArgs ?? []
+        guard let metadata = metadata[agentName] else { return [] }
+        if let command = metadata.command {
+            return [command] + metadata.launchArgs
+        }
+        return metadata.launchArgs
     }
 
     /// Get environment overrides for a specific agent launch
     nonisolated func getAgentLaunchEnvironment(for agentName: String) -> [String: String] {
         let metadata = loadMetadataFromDefaults()
         guard let storedMetadata = metadata[agentName] else { return [:] }
-        return AgentEnvironmentStore.shared.launchEnvironment(
+        var launchEnvironment = storedMetadata.baseEnvironment
+        let userEnvironment = AgentEnvironmentStore.shared.launchEnvironment(
             from: storedMetadata.environmentVariables,
             agentId: storedMetadata.id
         )
+        for (key, value) in userEnvironment {
+            launchEnvironment[key] = value
+        }
+        return launchEnvironment
     }
 
     /// Set executable path for a specific agent

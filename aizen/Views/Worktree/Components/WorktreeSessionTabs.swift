@@ -212,7 +212,7 @@ struct SessionTabsScrollView: View {
             HStack(spacing: 6) {
                 DetailCloseButton(action: { onCloseChatSession(session) }, size: 10)
 
-                AgentIconView(agent: session.agentName ?? "claude", size: 14)
+                AgentIconView(agent: session.agentName ?? AgentRegistry.defaultAgentID, size: 14)
 
                 Text(session.title ?? session.agentName?.capitalized ?? String(localized: "worktree.session.chat"))
                     .font(.callout)

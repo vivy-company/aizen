@@ -23,6 +23,7 @@ struct ChatTabView: View {
     private let sessionManager = ChatSessionManager.shared
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ChatTabView")
     @State private var enabledAgents: [AgentMetadata] = []
+    @State private var showingRegistryPicker = false
     @State private var cachedSessionIds: [UUID] = []
     // Keep only the active chat session mounted to avoid hidden view layout churn.
     private let maxCachedSessions = 1
@@ -112,19 +113,26 @@ struct ChatTabView: View {
     }
 
     var body: some View {
-        if sessions.isEmpty {
-            chatEmptyState
-        } else {
-            chatContentWithCompanion
-                .onAppear {
-                    syncSelectionAndCache()
-                }
-                .onChange(of: selectedSessionId) { _, _ in
-                    updateCacheForSelection()
-                }
-                .onChange(of: sessions.count) { _, _ in
-                    syncSelectionAndCache()
-                }
+        Group {
+            if sessions.isEmpty {
+                chatEmptyState
+            } else {
+                chatContentWithCompanion
+                    .onAppear {
+                        syncSelectionAndCache()
+                    }
+                    .onChange(of: selectedSessionId) { _, _ in
+                        updateCacheForSelection()
+                    }
+                    .onChange(of: sessions.count) { _, _ in
+                        syncSelectionAndCache()
+                    }
+            }
+        }
+        .sheet(isPresented: $showingRegistryPicker) {
+            RegistryAgentPickerView {
+                loadEnabledAgents()
+            }
         }
     }
 
@@ -402,12 +410,13 @@ struct ChatTabView: View {
                 }
             }
 
-            // Responsive layout: row if <=5 agents, column if >5
-            if enabledAgents.count <= 5 {
+            // Responsive layout: row if total tiles fit on one line, column otherwise
+            if enabledAgents.count + 1 <= 5 {
                 HStack(spacing: 10) {
                     ForEach(enabledAgents, id: \.id) { agentMetadata in
                         agentButton(for: agentMetadata)
                     }
+                    registryButton
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
             } else {
@@ -420,6 +429,7 @@ struct ChatTabView: View {
                         ForEach(enabledAgents, id: \.id) { agentMetadata in
                             agentButton(for: agentMetadata)
                         }
+                        registryButton
                     }
                     .frame(maxWidth: 420)
                     Spacer(minLength: 0)
@@ -506,6 +516,26 @@ struct ChatTabView: View {
         .buttonStyle(.plain)
     }
 
+    private var registryButton: some View {
+        Button {
+            showingRegistryPicker = true
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 54, height: 54)
+                .background {
+                    emptyStateItemBackground(cornerRadius: 12)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(emptyStateItemStrokeColor, lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .help("Add agent from registry")
+    }
+
     private func loadEnabledAgents() {
         Task {
             enabledAgents = AgentRegistry.shared.getEnabledAgents()
@@ -518,7 +548,7 @@ struct ChatTabView: View {
         let timestamp = relativeTimestamp(for: session)
 
         return HStack(spacing: 10) {
-            AgentIconView(agent: session.agentName ?? "claude", size: 14)
+            AgentIconView(agent: session.agentName ?? AgentRegistry.defaultAgentID, size: 14)
                 .frame(width: 20, height: 20)
 
             VStack(alignment: .leading, spacing: 4) {

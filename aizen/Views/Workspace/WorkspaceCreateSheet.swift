@@ -100,6 +100,7 @@ struct WorkspaceCreateSheet: View {
         }
         .frame(width: 450)
         .frame(minHeight: 250, maxHeight: 400)
+        .settingsSheetChrome()
     }
 
     private func createWorkspace() {

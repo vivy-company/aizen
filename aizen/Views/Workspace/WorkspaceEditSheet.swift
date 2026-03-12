@@ -106,6 +106,7 @@ struct WorkspaceEditSheet: View {
         }
         .frame(width: 450)
         .frame(minHeight: 280, maxHeight: 400)
+        .settingsSheetChrome()
         .onAppear {
             workspaceName = workspace.name ?? ""
             if let colorHex = workspace.colorHex {

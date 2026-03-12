@@ -96,7 +96,7 @@ struct ChatSessionView: View {
                         onTimelineStateChange: { state in
                             chatTimelineState = state
                             viewModel.enqueueScrollPositionChange(
-                                state.isPinnedToBottom,
+                                state.isLiveTail,
                                 isLayoutResizing: isLayoutResizing
                             )
                         }
@@ -443,7 +443,7 @@ struct ChatSessionView: View {
     }
 
     private var shouldShowScrollToBottom: Bool {
-        (!chatTimelineState.isPinnedToBottom || chatTimelineState.hasUnreadNewContent)
+        (!chatTimelineState.isLiveTail || chatTimelineState.hasUnreadNewContent)
             && (!viewModel.messages.isEmpty || !viewModel.toolCalls.isEmpty)
     }
 

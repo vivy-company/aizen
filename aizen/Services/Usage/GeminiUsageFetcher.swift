@@ -282,7 +282,7 @@ private func parseOAuthCredentials(from content: String) -> GeminiOAuthClientCre
 }
 
 private func resolveGeminiBinary() -> String? {
-    let managed = AgentRegistry.managedPath(for: "gemini")
+    let managed = ACPRegistryService.managedBinaryPath(agentID: "gemini", commandPath: "./gemini")
     if FileManager.default.isExecutableFile(atPath: managed) {
         return managed
     }

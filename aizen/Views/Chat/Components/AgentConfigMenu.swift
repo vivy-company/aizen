@@ -41,6 +41,19 @@ struct AgentConfigMenu: View {
                         }
                     }
                 }
+            case .boolean(let toggle):
+                Button {
+                    Task {
+                        try? await session.setConfigOption(configId: option.id.value, value: !toggle.currentValue)
+                    }
+                } label: {
+                    HStack {
+                        Text(toggle.currentValue ? "Disable" : "Enable")
+                        Spacer()
+                        Image(systemName: toggle.currentValue ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(toggle.currentValue ? .blue : .secondary)
+                    }
+                }
             }
         } label: {
             HStack(spacing: 6) {
@@ -84,22 +97,26 @@ struct AgentConfigMenu: View {
             }
         }
     }
-    
+
     private func currentOptionName(for option: SessionConfigOption) -> String {
-        guard case .select(let select) = option.kind else { return option.name }
-        let currentId = select.currentValue.value
-        
-        switch select.options {
-        case .ungrouped(let options):
-            return options.first { $0.value.value == currentId }?.name ?? currentId
-        case .grouped(let groups):
-            for group in groups {
-                if let opt = group.options.first(where: { $0.value.value == currentId }) {
-                    return opt.name
+        switch option.kind {
+        case .select(let select):
+            let currentId = select.currentValue.value
+
+            switch select.options {
+            case .ungrouped(let options):
+                return options.first { $0.value.value == currentId }?.name ?? currentId
+            case .grouped(let groups):
+                for group in groups {
+                    if let opt = group.options.first(where: { $0.value.value == currentId }) {
+                        return opt.name
+                    }
                 }
+                return currentId
             }
+        case .boolean(let toggle):
+            return toggle.currentValue ? "On" : "Off"
         }
-        return currentId
     }
 
     private func iconName(for option: SessionConfigOption) -> String {

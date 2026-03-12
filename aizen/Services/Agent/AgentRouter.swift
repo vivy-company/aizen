@@ -14,22 +14,25 @@ class AgentRouter: ObservableObject {
 
     var defaultAgent: String {
         get {
-            UserDefaults.standard.string(forKey: defaultAgentKey) ?? "claude"
+            UserDefaults.standard.string(forKey: defaultAgentKey) ?? AgentRegistry.defaultAgentID
         }
         set {
             UserDefaults.standard.set(newValue, forKey: defaultAgentKey)
         }
     }
 
-    /// Get a valid default agent, falling back to "claude" if the configured default doesn't exist
     func getValidDefaultAgent() -> String {
         let configuredDefault = defaultAgent
         if let metadata = AgentRegistry.shared.getMetadata(for: configuredDefault),
            metadata.isEnabled {
             return configuredDefault
         }
-        defaultAgent = "claude"
-        return "claude"
+        if let fallback = AgentRegistry.shared.getEnabledAgents().first?.id {
+            defaultAgent = fallback
+            return fallback
+        }
+        defaultAgent = AgentRegistry.defaultAgentID
+        return AgentRegistry.defaultAgentID
     }
 
     init() {

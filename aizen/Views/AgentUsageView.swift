@@ -791,6 +791,7 @@ struct AgentUsageSheet: View {
         }
         .padding(20)
         .frame(minWidth: 680, maxWidth: .infinity, alignment: .leading)
+        .settingsSheetChrome()
         .onAppear {
             metricsStore.refreshIfNeeded(agentId: agentId)
         }

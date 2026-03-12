@@ -91,26 +91,14 @@ struct AgentEnvironmentVariablesEditor: View {
 
             HStack(spacing: 6) {
                 // Name field
-                envTextField(text: nameBinding(for: id), isDuplicate: isDuplicate)
+                PlainTextField(text: nameBinding(for: id), isDuplicate: isDuplicate)
 
                 // Value field
                 HStack(spacing: 4) {
                     if variable.isSecret && !isRevealed {
-                        SecureField(text: valueBinding(for: id), prompt: nil) {}
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 12, design: .monospaced))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 5)
-                            .frame(maxWidth: .infinity, minHeight: 24)
-                            .background(Color(nsColor: .controlBackgroundColor))
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 5)
-                                    .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                            )
-                            .contentShape(Rectangle())
+                        PlainSecureField(text: valueBinding(for: id))
                     } else {
-                        envTextField(text: valueBinding(for: id))
+                        PlainTextField(text: valueBinding(for: id))
                     }
 
                     if variable.isSecret {
@@ -144,20 +132,66 @@ struct AgentEnvironmentVariablesEditor: View {
         }
     }
 
-    private func envTextField(text: Binding<String>, isDuplicate: Bool = false) -> some View {
-        TextField(text: text, prompt: nil) {}
-            .textFieldStyle(.plain)
-            .font(.system(size: 12, design: .monospaced))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 5)
-            .frame(maxWidth: .infinity, minHeight: 24)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-            .overlay(
-                RoundedRectangle(cornerRadius: 5)
-                    .strokeBorder(isDuplicate ? Color.orange.opacity(0.5) : Color(nsColor: .separatorColor), lineWidth: 0.5)
-            )
-            .contentShape(Rectangle())
+    // MARK: - Field Components
+
+    /// Plain-style TextField with full-width hit area.
+    /// Each instance owns its own @FocusState so an invisible overlay can
+    /// forward clicks that land outside the tiny underlying NSTextField.
+    private struct PlainTextField: View {
+        @Binding var text: String
+        var isDuplicate: Bool = false
+        @FocusState private var isFocused: Bool
+
+        var body: some View {
+            TextField(text: $text, prompt: nil) {}
+                .textFieldStyle(.plain)
+                .font(.system(size: 12, design: .monospaced))
+                .focused($isFocused)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 5)
+                .frame(maxWidth: .infinity, minHeight: 24)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 5))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .strokeBorder(isDuplicate ? Color.orange.opacity(0.5) : Color(nsColor: .separatorColor), lineWidth: 0.5)
+                )
+                .overlay {
+                    if !isFocused {
+                        Color.white.opacity(0.001)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .onTapGesture { isFocused = true }
+                    }
+                }
+        }
+    }
+
+    private struct PlainSecureField: View {
+        @Binding var text: String
+        @FocusState private var isFocused: Bool
+
+        var body: some View {
+            SecureField(text: $text, prompt: nil) {}
+                .textFieldStyle(.plain)
+                .font(.system(size: 12, design: .monospaced))
+                .focused($isFocused)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 5)
+                .frame(maxWidth: .infinity, minHeight: 24)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 5))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                )
+                .overlay {
+                    if !isFocused {
+                        Color.white.opacity(0.001)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .onTapGesture { isFocused = true }
+                    }
+                }
+        }
     }
 
     private func secureToggle(for id: UUID, variable: AgentEnvironmentVariable) -> some View {

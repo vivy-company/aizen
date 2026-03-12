@@ -168,6 +168,10 @@ extension AgentSession {
                 if configOptions.isEmpty {
                 } else {
                 }
+            case .sessionInfoUpdate:
+                break
+            case .usageUpdate:
+                break
         }
     }
 

@@ -136,7 +136,7 @@ struct ChatMessageList: View {
     }
 
     private var agentLaneIconType: AgentIconType {
-        AgentRegistry.shared.getMetadata(for: selectedAgent)?.iconType ?? .builtin(selectedAgent)
+        AgentRegistry.shared.getMetadata(for: selectedAgent)?.iconType ?? .sfSymbol("brain.head.profile")
     }
 
     private var agentLaneIconURL: String? {
@@ -3065,8 +3065,8 @@ private enum ChatTimelineHeaderIconStore {
         backingScale: CGFloat?
     ) -> String? {
         switch iconType {
-        case .builtin(let name):
-            guard let image = builtinImage(named: name, fallbackAgentId: fallbackAgentId) else {
+        case .builtin:
+            guard let image = NSImage(systemSymbolName: "brain.head.profile", accessibilityDescription: nil) else {
                 return nil
             }
             return writeRasterImage(
@@ -3104,48 +3104,6 @@ private enum ChatTimelineHeaderIconStore {
             }
             return writeRawImageData(data, cacheKey: cacheKey)
         }
-    }
-
-    private static func builtinImage(named name: String, fallbackAgentId: String) -> NSImage? {
-        for candidate in builtinAssetCandidates(for: name, fallbackAgentId: fallbackAgentId) {
-            if let image = NSImage(named: candidate) {
-                return image
-            }
-        }
-        return nil
-    }
-
-    private static func builtinAssetCandidates(for name: String, fallbackAgentId: String) -> [String] {
-        let normalized = name.lowercased()
-        var candidates: [String]
-
-        switch normalized {
-        case "codex", "openai":
-            candidates = ["openai", "codex"]
-        case "claude":
-            candidates = ["claude"]
-        case "gemini":
-            candidates = ["gemini"]
-        case "copilot":
-            candidates = ["copilot"]
-        case "droid":
-            candidates = ["droid"]
-        case "kimi":
-            candidates = ["kimi"]
-        case "opencode":
-            candidates = ["opencode"]
-        case "vibe", "mistral":
-            candidates = ["mistral"]
-        case "qwen":
-            candidates = ["qwen"]
-        default:
-            candidates = [normalized]
-        }
-
-        if !fallbackAgentId.isEmpty {
-            candidates.append(fallbackAgentId.lowercased())
-        }
-        return candidates
     }
 
     private static func writeRawImageData(_ data: Data, cacheKey: String) -> String? {

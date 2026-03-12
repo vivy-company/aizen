@@ -99,6 +99,7 @@ struct RepositoryAddSheet: View {
         }
         .frame(width: 520)
         .frame(minHeight: 360, maxHeight: 560)
+        .settingsSheetChrome()
     }
 
     @ViewBuilder

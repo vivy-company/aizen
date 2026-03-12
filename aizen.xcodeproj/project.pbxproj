@@ -25,6 +25,8 @@
 		CC8001752EC989600037DA4C /* SwiftTreeSitter in Frameworks */ = {isa = PBXBuildFile; productRef = CCFE00062EBF000000000006 /* SwiftTreeSitter */; };
 		CCACP0001000000000000001 /* ACP in Frameworks */ = {isa = PBXBuildFile; productRef = CCACP0002000000000000001 /* ACP */; };
 		CCACP0001000000000000002 /* ACP in Frameworks */ = {isa = PBXBuildFile; productRef = CCACP0002000000000000002 /* ACP */; };
+		CCACP0001000000000000003 /* ACPRegistry in Frameworks */ = {isa = PBXBuildFile; productRef = CCACP0002000000000000003 /* ACPRegistry */; };
+		CCACP0001000000000000004 /* ACPRegistry in Frameworks */ = {isa = PBXBuildFile; productRef = CCACP0002000000000000004 /* ACPRegistry */; };
 		CCF00000000000000000000C /* aizen-cli in Copy CLI */ = {isa = PBXBuildFile; fileRef = CCF000000000000000000001 /* aizen-cli */; };
 		CCF00000000000000000000D /* aizen-cli in Copy CLI */ = {isa = PBXBuildFile; fileRef = CCF000000000000000000001 /* aizen-cli */; };
 		D40AC0EE6127B8397D78C242 /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = 2CE06D116E3316BF792222D8 /* MLXFFT */; };
@@ -148,6 +150,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CCACP0001000000000000002 /* ACP in Frameworks */,
+				CCACP0001000000000000004 /* ACPRegistry in Frameworks */,
 				A1D4A4A2B3C4D5E6F7A8B902 /* VVDevKit in Frameworks */,
 				89C3A37FB37B4F8A8E0CE8B4 /* AppIntents.framework in Frameworks */,
 				CC2917D02EFBDAE300440062 /* SwiftTreeSitter in Frameworks */,
@@ -165,6 +168,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CCACP0001000000000000001 /* ACP in Frameworks */,
+				CCACP0001000000000000003 /* ACPRegistry in Frameworks */,
 				A1D4A4A2B3C4D5E6F7A8B901 /* VVDevKit in Frameworks */,
 				98D8F68E63ED4B66AB2B8651 /* AppIntents.framework in Frameworks */,
 				CC8001752EC989600037DA4C /* SwiftTreeSitter in Frameworks */,
@@ -259,6 +263,7 @@
 			name = "aizen nightly";
 			packageProductDependencies = (
 				CCACP0002000000000000002 /* ACP */,
+				CCACP0002000000000000004 /* ACPRegistry */,
 				A1D4A4A2B3C4D5E6F7A8B912 /* VVDevKit */,
 				CC2917B52EFBDAE300440062 /* Markdown */,
 				CC2917B72EFBDAE300440062 /* Sparkle */,
@@ -292,6 +297,7 @@
 			name = aizen;
 			packageProductDependencies = (
 				CCACP0002000000000000001 /* ACP */,
+				CCACP0002000000000000003 /* ACPRegistry */,
 				A1D4A4A2B3C4D5E6F7A8B911 /* VVDevKit */,
 				CCB04B732EA241B60007DBB1 /* Markdown */,
 				CC128B1A2EAF8DD600EA9A50 /* Sparkle */,
@@ -1287,7 +1293,7 @@
 			repositoryURL = "https://github.com/vivy-company/VVDevKit";
 			requirement = {
 				kind = revision;
-				revision = 31f78ba8cd8d5a8365a85bb0749f10d32c676285;
+				revision = 3e881a9ef7a6ea8d892a93ce22d266ee5490ccfb;
 			};
 		};
 		CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */ = {
@@ -1366,6 +1372,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */;
 			productName = ACP;
+		};
+		CCACP0002000000000000003 /* ACPRegistry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */;
+			productName = ACPRegistry;
+		};
+		CCACP0002000000000000004 /* ACPRegistry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */;
+			productName = ACPRegistry;
 		};
 		CCB04B732EA241B60007DBB1 /* Markdown */ = {
 			isa = XCSwiftPackageProductDependency;

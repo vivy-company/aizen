@@ -9,43 +9,64 @@ import SwiftUI
 
 /// Shared agent icon view builder
 struct AgentIconView: View {
+    let metadata: AgentMetadata?
     let iconType: AgentIconType?
     let agentName: String?
     let size: CGFloat
 
     init(iconType: AgentIconType, size: CGFloat) {
+        self.metadata = nil
         self.iconType = iconType
         self.agentName = nil
         self.size = size
     }
 
     init(agent: String, size: CGFloat) {
+        self.metadata = nil
         self.iconType = nil
         self.agentName = agent
         self.size = size
     }
 
     init(metadata: AgentMetadata, size: CGFloat) {
+        self.metadata = metadata
         self.iconType = metadata.iconType
         self.agentName = nil
         self.size = size
     }
 
     var body: some View {
-        if let iconType = iconType {
+        if let metadata {
+            iconForMetadata(metadata)
+        } else if let iconType = iconType {
             iconForType(iconType)
         } else if let agentName = agentName {
-            iconForAgentName(agentName)
+            if let metadata = AgentRegistry.shared.getMetadata(for: agentName) {
+                iconForMetadata(metadata)
+            } else {
+                defaultIcon
+            }
         } else {
             defaultIcon
         }
     }
 
     @ViewBuilder
+    private func iconForMetadata(_ metadata: AgentMetadata) -> some View {
+        if metadata.isRegistry, metadata.registryIconURL != nil {
+            RegistryRemoteIconView(iconURL: metadata.registryIconURL, size: size) {
+                iconForType(metadata.iconType)
+            }
+        } else {
+            iconForType(metadata.iconType)
+        }
+    }
+
+    @ViewBuilder
     private func iconForType(_ type: AgentIconType) -> some View {
         switch type {
-        case .builtin(let name):
-            iconForBuiltinName(name)
+        case .builtin:
+            defaultIcon
         case .sfSymbol(let symbolName):
             if let nsImage = configuredSymbolImage(
                 NSImage(systemSymbolName: symbolName, accessibilityDescription: nil),
@@ -70,59 +91,6 @@ struct AgentIconView: View {
             } else {
                 defaultIcon
             }
-        }
-    }
-
-    @ViewBuilder
-    private func iconForAgentName(_ agent: String) -> some View {
-        // Check if metadata exists
-        if let metadata = AgentRegistry.shared.getMetadata(for: agent) {
-            iconForType(metadata.iconType)
-        } else {
-            // Legacy fallback
-            iconForBuiltinName(agent.lowercased())
-        }
-    }
-
-    @ViewBuilder
-    private func iconForBuiltinName(_ name: String) -> some View {
-        switch name.lowercased() {
-        case "claude":
-            assetSymbolIcon("claude")
-        case "gemini":
-            assetSymbolIcon("gemini")
-        case "codex", "openai":
-            assetSymbolIcon("openai")
-        case "copilot":
-            assetSymbolIcon("copilot")
-        case "droid":
-            assetSymbolIcon("droid")
-        case "kimi":
-            assetSymbolIcon("kimi")
-        case "opencode":
-            assetSymbolIcon("opencode")
-        case "vibe", "mistral":
-            assetSymbolIcon("mistral")
-        case "qwen":
-            assetSymbolIcon("qwen")
-        default:
-            defaultIcon
-        }
-    }
-
-    @ViewBuilder
-    private func assetSymbolIcon(_ assetName: String) -> some View {
-        if let baseImage = NSImage(named: assetName),
-           let configured = configuredSymbolImage(baseImage, pointSize: size, weight: .semibold) {
-            Image(nsImage: configured)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
-        } else {
-            Image(assetName)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
         }
     }
 

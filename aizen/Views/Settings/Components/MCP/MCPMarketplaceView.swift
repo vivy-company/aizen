@@ -466,11 +466,16 @@ struct MCPMarketplaceView: View {
             return
         }
 
-        let launchArgs = AgentRegistry.shared.getMetadata(for: agentId)?.launchArgs ?? []
+        let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentId)
+        let launchEnvironment = AgentRegistry.shared.getAgentLaunchEnvironment(for: agentId)
         let tempClient = Client()
 
         do {
-            try await tempClient.launch(agentPath: path, arguments: launchArgs)
+            try await tempClient.launch(
+                agentPath: path,
+                arguments: launchArgs,
+                environment: launchEnvironment.isEmpty ? nil : launchEnvironment
+            )
             let capabilities = ClientCapabilities(
                 fs: FileSystemCapabilities(
                     readTextFile: true,

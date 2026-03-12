@@ -108,7 +108,7 @@ class ChatSessionViewModel: ObservableObject {
 
     /// Internal agent identifier used for ACP calls
     var selectedAgent: String {
-        session.agentName ?? "claude"
+        session.agentName ?? AgentRegistry.defaultAgentID
     }
 
     /// User-friendly agent name for UI (falls back to id)

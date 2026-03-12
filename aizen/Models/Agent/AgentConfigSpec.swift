@@ -94,9 +94,9 @@ struct AgentConfigSpec {
 enum AgentConfigRegistry {
     static func spec(for agentId: String) -> AgentConfigSpec {
         switch agentId {
-        case "claude":
+        case "claude-acp":
             return AgentConfigSpec(
-                agentId: "claude",
+                agentId: agentId,
                 configFiles: [
                     AgentConfigFile(
                         id: "claude-rules",
@@ -117,9 +117,9 @@ enum AgentConfigRegistry {
                 commandsDirectory: "~/.claude/commands"
             )
 
-        case "codex":
+        case "codex-acp":
             return AgentConfigSpec(
-                agentId: "codex",
+                agentId: agentId,
                 configFiles: [
                     AgentConfigFile(
                         id: "codex-rules",
@@ -193,9 +193,9 @@ enum AgentConfigRegistry {
                 commandsDirectory: nil
             )
 
-        case "vibe":
+        case "mistral-vibe":
             return AgentConfigSpec(
-                agentId: "vibe",
+                agentId: agentId,
                 configFiles: [
                     AgentConfigFile(
                         id: "vibe-rules",
@@ -216,9 +216,9 @@ enum AgentConfigRegistry {
                 commandsDirectory: nil
             )
 
-        case "qwen":
+        case "qwen-code":
             return AgentConfigSpec(
-                agentId: "qwen",
+                agentId: agentId,
                 configFiles: [
                     AgentConfigFile(
                         id: "qwen-rules",
@@ -249,6 +249,6 @@ enum AgentConfigRegistry {
     }
 
     static var supportedAgents: [String] {
-        ["claude", "codex", "gemini", "opencode", "qwen", "vibe"]
+        ["claude-acp", "codex-acp", "gemini", "opencode", "qwen-code", "mistral-vibe"]
     }
 }

@@ -14,9 +14,12 @@ struct AgentSetupDialog: View {
     @State private var isInstalling = false
     @State private var errorMessage: String?
 
-    private var isBuiltInAgent: Bool {
-        guard let agentName = session.missingAgentName else { return false }
-        return AgentRegistry.builtInExecutableNames.keys.contains(agentName)
+    private var canInstallAgent: Bool {
+        guard let agentName = session.missingAgentName,
+              let metadata = AgentRegistry.shared.getMetadata(for: agentName) else {
+            return false
+        }
+        return metadata.requiresInstall
     }
 
     private var agentDisplayName: String {
@@ -69,12 +72,21 @@ struct AgentSetupDialog: View {
                 }
                 .padding(24)
             } else {
-                // Should not normally show - auto-install starts immediately
                 VStack(spacing: 12) {
-                    ProgressView()
-                    Text("Preparing...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if canInstallAgent {
+                        ProgressView()
+                        Text("Preparing...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.secondary)
+                        Text("Install this agent from the registry or verify its command dependencies.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .padding(40)
             }
@@ -82,7 +94,7 @@ struct AgentSetupDialog: View {
         .frame(width: 300, height: 200)
         .background(AppSurfaceTheme.backgroundColor())
         .task {
-            if isBuiltInAgent && !isInstalling && errorMessage == nil {
+            if canInstallAgent && !isInstalling && errorMessage == nil {
                 installAgent()
             }
         }

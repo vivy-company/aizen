@@ -35,11 +35,12 @@ enum SettingsSelection: Hashable {
 
 struct SettingsView: View {
     @AppStorage("defaultEditor") private var defaultEditor = "code"
-    @AppStorage("defaultACPAgent") private var defaultACPAgent = "claude"
+    @AppStorage("defaultACPAgent") private var defaultACPAgent = AgentRegistry.defaultAgentID
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
     @State private var selection: SettingsSelection? = .general
     @State private var agents: [AgentMetadata] = []
+    @State private var showingRegistryPicker = false
     @State private var showingAddCustomAgent = false
     @StateObject private var licenseManager = LicenseManager.shared
 
@@ -88,6 +89,18 @@ struct SettingsView: View {
                                 }
                             }
                         }
+
+                        Button {
+                            showingRegistryPicker = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "plus.square.on.square")
+                                    .foregroundStyle(.secondary)
+                                Text("Add From Registry")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
 
                         Button {
                             showingAddCustomAgent = true
@@ -140,6 +153,11 @@ struct SettingsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSettingsPro)) { _ in
             selection = .pro
+        }
+        .sheet(isPresented: $showingRegistryPicker) {
+            RegistryAgentPickerView {
+                loadAgents()
+            }
         }
         .sheet(isPresented: $showingAddCustomAgent) {
             CustomAgentFormView(
@@ -203,7 +221,13 @@ struct SettingsView: View {
     }
 
     private func loadAgents() {
-        agents = AgentRegistry.shared.getAllAgents()
+        let updatedAgents = AgentRegistry.shared.getAllAgents()
+        agents = updatedAgents
+
+        if case .agent(let agentId) = selection,
+           !updatedAgents.contains(where: { $0.id == agentId }) {
+            selection = updatedAgents.first.map { .agent($0.id) } ?? .general
+        }
     }
 
     private var proSidebarRow: some View {

@@ -116,6 +116,7 @@ struct WorktreeDetailsSheet: View {
             }
         }
         .frame(width: 500, height: 400)
+        .settingsSheetChrome()
         .onAppear {
             refreshStatus()
         }

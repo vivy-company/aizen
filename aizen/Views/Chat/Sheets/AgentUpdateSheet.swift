@@ -79,6 +79,7 @@ struct AgentUpdateSheet: View {
         }
         .padding(24)
         .frame(width: 400)
+        .settingsSheetChrome()
     }
 
     private func performUpdate() {

@@ -58,6 +58,14 @@ struct AgentDetailView: View {
         }
     }
 
+    private var resolvedAgentPath: String? {
+        AgentRegistry.shared.getAgentPath(for: metadata.id)
+    }
+
+    private var resolvedLaunchArgs: [String] {
+        AgentRegistry.shared.getAgentLaunchArgs(for: metadata.id)
+    }
+
     var body: some View {
         Form {
             // MARK: - Agent Info
@@ -84,12 +92,19 @@ struct AgentDetailView: View {
                                 )
                             }
 
-                            if !metadata.isBuiltIn {
+                            if metadata.isCustom {
                                 TagBadge(
                                     text: "Custom",
                                     color: .blue,
                                     font: .caption,
                                     backgroundOpacity: 0.2
+                                )
+                            } else {
+                                TagBadge(
+                                    text: "Registry",
+                                    color: .green,
+                                    font: .caption,
+                                    backgroundOpacity: 0.18
                                 )
                             }
                         }
@@ -112,7 +127,7 @@ struct AgentDetailView: View {
                                 await AgentRegistry.shared.updateAgent(metadata)
 
                                 if wasEnabled && !newValue {
-                                    let defaultAgent = UserDefaults.standard.string(forKey: "defaultACPAgent") ?? "claude"
+                                    let defaultAgent = UserDefaults.standard.string(forKey: "defaultACPAgent") ?? AgentRegistry.defaultAgentID
                                     if defaultAgent == metadata.id {
                                         if let newDefault = AgentRegistry.shared.getEnabledAgents().first {
                                             await MainActor.run {
@@ -187,6 +202,26 @@ struct AgentDetailView: View {
                             Text("Launch arguments: \(metadata.launchArgs.joined(separator: " "))")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                        }
+                    }
+                } else if metadata.isRegistry {
+                    Section("Launch") {
+                        LabeledContent("Type") {
+                            Text(metadata.registryDistributionType?.rawValue.uppercased() ?? "Unknown")
+                        }
+
+                        if let path = resolvedAgentPath {
+                            LabeledContent("Command") {
+                                Text(path)
+                                    .textSelection(.enabled)
+                            }
+                        }
+
+                        if !resolvedLaunchArgs.isEmpty {
+                            LabeledContent("Arguments") {
+                                Text(resolvedLaunchArgs.joined(separator: " "))
+                                    .textSelection(.enabled)
+                            }
                         }
                     }
                 }
@@ -414,13 +449,13 @@ struct AgentDetailView: View {
 
                 // MARK: - Danger Zone (custom agents only)
 
-                if !metadata.isBuiltIn {
+                if metadata.isCustom || metadata.isRegistry {
                     Section {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Delete Agent")
+                                Text(metadata.isCustom ? "Delete Agent" : "Remove Agent")
                                     .font(.headline)
-                                Text("Remove this custom agent from settings")
+                                Text(metadata.isCustom ? "Remove this custom agent from settings" : "Remove this registry agent from settings")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -458,8 +493,7 @@ struct AgentDetailView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 // Install button
-                if metadata.isBuiltIn,
-                   metadata.installMethod != nil,
+                if metadata.requiresInstall,
                    !isAgentValid,
                    !isUpdating {
                     if isInstalling {
@@ -509,7 +543,7 @@ struct AgentDetailView: View {
                 }
 
                 // Edit button for custom agents only
-                if !metadata.isBuiltIn {
+                if metadata.isCustom {
                     Button {
                         showingEditSheet = true
                     } label: {
@@ -564,14 +598,14 @@ struct AgentDetailView: View {
                 Text(error)
             }
         }
-        .task(id: metadata.executablePath) {
+        .task(id: AgentRegistry.shared.getAgentPath(for: metadata.id) ?? metadata.id) {
             await validateAgent()
             canUpdate = await AgentInstaller.shared.canUpdate(metadata)
             loadAuthStatus()
             await loadVersion()
             loadRulesPreview()
             loadCommands()
-            await mcpManager.syncInstalled(agentId: metadata.id, agentPath: metadata.executablePath)
+            await mcpManager.syncInstalled(agentId: metadata.id, agentPath: AgentRegistry.shared.getAgentPath(for: metadata.id))
         }
         .task(id: metadata.id) {
             if supportsUsageMetrics {
@@ -609,7 +643,7 @@ struct AgentDetailView: View {
         .sheet(isPresented: $showingMCPMarketplace) {
             MCPMarketplaceView(
                 agentId: metadata.id,
-                agentPath: metadata.executablePath,
+                agentPath: AgentRegistry.shared.getAgentPath(for: metadata.id),
                 agentName: metadata.name
             )
         }
@@ -623,7 +657,7 @@ struct AgentDetailView: View {
                         try? await mcpManager.remove(
                             serverName: server.serverName,
                             agentId: metadata.id,
-                            agentPath: metadata.executablePath
+                            agentPath: AgentRegistry.shared.getAgentPath(for: metadata.id)
                         )
                         mcpServerToRemove = nil
                     }
@@ -664,10 +698,10 @@ struct AgentDetailView: View {
 
         do {
             try await AgentInstaller.shared.updateAgent(metadata)
-            let updatedPath = AgentRegistry.shared.getAgentPath(for: metadata.id)
+            let refreshedMetadata = AgentRegistry.shared.getMetadata(for: metadata.id)
             await MainActor.run {
-                if let path = updatedPath {
-                    metadata.executablePath = path
+                if let refreshedMetadata {
+                    metadata = refreshedMetadata
                 }
                 showResult("Updated to latest version")
             }
@@ -699,10 +733,10 @@ struct AgentDetailView: View {
 
         do {
             try await AgentInstaller.shared.installAgent(metadata)
-            let path = AgentRegistry.shared.getAgentPath(for: metadata.id)
+            let refreshedMetadata = AgentRegistry.shared.getMetadata(for: metadata.id)
             await MainActor.run {
-                if let execPath = path {
-                    metadata.executablePath = execPath
+                if let refreshedMetadata {
+                    metadata = refreshedMetadata
                 }
             }
 
@@ -730,7 +764,7 @@ struct AgentDetailView: View {
         isTesting = true
         testResult = nil
 
-        guard let path = metadata.executablePath else {
+        guard let path = AgentRegistry.shared.getAgentPath(for: metadata.id) else {
             showResult("No executable path set", autoDismiss: false)
             isTesting = false
             return
@@ -740,12 +774,13 @@ struct AgentDetailView: View {
             do {
                 let tempClient = Client()
 
+                let arguments = AgentRegistry.shared.getAgentLaunchArgs(for: metadata.id)
+                let environment = AgentRegistry.shared.getAgentLaunchEnvironment(for: metadata.id)
+
                 try await tempClient.launch(
                     agentPath: path,
-                    arguments: metadata.launchArgs,
-                    environment: environmentVariablesDraft.launchEnvironment.isEmpty
-                        ? nil
-                        : environmentVariablesDraft.launchEnvironment
+                    arguments: arguments,
+                    environment: environment.isEmpty ? nil : environment
                 )
 
                 let capabilities = ClientCapabilities(
