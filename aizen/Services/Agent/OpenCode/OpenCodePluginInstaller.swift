@@ -28,6 +28,16 @@ enum OpenCodePluginError: Error, LocalizedError {
     }
 }
 
+private struct OpenCodePluginDefinition: Hashable {
+    let name: String
+    let displayName: String
+    let description: String
+    let npmPackage: String
+    let icon: String?
+    let accentColor: String?
+    let sortOrder: Int?
+}
+
 struct OpenCodePluginInfo {
     let name: String
     let displayName: String
@@ -51,7 +61,44 @@ actor OpenCodePluginInstaller {
     
     private let configService: OpenCodeConfigService
     
-    private static let registryPlugins: [OpenCodePluginDefinition] = OpenCodePluginRegistryLoader.load()
+    private static let knownPlugins: [OpenCodePluginDefinition] = [
+        OpenCodePluginDefinition(
+            name: "oh-my-opencode",
+            displayName: "Oh My OpenCode",
+            description: "Plugin system with custom agents, hooks, and MCP servers",
+            npmPackage: "oh-my-opencode",
+            icon: "sparkles",
+            accentColor: "purple",
+            sortOrder: 0
+        ),
+        OpenCodePluginDefinition(
+            name: "opencode-openai-codex-auth",
+            displayName: "OpenAI Codex Auth",
+            description: "Authentication for OpenAI Codex models",
+            npmPackage: "opencode-openai-codex-auth",
+            icon: "key.fill",
+            accentColor: "blue",
+            sortOrder: 1
+        ),
+        OpenCodePluginDefinition(
+            name: "opencode-gemini-auth",
+            displayName: "Gemini Auth",
+            description: "Authentication for Google Gemini models",
+            npmPackage: "opencode-gemini-auth",
+            icon: "bolt.shield.fill",
+            accentColor: "orange",
+            sortOrder: 2
+        ),
+        OpenCodePluginDefinition(
+            name: "opencode-antigravity-auth",
+            displayName: "Antigravity Auth",
+            description: "OAuth authentication for Antigravity models",
+            npmPackage: "opencode-antigravity-auth",
+            icon: "person.crop.circle.badge.checkmark",
+            accentColor: "green",
+            sortOrder: 3
+        )
+    ]
     
     init(configService: OpenCodeConfigService = .shared) {
         self.configService = configService
@@ -392,7 +439,7 @@ actor OpenCodePluginInstaller {
     
     func getAllPluginInfo() async -> [OpenCodePluginInfo] {
         var infos: [OpenCodePluginInfo] = []
-        let sorted = Self.sortedRegistryPlugins()
+        let sorted = Self.sortedKnownPlugins()
         for known in sorted {
             if let info = await getPluginInfo(known.name) {
                 infos.append(info)
@@ -514,15 +561,15 @@ actor OpenCodePluginInstaller {
     }
 
     private static func pluginDefinition(named name: String) -> OpenCodePluginDefinition? {
-        registryPlugins.first { $0.name == name }
+        knownPlugins.first { $0.name == name }
     }
 
     private static func pluginDefinition(forPackage package: String) -> OpenCodePluginDefinition? {
-        registryPlugins.first { $0.npmPackage == package }
+        knownPlugins.first { $0.npmPackage == package }
     }
 
-    private static func sortedRegistryPlugins() -> [OpenCodePluginDefinition] {
-        registryPlugins.sorted { lhs, rhs in
+    private static func sortedKnownPlugins() -> [OpenCodePluginDefinition] {
+        knownPlugins.sorted { lhs, rhs in
             switch (lhs.sortOrder, rhs.sortOrder) {
             case let (l?, r?):
                 if l != r { return l < r }
