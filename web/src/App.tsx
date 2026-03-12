@@ -82,9 +82,14 @@ function AppContent() {
               {t("hero.earlyAccess")}
             </span>
           </div>
-          <h1 className="text-8xl font-semibold tracking-tight mb-6 leading-none">{t("hero.title")}</h1>
-          <p className="text-[28px] text-[#86868b] mb-12">
+          <h1 className="max-w-[1100px] mx-auto text-[42px] md:text-[64px] lg:text-[76px] font-semibold tracking-tight mb-6 leading-[0.98]">
+            {t("hero.title")}
+          </h1>
+          <p className="max-w-[860px] mx-auto text-[22px] md:text-[28px] text-[#86868b] mb-4 leading-[1.2]">
             {t("hero.subtitle")}
+          </p>
+          <p className="max-w-[900px] mx-auto text-[18px] md:text-[21px] text-[#a1a1aa] mb-12 leading-[1.45]">
+            {t("hero.description")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
             <a

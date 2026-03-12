@@ -11,32 +11,34 @@
 
 > **Early Access** — Aizen is under active development with near-daily updates. Expect breaking changes and new features frequently.
 
-A native macOS workspace for developers working across multiple repos and branches at once.
+Aizen is a macOS workspace for parallel development.
 
-Bring order to your repos. Switch worktrees, not windows.
+Bring order to your projects, environments, and day-to-day work.
+
+Give each project or branch its own environment, with its own terminal, files, browser, agents, and state.
 
 ![Aizen Demo](https://r2.aizen.win/demo.png)
 
 ## What is Aizen?
 
-Aizen is a worktree-first developer workspace for macOS. It keeps the tools that usually spill across separate apps attached to each worktree: terminal, files, browser, agent chat, Git context, and review state.
+Aizen is an agentic-first developer workspace for macOS. It helps you run projects and branches in parallel without turning worktrees, folders, or copies into manual setup. Each environment keeps its own terminal, files, browser, agent sessions, Git context, and review state in one place.
 
 ## Current Highlights
 
-### Worktree-first workspace
-- **Workspaces** — Organize repositories into color-coded groups
-- **Worktrees** — Create and manage Git worktrees with visual UI
-- **Per-worktree sessions** — Each worktree has its own terminal, files, browser, and chat
+### Parallel Environments
+- **Workspaces** — Organize active projects into color-coded groups
+- **Per-project environments** — Give each project or branch its own terminal, files, browser, and chat
+- **Flexible under the hood** — Aizen can use Git worktrees, folders, or copies, depending on the setup
 
 ### Terminal and CLI
 - **GPU-accelerated** — Powered by [libghostty](https://github.com/ghostty-org/ghostty)
 - **Split panes and tabs** — Horizontal and vertical splits with presets and themes
 - **Persistence** — Optional tmux-backed terminal session restore
-- **CLI companion** — Open repos, manage workspaces, and attach to persistent terminals with `aizen`
+- **CLI companion** — Open projects, manage workspaces, and attach to persistent terminals with `aizen`
 
-### Agents and MCP
+### Agentic-First Workflow
 - **ACP registry-first** — Add registry agents or bring your own custom command/binary
-- **Supported agents** — Works with Claude Code, Codex, OpenCode, Gemini, and other ACP-compatible agents
+- **Agent sessions per environment** — Keep chat, tool calls, and context attached to the project you are working in
 - **MCP marketplace** — Browse and add MCP servers from inside the app
 - **Rich input** — File attachments, tool calls, and on-device voice input with waveform visualization
 
@@ -105,7 +107,7 @@ aizen terminal . --attach
 aizen attach
 ```
 
-The CLI can add or open repositories, inspect tracked workspaces, create persistent terminals, and attach to tmux-backed sessions created in the app.
+The CLI can add or open projects, inspect tracked workspaces, create persistent terminals, and attach to tmux-backed sessions created in the app.
 
 ## Configuration
 

@@ -1,7 +1,8 @@
 {
   "hero": {
-    "title": "Aizen",
-    "subtitle": "A worktree-first macOS workspace with terminal, files, browser, agents, workflows, and CLI.",
+    "title": "Aizen is a macOS workspace for parallel development.",
+    "subtitle": "Bring order to your projects, environments, and day-to-day work.",
+    "description": "Give each project or branch its own environment, with its own terminal, files, browser, agents, and state.",
     "earlyAccess": "Early Access",
     "download": "Download",
     "viewOnGithub": "View on GitHub",
@@ -14,18 +15,18 @@
     "browser": "Browser"
   },
   "features": {
-    "title": "One Window for Parallel Development",
+    "title": "Parallel Environments, Agentic by Default",
     "workspaces": {
       "title": "Workspace Management",
-      "desc": "Group repositories into color-coded workspaces, then jump between active projects without losing your place."
+      "desc": "Group active projects into workspaces, then move between environments without losing your place."
     },
     "worktrees": {
-      "title": "Git Worktrees",
-      "desc": "Create and manage multiple branches in parallel. Each worktree keeps its own terminal, files, browser, and chat."
+      "title": "Project Environments",
+      "desc": "Give each project or branch its own environment. Under the hood, Aizen can use worktrees, folders, or full copies."
     },
     "agents": {
-      "title": "Agents and MCP",
-      "desc": "Run Claude, Codex, OpenCode, Gemini, and other ACP agents. Add MCP servers from the built-in marketplace."
+      "title": "Agentic-First",
+      "desc": "Run Claude, Codex, OpenCode, Gemini, and other ACP agents where the work happens. Add MCP servers from the built-in marketplace."
     },
     "terminal": {
       "title": "Persistent Terminal",
@@ -36,8 +37,8 @@
       "desc": "Stage, commit, diff, review pull requests, and keep GitHub Actions or GitLab CI runs within reach."
     },
     "voice": {
-      "title": "Chat Context",
-      "desc": "Use voice input, file attachments, and per-worktree chat history to keep agent context tied to the branch."
+      "title": "Environment Context",
+      "desc": "Use voice input, file attachments, and per-environment chat history to keep agent context tied to the work."
     },
     "fileBrowser": {
       "title": "File Browser",
@@ -49,25 +50,25 @@
     }
   },
   "howItWorks": {
-    "title": "How Teams Actually Use It",
+    "title": "How It Works",
     "step1": {
-      "title": "Group repos and spin up worktrees",
-      "desc": "Bring related repositories into one workspace, then create worktrees for the branches or tasks that are active right now."
+      "title": "Set up projects, not plumbing",
+      "desc": "Bring related projects into one workspace, then create environments for the branches or tasks that are active right now."
     },
     "step2": {
-      "title": "Keep every branch stateful",
-      "desc": "Each worktree carries its own terminal panes, file tabs, browser tabs, chat history, and review context."
+      "title": "Keep every environment ready",
+      "desc": "Each environment keeps its own terminal panes, file tabs, browser tabs, chat history, and review context."
     },
     "step3": {
-      "title": "Ship without context switching",
-      "desc": "Kick off agents, watch workflow runs, review diffs, or open the same repo from the CLI without rebuilding your setup."
+      "title": "Let agents work with you",
+      "desc": "Run agents, watch workflow runs, review diffs, or open the same project from the CLI without rebuilding your setup."
     }
   },
   "faq": {
     "title": "Frequently asked questions",
     "q1": {
       "question": "What problem does Aizen solve?",
-      "answer": "Developers shipping across multiple branches or repositories usually juggle terminals, editor windows, docs, CI dashboards, and agent chats. Aizen keeps that stack attached to each worktree so the context moves with the branch."
+      "answer": "Developers working across multiple projects or branches usually juggle terminals, editor windows, docs, CI dashboards, and agent chats. Aizen keeps that stack attached to each environment so the context moves with the work."
     },
     "q2": {
       "question": "What are Git worktrees?",
@@ -75,15 +76,15 @@
     },
     "q3": {
       "question": "How is this different from VS Code or other editors?",
-      "answer": "Editors focus on one project at a time. Aizen is built around worktrees and repo-level context: persistent terminal panes, built-in browser tabs, agent sessions, diffs, and workflow visibility. It's a workspace for parallel development, not just a text editor."
+      "answer": "Editors focus on one project at a time. Aizen is built around parallel environments: persistent terminal panes, built-in browser tabs, agent sessions, diffs, and workflow visibility. It's a workspace for parallel development, not just a text editor."
     },
     "q4": {
       "question": "Which agents are supported?",
-      "answer": "Aizen is ACP-first. You can add registry-backed agents such as Claude, Codex, OpenCode, Gemini, and other ACP-compatible tools, or configure your own custom command. MCP servers can be added per agent from inside the app."
+      "answer": "Aizen is agentic-first and ACP-first. You can add registry-backed agents such as Claude, Codex, OpenCode, Gemini, and other ACP-compatible tools, or configure your own custom command. MCP servers can be added per agent from inside the app."
     },
     "q5": {
       "question": "Is Aizen free?",
-      "answer": "Yes. The app is free to download and open source under the GPL-3.0 license. The current core experience — workspaces, worktrees, agents, terminal, file browser, browser, CLI, and workflow views — is available without paying."
+      "answer": "Yes. The app is free to download and open source under the GPL-3.0 license. The current core experience — workspaces, project environments, agents, terminal, file browser, browser, CLI, and workflow views — is available without paying."
     },
     "q6": {
       "question": "What's Aizen Pro?",

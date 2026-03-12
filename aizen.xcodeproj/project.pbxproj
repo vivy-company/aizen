@@ -91,9 +91,9 @@
 
 /* Begin PBXFileReference section */
 		CC1234562EA241B30007DBB1 /* libghostty.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libghostty.a; path = Vendor/libghostty/lib/libghostty.a; sourceTree = "<group>"; };
-		CC2917DB2EFBDAE300440062 /* aizen nightly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "aizen nightly.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC2917DB2EFBDAE300440062 /* Aizen Nightly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aizen Nightly.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC2917DD2EFBDAE400440062 /* aizen nightly-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "aizen nightly-Info.plist"; path = "/Users/uyakauleu/development/aizen/aizen nightly-Info.plist"; sourceTree = "<absolute>"; };
-		CCB04B422EA241B30007DBB1 /* aizen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = aizen.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CCB04B422EA241B30007DBB1 /* Aizen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aizen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCB04B542EA241B50007DBB1 /* aizenTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = aizenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCB04B5E2EA241B50007DBB1 /* aizenUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = aizenUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCF000000000000000000001 /* aizen-cli */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "aizen-cli"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -230,10 +230,10 @@
 		CCB04B432EA241B30007DBB1 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				CCB04B422EA241B30007DBB1 /* aizen.app */,
+				CCB04B422EA241B30007DBB1 /* Aizen.app */,
 				CCB04B542EA241B50007DBB1 /* aizenTests.xctest */,
 				CCB04B5E2EA241B50007DBB1 /* aizenUITests.xctest */,
-				CC2917DB2EFBDAE300440062 /* aizen nightly.app */,
+				CC2917DB2EFBDAE300440062 /* Aizen Nightly.app */,
 				CCF000000000000000000001 /* aizen-cli */,
 			);
 			name = Products;
@@ -273,7 +273,7 @@
 				2CE06D116E3316BF792222D8 /* MLXFFT */,
 			);
 			productName = aizen;
-			productReference = CC2917DB2EFBDAE300440062 /* aizen nightly.app */;
+			productReference = CC2917DB2EFBDAE300440062 /* Aizen Nightly.app */;
 			productType = "com.apple.product-type.application";
 		};
 		CCB04B412EA241B30007DBB1 /* aizen */ = {
@@ -307,7 +307,7 @@
 				2CE06D116E3316BF792222D8 /* MLXFFT */,
 			);
 			productName = aizen;
-			productReference = CCB04B422EA241B30007DBB1 /* aizen.app */;
+			productReference = CCB04B422EA241B30007DBB1 /* Aizen.app */;
 			productType = "com.apple.product-type.application";
 		};
 		CCB04B532EA241B50007DBB1 /* aizenTests */ = {
@@ -611,7 +611,7 @@
 					"$(PROJECT_DIR)/Vendor/libgit2/include",
 				);
 				INFOPLIST_FILE = "aizen nightly-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = aizen;
+				INFOPLIST_KEY_CFBundleDisplayName = "Aizen Nightly";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -640,7 +640,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "-Xcc -fmodule-map-file=$(PROJECT_DIR)/Vendor/libgit2/include/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = win.aizen.app.nightly;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Aizen Nightly";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
@@ -691,7 +691,7 @@
 					"$(PROJECT_DIR)/Vendor/libgit2/include",
 				);
 				INFOPLIST_FILE = "aizen nightly-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = aizen;
+				INFOPLIST_KEY_CFBundleDisplayName = "Aizen Nightly";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -720,7 +720,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "-Xcc -fmodule-map-file=$(PROJECT_DIR)/Vendor/libgit2/include/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = win.aizen.app.nightly;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Aizen Nightly";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -894,7 +894,7 @@
 					"$(PROJECT_DIR)/Vendor/libgit2/include",
 				);
 				INFOPLIST_FILE = aizen/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = aizen;
+				INFOPLIST_KEY_CFBundleDisplayName = Aizen;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -923,7 +923,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "-Xcc -fmodule-map-file=$(PROJECT_DIR)/Vendor/libgit2/include/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = win.aizen.app;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = Aizen;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
@@ -973,7 +973,7 @@
 					"$(PROJECT_DIR)/Vendor/libgit2/include",
 				);
 				INFOPLIST_FILE = aizen/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = aizen;
+				INFOPLIST_KEY_CFBundleDisplayName = Aizen;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1002,7 +1002,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "-Xcc -fmodule-map-file=$(PROJECT_DIR)/Vendor/libgit2/include/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = win.aizen.app;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = Aizen;
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -1039,7 +1039,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/aizen.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/aizen";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aizen.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Aizen";
 			};
 			name = Debug;
 		};
@@ -1061,7 +1061,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/aizen.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/aizen";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aizen.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Aizen";
 			};
 			name = Release;
 		};
