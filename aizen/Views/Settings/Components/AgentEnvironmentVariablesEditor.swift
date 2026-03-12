@@ -96,18 +96,19 @@ struct AgentEnvironmentVariablesEditor: View {
                 // Value field
                 HStack(spacing: 4) {
                     if variable.isSecret && !isRevealed {
-                        SecureField("", text: valueBinding(for: id))
+                        SecureField(text: valueBinding(for: id), prompt: nil) {}
                             .textFieldStyle(.plain)
                             .font(.system(size: 12, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 5)
+                            .frame(maxWidth: .infinity, minHeight: 24)
                             .background(Color(nsColor: .controlBackgroundColor))
                             .clipShape(RoundedRectangle(cornerRadius: 5))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 5)
                                     .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
                             )
+                            .contentShape(Rectangle())
                     } else {
                         envTextField(text: valueBinding(for: id))
                     }
@@ -144,18 +145,19 @@ struct AgentEnvironmentVariablesEditor: View {
     }
 
     private func envTextField(text: Binding<String>, isDuplicate: Bool = false) -> some View {
-        TextField("", text: text)
+        TextField(text: text, prompt: nil) {}
             .textFieldStyle(.plain)
             .font(.system(size: 12, design: .monospaced))
-            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 6)
             .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, minHeight: 24)
             .background(Color(nsColor: .controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .overlay(
                 RoundedRectangle(cornerRadius: 5)
                     .strokeBorder(isDuplicate ? Color.orange.opacity(0.5) : Color(nsColor: .separatorColor), lineWidth: 0.5)
             )
+            .contentShape(Rectangle())
     }
 
     private func secureToggle(for id: UUID, variable: AgentEnvironmentVariable) -> some View {
