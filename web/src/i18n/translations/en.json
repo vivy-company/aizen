@@ -1,8 +1,7 @@
 {
   "hero": {
-    "title": "Aizen is a macOS workspace for parallel development.",
+    "title": "Aizen",
     "subtitle": "Bring order to your projects, environments, and day-to-day work.",
-    "description": "Give each project or branch its own environment, with its own terminal, files, browser, agents, and state.",
     "earlyAccess": "Early Access",
     "download": "Download",
     "viewOnGithub": "View on GitHub",

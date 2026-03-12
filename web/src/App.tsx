@@ -88,9 +88,6 @@ function AppContent() {
           <p className="max-w-[860px] mx-auto text-[22px] md:text-[28px] text-[#86868b] mb-4 leading-[1.2]">
             {t("hero.subtitle")}
           </p>
-          <p className="max-w-[900px] mx-auto text-[18px] md:text-[21px] text-[#a1a1aa] mb-12 leading-[1.45]">
-            {t("hero.description")}
-          </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
             <a
               href={versionInfo?.downloadUrl || "https://github.com/vivy-company/aizen/releases"}
