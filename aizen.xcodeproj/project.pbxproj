@@ -600,7 +600,6 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libghostty/include",
 					"$(PROJECT_DIR)/Vendor/libgit2/include",
 				);
 				INFOPLIST_FILE = "aizen nightly-Info.plist";
@@ -680,7 +679,6 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libghostty/include",
 					"$(PROJECT_DIR)/Vendor/libgit2/include",
 				);
 				INFOPLIST_FILE = "aizen nightly-Info.plist";
@@ -883,7 +881,6 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libghostty/include",
 					"$(PROJECT_DIR)/Vendor/libgit2/include",
 				);
 				INFOPLIST_FILE = aizen/Info.plist;
@@ -962,7 +959,6 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libghostty/include",
 					"$(PROJECT_DIR)/Vendor/libgit2/include",
 				);
 				INFOPLIST_FILE = aizen/Info.plist;
