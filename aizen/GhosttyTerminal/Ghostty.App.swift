@@ -33,15 +33,6 @@ enum Ghostty {
     }
 }
 
-private func ghosttyActionCallback(
-    _ app: ghostty_app_t?,
-    _ target: ghostty_target_s,
-    _ action: ghostty_action_s
-) -> Bool {
-    guard let app else { return false }
-    return Ghostty.App.handleAction(app, target: target, action: action)
-}
-
 // MARK: - Ghostty.App
 
 extension Ghostty {
@@ -104,7 +95,9 @@ extension Ghostty {
                 userdata: Unmanaged.passUnretained(self).toOpaque(),
                 supports_selection_clipboard: true,
                 wakeup_cb: { userdata in App.wakeup(userdata) },
-                action_cb: ghosttyActionCallback,
+                action_cb: { app, target, action in
+                    app.map { App.handleAction($0, target: target, action: action) } ?? false
+                },
                 read_clipboard_cb: { userdata, loc, state in App.readClipboard(userdata, location: loc, state: state) },
                 confirm_read_clipboard_cb: { userdata, str, state, request in App.confirmReadClipboard(userdata, string: str, state: state, request: request) },
                 write_clipboard_cb: { userdata, loc, content, count, confirm in

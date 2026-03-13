@@ -3,15 +3,21 @@ set -euo pipefail
 
 # Build libghostty as an Apple Silicon (arm64) static library.
 # Usage: ./scripts/build-libghostty.sh [commit]
-#   - commit: ghostty commit/tag/branch (default: main HEAD)
+#   - commit: ghostty commit/tag/branch
+#             default: Vendor/libghostty/VERSION when present, otherwise main HEAD
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENDOR_DIR="${ROOT_DIR}/Vendor/libghostty"
 GHOSTTY_REPO="https://github.com/ghostty-org/ghostty"
 
 REF="${1:-}"
+if [ -z "${REF}" ] && [ -f "${VENDOR_DIR}/VERSION" ]; then
+    REF="$(tr -d '\r\n' < "${VENDOR_DIR}/VERSION")"
+    echo "Using pinned ghostty version from Vendor/libghostty/VERSION: ${REF}"
+fi
+
 if [ -z "${REF}" ]; then
-    echo "Fetching ghostty main HEAD..."
+    echo "No pinned ghostty version found, fetching ghostty main HEAD..."
     REF="$(git ls-remote "${GHOSTTY_REPO}" HEAD | awk '{print $1}')"
 fi
 

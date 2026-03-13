@@ -39,9 +39,23 @@ jobs:
       - name: Download libghostty from R2
         run: |
           curl -fsSL "${{ secrets.R2_PUBLIC_URL }}/libghostty.tar.gz" -o libghostty.tar.gz
+          rm -rf Vendor/libghostty/include Vendor/libghostty/lib
           tar -xzf libghostty.tar.gz -C Vendor/libghostty/
           rm libghostty.tar.gz
           rm -f Vendor/libghostty/include/module.modulemap
+
+          for required_path in \
+            Vendor/libghostty/VERSION \
+            Vendor/libghostty/include/ghostty.h \
+            Vendor/libghostty/lib/libghostty.a
+          do
+            if [ ! -f "$required_path" ]; then
+              echo "Error: Missing expected libghostty payload file: $required_path"
+              exit 1
+            fi
+          done
+
+          echo "Using libghostty version $(cat Vendor/libghostty/VERSION)"
 
       - name: Show Xcode version
         id: xcode-version

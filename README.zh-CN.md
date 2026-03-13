@@ -76,7 +76,7 @@ git lfs install
 git clone https://github.com/vivy-company/aizen.git
 cd aizen
 
-# 构建 libghostty（Apple Silicon / arm64）
+# 构建 libghostty（默认固定到 Vendor/libghostty/VERSION 中的版本，Apple Silicon / arm64）
 ./scripts/build-libghostty.sh
 
 # 在 Xcode 中打开并构建
