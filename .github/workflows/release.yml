@@ -42,7 +42,10 @@ jobs:
           rm libghostty.tar.gz
 
       - name: Show Xcode version
-        run: xcodebuild -version
+        id: xcode-version
+        run: |
+          xcodebuild -version
+          echo "cache_key=$(xcodebuild -version | shasum -a 256 | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Bump version
         run: |
@@ -61,6 +64,17 @@ jobs:
             -derivedDataPath "${{ env.DERIVED_DATA_PATH }}" \
             -skipPackagePluginValidation \
             -skipMacroValidation
+
+      - name: Cache VVDevKit grammar build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.DERIVED_DATA_PATH }}/SourcePackages/checkouts/VVDevKit/.build
+            ${{ env.DERIVED_DATA_PATH }}/SourcePackages/checkouts/vvdevkit/.build
+          key: vvdevkit-grammars-${{ runner.os }}-${{ steps.xcode-version.outputs.cache_key }}-${{ hashFiles('aizen.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', '.github/workflows/release.yml') }}
+          restore-keys: |
+            vvdevkit-grammars-${{ runner.os }}-${{ steps.xcode-version.outputs.cache_key }}-
+            vvdevkit-grammars-${{ runner.os }}-
 
       - name: Build VVHighlighting grammar dylibs
         run: |
@@ -110,16 +124,19 @@ jobs:
           fi
 
           echo "No VVHighlighting dylibs found in exported app bundle, copying from DerivedData fallback"
-          mapfile -t FALLBACK_DYLIBS < <(find "${{ env.DERIVED_DATA_PATH }}" -type f -name 'libTreeSitter*.dylib' -not -path '*.dSYM/*' | sort -u)
+          FALLBACK_DYLIBS_FILE="$(mktemp)"
+          find "${{ env.DERIVED_DATA_PATH }}" -type f -name 'libTreeSitter*.dylib' -not -path '*.dSYM/*' | sort -u > "$FALLBACK_DYLIBS_FILE"
 
-          if [ "${#FALLBACK_DYLIBS[@]}" -eq 0 ]; then
+          if [ ! -s "$FALLBACK_DYLIBS_FILE" ]; then
+            rm -f "$FALLBACK_DYLIBS_FILE"
             echo "Error: Could not find VVHighlighting dylibs anywhere in DerivedData"
             exit 1
           fi
 
-          for dylib_path in "${FALLBACK_DYLIBS[@]}"; do
+          while IFS= read -r dylib_path; do
             cp -f "$dylib_path" "$APP_RESOURCES"/
-          done
+          done < "$FALLBACK_DYLIBS_FILE"
+          rm -f "$FALLBACK_DYLIBS_FILE"
 
           GRAMMAR_COUNT=$(find "$APP_RESOURCES" -maxdepth 1 -type f -name 'libTreeSitter*.dylib' | wc -l | tr -d ' ')
 
