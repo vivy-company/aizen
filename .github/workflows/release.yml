@@ -53,6 +53,34 @@ jobs:
         run: |
           brew install create-dmg awscli sparkle
 
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -scheme "${{ env.SCHEME }}" \
+            -configuration "${{ env.CONFIGURATION }}" \
+            -derivedDataPath "${{ env.DERIVED_DATA_PATH }}" \
+            -skipPackagePluginValidation \
+            -skipMacroValidation
+
+      - name: Build VVHighlighting grammar dylibs
+        run: |
+          VVDEVKIT_DIR=$(find "${{ env.DERIVED_DATA_PATH }}/SourcePackages/checkouts" -maxdepth 1 -type d \( -name 'VVDevKit' -o -name 'vvdevkit' \) | head -1)
+
+          if [ -z "$VVDEVKIT_DIR" ]; then
+            echo "Error: Could not locate VVDevKit checkout in DerivedData"
+            exit 1
+          fi
+
+          swift build -c release --package-path "$VVDEVKIT_DIR"
+
+          GRAMMAR_COUNT=$(find "$VVDEVKIT_DIR/.build" -type f -name 'libTreeSitter*.dylib' -not -path '*.dSYM/*' | wc -l | tr -d ' ')
+          if [ "$GRAMMAR_COUNT" -eq 0 ]; then
+            echo "Error: VVDevKit build did not produce any grammar dylibs"
+            exit 1
+          fi
+
+          echo "Built $GRAMMAR_COUNT VVHighlighting grammar dylibs"
+
       - name: Build Apple Silicon archive
         run: |
           xcodebuild clean archive \
@@ -81,20 +109,18 @@ jobs:
             exit 0
           fi
 
-          echo "No VVHighlighting dylibs found in exported app bundle, searching DerivedData fallback"
-          FALLBACK_RESOURCES=$(find "${{ env.DERIVED_DATA_PATH }}" -type d -path "*${{ env.APP_BUNDLE_NAME }}/Contents/Resources" | while read -r dir; do
-            if find "$dir" -maxdepth 1 -type f -name 'libTreeSitter*.dylib' | grep -q .; then
-              echo "$dir"
-              break
-            fi
-          done)
+          echo "No VVHighlighting dylibs found in exported app bundle, copying from DerivedData fallback"
+          mapfile -t FALLBACK_DYLIBS < <(find "${{ env.DERIVED_DATA_PATH }}" -type f -name 'libTreeSitter*.dylib' -not -path '*.dSYM/*' | sort -u)
 
-          if [ -z "$FALLBACK_RESOURCES" ]; then
-            echo "Error: Could not find VVHighlighting dylibs in DerivedData"
+          if [ "${#FALLBACK_DYLIBS[@]}" -eq 0 ]; then
+            echo "Error: Could not find VVHighlighting dylibs anywhere in DerivedData"
             exit 1
           fi
 
-          find "$FALLBACK_RESOURCES" -maxdepth 1 -type f -name 'libTreeSitter*.dylib' -exec cp -f {} "$APP_RESOURCES"/ \;
+          for dylib_path in "${FALLBACK_DYLIBS[@]}"; do
+            cp -f "$dylib_path" "$APP_RESOURCES"/
+          done
+
           GRAMMAR_COUNT=$(find "$APP_RESOURCES" -maxdepth 1 -type f -name 'libTreeSitter*.dylib' | wc -l | tr -d ' ')
 
           if [ "$GRAMMAR_COUNT" -eq 0 ]; then
