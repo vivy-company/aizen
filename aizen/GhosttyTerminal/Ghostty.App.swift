@@ -95,7 +95,7 @@ extension Ghostty {
                 userdata: Unmanaged.passUnretained(self).toOpaque(),
                 supports_selection_clipboard: true,
                 wakeup_cb: { userdata in App.wakeup(userdata) },
-                action_cb: { app, target, action in
+                action_cb: { (app: ghostty_app_t?, target: ghostty_target_s, action: ghostty_action_s) -> Bool in
                     guard let app else { return false }
                     return App.handleAction(app, target: target, action: action)
                 },
