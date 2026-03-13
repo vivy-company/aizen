@@ -103,11 +103,22 @@ jobs:
             -configuration "${{ env.CONFIGURATION }}" \
             -derivedDataPath "${{ env.DERIVED_DATA_PATH }}" \
             -archivePath build/aizen.xcarchive \
+            -resultBundlePath build/aizen-archive.xcresult \
             -arch arm64 \
+            -jobs 1 \
             -skipPackagePluginValidation \
             -skipMacroValidation \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO
+
+      - name: Dump archive diagnostics
+        if: ${{ failure() }}
+        run: |
+          if [ -d build/aizen-archive.xcresult ]; then
+            xcrun xcresulttool get --legacy --path build/aizen-archive.xcresult --format json > build/aizen-archive.json || true
+            tail -n 200 build/aizen-archive.json || true
+          fi
 
       - name: Export app bundle
         run: |
