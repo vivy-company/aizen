@@ -215,7 +215,17 @@ bundle_vvdevkit_grammar_dylibs() {
     local arch_hint="${NATIVE_ARCH_ACTUAL:-${ARCHS%% *}}"
     local derived_data_dir=""
     if [ -n "${BUILD_DIR:-}" ]; then
-        derived_data_dir="$(cd "${BUILD_DIR}/../.." 2>/dev/null && pwd -P || true)"
+        case "${BUILD_DIR}" in
+            */Build/Products/*)
+                derived_data_dir="${BUILD_DIR%%/Build/Products/*}"
+                ;;
+            */Build/Intermediates.noindex/ArchiveIntermediates/*/BuildProductsPath/*)
+                derived_data_dir="${BUILD_DIR%%/Build/Intermediates.noindex/ArchiveIntermediates/*}"
+                ;;
+            */Build/Intermediates.noindex/ArchiveIntermediates/*/BuildProductsPath)
+                derived_data_dir="${BUILD_DIR%%/Build/Intermediates.noindex/ArchiveIntermediates/*}"
+                ;;
+        esac
     fi
 
     local -a candidate_dirs=()
@@ -228,6 +238,19 @@ bundle_vvdevkit_grammar_dylibs() {
 
     # Xcode-built products first (typically the linked subset).
     add_candidate_dir "${BUILT_PRODUCTS_DIR}"
+    add_candidate_dir "${BUILD_DIR:-}"
+
+    # Archive builds place package outputs under ArchiveIntermediates/.../BuildProductsPath.
+    if [ -n "${BUILD_DIR:-}" ]; then
+        case "${BUILD_DIR}" in
+            */Build/Intermediates.noindex/ArchiveIntermediates/*/BuildProductsPath/*)
+                add_candidate_dir "${BUILD_DIR%%/BuildProductsPath/*}/BuildProductsPath/${CONFIGURATION:-Debug}"
+                ;;
+            */Build/Intermediates.noindex/ArchiveIntermediates/*/BuildProductsPath)
+                add_candidate_dir "${BUILD_DIR}/${CONFIGURATION:-Debug}"
+                ;;
+        esac
+    fi
 
     # VVDevKit checkout outputs (local/source checkout).
     if [ -n "${vvdevkit_dir}" ]; then

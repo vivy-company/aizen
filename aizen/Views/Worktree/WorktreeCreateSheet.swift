@@ -110,6 +110,15 @@ struct WorktreeCreateSheet: View {
         return "feature/\(trimmedName)"
     }
 
+    private var independentMethodDescription: String {
+        switch independentMethod {
+        case .clone:
+            return "Clone creates a separate Git repository using git clone --local. It keeps .git, history, branches, and remotes."
+        case .copy:
+            return "Copy runs rsync and excludes .git. It only copies the current files, so the new environment is not a Git checkout."
+        }
+    }
+
     private func submoduleSelectionBinding(for path: String) -> Binding<Bool> {
         Binding(
             get: { selectedSubmodulePaths.contains(path) },
@@ -440,6 +449,10 @@ struct WorktreeCreateSheet: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
+
+                Text(independentMethodDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
