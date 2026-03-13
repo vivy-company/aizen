@@ -107,6 +107,17 @@ jobs:
           mkdir -p build/dmg
           cp -R "build/aizen.xcarchive/Products/Applications/${{ env.APP_BUNDLE_NAME }}" build/dmg/
 
+      - name: Read minimum macOS version
+        run: |
+          MIN_SYSTEM_VERSION=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "build/dmg/${{ env.APP_BUNDLE_NAME }}/Contents/Info.plist")
+
+          if [ -z "$MIN_SYSTEM_VERSION" ]; then
+            echo "Error: Failed to read LSMinimumSystemVersion from built app"
+            exit 1
+          fi
+
+          echo "MIN_SYSTEM_VERSION=$MIN_SYSTEM_VERSION" >> "$GITHUB_ENV"
+
       - name: Import signing certificate
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -261,7 +272,8 @@ jobs:
             "build/${{ env.APP_DISPLAY_NAME }}-${{ github.event.inputs.marketing_version }}.dmg" \
             "${{ github.event.inputs.build_version }}" \
             "${{ github.event.inputs.marketing_version }}" \
-            "${{ github.event.inputs.release_notes }}"
+            "${{ github.event.inputs.release_notes }}" \
+            "${{ env.MIN_SYSTEM_VERSION }}"
 
       - name: Upload to Cloudflare R2
         env:

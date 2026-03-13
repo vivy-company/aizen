@@ -3,12 +3,12 @@ set -e
 
 # Script to generate appcast.xml for Sparkle updates
 # This script should be run after building and signing a new release
-# Usage: ./generate-appcast.sh <dmg-path> <build-version> <marketing-version> <release-notes>
+# Usage: ./generate-appcast.sh <dmg-path> <build-version> <marketing-version> [release-notes] [minimum-system-version]
 
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
     echo "Error: Missing required arguments"
-    echo "Usage: $0 <dmg-path> <build-version> <marketing-version> [release-notes]"
-    echo "Example: $0 build/Aizen-1.0.1.dmg 10001 1.0.1 'Bug fixes and improvements'"
+    echo "Usage: $0 <dmg-path> <build-version> <marketing-version> [release-notes] [minimum-system-version]"
+    echo "Example: $0 build/Aizen-1.0.1.dmg 10001 1.0.1 'Bug fixes and improvements' 14.0"
     exit 1
 fi
 
@@ -16,10 +16,40 @@ DMG_PATH="$1"
 BUILD_VERSION="$2"
 MARKETING_VERSION="$3"
 RELEASE_NOTES="${4:-New release}"
+MIN_SYSTEM_VERSION="${5:-${SPARKLE_MIN_SYSTEM_VERSION:-}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APPCAST_FILE="$PROJECT_ROOT/appcast.xml"
 PRIVATE_KEY="${SPARKLE_PRIVATE_KEY_FILE:-$PROJECT_ROOT/.sparkle-keys/eddsa_priv.pem}"
+
+resolve_min_system_version() {
+    if [ -n "$MIN_SYSTEM_VERSION" ]; then
+        echo "$MIN_SYSTEM_VERSION"
+        return 0
+    fi
+
+    local derived_info_plist=""
+    local dmg_dir
+    dmg_dir="$(dirname "$DMG_PATH")"
+
+    for candidate in \
+        "$dmg_dir/dmg"/*.app/Contents/Info.plist \
+        "$PROJECT_ROOT/build/dmg"/*.app/Contents/Info.plist \
+        "$PROJECT_ROOT/aizen/Info.plist" \
+        "$PROJECT_ROOT/aizen nightly-Info.plist"
+    do
+        if [ -f "$candidate" ]; then
+            derived_info_plist="$candidate"
+            break
+        fi
+    done
+
+    if [ -z "$derived_info_plist" ]; then
+        return 1
+    fi
+
+    /usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$derived_info_plist" 2>/dev/null
+}
 
 # Check if DMG exists
 if [ ! -f "$DMG_PATH" ]; then
@@ -78,6 +108,13 @@ if [ -z "$R2_PUBLIC_URL" ]; then
     exit 1
 fi
 DOWNLOAD_URL="${R2_PUBLIC_URL}/Aizen-${MARKETING_VERSION}.dmg"
+MIN_SYSTEM_VERSION="$(resolve_min_system_version || true)"
+
+if [ -z "$MIN_SYSTEM_VERSION" ]; then
+    echo "Error: Failed to determine minimum system version for appcast"
+    echo "Pass it as the 5th argument or set SPARKLE_MIN_SYSTEM_VERSION"
+    exit 1
+fi
 
 # Create or update appcast.xml
 if [ ! -f "$APPCAST_FILE" ]; then
@@ -109,7 +146,7 @@ ITEM_TEMPLATE="
                    length=\"$DMG_SIZE\"
                    type=\"application/octet-stream\"
                    sparkle:edSignature=\"$SIGNATURE\" />
-        <sparkle:minimumSystemVersion>13.5</sparkle:minimumSystemVersion>
+        <sparkle:minimumSystemVersion>$MIN_SYSTEM_VERSION</sparkle:minimumSystemVersion>
     </item>"
 
 # Insert the new item into appcast (before closing </channel>)
@@ -121,9 +158,10 @@ echo "Appcast location: $APPCAST_FILE"
 echo "Download URL: $DOWNLOAD_URL"
 echo "Build Version: $BUILD_VERSION"
 echo "Marketing Version: $MARKETING_VERSION"
+echo "Minimum System Version: $MIN_SYSTEM_VERSION"
 echo "Signature: $SIGNATURE"
 echo ""
 echo "Next steps:"
 echo "  1. Upload appcast.xml to R2 bucket root"
-echo "  2. Upload DMG to R2 bucket as Aizen-$VERSION.dmg"
+echo "  2. Upload DMG to R2 bucket as Aizen-$MARKETING_VERSION.dmg"
 echo "  3. Set SPARKLE_FEED_URL in Xcode to point to appcast.xml on R2"
