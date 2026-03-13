@@ -71,10 +71,10 @@ done
 
 if [[ "$SCHEME" == "aizen nightly" ]]; then
     VERSION_TYPE="nightly"
-    APP_NAME="aizen nightly.app"
+    APP_NAME="Aizen Nightly.app"
 else
     VERSION_TYPE="release"
-    APP_NAME="aizen.app"
+    APP_NAME="Aizen.app"
 fi
 
 if [[ "$ARCH" == "arm64 x86_64" ]]; then

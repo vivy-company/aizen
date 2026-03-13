@@ -20,6 +20,9 @@ on:
 env:
   SCHEME: 'aizen'
   CONFIGURATION: 'Release'
+  APP_BUNDLE_NAME: 'Aizen.app'
+  APP_EXECUTABLE_NAME: 'Aizen'
+  APP_DISPLAY_NAME: 'Aizen'
 
 jobs:
   build-and-release:
@@ -82,27 +85,27 @@ jobs:
           cp -R build/arm64.xcarchive build/aizen.xcarchive
 
           ditto --arch x86_64 \
-            build/x86_64.xcarchive/Products/Applications/aizen.app/Contents/MacOS/aizen \
+            "build/x86_64.xcarchive/Products/Applications/${{ env.APP_BUNDLE_NAME }}/Contents/MacOS/${{ env.APP_EXECUTABLE_NAME }}" \
             /tmp/aizen-x86_64
 
           ditto --arch x86_64 \
-            build/x86_64.xcarchive/Products/Applications/aizen.app/Contents/Resources/cli/aizen-cli \
+            "build/x86_64.xcarchive/Products/Applications/${{ env.APP_BUNDLE_NAME }}/Contents/Resources/cli/aizen-cli" \
             /tmp/aizen-cli-x86_64
 
           lipo -create \
-            build/arm64.xcarchive/Products/Applications/aizen.app/Contents/MacOS/aizen \
+            "build/arm64.xcarchive/Products/Applications/${{ env.APP_BUNDLE_NAME }}/Contents/MacOS/${{ env.APP_EXECUTABLE_NAME }}" \
             /tmp/aizen-x86_64 \
-            -output build/aizen.xcarchive/Products/Applications/aizen.app/Contents/MacOS/aizen
+            -output "build/aizen.xcarchive/Products/Applications/${{ env.APP_BUNDLE_NAME }}/Contents/MacOS/${{ env.APP_EXECUTABLE_NAME }}"
 
           lipo -create \
-            build/arm64.xcarchive/Products/Applications/aizen.app/Contents/Resources/cli/aizen-cli \
+            "build/arm64.xcarchive/Products/Applications/${{ env.APP_BUNDLE_NAME }}/Contents/Resources/cli/aizen-cli" \
             /tmp/aizen-cli-x86_64 \
-            -output build/aizen.xcarchive/Products/Applications/aizen.app/Contents/Resources/cli/aizen-cli
+            -output "build/aizen.xcarchive/Products/Applications/${{ env.APP_BUNDLE_NAME }}/Contents/Resources/cli/aizen-cli"
 
       - name: Export app bundle
         run: |
           mkdir -p build/dmg
-          cp -R build/aizen.xcarchive/Products/Applications/aizen.app build/dmg/
+          cp -R "build/aizen.xcarchive/Products/Applications/${{ env.APP_BUNDLE_NAME }}" build/dmg/
 
       - name: Import signing certificate
         env:
@@ -133,7 +136,7 @@ jobs:
           CERT_IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" | head -1 | grep -o '"[^"]*"' | tr -d '"')
           echo "Using certificate: $CERT_IDENTITY"
 
-          CLI_PATH="build/dmg/aizen.app/Contents/Resources/cli/aizen-cli"
+          CLI_PATH="build/dmg/${{ env.APP_BUNDLE_NAME }}/Contents/Resources/cli/aizen-cli"
           if [ -f "$CLI_PATH" ]; then
             codesign --force --sign "$CERT_IDENTITY" \
               --options runtime \
@@ -148,22 +151,22 @@ jobs:
             --options runtime \
             --timestamp \
             --entitlements aizen/aizen.entitlements \
-            build/dmg/aizen.app
+            "build/dmg/${{ env.APP_BUNDLE_NAME }}"
 
       - name: Create DMG
         run: |
           create-dmg \
-            --volname "aizen" \
+            --volname "${{ env.APP_DISPLAY_NAME }}" \
             --window-pos 200 120 \
             --window-size 800 400 \
             --icon-size 100 \
-            --icon "aizen.app" 200 190 \
-            --hide-extension "aizen.app" \
+            --icon "${{ env.APP_BUNDLE_NAME }}" 200 190 \
+            --hide-extension "${{ env.APP_BUNDLE_NAME }}" \
             --app-drop-link 600 185 \
-            "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" \
+            "build/${{ env.APP_DISPLAY_NAME }}-${{ github.event.inputs.marketing_version }}.dmg" \
             "build/dmg/" || true
 
-          if [ ! -f "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" ]; then
+          if [ ! -f "build/${{ env.APP_DISPLAY_NAME }}-${{ github.event.inputs.marketing_version }}.dmg" ]; then
             echo "Error: DMG creation failed"
             exit 1
           fi
@@ -176,7 +179,7 @@ jobs:
           CERT_IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" | head -1 | grep -o '"[^"]*"' | tr -d '"')
           codesign --force --sign "$CERT_IDENTITY" \
             --timestamp \
-            "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg"
+            "build/${{ env.APP_DISPLAY_NAME }}-${{ github.event.inputs.marketing_version }}.dmg"
 
       - name: Notarize DMG
         env:
@@ -187,7 +190,7 @@ jobs:
         run: |
           NOTARY_PLIST="$(mktemp)"
           xcrun notarytool submit \
-            "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" \
+            "build/${{ env.APP_DISPLAY_NAME }}-${{ github.event.inputs.marketing_version }}.dmg" \
             --apple-id "${{ secrets.APPLE_ID }}" \
             --team-id "${{ secrets.APPLE_TEAM_ID }}" \
             --password "${{ secrets.APPLE_APP_PASSWORD }}" \
@@ -219,7 +222,7 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_ID != '' && env.APPLE_APP_PASSWORD != '' }}
         run: |
-          DMG_PATH="build/Aizen-${{ github.event.inputs.marketing_version }}.dmg"
+          DMG_PATH="build/${{ env.APP_DISPLAY_NAME }}-${{ github.event.inputs.marketing_version }}.dmg"
           xcrun stapler staple -v "$DMG_PATH"
           xcrun stapler validate -v "$DMG_PATH"
 
@@ -239,7 +242,7 @@ jobs:
             exit 1
           fi
 
-          SIGNATURE=$("$SIGN_UPDATE" --ed-key-file sparkle_priv.pem -p "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg")
+          SIGNATURE=$("$SIGN_UPDATE" --ed-key-file sparkle_priv.pem -p "build/${{ env.APP_DISPLAY_NAME }}-${{ github.event.inputs.marketing_version }}.dmg")
 
           if [ -z "$SIGNATURE" ]; then
             echo "Error: sign_update returned empty signature"
@@ -255,7 +258,7 @@ jobs:
         run: |
           chmod +x scripts/generate-appcast.sh
           scripts/generate-appcast.sh \
-            "build/Aizen-${{ github.event.inputs.marketing_version }}.dmg" \
+            "build/${{ env.APP_DISPLAY_NAME }}-${{ github.event.inputs.marketing_version }}.dmg" \
             "${{ github.event.inputs.build_version }}" \
             "${{ github.event.inputs.marketing_version }}" \
             "${{ github.event.inputs.release_notes }}"
