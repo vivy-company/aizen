@@ -96,6 +96,13 @@ jobs:
 
           echo "Built $GRAMMAR_COUNT VVHighlighting grammar dylibs"
 
+      - name: Disable Ghostty implicit module map
+        run: |
+          GHOSTTY_MODULEMAP="Vendor/libghostty/include/module.modulemap"
+          if [ -f "$GHOSTTY_MODULEMAP" ]; then
+            mv "$GHOSTTY_MODULEMAP" "${GHOSTTY_MODULEMAP}.disabled"
+          fi
+
       - name: Build Apple Silicon archive
         run: |
           xcodebuild clean archive \
