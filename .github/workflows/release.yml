@@ -66,6 +66,26 @@ jobs:
             -skipPackagePluginValidation \
             -skipMacroValidation
 
+      - name: Patch mlx-swift Metal warnings
+        run: |
+          MLX_DIR=$(find "${{ env.DERIVED_DATA_PATH }}/SourcePackages/checkouts" -maxdepth 1 -type d -name 'mlx-swift' | head -1)
+          if [ -z "$MLX_DIR" ]; then
+            echo "Error: Could not locate mlx-swift checkout in DerivedData"
+            exit 1
+          fi
+
+          TARGET="$MLX_DIR/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/steel_attention.metal"
+          if [ ! -f "$TARGET" ]; then
+            echo "Error: Could not locate steel_attention.metal in mlx-swift checkout"
+            exit 1
+          fi
+
+          if ! grep -q 'diagnostic ignored "-Wc++17-extensions"' "$TARGET"; then
+            chmod u+w "$TARGET"
+            perl -0pi -e 's@^@#pragma clang diagnostic push\n#pragma clang diagnostic ignored "-Wc++17-extensions"\n@' "$TARGET"
+            printf '\n#pragma clang diagnostic pop\n' >> "$TARGET"
+          fi
+
       - name: Cache VVDevKit grammar build
         uses: actions/cache@v4
         with:
