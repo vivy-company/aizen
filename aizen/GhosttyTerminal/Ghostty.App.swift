@@ -95,7 +95,10 @@ extension Ghostty {
                 userdata: Unmanaged.passUnretained(self).toOpaque(),
                 supports_selection_clipboard: true,
                 wakeup_cb: { userdata in App.wakeup(userdata) },
-                action_cb: { app, target, action in App.action(app!, target: target, action: action) },
+                action_cb: { app, target, action in
+                    guard let app else { return false }
+                    return App.handleAction(app, target: target, action: action)
+                },
                 read_clipboard_cb: { userdata, loc, state in App.readClipboard(userdata, location: loc, state: state) },
                 confirm_read_clipboard_cb: { userdata, str, state, request in App.confirmReadClipboard(userdata, string: str, state: state, request: request) },
                 write_clipboard_cb: { userdata, loc, content, count, confirm in
@@ -336,7 +339,7 @@ extension Ghostty {
             }
         }
 
-        static func action(_ app: ghostty_app_t, target: ghostty_target_s, action: ghostty_action_s) -> Bool {
+        static func handleAction(_ app: ghostty_app_t, target: ghostty_target_s, action: ghostty_action_s) -> Bool {
             // Get the terminal view from surface userdata if target is a surface
             let terminalView: GhosttyTerminalView? = {
                 guard target.tag == GHOSTTY_TARGET_SURFACE else { return nil }
