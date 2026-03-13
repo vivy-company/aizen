@@ -112,9 +112,24 @@ if [ $BUILD_STATUS -eq 0 ]; then
     echo ""
     echo -e "${GREEN}Build succeeded${NC}"
     if [ -n "$APP_PATH" ]; then
+        BUNDLE_NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleName" "$APP_PATH/Contents/Info.plist" 2>/dev/null || echo "")
+        SPARKLE_BUNDLE_NAME=$(/usr/libexec/PlistBuddy -c "Print :SUBundleName" "$APP_PATH/Contents/Info.plist" 2>/dev/null || echo "")
+        EXPECTED_BUNDLE_NAME="${APP_NAME%.app}"
+
+        if [ "$BUNDLE_NAME" != "$EXPECTED_BUNDLE_NAME" ] || [ "$SPARKLE_BUNDLE_NAME" != "$EXPECTED_BUNDLE_NAME" ]; then
+            echo -e "${RED}Bundle naming mismatch detected${NC}"
+            echo "Expected CFBundleName and SUBundleName to be: $EXPECTED_BUNDLE_NAME"
+            echo "Found CFBundleName: ${BUNDLE_NAME:-<missing>}"
+            echo "Found SUBundleName: ${SPARKLE_BUNDLE_NAME:-<missing>}"
+            exit 1
+        fi
+
         echo -e "Output: ${YELLOW}$APP_PATH${NC}"
         echo ""
         echo "To run: open \"$APP_PATH\""
+    else
+        echo -e "${RED}Expected app bundle not found: $APP_NAME${NC}"
+        exit 1
     fi
 else
     echo ""

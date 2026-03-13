@@ -109,7 +109,19 @@ jobs:
 
       - name: Read minimum macOS version
         run: |
+          BUNDLE_NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleName" "build/dmg/${{ env.APP_BUNDLE_NAME }}/Contents/Info.plist")
+          SPARKLE_BUNDLE_NAME=$(/usr/libexec/PlistBuddy -c "Print :SUBundleName" "build/dmg/${{ env.APP_BUNDLE_NAME }}/Contents/Info.plist")
           MIN_SYSTEM_VERSION=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "build/dmg/${{ env.APP_BUNDLE_NAME }}/Contents/Info.plist")
+
+          if [ "$BUNDLE_NAME" != "${{ env.APP_DISPLAY_NAME }}" ]; then
+            echo "Error: CFBundleName is '$BUNDLE_NAME' but expected '${{ env.APP_DISPLAY_NAME }}'"
+            exit 1
+          fi
+
+          if [ "$SPARKLE_BUNDLE_NAME" != "${{ env.APP_DISPLAY_NAME }}" ]; then
+            echo "Error: SUBundleName is '$SPARKLE_BUNDLE_NAME' but expected '${{ env.APP_DISPLAY_NAME }}'"
+            exit 1
+          fi
 
           if [ -z "$MIN_SYSTEM_VERSION" ]; then
             echo "Error: Failed to read LSMinimumSystemVersion from built app"
