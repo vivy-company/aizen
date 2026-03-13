@@ -116,6 +116,7 @@ jobs:
             -skipPackagePluginValidation \
             -skipMacroValidation \
             COMPILER_INDEX_STORE_ENABLE=NO \
+            OTHER_METAL_FLAGS='-Wno-c++17-extensions' \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO
 
