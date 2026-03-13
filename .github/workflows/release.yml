@@ -24,6 +24,7 @@ env:
   APP_EXECUTABLE_NAME: 'Aizen'
   APP_DISPLAY_NAME: 'Aizen'
   DERIVED_DATA_PATH: 'build/DerivedData'
+  VVDEVKIT_SWIFTPM_SCRATCH_PATH: 'build/DerivedData/VVDevKitSwiftPM'
 
 jobs:
   build-and-release:
@@ -68,9 +69,7 @@ jobs:
       - name: Cache VVDevKit grammar build
         uses: actions/cache@v4
         with:
-          path: |
-            ${{ env.DERIVED_DATA_PATH }}/SourcePackages/checkouts/VVDevKit/.build
-            ${{ env.DERIVED_DATA_PATH }}/SourcePackages/checkouts/vvdevkit/.build
+          path: ${{ env.VVDEVKIT_SWIFTPM_SCRATCH_PATH }}
           key: vvdevkit-grammars-${{ runner.os }}-${{ steps.xcode-version.outputs.cache_key }}-${{ hashFiles('aizen.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', '.github/workflows/release.yml') }}
           restore-keys: |
             vvdevkit-grammars-${{ runner.os }}-${{ steps.xcode-version.outputs.cache_key }}-
@@ -85,9 +84,11 @@ jobs:
             exit 1
           fi
 
-          swift build -c release --package-path "$VVDEVKIT_DIR"
+          swift build -c release \
+            --package-path "$VVDEVKIT_DIR" \
+            --scratch-path "${{ env.VVDEVKIT_SWIFTPM_SCRATCH_PATH }}"
 
-          GRAMMAR_COUNT=$(find "$VVDEVKIT_DIR/.build" -type f -name 'libTreeSitter*.dylib' -not -path '*.dSYM/*' | wc -l | tr -d ' ')
+          GRAMMAR_COUNT=$(find "${{ env.VVDEVKIT_SWIFTPM_SCRATCH_PATH }}" -type f -name 'libTreeSitter*.dylib' -not -path '*.dSYM/*' | wc -l | tr -d ' ')
           if [ "$GRAMMAR_COUNT" -eq 0 ]; then
             echo "Error: VVDevKit build did not produce any grammar dylibs"
             exit 1
