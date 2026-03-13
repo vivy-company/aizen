@@ -45,6 +45,7 @@ struct ChatMessageList: View {
     @State private var hoveredCopyUserMessageID: String?
     @State private var copyIndicatorResetTask: Task<Void, Never>?
     @State private var expandedToolGroupIDs: Set<String> = []
+    @State private var suppressNextTimelineSignatureSync = false
 
     private var shouldShowLoading: Bool {
         isSessionInitializing && messages.isEmpty && toolCalls.isEmpty
@@ -262,6 +263,10 @@ struct ChatMessageList: View {
             reportTimelineStateIfNeeded(controller.state)
         }
         .onChange(of: timelineSignature) { _, _ in
+            if suppressNextTimelineSignatureSync {
+                suppressNextTimelineSignatureSync = false
+                return
+            }
             syncTimeline(scrollToBottom: isAutoScrollEnabled())
         }
         .onChange(of: colorScheme) { _, _ in
@@ -478,16 +483,35 @@ struct ChatMessageList: View {
 
     private func handleEntryActivate(_ entryID: String) {
         if isToolGroupEntryID(entryID) {
-            controller.prepareLayoutTransition(anchorItemID: entryID)
-            if expandedToolGroupIDs.contains(entryID) {
-                expandedToolGroupIDs.remove(entryID)
-            } else {
-                expandedToolGroupIDs.insert(entryID)
-            }
+            toggleToolGroupEntry(entryID)
+            return
+        }
+
+    }
+
+    private func toggleToolGroupEntry(_ entryID: String) {
+        suppressNextTimelineSignatureSync = true
+        controller.prepareLayoutTransition(anchorItemID: entryID)
+        if expandedToolGroupIDs.contains(entryID) {
+            expandedToolGroupIDs.remove(entryID)
+        } else {
+            expandedToolGroupIDs.insert(entryID)
+        }
+
+        guard let group = toolCallGroup(forEntryID: entryID),
+              let replacementRange = toolCallGroupEntryRange(for: entryID, in: appliedEntries) else {
             syncTimeline(scrollToBottom: false)
             return
         }
 
+        let replacementEntries = makeEntries(from: .toolCallGroup(group), startsAssistantLane: false)
+        controller.replaceEntries(
+            in: replacementRange,
+            with: replacementEntries,
+            scrollToBottom: false,
+            markUnread: false
+        )
+        appliedEntries.replaceSubrange(replacementRange, with: replacementEntries)
     }
 
     private func handleTimelineLinkActivate(_ rawLink: String) {
@@ -515,6 +539,29 @@ struct ChatMessageList: View {
 
     private func timelineMessage(withID messageID: String) -> MessageItem? {
         lastBuildMetadata.messagesByID[messageID]
+    }
+
+    private func toolCallGroup(forEntryID entryID: String) -> ToolCallGroup? {
+        for item in assembleTimelineSourceItems() {
+            guard case .toolCallGroup(let group) = item, group.entryID == entryID else { continue }
+            return group
+        }
+        return nil
+    }
+
+    private func toolCallGroupEntryRange(
+        for groupEntryID: String,
+        in entries: [VVChatTimelineEntry]
+    ) -> Range<Int>? {
+        guard let lowerBound = entries.firstIndex(where: { $0.id == groupEntryID }) else {
+            return nil
+        }
+        let detailPrefix = "\(groupEntryID)::"
+        var upperBound = lowerBound + 1
+        while upperBound < entries.count, entries[upperBound].id.hasPrefix(detailPrefix) {
+            upperBound += 1
+        }
+        return lowerBound..<upperBound
     }
 
     private var customEntryMessageMapper: VVChatTimelineController.CustomEntryMessageMapper {
@@ -2374,7 +2421,7 @@ struct ChatMessageList: View {
         case .move:
             base = "Moved"
         case .search:
-            base = "Searched"
+            base = toolCallSearchHeaderTitle(toolCall) ?? "Searched"
         case .execute:
             if toolCallRawCommand(toolCall) != nil {
                 base = "Ran"
@@ -2593,6 +2640,27 @@ struct ChatMessageList: View {
         }
         if let path = nestedInputString(in: raw, preferredKeys: ["path", "file", "filePath", "filepath"]) {
             return compactDisplayPath(path)
+        }
+
+        return nil
+    }
+
+    private func toolCallSearchHeaderTitle(_ toolCall: ToolCall) -> String? {
+        if let input = toolCallInputPreview(toolCall) {
+            let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            if trimmed.lowercased().hasPrefix("searched ") {
+                return abbreviated(trimmed, maxLength: 96)
+            }
+            return "Searched \(abbreviated(trimmed, maxLength: 88))"
+        }
+
+        if let action = humanizedToolTitleAction(toolCall.title) {
+            let trimmed = action.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            if trimmed.lowercased().hasPrefix("searched ") {
+                return abbreviated(trimmed, maxLength: 96)
+            }
         }
 
         return nil
