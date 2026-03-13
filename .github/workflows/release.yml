@@ -41,6 +41,7 @@ jobs:
           curl -fsSL "${{ secrets.R2_PUBLIC_URL }}/libghostty.tar.gz" -o libghostty.tar.gz
           tar -xzf libghostty.tar.gz -C Vendor/libghostty/
           rm libghostty.tar.gz
+          rm -f Vendor/libghostty/include/module.modulemap
 
       - name: Show Xcode version
         id: xcode-version
@@ -115,13 +116,6 @@ jobs:
           fi
 
           echo "Built $GRAMMAR_COUNT VVHighlighting grammar dylibs"
-
-      - name: Disable Ghostty implicit module map
-        run: |
-          GHOSTTY_MODULEMAP="Vendor/libghostty/include/module.modulemap"
-          if [ -f "$GHOSTTY_MODULEMAP" ]; then
-            mv "$GHOSTTY_MODULEMAP" "${GHOSTTY_MODULEMAP}.disabled"
-          fi
 
       - name: Build Apple Silicon archive
         run: |

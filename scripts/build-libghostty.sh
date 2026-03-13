@@ -72,10 +72,13 @@ fi
 mkdir -p "${VENDOR_DIR}/lib" "${VENDOR_DIR}/include"
 cp "${OUTDIR}/lib/libghostty.a" "${VENDOR_DIR}/lib/libghostty.a"
 
-# Copy headers (preserve module.modulemap which is custom)
+# Copy headers from the Ghostty build and drop Aizen's stale custom module map.
+# The app uses a bridging header, not an imported Clang module, and the
+# checked-in module.modulemap drifts against Ghostty HEAD as headers change.
 if [ -d "${WORKDIR}/ghostty/include" ]; then
-    rsync -a --exclude='module.modulemap' "${WORKDIR}/ghostty/include/" "${VENDOR_DIR}/include/"
+    rsync -a "${WORKDIR}/ghostty/include/" "${VENDOR_DIR}/include/"
 fi
+rm -f "${VENDOR_DIR}/include/module.modulemap"
 
 # Record version
 printf "%s\n" "${REF}" > "${VENDOR_DIR}/VERSION"
