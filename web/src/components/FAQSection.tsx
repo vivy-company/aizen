@@ -17,6 +17,7 @@ export default function FAQSection() {
       .replace(/GitHub/g, '<span class="text-zinc-300">GitHub</span>')
       .replace(/GPL-3\.0/g, '<span class="text-zinc-300">GPL-3.0</span>')
       .replace(/macOS 13\.5 Ventura/g, '<span class="text-blue-500">macOS 13.5 Ventura</span>')
+      .replace(/1\.0\.71/g, '<span class="text-zinc-300">1.0.71</span>')
       .replace(/Apple Silicon/g, '<span class="text-zinc-400">Apple Silicon</span>')
       .replace(/Intel Macs/g, '<span class="text-zinc-400">Intel Macs</span>')
       .replace(/Aizen Pro/g, '<span class="text-blue-400">Aizen Pro</span>')

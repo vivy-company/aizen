@@ -1,10 +1,7 @@
 import SwiftUI
 import AppKit
-import os.log
 
 struct TranscriptionSettingsView: View {
-    private let logger = Logger.settings
-
     @AppStorage(TranscriptionSettingsKeys.provider) private var providerRaw = TranscriptionSettingsDefaults.provider.rawValue
     @AppStorage(TranscriptionSettingsKeys.mlxWhisperModelId) private var whisperModelId = TranscriptionSettingsDefaults.mlxWhisperModelId
     @AppStorage(TranscriptionSettingsKeys.mlxParakeetModelId) private var parakeetModelId = TranscriptionSettingsDefaults.mlxParakeetModelId
@@ -21,10 +18,6 @@ struct TranscriptionSettingsView: View {
 
     private var provider: TranscriptionProvider {
         TranscriptionProvider(rawValue: providerRaw) ?? .system
-    }
-
-    private var mlxSupported: Bool {
-        MLXAudioSupport.isSupported
     }
 
     private var activeConfiguration: ModelConfiguration? {
@@ -71,7 +64,6 @@ struct TranscriptionSettingsView: View {
                     Text("MLX Whisper").tag(TranscriptionProvider.mlxWhisper.rawValue)
                     Text("MLX Parakeet").tag(TranscriptionProvider.mlxParakeet.rawValue)
                 }
-                .disabled(!mlxSupported && provider != .system)
             } header: {
                 Text("Engine")
             } footer: {
@@ -179,18 +171,8 @@ struct TranscriptionSettingsView: View {
             parakeetManager.modelId = parakeetModelId
             whisperManager.refreshStatus()
             parakeetManager.refreshStatus()
-
-            if (provider == .mlxWhisper || provider == .mlxParakeet) && !mlxSupported {
-                providerRaw = TranscriptionProvider.system.rawValue
-            }
         }
         .onChange(of: providerRaw) { _, newValue in
-            if (newValue == TranscriptionProvider.mlxWhisper.rawValue || newValue == TranscriptionProvider.mlxParakeet.rawValue) && !mlxSupported {
-                logger.warning("MLX not supported on this Mac; reverting to system provider")
-                providerRaw = TranscriptionProvider.system.rawValue
-                return
-            }
-
             if newValue == TranscriptionProvider.mlxWhisper.rawValue {
                 whisperManager.refreshStatus()
             } else if newValue == TranscriptionProvider.mlxParakeet.rawValue {
@@ -212,13 +194,9 @@ struct TranscriptionSettingsView: View {
         case .system:
             return "Uses macOS speech recognition for the fastest setup."
         case .mlxWhisper:
-            return mlxSupported
-                ? "Runs Whisper on-device with MLX acceleration."
-                : "MLX models require Apple Silicon. Apple Speech will be used on this Mac."
+            return "Runs Whisper on-device with MLX acceleration."
         case .mlxParakeet:
-            return mlxSupported
-                ? "Runs Parakeet TDT on-device with MLX acceleration."
-                : "MLX models require Apple Silicon. Apple Speech will be used on this Mac."
+            return "Runs Parakeet TDT on-device with MLX acceleration."
         }
     }
 
@@ -234,10 +212,7 @@ struct TranscriptionSettingsView: View {
     }
 
     private func configurationFooter(_ configuration: ModelConfiguration) -> String {
-        if !mlxSupported {
-            return "MLX models require Apple Silicon. Apple Speech will be used on Intel Macs."
-        }
-        return configuration.infoText
+        configuration.infoText
     }
 
     private func modelPickerTitle(for preset: MLXModelOption) -> String {
@@ -261,7 +236,6 @@ struct TranscriptionSettingsView: View {
     }
 
     private func modelActionDisabled(for manager: MLXModelManager) -> Bool {
-        if !mlxSupported { return true }
         if case .downloading = manager.state { return true }
         return false
     }

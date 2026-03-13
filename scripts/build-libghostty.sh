@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Build libghostty as universal (arm64 + x86_64) static library.
+# Build libghostty as an Apple Silicon (arm64) static library.
 # Usage: ./scripts/build-libghostty.sh [commit]
 #   - commit: ghostty commit/tag/branch (default: main HEAD)
 
@@ -18,7 +18,7 @@ fi
 echo "Building libghostty @ ${REF}"
 
 # Check dependencies
-for cmd in git zig lipo; do
+for cmd in git zig; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         echo "Error: $cmd required (try 'brew install $cmd')" >&2
         exit 1
@@ -60,25 +60,17 @@ ZIG_FLAGS=(
     -Dstrip
 )
 
-build_arch() {
-    local arch="$1"
-    local outdir="${WORKDIR}/zig-out-${arch}"
-    echo "Building for ${arch}..." >&2
-    (cd "${WORKDIR}/ghostty" && zig build "${ZIG_FLAGS[@]}" -Dtarget="${arch}-macos" -p "${outdir}")
-    if [ ! -f "${outdir}/lib/libghostty.a" ]; then
-        echo "Error: build failed - ${outdir}/lib/libghostty.a not found" >&2
-        exit 1
-    fi
-    echo "${outdir}/lib/libghostty.a"
-}
+OUTDIR="${WORKDIR}/zig-out-aarch64"
+echo "Building for Apple Silicon (arm64)..."
+(cd "${WORKDIR}/ghostty" && zig build "${ZIG_FLAGS[@]}" -Dtarget="aarch64-macos" -p "${OUTDIR}")
+if [ ! -f "${OUTDIR}/lib/libghostty.a" ]; then
+    echo "Error: build failed - ${OUTDIR}/lib/libghostty.a not found" >&2
+    exit 1
+fi
 
-ARM64_LIB="$(build_arch aarch64)"
-X64_LIB="$(build_arch x86_64)"
-
-# Create universal binary
-echo "Creating universal binary..."
+# Copy built binary
 mkdir -p "${VENDOR_DIR}/lib" "${VENDOR_DIR}/include"
-lipo -create "${ARM64_LIB}" "${X64_LIB}" -output "${VENDOR_DIR}/lib/libghostty.a"
+cp "${OUTDIR}/lib/libghostty.a" "${VENDOR_DIR}/lib/libghostty.a"
 
 # Copy headers (preserve module.modulemap which is custom)
 if [ -d "${WORKDIR}/ghostty/include" ]; then
@@ -88,4 +80,4 @@ fi
 # Record version
 printf "%s\n" "${REF}" > "${VENDOR_DIR}/VERSION"
 
-echo "Done: $(lipo -info "${VENDOR_DIR}/lib/libghostty.a")"
+echo "Done: built Apple Silicon libghostty.a"

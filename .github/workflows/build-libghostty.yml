@@ -60,4 +60,5 @@ jobs:
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Ghostty ref:** $(cat Vendor/libghostty/VERSION)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Architecture:** arm64" >> $GITHUB_STEP_SUMMARY
           echo "- **R2 URL:** ${{ secrets.R2_PUBLIC_URL }}/libghostty.tar.gz" >> $GITHUB_STEP_SUMMARY

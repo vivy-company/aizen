@@ -5,7 +5,7 @@
     "earlyAccess": "Early Access",
     "download": "Download",
     "viewOnGithub": "View on GitHub",
-    "requirements": "macOS 13.5+ on Apple Silicon or Intel. Signed and notarized builds available."
+    "requirements": "macOS 13.5+ on Apple Silicon only. Intel Macs have been intentionally unsupported since 1.0.71 for a better user experience. Signed and notarized builds available."
   },
   "showcase": {
     "agents": "Agents",
@@ -99,7 +99,7 @@
     },
     "q9": {
       "question": "What are the requirements?",
-      "answer": "macOS 13.5 or later. Apple Silicon and Intel Macs are both supported."
+      "answer": "macOS 13.5 or later on Apple Silicon only. Intel Macs have been intentionally unsupported since 1.0.71 for a better user experience."
     }
   },
   "footer": {

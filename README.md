@@ -55,7 +55,8 @@ Aizen is an agentic-first developer workspace for macOS. It helps you run projec
 ## Requirements
 
 - macOS 13.5+
-- Apple Silicon or Intel Mac
+- Apple Silicon Mac only
+- Intel Macs are intentionally unsupported starting with 1.0.71 for a better user experience
 
 ## Installation
 
@@ -75,7 +76,7 @@ git lfs install
 git clone https://github.com/vivy-company/aizen.git
 cd aizen
 
-# Build libghostty (universal arm64 + x86_64)
+# Build libghostty (Apple Silicon / arm64)
 ./scripts/build-libghostty.sh
 
 # Open in Xcode and build

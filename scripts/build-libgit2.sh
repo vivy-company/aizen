@@ -19,7 +19,7 @@ echo "Building libgit2 $LIBGIT2_VERSION with SSH support..."
 rm -rf "$TMP_DIR"
 mkdir -p "$TMP_DIR"
 
-# Build OpenSSL first (universal binary)
+# Build OpenSSL first (Apple Silicon only)
 echo "=== Building OpenSSL $OPENSSL_VERSION ==="
 cd "$TMP_DIR"
 git clone --depth 1 --branch $OPENSSL_VERSION https://github.com/openssl/openssl.git
@@ -30,25 +30,10 @@ echo "Building OpenSSL for arm64..."
 ./Configure darwin64-arm64-cc no-shared no-tests --prefix="$TMP_DIR/openssl-arm64" --openssldir="$TMP_DIR/openssl-arm64"
 make -j$(sysctl -n hw.ncpu)
 make install_sw
-make clean
-
-# Build for x86_64
-echo "Building OpenSSL for x86_64..."
-./Configure darwin64-x86_64-cc no-shared no-tests --prefix="$TMP_DIR/openssl-x86_64" --openssldir="$TMP_DIR/openssl-x86_64"
-make -j$(sysctl -n hw.ncpu)
-make install_sw
-
-# Create universal OpenSSL libraries
-echo "Creating universal OpenSSL libraries..."
-mkdir -p "$TMP_DIR/openssl-universal/lib"
-mkdir -p "$TMP_DIR/openssl-universal/include"
-lipo -create "$TMP_DIR/openssl-arm64/lib/libssl.a" "$TMP_DIR/openssl-x86_64/lib/libssl.a" -output "$TMP_DIR/openssl-universal/lib/libssl.a"
-lipo -create "$TMP_DIR/openssl-arm64/lib/libcrypto.a" "$TMP_DIR/openssl-x86_64/lib/libcrypto.a" -output "$TMP_DIR/openssl-universal/lib/libcrypto.a"
-cp -r "$TMP_DIR/openssl-arm64/include/openssl" "$TMP_DIR/openssl-universal/include/"
 
 echo "OpenSSL built:"
-lipo -info "$TMP_DIR/openssl-universal/lib/libssl.a"
-lipo -info "$TMP_DIR/openssl-universal/lib/libcrypto.a"
+file "$TMP_DIR/openssl-arm64/lib/libssl.a"
+file "$TMP_DIR/openssl-arm64/lib/libcrypto.a"
 
 # Build libssh2
 echo ""
@@ -61,16 +46,16 @@ mkdir build && cd build
 cmake .. \
     -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_STATIC_LIBS=ON \
-    -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+    -DCMAKE_OSX_ARCHITECTURES="arm64" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_EXAMPLES=OFF \
     -DBUILD_TESTING=OFF \
     -DCRYPTO_BACKEND=OpenSSL \
-    -DOPENSSL_ROOT_DIR="$TMP_DIR/openssl-universal" \
-    -DOPENSSL_INCLUDE_DIR="$TMP_DIR/openssl-universal/include" \
-    -DOPENSSL_SSL_LIBRARY="$TMP_DIR/openssl-universal/lib/libssl.a" \
-    -DOPENSSL_CRYPTO_LIBRARY="$TMP_DIR/openssl-universal/lib/libcrypto.a" \
+    -DOPENSSL_ROOT_DIR="$TMP_DIR/openssl-arm64" \
+    -DOPENSSL_INCLUDE_DIR="$TMP_DIR/openssl-arm64/include" \
+    -DOPENSSL_SSL_LIBRARY="$TMP_DIR/openssl-arm64/lib/libssl.a" \
+    -DOPENSSL_CRYPTO_LIBRARY="$TMP_DIR/openssl-arm64/lib/libcrypto.a" \
     -DCMAKE_INSTALL_PREFIX="$TMP_DIR/libssh2-install"
 
 cmake --build . --config Release
@@ -93,7 +78,7 @@ export PKG_CONFIG_PATH=""
 
 cmake .. \
     -DBUILD_SHARED_LIBS=OFF \
-    -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+    -DCMAKE_OSX_ARCHITECTURES="arm64" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" \
     -DCMAKE_BUILD_TYPE=Release \
     -DUSE_SSH=ON \
@@ -105,10 +90,10 @@ cmake .. \
 
 cmake --build . --config Release
 
-# Verify universal binary
+# Verify Apple Silicon binary
 echo ""
-echo "Verifying universal binary..."
-lipo -info libgit2.a
+echo "Verifying Apple Silicon binary..."
+file libgit2.a
 
 # Copy to Vendor
 echo ""
@@ -120,8 +105,8 @@ mkdir -p "$OUTPUT_DIR/include"
 # Copy all libraries
 cp libgit2.a "$OUTPUT_DIR/lib/"
 cp "$TMP_DIR/libssh2-install/lib/libssh2.a" "$OUTPUT_DIR/lib/"
-cp "$TMP_DIR/openssl-universal/lib/libssl.a" "$OUTPUT_DIR/lib/"
-cp "$TMP_DIR/openssl-universal/lib/libcrypto.a" "$OUTPUT_DIR/lib/"
+cp "$TMP_DIR/openssl-arm64/lib/libssl.a" "$OUTPUT_DIR/lib/"
+cp "$TMP_DIR/openssl-arm64/lib/libcrypto.a" "$OUTPUT_DIR/lib/"
 
 # Copy headers
 cp -r ../include/git2 "$OUTPUT_DIR/include/"

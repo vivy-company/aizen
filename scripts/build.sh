@@ -10,7 +10,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 CONFIGURATION="Release"
-ARCH="arm64 x86_64"
+ARCH="arm64"
 CLEAN=false
 SCHEME="aizen"
 
@@ -36,10 +36,6 @@ while [[ $# -gt 0 ]]; do
             ARCH="arm64"
             shift
             ;;
-        --x86_64|--intel)
-            ARCH="x86_64"
-            shift
-            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -49,15 +45,13 @@ while [[ $# -gt 0 ]]; do
             echo "  -n, --nightly   Build nightly version"
             echo "  -c, --clean     Clean before building"
             echo "  --arm64         Build for Apple Silicon only"
-            echo "  --x86_64        Build for Intel only"
             echo "  -h, --help      Show this help message"
             echo ""
             echo "Examples:"
-            echo "  $0                         # Build universal (arm64 + x86_64)"
-            echo "  $0 --debug                 # Build Debug universal"
-            echo "  $0 --nightly               # Build nightly universal"
+            echo "  $0                         # Build Apple Silicon release"
+            echo "  $0 --debug                 # Build Apple Silicon debug"
+            echo "  $0 --nightly               # Build Apple Silicon nightly"
             echo "  $0 --arm64                 # Build for Apple Silicon only"
-            echo "  $0 --x86_64                # Build for Intel only"
             echo "  $0 --release --clean       # Clean and build Release"
             exit 0
             ;;
@@ -77,11 +71,7 @@ else
     APP_NAME="Aizen.app"
 fi
 
-if [[ "$ARCH" == "arm64 x86_64" ]]; then
-    ARCH_DISPLAY="universal (arm64 + x86_64)"
-else
-    ARCH_DISPLAY="$ARCH"
-fi
+ARCH_DISPLAY="$ARCH"
 
 echo -e "${GREEN}=== Building aizen ===${NC}"
 echo "Version: $VERSION_TYPE"
