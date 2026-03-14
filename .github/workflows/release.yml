@@ -242,6 +242,8 @@ jobs:
           CERT_IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" | head -1 | grep -o '"[^"]*"' | tr -d '"')
           echo "Using certificate: $CERT_IDENTITY"
 
+          APP_PATH="build/dmg/${{ env.APP_BUNDLE_NAME }}"
+          RESOURCE_ROOT="$APP_PATH/Contents/Resources"
           CLI_PATH="build/dmg/${{ env.APP_BUNDLE_NAME }}/Contents/Resources/cli/aizen-cli"
           if [ -f "$CLI_PATH" ]; then
             codesign --force --sign "$CERT_IDENTITY" \
@@ -253,11 +255,22 @@ jobs:
             exit 1
           fi
 
+          while IFS= read -r resource_path; do
+            if file -b "$resource_path" | grep -q '^Mach-O'; then
+              echo "Signing nested resource binary: $resource_path"
+              codesign --force --sign "$CERT_IDENTITY" \
+                --timestamp \
+                "$resource_path"
+            fi
+          done < <(find "$RESOURCE_ROOT" -type f ! -path "$CLI_PATH")
+
           codesign --force --deep --sign "$CERT_IDENTITY" \
             --options runtime \
             --timestamp \
             --entitlements aizen/aizen.entitlements \
-            "build/dmg/${{ env.APP_BUNDLE_NAME }}"
+            "$APP_PATH"
+
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
       - name: Create DMG
         run: |
@@ -317,6 +330,14 @@ jobs:
           echo "Notary status: $NOTARY_STATUS"
 
           if [ "$NOTARY_STATUS" != "Accepted" ]; then
+            LOG_PATH="build/notary-log.json"
+            xcrun notarytool log "$NOTARY_ID" \
+              --apple-id "${{ secrets.APPLE_ID }}" \
+              --team-id "${{ secrets.APPLE_TEAM_ID }}" \
+              --password "${{ secrets.APPLE_APP_PASSWORD }}" > "$LOG_PATH" || true
+            if [ -s "$LOG_PATH" ]; then
+              cat "$LOG_PATH"
+            fi
             echo "Error: Notary status is not Accepted"
             exit 1
           fi
