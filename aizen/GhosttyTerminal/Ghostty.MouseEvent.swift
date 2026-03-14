@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import GhosttyKit
 
 extension Ghostty.Input {
     /// Represents a mouse input event with button state, button type, and modifier keys.
@@ -110,6 +111,14 @@ extension Ghostty.Input {
         case left
         case right
         case middle
+        case four
+        case five
+        case six
+        case seven
+        case eight
+        case nine
+        case ten
+        case eleven
 
         var cMouseButton: ghostty_input_mouse_button_e {
             switch self {
@@ -117,6 +126,31 @@ extension Ghostty.Input {
             case .left: GHOSTTY_MOUSE_LEFT
             case .right: GHOSTTY_MOUSE_RIGHT
             case .middle: GHOSTTY_MOUSE_MIDDLE
+            case .four: GHOSTTY_MOUSE_FOUR
+            case .five: GHOSTTY_MOUSE_FIVE
+            case .six: GHOSTTY_MOUSE_SIX
+            case .seven: GHOSTTY_MOUSE_SEVEN
+            case .eight: GHOSTTY_MOUSE_EIGHT
+            case .nine: GHOSTTY_MOUSE_NINE
+            case .ten: GHOSTTY_MOUSE_TEN
+            case .eleven: GHOSTTY_MOUSE_ELEVEN
+            }
+        }
+
+        init(fromNSEventButtonNumber buttonNumber: Int) {
+            switch buttonNumber {
+            case 0: self = .left
+            case 1: self = .right
+            case 2: self = .middle
+            case 3: self = .eight
+            case 4: self = .nine
+            case 5: self = .six
+            case 6: self = .seven
+            case 7: self = .four
+            case 8: self = .five
+            case 9: self = .ten
+            case 10: self = .eleven
+            default: self = .unknown
             }
         }
     }

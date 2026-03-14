@@ -36,26 +36,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download libghostty from R2
+      - name: Verify vendored GhosttyKit
         run: |
-          curl -fsSL "${{ secrets.R2_PUBLIC_URL }}/libghostty.tar.gz" -o libghostty.tar.gz
-          rm -rf Vendor/libghostty/include Vendor/libghostty/lib
-          tar -xzf libghostty.tar.gz -C Vendor/libghostty/
-          rm libghostty.tar.gz
-          rm -f Vendor/libghostty/include/module.modulemap
-
           for required_path in \
             Vendor/libghostty/VERSION \
-            Vendor/libghostty/include/ghostty.h \
-            Vendor/libghostty/lib/libghostty.a
+            Vendor/libghostty/GhosttyKit.xcframework \
+            Vendor/libghostty/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a
           do
-            if [ ! -f "$required_path" ]; then
-              echo "Error: Missing expected libghostty payload file: $required_path"
+            if [ ! -e "$required_path" ]; then
+              echo "Error: Missing vendored GhosttyKit payload file: $required_path"
               exit 1
             fi
           done
 
-          echo "Using libghostty version $(cat Vendor/libghostty/VERSION)"
+          echo "Using vendored libghostty version $(cat Vendor/libghostty/VERSION)"
+          ls -lh Vendor/libghostty/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a
 
       - name: Show Xcode version
         id: xcode-version

@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import GhosttyKit
 
 extension Ghostty.Input {
     /// `ghostty_input_mods_e`

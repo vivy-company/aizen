@@ -1,4 +1,5 @@
 import Foundation
+import GhosttyKit
 
 extension Ghostty {
     /// Represents a single surface within Ghostty.
@@ -63,6 +64,18 @@ extension Ghostty {
             }
         }
 
+        @MainActor
+        func keyTranslationMods(_ mods: ghostty_input_mods_e) -> ghostty_input_mods_e {
+            ghostty_surface_key_translation_mods(surface, mods)
+        }
+
+        @MainActor
+        func keyIsBinding(_ event: ghostty_input_key_s) -> Input.BindingFlags? {
+            var flags = ghostty_binding_flags_e(rawValue: 0)
+            guard ghostty_surface_key_is_binding(surface, event, &flags) else { return nil }
+            return Input.BindingFlags(cFlags: flags)
+        }
+
         /// Whether the terminal has captured mouse input.
         ///
         /// When the mouse is captured, the terminal application is receiving mouse events
@@ -90,7 +103,7 @@ extension Ghostty {
         ///
         /// - Parameter event: The mouse button event to send to the terminal
         @MainActor
-        func sendMouseButton(_ event: Input.MouseButtonEvent) {
+        func sendMouseButton(_ event: Input.MouseButtonEvent) -> Bool {
             ghostty_surface_mouse_button(
                 surface,
                 event.action.cMouseState,

@@ -15,8 +15,7 @@ struct TerminalRuntimeCounts {
 class TerminalSessionManager {
     static let shared = TerminalSessionManager()
 
-    private var terminals: [String: GhosttyTerminalView] = [:]
-    private var scrollViews: [String: TerminalScrollView] = [:]
+    private var terminals: [String: AizenTerminalSurfaceView] = [:]
     private var accessOrder: [String] = []
     private let maxTerminals = 50
 
@@ -30,7 +29,7 @@ class TerminalSessionManager {
         "\(sessionId.uuidString)-"
     }
 
-    func getTerminal(for sessionId: UUID, paneId: String) -> GhosttyTerminalView? {
+    func getTerminal(for sessionId: UUID, paneId: String) -> AizenTerminalSurfaceView? {
         let key = key(for: sessionId, paneId: paneId)
         if let terminal = terminals[key] {
             touch(key)
@@ -39,7 +38,7 @@ class TerminalSessionManager {
         return nil
     }
 
-    func setTerminal(_ terminal: GhosttyTerminalView, for sessionId: UUID, paneId: String) {
+    func setTerminal(_ terminal: AizenTerminalSurfaceView, for sessionId: UUID, paneId: String) {
         let key = key(for: sessionId, paneId: paneId)
         terminals[key] = terminal
         touch(key)
@@ -51,7 +50,6 @@ class TerminalSessionManager {
         if let terminal = terminals.removeValue(forKey: key) {
             cleanupTerminal(terminal)
         }
-        scrollViews.removeValue(forKey: key)
         accessOrder.removeAll { $0 == key }
     }
 
@@ -61,26 +59,7 @@ class TerminalSessionManager {
             cleanupTerminal(terminal)
             terminals.removeValue(forKey: key)
         }
-        scrollViews = scrollViews.filter { !$0.key.hasPrefix(prefix) }
         accessOrder.removeAll { $0.hasPrefix(prefix) }
-    }
-
-    // MARK: - Scroll View Management
-
-    func getScrollView(for sessionId: UUID, paneId: String) -> TerminalScrollView? {
-        let key = key(for: sessionId, paneId: paneId)
-        if let scrollView = scrollViews[key] {
-            touch(key)
-            return scrollView
-        }
-        return nil
-    }
-
-    func setScrollView(_ scrollView: TerminalScrollView, for sessionId: UUID, paneId: String) {
-        let key = key(for: sessionId, paneId: paneId)
-        scrollViews[key] = scrollView
-        touch(key)
-        evictIfNeeded()
     }
 
     func getTerminalCount(for sessionId: UUID) -> Int {
@@ -125,12 +104,12 @@ class TerminalSessionManager {
             if let terminal = terminals.removeValue(forKey: oldest) {
                 cleanupTerminal(terminal)
             }
-            scrollViews.removeValue(forKey: oldest)
         }
     }
 
-    private func cleanupTerminal(_ terminal: GhosttyTerminalView) {
+    private func cleanupTerminal(_ terminal: AizenTerminalSurfaceView) {
         terminal.onProcessExit = nil
+        terminal.onFocus = nil
         terminal.onTitleChange = nil
         terminal.onProgressReport = nil
         terminal.onReady = nil

@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import GhosttyKit
 
 enum GhosttyProgressState {
     case remove

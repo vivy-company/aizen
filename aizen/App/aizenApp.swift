@@ -63,7 +63,6 @@ struct aizenApp: App {
 
     let persistenceController = PersistenceController.shared
     @StateObject private var ghosttyApp = Ghostty.App()
-    @FocusedValue(\.terminalSplitActions) private var splitActions
     @FocusedValue(\.chatActions) private var chatActions
 
     // Sparkle updater controller
@@ -182,17 +181,17 @@ struct aizenApp: App {
                 Divider()
 
                 Button("Split Right") {
-                    splitActions?.splitHorizontal()
+                    TerminalSplitActionRouter.shared.splitHorizontal()
                 }
                 .keyboardShortcut("d", modifiers: .command)
 
                 Button("Split Down") {
-                    splitActions?.splitVertical()
+                    TerminalSplitActionRouter.shared.splitVertical()
                 }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
 
                 Button("Close Pane") {
-                    splitActions?.closePane()
+                    TerminalSplitActionRouter.shared.closePane()
                 }
                 .keyboardShortcut("w", modifiers: .command)
 

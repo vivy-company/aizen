@@ -114,11 +114,13 @@ struct WorktreeDetailView: View {
                     selectedBrowserSessionId: $viewModel.selectedBrowserSessionId
                 )
             } else if selectedTab == "terminal" {
-                TerminalTabView(
-                    worktree: worktree,
-                    selectedSessionId: $viewModel.selectedTerminalSessionId,
-                    repositoryManager: repositoryManager
-                )
+                AizenTerminalRootContainer {
+                    TerminalTabView(
+                        worktree: worktree,
+                        selectedSessionId: $viewModel.selectedTerminalSessionId,
+                        repositoryManager: repositoryManager
+                    )
+                }
             } else if selectedTab == "files" {
                 FileTabView(
                     worktree: worktree,

@@ -1,4 +1,5 @@
 import AppKit
+import GhosttyKit
 import SwiftUI
 
 extension SwiftUI.EventModifiers {
@@ -105,4 +106,25 @@ extension Ghostty {
         GHOSTTY_KEY_BACKSPACE.rawValue: .delete,
         GHOSTTY_KEY_SPACE.rawValue: .space,
     ]
+}
+
+// MARK: Ghostty.Input.BindingFlags
+
+extension Ghostty.Input {
+    struct BindingFlags: OptionSet, Sendable {
+        let rawValue: UInt32
+
+        static let consumed = BindingFlags(rawValue: GHOSTTY_BINDING_FLAGS_CONSUMED.rawValue)
+        static let all = BindingFlags(rawValue: GHOSTTY_BINDING_FLAGS_ALL.rawValue)
+        static let global = BindingFlags(rawValue: GHOSTTY_BINDING_FLAGS_GLOBAL.rawValue)
+        static let performable = BindingFlags(rawValue: GHOSTTY_BINDING_FLAGS_PERFORMABLE.rawValue)
+
+        init(rawValue: UInt32) {
+            self.rawValue = rawValue
+        }
+
+        init(cFlags: ghostty_binding_flags_e) {
+            self.rawValue = cFlags.rawValue
+        }
+    }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import GhosttyKit
 
 extension Ghostty.Input {
     /// `ghostty_input_key_e`

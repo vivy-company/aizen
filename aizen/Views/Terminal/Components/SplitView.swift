@@ -17,36 +17,39 @@ struct SplitView<L: View, R: View>: View {
     let resizeIncrements: NSSize
     let left: L
     let right: R
+    let onEqualize: () -> Void
     let minSize: CGFloat = 10
 
     @Binding var split: CGFloat
-
     private let splitterVisibleSize: CGFloat = 1
     private let splitterInvisibleSize: CGFloat = 6
 
     var body: some View {
         GeometryReader { geo in
-            let metrics = layoutMetrics(for: geo.size)
+            let leftRect = self.leftRect(for: geo.size)
+            let rightRect = self.rightRect(for: geo.size, leftRect: leftRect)
+            let splitterPoint = self.splitterPoint(for: geo.size, leftRect: leftRect)
 
             ZStack(alignment: .topLeading) {
                 left
-                    .frame(width: metrics.left.size.width, height: metrics.left.size.height)
-                    .offset(x: metrics.left.origin.x, y: metrics.left.origin.y)
+                    .frame(width: leftRect.size.width, height: leftRect.size.height)
+                    .offset(x: leftRect.origin.x, y: leftRect.origin.y)
                 right
-                    .frame(width: metrics.right.size.width, height: metrics.right.size.height)
-                    .offset(x: metrics.right.origin.x, y: metrics.right.origin.y)
+                    .frame(width: rightRect.size.width, height: rightRect.size.height)
+                    .offset(x: rightRect.origin.x, y: rightRect.origin.y)
                 Divider(
                     direction: direction,
                     visibleSize: splitterVisibleSize,
                     invisibleSize: splitterInvisibleSize,
                     color: dividerColor,
-                    split: $split,
-                    axisLength: direction == .horizontal ? geo.size.height : geo.size.width
+                    split: $split
                 )
-                .position(metrics.splitterPoint)
-                .gesture(dragGesture(geo.size, splitterPoint: metrics.splitterPoint))
+                .position(splitterPoint)
+                .gesture(dragGesture(geo.size))
+                .onTapGesture(count: 2) {
+                    onEqualize()
+                }
             }
-            .clipped() // Ensure subviews don't draw outside their allocated rect
         }
     }
 
@@ -56,7 +59,8 @@ struct SplitView<L: View, R: View>: View {
         dividerColor: Color = Color(nsColor: .separatorColor),
         resizeIncrements: NSSize = .init(width: 1, height: 1),
         @ViewBuilder left: (() -> L),
-        @ViewBuilder right: (() -> R)
+        @ViewBuilder right: (() -> R),
+        onEqualize: @escaping () -> Void = {}
     ) {
         self.direction = direction
         self._split = split
@@ -64,66 +68,66 @@ struct SplitView<L: View, R: View>: View {
         self.resizeIncrements = resizeIncrements
         self.left = left()
         self.right = right()
+        self.onEqualize = onEqualize
     }
 
-    private func dragGesture(_ size: CGSize, splitterPoint: CGPoint) -> some Gesture {
-        return DragGesture()
+    private func dragGesture(_ size: CGSize) -> some Gesture {
+        DragGesture()
             .onChanged { gesture in
-                // Disable animations during drag to prevent flicker
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
+                switch direction {
+                case .horizontal:
+                    let new = min(max(minSize, gesture.location.x), size.width - minSize)
+                    split = new / size.width
 
-                withTransaction(transaction) {
-                    switch (direction) {
-                    case .horizontal:
-                        let new = min(max(minSize, gesture.location.x), size.width - minSize)
-                        split = new / size.width
-
-                    case .vertical:
-                        let new = min(max(minSize, gesture.location.y), size.height - minSize)
-                        split = new / size.height
-                    }
+                case .vertical:
+                    let new = min(max(minSize, gesture.location.y), size.height - minSize)
+                    split = new / size.height
                 }
             }
     }
 
-    // MARK: - Layout helpers (pixel-aligned)
-    private func layoutMetrics(for size: CGSize) -> (left: CGRect, right: CGRect, splitterPoint: CGPoint) {
-        var leftRect = CGRect(origin: .zero, size: size)
-        var rightRect = CGRect(origin: .zero, size: size)
-        var point = CGPoint(x: size.width / 2, y: size.height / 2)
-
-        switch (direction) {
+    private func leftRect(for size: CGSize) -> CGRect {
+        var result = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+        switch direction {
         case .horizontal:
-            let divider = splitterVisibleSize
-            var leftWidth = size.width * split - divider / 2
-            leftWidth = min(max(minSize, leftWidth), size.width - divider - minSize)
-
-            leftRect.size.width = leftWidth
-            leftRect.size.height = size.height
-
-            rightRect.origin.x = leftWidth + divider
-            rightRect.size.width = size.width - rightRect.origin.x
-            rightRect.size.height = size.height
-
-            point = CGPoint(x: leftWidth + divider / 2, y: size.height / 2)
+            result.size.width *= split
+            result.size.width -= splitterVisibleSize / 2
+            result.size.width -= result.size.width.truncatingRemainder(dividingBy: self.resizeIncrements.width)
 
         case .vertical:
-            let divider = splitterVisibleSize
-            var topHeight = size.height * split - divider / 2
-            topHeight = min(max(minSize, topHeight), size.height - divider - minSize)
-
-            leftRect.size.height = topHeight
-            leftRect.size.width = size.width
-
-            rightRect.origin.y = topHeight + divider
-            rightRect.size.height = size.height - rightRect.origin.y
-            rightRect.size.width = size.width
-
-            point = CGPoint(x: size.width / 2, y: topHeight + divider / 2)
+            result.size.height *= split
+            result.size.height -= splitterVisibleSize / 2
+            result.size.height -= result.size.height.truncatingRemainder(dividingBy: self.resizeIncrements.height)
         }
 
-        return (left: leftRect, right: rightRect, splitterPoint: point)
+        return result
+    }
+
+    private func rightRect(for size: CGSize, leftRect: CGRect) -> CGRect {
+        var result = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+        switch direction {
+        case .horizontal:
+            result.origin.x += leftRect.size.width
+            result.origin.x += splitterVisibleSize / 2
+            result.size.width -= result.origin.x
+
+        case .vertical:
+            result.origin.y += leftRect.size.height
+            result.origin.y += splitterVisibleSize / 2
+            result.size.height -= result.origin.y
+        }
+
+        return result
+    }
+
+    private func splitterPoint(for size: CGSize, leftRect: CGRect) -> CGPoint {
+        switch direction {
+        case .horizontal:
+            return CGPoint(x: leftRect.size.width, y: size.height / 2)
+
+        case .vertical:
+            return CGPoint(x: size.width / 2, y: leftRect.size.height)
+        }
     }
 
     struct Divider: View {
@@ -132,57 +136,79 @@ struct SplitView<L: View, R: View>: View {
         let invisibleSize: CGFloat
         let color: Color
         @Binding var split: CGFloat
-        let axisLength: CGFloat
 
         private var visibleWidth: CGFloat? {
-            switch (direction) {
-            case .horizontal: return visibleSize
-            case .vertical: return axisLength
+            switch direction {
+            case .horizontal:
+                return visibleSize
+            case .vertical:
+                return nil
             }
         }
 
         private var visibleHeight: CGFloat? {
-            switch (direction) {
-            case .horizontal: return axisLength
-            case .vertical: return visibleSize
+            switch direction {
+            case .horizontal:
+                return nil
+            case .vertical:
+                return visibleSize
             }
         }
 
         private var invisibleWidth: CGFloat? {
-            switch (direction) {
-            case .horizontal: return visibleSize + invisibleSize
-            case .vertical: return axisLength
+            switch direction {
+            case .horizontal:
+                return visibleSize + invisibleSize
+            case .vertical:
+                return nil
             }
         }
 
         private var invisibleHeight: CGFloat? {
-            switch (direction) {
-            case .horizontal: return axisLength
-            case .vertical: return visibleSize + invisibleSize
+            switch direction {
+            case .horizontal:
+                return nil
+            case .vertical:
+                return visibleSize + invisibleSize
+            }
+        }
+
+        @ViewBuilder
+        private func pointerStyled<Content: View>(_ content: Content) -> some View {
+            if #available(macOS 15.0, *) {
+                switch direction {
+                case .horizontal:
+                    content.pointerStyle(.frameResize(position: .trailing))
+                case .vertical:
+                    content.pointerStyle(.frameResize(position: .top))
+                }
+            } else {
+                content.onHover { isHovered in
+                    if isHovered {
+                        switch direction {
+                        case .horizontal:
+                            NSCursor.resizeLeftRight.push()
+                        case .vertical:
+                            NSCursor.resizeUpDown.push()
+                        }
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
             }
         }
 
         var body: some View {
-            ZStack {
-                Color.clear
-                    .frame(width: invisibleWidth, height: invisibleHeight)
-                    .contentShape(Rectangle())
-                Rectangle()
-                    .fill(color)
-                    .frame(width: visibleWidth, height: visibleHeight)
-            }
-            .onHover { isHovered in
-                if (isHovered) {
-                    switch (direction) {
-                    case .horizontal:
-                        NSCursor.resizeLeftRight.push()
-                    case .vertical:
-                        NSCursor.resizeUpDown.push()
-                    }
-                } else {
-                    NSCursor.pop()
+            pointerStyled(
+                ZStack {
+                    Color.clear
+                        .frame(width: invisibleWidth, height: invisibleHeight)
+                        .contentShape(Rectangle())
+                    Rectangle()
+                        .fill(color)
+                        .frame(width: visibleWidth, height: visibleHeight)
                 }
-            }
+            )
         }
     }
 }

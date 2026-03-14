@@ -7,6 +7,7 @@
 //
 
 import AppKit
+import GhosttyKit
 import OSLog
 
 /// Manages IME (Input Method Editor) state and text input handling for Ghostty terminal
@@ -19,6 +20,7 @@ class GhosttyIMEHandler {
 
     /// Track marked text for IME composition
     private(set) var markedText: String = ""
+    private var markedTextSelectionRange = NSRange(location: NSNotFound, length: 0)
 
     /// Attributes for displaying marked text
     private let markedTextAttributes: [NSAttributedString.Key: Any] = [
@@ -66,6 +68,8 @@ class GhosttyIMEHandler {
     func clearMarkedText() {
         if !markedText.isEmpty {
             markedText = ""
+            markedTextSelectionRange = NSRange(location: NSNotFound, length: 0)
+            syncPreedit(clearIfNeeded: true)
             view?.needsDisplay = true
         }
     }
@@ -94,6 +98,8 @@ class GhosttyIMEHandler {
 
         // Update marked text state
         markedText = text
+        markedTextSelectionRange = selectedRange
+        syncPreedit(clearIfNeeded: false)
 
         // Tell system we've handled the marked text
         view?.inputContext?.invalidateCharacterCoordinates()
@@ -107,13 +113,14 @@ class GhosttyIMEHandler {
         if !markedText.isEmpty {
             surface?.sendText(markedText)
             markedText = ""
+            markedTextSelectionRange = NSRange(location: NSNotFound, length: 0)
+            syncPreedit(clearIfNeeded: true)
             view?.needsDisplay = true
         }
     }
 
     func selectedRange() -> NSRange {
-        // Terminals don't have text selection in the traditional sense for IME
-        return NSRange(location: NSNotFound, length: 0)
+        markedTextSelectionRange
     }
 
     func markedRange() -> NSRange {
@@ -183,6 +190,19 @@ class GhosttyIMEHandler {
 
     func characterIndex(for point: NSPoint) -> Int {
         return NSNotFound
+    }
+
+    private func syncPreedit(clearIfNeeded: Bool) {
+        guard let surface = surface?.unsafeCValue else { return }
+
+        if !markedText.isEmpty {
+            let len = markedText.utf8CString.count
+            markedText.withCString { ptr in
+                ghostty_surface_preedit(surface, ptr, UInt(len - 1))
+            }
+        } else if clearIfNeeded {
+            ghostty_surface_preedit(surface, nil, 0)
+        }
     }
 
     // MARK: - Helper

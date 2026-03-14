@@ -145,11 +145,13 @@ struct CompanionPanelView: View {
     private var content: some View {
         switch panel {
         case .terminal:
-            TerminalTabView(
-                worktree: worktree,
-                selectedSessionId: $terminalSessionId,
-                repositoryManager: repositoryManager
-            )
+            AizenTerminalRootContainer {
+                TerminalTabView(
+                    worktree: worktree,
+                    selectedSessionId: $terminalSessionId,
+                    repositoryManager: repositoryManager
+                )
+            }
 
         case .files:
             FileTabView(

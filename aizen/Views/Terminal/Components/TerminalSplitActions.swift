@@ -5,37 +5,59 @@
 //  Created by Uladzislau Yakauleu on 17.10.25.
 //
 
-import SwiftUI
-
 // MARK: - Terminal Split Actions (for keyboard shortcuts)
 
 final class TerminalSplitActions {
-    private var splitHorizontalHandler: (() -> Void)?
-    private var splitVerticalHandler: (() -> Void)?
+    private var splitRightHandler: (() -> Void)?
+    private var splitLeftHandler: (() -> Void)?
+    private var splitDownHandler: (() -> Void)?
+    private var splitUpHandler: (() -> Void)?
     private var closePaneHandler: (() -> Void)?
 
     func configure(
-        splitHorizontal: @escaping () -> Void,
-        splitVertical: @escaping () -> Void,
+        splitRight: @escaping () -> Void,
+        splitLeft: @escaping () -> Void,
+        splitDown: @escaping () -> Void,
+        splitUp: @escaping () -> Void,
         closePane: @escaping () -> Void
     ) {
-        splitHorizontalHandler = splitHorizontal
-        splitVerticalHandler = splitVertical
+        splitRightHandler = splitRight
+        splitLeftHandler = splitLeft
+        splitDownHandler = splitDown
+        splitUpHandler = splitUp
         closePaneHandler = closePane
     }
 
     func clear() {
-        splitHorizontalHandler = nil
-        splitVerticalHandler = nil
+        splitRightHandler = nil
+        splitLeftHandler = nil
+        splitDownHandler = nil
+        splitUpHandler = nil
         closePaneHandler = nil
     }
 
     func splitHorizontal() {
-        splitHorizontalHandler?()
+        splitRightHandler?()
     }
 
     func splitVertical() {
-        splitVerticalHandler?()
+        splitDownHandler?()
+    }
+
+    func splitRight() {
+        splitRightHandler?()
+    }
+
+    func splitLeft() {
+        splitLeftHandler?()
+    }
+
+    func splitDown() {
+        splitDownHandler?()
+    }
+
+    func splitUp() {
+        splitUpHandler?()
     }
 
     func closePane() {
@@ -43,13 +65,47 @@ final class TerminalSplitActions {
     }
 }
 
-private struct TerminalSplitActionsKey: FocusedValueKey {
-    typealias Value = TerminalSplitActions
-}
+final class TerminalSplitActionRouter {
+    static let shared = TerminalSplitActionRouter()
 
-extension FocusedValues {
-    var terminalSplitActions: TerminalSplitActions? {
-        get { self[TerminalSplitActionsKey.self] }
-        set { self[TerminalSplitActionsKey.self] = newValue }
+    private weak var activeActions: TerminalSplitActions?
+
+    private init() {}
+
+    func activate(_ actions: TerminalSplitActions) {
+        activeActions = actions
+    }
+
+    func clear(_ actions: TerminalSplitActions) {
+        guard activeActions === actions else { return }
+        activeActions = nil
+    }
+
+    func splitHorizontal() {
+        activeActions?.splitHorizontal()
+    }
+
+    func splitVertical() {
+        activeActions?.splitVertical()
+    }
+
+    func splitRight() {
+        activeActions?.splitRight()
+    }
+
+    func splitLeft() {
+        activeActions?.splitLeft()
+    }
+
+    func splitDown() {
+        activeActions?.splitDown()
+    }
+
+    func splitUp() {
+        activeActions?.splitUp()
+    }
+
+    func closePane() {
+        activeActions?.closePane()
     }
 }

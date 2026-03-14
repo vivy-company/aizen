@@ -6,7 +6,7 @@
 //
 
 import AppKit
-import Metal
+import GhosttyKit
 import OSLog
 import SwiftUI
 
@@ -25,28 +25,6 @@ class GhosttyRenderingSetup {
     @AppStorage("terminalSelectionBackground") private var terminalSelectionBackground = "#585b70"
     @AppStorage("terminalPalette") private var terminalPalette = "#45475a,#f38ba8,#a6e3a1,#f9e2af,#89b4fa,#f5c2e7,#94e2d5,#a6adc8,#585b70,#f37799,#89d88b,#ebd391,#74a8fc,#f2aede,#6bd7ca,#bac2de"
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
-
-    // MARK: - Layer Setup
-
-    /// Configure the Metal-backed layer for terminal rendering
-    ///
-    /// CRITICAL: Must set layer property BEFORE setting wantsLayer = true
-    /// This ensures Metal rendering works correctly
-    func setupLayer(for view: NSView) {
-        // Create Metal layer
-        let metalLayer = CAMetalLayer()
-        metalLayer.device = MTLCreateSystemDefaultDevice()
-        metalLayer.pixelFormat = .bgra8Unorm
-        metalLayer.framebufferOnly = true
-        metalLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 2.0
-
-        // IMPORTANT: Set layer before wantsLayer for proper Metal initialization
-        view.layer = metalLayer
-        view.wantsLayer = true
-        view.layerContentsRedrawPolicy = .duringViewResize
-
-        Self.logger.debug("Metal layer configured")
-    }
 
     // MARK: - Surface Setup
 
@@ -179,72 +157,4 @@ class GhosttyRenderingSetup {
         }
     }
 
-    // MARK: - Scale and Size Updates
-
-    /// Update Metal layer content scale and surface scale factors
-    func updateBackingProperties(view: NSView, surface: ghostty_surface_t?, window: NSWindow?) {
-        guard let surface = surface else { return }
-
-        // Update Metal layer content scale
-        if let window = window {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            view.layer?.contentsScale = window.backingScaleFactor
-            CATransaction.commit()
-        }
-
-        // Update surface scale factors
-        let fbFrame = view.convertToBacking(view.frame)
-        let xScale = fbFrame.size.width / view.frame.size.width
-        let yScale = fbFrame.size.height / view.frame.size.height
-        ghostty_surface_set_content_scale(surface, xScale, yScale)
-
-        // Update surface size (framebuffer dimensions changed)
-        ghostty_surface_set_size(
-            surface,
-            UInt32(fbFrame.size.width),
-            UInt32(fbFrame.size.height)
-        )
-    }
-
-    /// Update Metal layer frame and Ghostty surface size
-    func updateLayout(view: NSView, metalLayer: CAMetalLayer?, surface: ghostty_surface_t?, lastSize: inout CGSize) -> Bool {
-        // Update Metal layer frame to match view bounds
-        if let metalLayer = metalLayer {
-            metalLayer.frame = view.bounds
-        }
-
-        // Update Ghostty surface size during layout pass
-        // Only update if backing pixel size actually changed to prevent flicker
-        guard let surface = surface else { return false }
-        guard view.bounds.width > 0 && view.bounds.height > 0 else { return false }
-
-        var scaledSize = view.convertToBacking(view.bounds.size)
-        scaledSize = snapSizeToCell(surface: surface, scaledSize: scaledSize)
-
-        // Only update if size changed by at least 1 pixel
-        let widthChanged = abs(scaledSize.width - lastSize.width) >= 1.0
-        let heightChanged = abs(scaledSize.height - lastSize.height) >= 1.0
-
-        guard widthChanged || heightChanged else { return false }
-
-        lastSize = scaledSize
-        if let metalLayer = metalLayer {
-            metalLayer.drawableSize = scaledSize
-        }
-        ghostty_surface_set_size(
-            surface,
-            UInt32(scaledSize.width),
-            UInt32(scaledSize.height)
-        )
-        ghostty_surface_refresh(surface)
-
-        return true
-    }
-
-    /// Snap the desired pixel size down to the nearest full terminal cell to avoid partial-cell artifacts.
-    /// Snap size to whole pixels (scaledSize is already in pixel units).
-    func snapSizeToCell(surface: ghostty_surface_t, scaledSize: CGSize) -> CGSize {
-        CGSize(width: floor(scaledSize.width), height: floor(scaledSize.height))
-    }
 }

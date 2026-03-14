@@ -1,0 +1,497 @@
+//
+//  TerminalSplitController.swift
+//  aizen
+//
+//  Controller-owned split state aligned with Ghostty's terminal controller model.
+//
+
+import AppKit
+import Combine
+import SwiftUI
+import os
+
+@MainActor
+final class TerminalSplitController: ObservableObject {
+    enum CloseAction {
+        case pane
+        case tab
+    }
+
+    let worktree: Worktree
+    let session: TerminalSession
+    let sessionManager: TerminalSessionManager
+    let splitActions = TerminalSplitActions()
+
+    @Published var layout: SplitNode {
+        didSet {
+            guard isSelected else { return }
+            scheduleLayoutSave()
+        }
+    }
+
+    @Published var focusedPaneId: String {
+        didSet {
+            guard isSelected else { return }
+            guard !focusedPaneId.isEmpty else { return }
+            focusedPaneVoiceRecording = paneVoiceRecordingStates[focusedPaneId] ?? false
+            scheduleFocusSave()
+            applyTitleForFocusedPane()
+        }
+    }
+
+    @Published var showCloseConfirmation = false
+    @Published var voiceAction: (paneId: String, action: VoiceAction)?
+    @Published var focusRequestVersion = 0
+
+    private(set) var isSelected: Bool
+    private var paneTitles: [String: String] = [:]
+    private var layoutSaveTask: Task<Void, Never>?
+    private var focusSaveTask: Task<Void, Never>?
+    private var contextSaveTask: Task<Void, Never>?
+    private var pendingCloseAction: CloseAction = .pane
+    private var keyMonitor: Any?
+    private var focusedPaneVoiceRecording = false
+    private var paneVoiceRecordingStates: [String: Bool] = [:]
+
+    init(
+        worktree: Worktree,
+        session: TerminalSession,
+        sessionManager: TerminalSessionManager,
+        isSelected: Bool
+    ) {
+        self.worktree = worktree
+        self.session = session
+        self.sessionManager = sessionManager
+        self.isSelected = isSelected
+
+        if let layoutJSON = session.splitLayout,
+           let decoded = SplitLayoutHelper.decode(layoutJSON) {
+            self.layout = decoded
+            self.focusedPaneId = session.focusedPaneId ?? decoded.allPaneIds().first ?? ""
+        } else {
+            let defaultPaneId = TerminalLayoutDefaults.paneId(
+                sessionId: session.id,
+                focusedPaneId: session.focusedPaneId
+            )
+            self.layout = SplitLayoutHelper.createDefault(paneId: defaultPaneId)
+            self.focusedPaneId = defaultPaneId
+        }
+
+        splitActions.configure(
+            splitRight: { [weak self] in self?.splitRight() },
+            splitLeft: { [weak self] in self?.splitLeft() },
+            splitDown: { [weak self] in self?.splitDown() },
+            splitUp: { [weak self] in self?.splitUp() },
+            closePane: { [weak self] in self?.closePane() }
+        )
+    }
+
+    func handleAppear() {
+        seedSessionLayoutIfNeeded()
+        ensureKeyMonitor()
+
+        guard isSelected else { return }
+        activateSplitActions()
+        persistLayout()
+        persistFocus()
+        applyTitleForFocusedPane()
+        focusRequestVersion += 1
+    }
+
+    func handleDisappear() {
+        layoutSaveTask?.cancel()
+        focusSaveTask?.cancel()
+        contextSaveTask?.cancel()
+        deactivateSplitActions()
+
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
+    }
+
+    func handleSelectionChange(_ selected: Bool) {
+        isSelected = selected
+
+        if selected {
+            activateSplitActions()
+            persistLayout()
+            persistFocus()
+            applyTitleForFocusedPane()
+            focusRequestVersion += 1
+        } else {
+            deactivateSplitActions()
+        }
+    }
+
+    func handlePaneFocus(_ paneId: String) {
+        activateSplitActions()
+        focusedPaneId = paneId
+    }
+
+    func handleTitleChange(for paneId: String, title: String) {
+        paneTitles[paneId] = title
+        if paneId == focusedPaneId, session.title != title {
+            session.title = title
+            saveContext()
+        }
+    }
+
+    func handleVoiceRecordingChanged(for paneId: String, isRecording: Bool) {
+        paneVoiceRecordingStates[paneId] = isRecording
+        if focusedPaneId == paneId {
+            focusedPaneVoiceRecording = isRecording
+        }
+    }
+
+    func resizeSplit(_ node: SplitNode, to newRatio: CGFloat) {
+        let updatedSplit = node.withUpdatedRatio(Double(newRatio))
+        layout = layout.replacingNode(node, with: updatedSplit)
+    }
+
+    func equalize() {
+        layout = layout.equalized()
+    }
+
+    func splitHorizontal() {
+        splitRight()
+    }
+
+    func splitVertical() {
+        splitDown()
+    }
+
+    func splitRight() {
+        let sourcePaneId = activePaneId()
+        let newPaneId = UUID().uuidString
+        let newSplit = SplitNode.split(SplitNode.Split(
+            direction: .horizontal,
+            ratio: 0.5,
+            left: .leaf(paneId: sourcePaneId),
+            right: .leaf(paneId: newPaneId)
+        ))
+        layout = layout.replacingPane(sourcePaneId, with: newSplit).equalized()
+        focusedPaneId = newPaneId
+        focusRequestVersion += 1
+        activateSplitActions()
+    }
+
+    func splitLeft() {
+        let sourcePaneId = activePaneId()
+        let newPaneId = UUID().uuidString
+        let newSplit = SplitNode.split(SplitNode.Split(
+            direction: .horizontal,
+            ratio: 0.5,
+            left: .leaf(paneId: newPaneId),
+            right: .leaf(paneId: sourcePaneId)
+        ))
+        layout = layout.replacingPane(sourcePaneId, with: newSplit).equalized()
+        focusedPaneId = newPaneId
+        focusRequestVersion += 1
+        activateSplitActions()
+    }
+
+    func splitDown() {
+        let sourcePaneId = activePaneId()
+        let newPaneId = UUID().uuidString
+        let newSplit = SplitNode.split(SplitNode.Split(
+            direction: .vertical,
+            ratio: 0.5,
+            left: .leaf(paneId: sourcePaneId),
+            right: .leaf(paneId: newPaneId)
+        ))
+        layout = layout.replacingPane(sourcePaneId, with: newSplit).equalized()
+        focusedPaneId = newPaneId
+        focusRequestVersion += 1
+        activateSplitActions()
+    }
+
+    func splitUp() {
+        let sourcePaneId = activePaneId()
+        let newPaneId = UUID().uuidString
+        let newSplit = SplitNode.split(SplitNode.Split(
+            direction: .vertical,
+            ratio: 0.5,
+            left: .leaf(paneId: newPaneId),
+            right: .leaf(paneId: sourcePaneId)
+        ))
+        layout = layout.replacingPane(sourcePaneId, with: newSplit).equalized()
+        focusedPaneId = newPaneId
+        focusRequestVersion += 1
+        activateSplitActions()
+    }
+
+    func handleProcessExit(for paneId: String) {
+        paneVoiceRecordingStates.removeValue(forKey: paneId)
+
+        if let sessionId = session.id {
+            sessionManager.removeTerminal(for: sessionId, paneId: paneId)
+        }
+
+        let paneIds = layout.allPaneIds()
+        guard paneIds.contains(paneId) else { return }
+
+        if paneIds.count == 1 {
+            Task { @MainActor [weak session] in
+                try? await Task.sleep(for: .milliseconds(100))
+                guard let session,
+                      !session.isDeleted,
+                      let context = session.managedObjectContext else { return }
+                context.delete(session)
+                do {
+                    try context.save()
+                } catch {
+                    Logger.terminal.error("Failed to delete terminal session: \(error.localizedDescription)")
+                }
+            }
+            return
+        }
+
+        if let newLayout = layout.removingPane(paneId) {
+            if focusedPaneId == paneId, let nextPane = newLayout.allPaneIds().first {
+                focusedPaneId = nextPane
+            }
+            layout = newLayout
+        }
+    }
+
+    func closePane() {
+        let paneCount = layout.allPaneIds().count
+
+        if paneCount == 1 {
+            if let sessionId = session.id,
+               sessionManager.paneHasRunningProcess(for: sessionId, paneId: focusedPaneId) {
+                pendingCloseAction = .tab
+                showCloseConfirmation = true
+            } else {
+                closeTab()
+            }
+        } else {
+            if let sessionId = session.id,
+               sessionManager.paneHasRunningProcess(for: sessionId, paneId: activePaneId()) {
+                pendingCloseAction = .pane
+                showCloseConfirmation = true
+            } else {
+                executeClosePaneOnly()
+            }
+        }
+    }
+
+    func executeCloseAction() {
+        switch pendingCloseAction {
+        case .pane:
+            executeClosePaneOnly()
+        case .tab:
+            closeTab()
+        }
+    }
+
+    private func executeClosePaneOnly() {
+        let paneIdToClose = activePaneId()
+        paneVoiceRecordingStates.removeValue(forKey: paneIdToClose)
+
+        guard let newLayout = layout.removingPane(paneIdToClose) else {
+            closeTab()
+            return
+        }
+
+        if let nextPane = newLayout.allPaneIds().first {
+            focusedPaneId = nextPane
+        }
+
+        layout = newLayout.equalized()
+
+        DispatchQueue.main.async { [session, sessionManager] in
+            if let sessionId = session.id {
+                sessionManager.removeTerminal(for: sessionId, paneId: paneIdToClose)
+            }
+
+            if Self.sessionPersistenceEnabled {
+                Task {
+                    await TmuxSessionManager.shared.killSession(paneId: paneIdToClose)
+                }
+            }
+        }
+    }
+
+    private func closeTab() {
+        let allPaneIds = layout.allPaneIds()
+        for paneId in allPaneIds {
+            paneVoiceRecordingStates.removeValue(forKey: paneId)
+        }
+        focusedPaneVoiceRecording = false
+
+        if let sessionId = session.id {
+            for paneId in allPaneIds {
+                sessionManager.removeTerminal(for: sessionId, paneId: paneId)
+            }
+        }
+
+        if Self.sessionPersistenceEnabled {
+            Task {
+                for paneId in allPaneIds {
+                    await TmuxSessionManager.shared.killSession(paneId: paneId)
+                }
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak session] in
+            guard let session,
+                  !session.isDeleted,
+                  let context = session.managedObjectContext else { return }
+            context.delete(session)
+            do {
+                try context.save()
+            } catch {
+                Logger.terminal.error("Failed to delete terminal session: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func activateSplitActions() {
+        TerminalSplitActionRouter.shared.activate(splitActions)
+    }
+
+    private func deactivateSplitActions() {
+        TerminalSplitActionRouter.shared.clear(splitActions)
+    }
+
+    private func ensureKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handleVoiceShortcut(event) ?? event
+        }
+    }
+
+    private func saveContext() {
+        scheduleDebouncedSave()
+    }
+
+    private func scheduleDebouncedSave() {
+        contextSaveTask?.cancel()
+        contextSaveTask = Task { @MainActor [weak session] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled,
+                  let session,
+                  !session.isDeleted,
+                  let context = session.managedObjectContext else { return }
+            do {
+                try context.save()
+            } catch {
+                Logger.terminal.error("Failed to save split layout: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func seedSessionLayoutIfNeeded() {
+        guard !session.isDeleted else { return }
+        guard let context = session.managedObjectContext else { return }
+
+        let resolvedPaneId = TerminalLayoutDefaults.paneId(
+            sessionId: session.id,
+            focusedPaneId: focusedPaneId
+        )
+
+        var didChange = false
+        if session.focusedPaneId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            session.focusedPaneId = resolvedPaneId
+            didChange = true
+        }
+
+        if session.splitLayout?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true,
+           let json = SplitLayoutHelper.encode(TerminalLayoutDefaults.defaultLayout(paneId: resolvedPaneId)) {
+            session.splitLayout = json
+            didChange = true
+        }
+
+        guard didChange else { return }
+        do {
+            try context.save()
+        } catch {
+            Logger.terminal.error("Failed to seed terminal session layout: \(error.localizedDescription)")
+        }
+    }
+
+    private func scheduleLayoutSave() {
+        layoutSaveTask?.cancel()
+        let currentLayout = layout
+        layoutSaveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            self?.persistLayout(currentLayout)
+        }
+    }
+
+    private func scheduleFocusSave() {
+        focusSaveTask?.cancel()
+        let currentFocusedPaneId = focusedPaneId
+        focusSaveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled else { return }
+            self?.persistFocus(currentFocusedPaneId)
+        }
+    }
+
+    private func persistLayout(_ layoutToSave: SplitNode? = nil) {
+        guard !session.isDeleted else { return }
+        let node = layoutToSave ?? layout
+        if let json = SplitLayoutHelper.encode(node), session.splitLayout != json {
+            session.splitLayout = json
+            saveContext()
+        }
+    }
+
+    private func persistFocus(_ paneId: String? = nil) {
+        guard !session.isDeleted else { return }
+        let id = paneId ?? focusedPaneId
+        guard !id.isEmpty else { return }
+        guard session.focusedPaneId != id else { return }
+        session.focusedPaneId = id
+        saveContext()
+    }
+
+    private func applyTitleForFocusedPane() {
+        guard !session.isDeleted else { return }
+        if let title = paneTitles[focusedPaneId], session.title != title {
+            session.title = title
+            saveContext()
+        }
+    }
+
+    private func handleVoiceShortcut(_ event: NSEvent) -> NSEvent? {
+        guard isSelected else { return event }
+        let targetPaneId = activePaneId()
+
+        if focusedPaneVoiceRecording {
+            if event.keyCode == 53 {
+                voiceAction = (targetPaneId, .cancel)
+                return nil
+            }
+            if event.keyCode == 36 {
+                voiceAction = (targetPaneId, .accept)
+                return nil
+            }
+        }
+
+        guard event.modifierFlags.contains(.command),
+              event.modifierFlags.contains(.shift),
+              event.charactersIgnoringModifiers?.lowercased() == "m" else {
+            return event
+        }
+
+        voiceAction = (targetPaneId, .toggle)
+        return nil
+    }
+
+    private func activePaneId() -> String {
+        let paneIds = layout.allPaneIds()
+        if paneIds.contains(focusedPaneId) {
+            return focusedPaneId
+        }
+        return paneIds.first ?? focusedPaneId
+    }
+
+    private static var sessionPersistenceEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "terminalSessionPersistence")
+    }
+}

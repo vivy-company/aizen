@@ -8,6 +8,7 @@
 import Foundation
 import AppKit
 import Combine
+import GhosttyKit
 import OSLog
 import SwiftUI
 
@@ -18,7 +19,7 @@ enum Ghostty {
 
     /// Wrapper to hold reference to a surface for tracking
     /// Note: ghostty_surface_t is an opaque pointer, so we store it directly
-    /// The surface is freed when the GhosttyTerminalView is deallocated
+    /// The surface is freed when the AizenTerminalSurfaceView is deallocated
     class SurfaceReference {
         let surface: ghostty_surface_t
         var isValid: Bool = true
@@ -37,7 +38,6 @@ enum Ghostty {
 
 extension Ghostty {
     /// Minimal wrapper for ghostty_app_t lifecycle management
-    @MainActor
     class App: ObservableObject {
         enum Readiness: String {
             case loading, error, ready
@@ -95,9 +95,7 @@ extension Ghostty {
                 userdata: Unmanaged.passUnretained(self).toOpaque(),
                 supports_selection_clipboard: true,
                 wakeup_cb: { userdata in App.wakeup(userdata) },
-                action_cb: { app, target, action in
-                    app.map { App.handleAction($0, target: target, action: action) } ?? false
-                },
+                action_cb: { app, target, action in App.handleAction(app!, target: target, action: action) },
                 read_clipboard_cb: { userdata, loc, state in App.readClipboard(userdata, location: loc, state: state) },
                 confirm_read_clipboard_cb: { userdata, str, state, request in App.confirmReadClipboard(userdata, string: str, state: state, request: request) },
                 write_clipboard_cb: { userdata, loc, content, count, confirm in
@@ -135,6 +133,7 @@ extension Ghostty {
             unsetenv("XDG_CONFIG_HOME")
 
             self.app = app
+            ghostty_app_set_focus(app, NSApp.isActive)
             self.readiness = .ready
 
             // Store initial appearance and theme
@@ -160,10 +159,44 @@ extension Ghostty {
                 }
             }
 
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(keyboardSelectionDidChange),
+                name: NSTextInputContext.keyboardSelectionDidChangeNotification,
+                object: nil
+            )
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(applicationDidBecomeActive),
+                name: NSApplication.didBecomeActiveNotification,
+                object: nil
+            )
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(applicationDidResignActive),
+                name: NSApplication.didResignActiveNotification,
+                object: nil
+            )
+
         }
 
-        @objc private func systemAppearanceDidChange(_ notification: Notification) {
+        @objc private func systemAppearanceDidChange(_ notification: Foundation.Notification) {
             handleAppearanceChange()
+        }
+
+        @objc private func keyboardSelectionDidChange(_ notification: Foundation.Notification) {
+            guard let app = self.app else { return }
+            ghostty_app_keyboard_changed(app)
+        }
+
+        @objc private func applicationDidBecomeActive(_ notification: Foundation.Notification) {
+            guard let app = self.app else { return }
+            ghostty_app_set_focus(app, true)
+        }
+
+        @objc private func applicationDidResignActive(_ notification: Foundation.Notification) {
+            guard let app = self.app else { return }
+            ghostty_app_set_focus(app, false)
         }
 
         private func handleAppearanceChange() {
@@ -200,6 +233,7 @@ extension Ghostty {
         /// Clean up the ghostty app resources
         func cleanup() {
             DistributedNotificationCenter.default().removeObserver(self)
+            NotificationCenter.default.removeObserver(self)
 
             if let observer = appearanceSettingObserver {
                 NotificationCenter.default.removeObserver(observer)
@@ -288,7 +322,7 @@ extension Ghostty {
                 font-family = \(terminalFontName)
                 font-size = \(Int(terminalFontSize))
                 window-inherit-font-size = false
-                window-padding-balance = true
+                window-padding-balance = false
                 window-padding-x = 0
                 window-padding-y = 0
                 window-padding-color = extend-always
@@ -340,11 +374,11 @@ extension Ghostty {
 
         static func handleAction(_ app: ghostty_app_t, target: ghostty_target_s, action: ghostty_action_s) -> Bool {
             // Get the terminal view from surface userdata if target is a surface
-            let terminalView: GhosttyTerminalView? = {
+            let terminalView: AizenTerminalSurfaceView? = {
                 guard target.tag == GHOSTTY_TARGET_SURFACE else { return nil }
                 let surface = target.target.surface
                 guard let userdata = ghostty_surface_userdata(surface) else { return nil }
-                return Unmanaged<GhosttyTerminalView>.fromOpaque(userdata).takeUnretainedValue()
+                return Unmanaged<AizenTerminalSurfaceView>.fromOpaque(userdata).takeUnretainedValue()
             }()
 
             switch action.tag {
@@ -411,8 +445,35 @@ extension Ghostty {
                 NotificationCenter.default.post(
                     name: .ghosttyDidUpdateScrollbar,
                     object: terminalView,
-                    userInfo: [Notification.Name.ScrollbarKey: scrollbar]
+                    userInfo: [Foundation.Notification.Name.ScrollbarKey: scrollbar]
                 )
+                return true
+
+            case GHOSTTY_ACTION_START_SEARCH:
+                let startSearch = Ghostty.Action.StartSearch(c: action.action.start_search)
+                DispatchQueue.main.async {
+                    terminalView?.startSearch(startSearch)
+                }
+                return true
+
+            case GHOSTTY_ACTION_END_SEARCH:
+                DispatchQueue.main.async {
+                    terminalView?.endSearchFromGhostty()
+                }
+                return true
+
+            case GHOSTTY_ACTION_SEARCH_TOTAL:
+                let total = action.action.search_total.total
+                DispatchQueue.main.async {
+                    terminalView?.updateSearchTotal(total)
+                }
+                return true
+
+            case GHOSTTY_ACTION_SEARCH_SELECTED:
+                let selected = action.action.search_selected.selected
+                DispatchQueue.main.async {
+                    terminalView?.updateSearchSelected(selected)
+                }
                 return true
 
             default:
@@ -420,20 +481,27 @@ extension Ghostty {
             }
         }
 
-        static func readClipboard(_ userdata: UnsafeMutableRawPointer?, location: ghostty_clipboard_e, state: UnsafeMutableRawPointer?) {
-            // userdata is the GhosttyTerminalView instance
-            guard let userdata = userdata else { return }
-            let terminalView = Unmanaged<GhosttyTerminalView>.fromOpaque(userdata).takeUnretainedValue()
-            guard let surface = terminalView.surface?.unsafeCValue else { return }
+        static func readClipboard(
+            _ userdata: UnsafeMutableRawPointer?,
+            location: ghostty_clipboard_e,
+            state: UnsafeMutableRawPointer?
+        ) -> Bool {
+            // userdata is the AizenTerminalSurfaceView instance
+            guard let userdata = userdata else { return false }
+            let terminalView = Unmanaged<AizenTerminalSurfaceView>.fromOpaque(userdata).takeUnretainedValue()
+            guard let surface = terminalView.surface else { return false }
 
             // Read from macOS clipboard
-            let clipboardString = Clipboard.readString() ?? ""
+            guard let clipboardString = Clipboard.readString(), !clipboardString.isEmpty else {
+                return false
+            }
 
             // Complete the clipboard request by providing data to Ghostty
             clipboardString.withCString { ptr in
                 ghostty_surface_complete_clipboard_request(surface, ptr, state, false)
             }
 
+            return true
         }
 
         static func confirmReadClipboard(
@@ -482,9 +550,9 @@ extension Ghostty {
         }
 
         static func closeSurface(_ userdata: UnsafeMutableRawPointer?, processAlive: Bool) {
-            // userdata is the GhosttyTerminalView instance
+            // userdata is the AizenTerminalSurfaceView instance
             guard let userdata = userdata else { return }
-            let terminalView = Unmanaged<GhosttyTerminalView>.fromOpaque(userdata).takeUnretainedValue()
+            let terminalView = Unmanaged<AizenTerminalSurfaceView>.fromOpaque(userdata).takeUnretainedValue()
 
             // Trigger process exit callback on main thread
             DispatchQueue.main.async {

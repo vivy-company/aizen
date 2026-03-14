@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Build libghostty as an Apple Silicon (arm64) static library.
+# Build GhosttyKit as a macOS xcframework.
 # Usage: ./scripts/build-libghostty.sh [commit]
 #   - commit: ghostty commit/tag/branch
 #             default: Vendor/libghostty/VERSION when present, otherwise main HEAD
@@ -21,7 +21,7 @@ if [ -z "${REF}" ]; then
     REF="$(git ls-remote "${GHOSTTY_REPO}" HEAD | awk '{print $1}')"
 fi
 
-echo "Building libghostty @ ${REF}"
+echo "Building GhosttyKit @ ${REF}"
 
 # Check dependencies
 for cmd in git zig; do
@@ -40,20 +40,11 @@ echo "Cloning ghostty..."
 git clone --filter=blob:none --no-checkout --depth 1 "${GHOSTTY_REPO}" "${WORKDIR}/ghostty"
 (cd "${WORKDIR}/ghostty" && git fetch --depth 1 origin "${REF}" && git checkout FETCH_HEAD)
 
-# Patch build.zig to install libs on macOS
-perl -0pi -e 's/if \(!config\.target\.result\.os\.tag\.isDarwin\(\)\) \{/if (true) {/' "${WORKDIR}/ghostty/build.zig"
-
-# Patch to link Metal frameworks
-perl -0pi -e 's/lib\.linkFramework\("IOSurface"\);/lib.linkFramework("IOSurface");\n    lib.linkFramework("Metal");\n    lib.linkFramework("MetalKit");/g' "${WORKDIR}/ghostty/pkg/macos/build.zig"
-perl -0pi -e 's/module\.linkFramework\("IOSurface", \.\{\}\);/module.linkFramework("IOSurface", .{});\n        module.linkFramework("Metal", .{});\n        module.linkFramework("MetalKit", .{});/g' "${WORKDIR}/ghostty/pkg/macos/build.zig"
-
-# Patch bundle ID to use Aizen's instead of Ghostty's
-# This prevents loading user's Ghostty config from ~/Library/Application Support/com.mitchellh.ghostty/
+# Patch bundle ID to use Aizen's instead of Ghostty's so the embedded core
+# doesn't collide with the standalone Ghostty app's config/runtime identifiers.
 sed -i '' 's/com\.mitchellh\.ghostty/win.aizen.app/g' "${WORKDIR}/ghostty/src/build_config.zig"
 
 ZIG_FLAGS=(
-    -Dapp-runtime=none
-    -Demit-xcframework=false
     -Demit-macos-app=false
     -Demit-exe=false
     -Demit-docs=false
@@ -62,31 +53,34 @@ ZIG_FLAGS=(
     -Demit-terminfo=true
     -Demit-termcap=false
     -Demit-themes=false
+    -Dxcframework-target=native
     -Doptimize=ReleaseFast
     -Dstrip
 )
 
-OUTDIR="${WORKDIR}/zig-out-aarch64"
-echo "Building for Apple Silicon (arm64)..."
-(cd "${WORKDIR}/ghostty" && zig build "${ZIG_FLAGS[@]}" -Dtarget="aarch64-macos" -p "${OUTDIR}")
-if [ ! -f "${OUTDIR}/lib/libghostty.a" ]; then
-    echo "Error: build failed - ${OUTDIR}/lib/libghostty.a not found" >&2
+OUTDIR="${WORKDIR}/ghostty/macos/GhosttyKit.xcframework"
+echo "Building native GhosttyKit.xcframework..."
+(cd "${WORKDIR}/ghostty" && zig build "${ZIG_FLAGS[@]}")
+if [ ! -d "${OUTDIR}" ]; then
+    echo "Error: build failed - ${OUTDIR} not found" >&2
     exit 1
 fi
 
-# Copy built binary
-mkdir -p "${VENDOR_DIR}/lib" "${VENDOR_DIR}/include"
-cp "${OUTDIR}/lib/libghostty.a" "${VENDOR_DIR}/lib/libghostty.a"
+# Copy built framework
+mkdir -p "${VENDOR_DIR}"
+rm -rf "${VENDOR_DIR}/GhosttyKit.xcframework" "${VENDOR_DIR}/include" "${VENDOR_DIR}/lib"
+rsync -a "${OUTDIR}/" "${VENDOR_DIR}/GhosttyKit.xcframework/"
 
-# Copy headers from the Ghostty build and drop Aizen's stale custom module map.
-# The app uses a bridging header, not an imported Clang module, and the
-# checked-in module.modulemap drifts against Ghostty HEAD as headers change.
-if [ -d "${WORKDIR}/ghostty/include" ]; then
-    rsync -a "${WORKDIR}/ghostty/include/" "${VENDOR_DIR}/include/"
+ARCHIVE_PATH="${VENDOR_DIR}/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a"
+if [ -f "${ARCHIVE_PATH}" ]; then
+    echo "Stripping static archive for GitHub size limits..."
+    chmod u+w "${ARCHIVE_PATH}"
+    strip -S -x "${ARCHIVE_PATH}"
+    ranlib "${ARCHIVE_PATH}"
+    ls -lh "${ARCHIVE_PATH}"
 fi
-rm -f "${VENDOR_DIR}/include/module.modulemap"
 
 # Record version
 printf "%s\n" "${REF}" > "${VENDOR_DIR}/VERSION"
 
-echo "Done: built Apple Silicon libghostty.a"
+echo "Done: built GhosttyKit.xcframework"

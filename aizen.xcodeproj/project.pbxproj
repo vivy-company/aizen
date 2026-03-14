@@ -15,9 +15,9 @@
 		98D8F68E63ED4B66AB2B8651 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F05B3C5650AC493F9C8D24E4 /* AppIntents.framework */; };
 		A1D4A4A2B3C4D5E6F7A8B901 /* VVDevKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1D4A4A2B3C4D5E6F7A8B911 /* VVDevKit */; };
 		A1D4A4A2B3C4D5E6F7A8B902 /* VVDevKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1D4A4A2B3C4D5E6F7A8B912 /* VVDevKit */; };
-		CC1234572EA241B30007DBB1 /* libghostty.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* libghostty.a */; };
+		CC1234572EA241B30007DBB1 /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* GhosttyKit.xcframework */; };
 		CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC128B1A2EAF8DD600EA9A50 /* Sparkle */; };
-		CC2917D32EFBDAE300440062 /* libghostty.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* libghostty.a */; };
+		CC2917D32EFBDAE300440062 /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* GhosttyKit.xcframework */; };
 		CC2917D42EFBDAE300440062 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917B52EFBDAE300440062 /* Markdown */; };
 		CC2917D52EFBDAE300440062 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917B72EFBDAE300440062 /* Sparkle */; };
 		CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = CCB04B732EA241B60007DBB1 /* Markdown */; };
@@ -88,7 +88,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		CC1234562EA241B30007DBB1 /* libghostty.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libghostty.a; path = Vendor/libghostty/lib/libghostty.a; sourceTree = "<group>"; };
+		CC1234562EA241B30007DBB1 /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Vendor/libghostty/GhosttyKit.xcframework; sourceTree = "<group>"; };
 		CC2917DB2EFBDAE300440062 /* Aizen Nightly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aizen Nightly.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC2917DD2EFBDAE400440062 /* aizen nightly-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "aizen nightly-Info.plist"; path = "/Users/uyakauleu/development/aizen/aizen nightly-Info.plist"; sourceTree = "<absolute>"; };
 		CCB04B422EA241B30007DBB1 /* Aizen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aizen.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -151,7 +151,7 @@
 				CCACP0001000000000000004 /* ACPRegistry in Frameworks */,
 				A1D4A4A2B3C4D5E6F7A8B902 /* VVDevKit in Frameworks */,
 				89C3A37FB37B4F8A8E0CE8B4 /* AppIntents.framework in Frameworks */,
-				CC2917D32EFBDAE300440062 /* libghostty.a in Frameworks */,
+				CC2917D32EFBDAE300440062 /* GhosttyKit.xcframework in Frameworks */,
 				CC2917D42EFBDAE300440062 /* Markdown in Frameworks */,
 				CC2917D52EFBDAE300440062 /* Sparkle in Frameworks */,
 				21DCDAD9BE07D782912A77AD /* MLX in Frameworks */,
@@ -168,7 +168,7 @@
 				CCACP0001000000000000003 /* ACPRegistry in Frameworks */,
 				A1D4A4A2B3C4D5E6F7A8B901 /* VVDevKit in Frameworks */,
 				98D8F68E63ED4B66AB2B8651 /* AppIntents.framework in Frameworks */,
-				CC1234572EA241B30007DBB1 /* libghostty.a in Frameworks */,
+				CC1234572EA241B30007DBB1 /* GhosttyKit.xcframework in Frameworks */,
 				CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */,
 				CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */,
 				F023734E9DB882ACB5152A8C /* MLX in Frameworks */,
@@ -205,7 +205,7 @@
 			isa = PBXGroup;
 			children = (
 				F05B3C5650AC493F9C8D24E4 /* AppIntents.framework */,
-				CC1234562EA241B30007DBB1 /* libghostty.a */,
+				CC1234562EA241B30007DBB1 /* GhosttyKit.xcframework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -482,7 +482,7 @@
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/libTreeSitterSwift.dylib",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
+			shellPath = /bin/bash;
 			shellScript = "\"${SRCROOT}/scripts/organize-resources.sh\"\n";
 		};
 		CC2917D72EFBDAE300440062 /* Organize Ghostty Resources */ = {
@@ -505,7 +505,7 @@
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/libTreeSitterSwift.dylib",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
+			shellPath = /bin/bash;
 			shellScript = "\"${SRCROOT}/scripts/organize-resources.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -610,7 +610,6 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libghostty/lib",
 					"$(PROJECT_DIR)/Vendor/libgit2/lib",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
@@ -646,7 +645,6 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
-				SWIFT_OBJC_BRIDGING_HEADER = "aizen/ghostty-bridging-header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -689,7 +687,6 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libghostty/lib",
 					"$(PROJECT_DIR)/Vendor/libgit2/lib",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
@@ -724,7 +721,6 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
-				SWIFT_OBJC_BRIDGING_HEADER = "aizen/ghostty-bridging-header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -891,7 +887,6 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libghostty/lib",
 					"$(PROJECT_DIR)/Vendor/libgit2/lib",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
@@ -927,7 +922,6 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
-				SWIFT_OBJC_BRIDGING_HEADER = "aizen/ghostty-bridging-header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -969,7 +963,6 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libghostty/lib",
 					"$(PROJECT_DIR)/Vendor/libgit2/lib",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
@@ -1004,7 +997,6 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
-				SWIFT_OBJC_BRIDGING_HEADER = "aizen/ghostty-bridging-header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};

@@ -50,6 +50,12 @@ nonisolated extension NSColor {
         self.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
         return NSColor(hue: h, saturation: s, brightness: b * (1 - amount), alpha: a)
     }
+
+    func lighten(by amount: CGFloat) -> NSColor {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        self.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        return NSColor(hue: h, saturation: s, brightness: min(b + ((1 - b) * amount), 1), alpha: a)
+    }
 }
 
 nonisolated struct GitStatusColors {

@@ -68,22 +68,20 @@ Signed and notarized with an Apple Developer certificate.
 
 - Xcode 16.0+
 - Swift 5.0+
-- Git LFS
-- Zig (for building libghostty): `brew install zig`
+- Zig (for building GhosttyKit): `brew install zig`
 
 ```bash
-git lfs install
 git clone https://github.com/vivy-company/aizen.git
 cd aizen
 
-# Build libghostty (Apple Silicon / arm64, pinned to Vendor/libghostty/VERSION by default)
+# Build GhosttyKit.xcframework (pinned to Vendor/libghostty/VERSION by default)
 ./scripts/build-libghostty.sh
 
 # Open in Xcode and build
 open aizen.xcodeproj
 ```
 
-To rebuild libghostty at a specific commit:
+To rebuild GhosttyKit at a specific commit:
 ```bash
 ./scripts/build-libghostty.sh <commit-sha>
 ```

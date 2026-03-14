@@ -39,27 +39,24 @@ struct TerminalTabView: View {
         return sessions.last?.id ?? sessions.first?.id
     }
 
+    private var selectedSessions: [TerminalSession] {
+        guard let selectedId = validatedSelectedSessionId else { return [] }
+        return sessions.filter { $0.id == selectedId }
+    }
+
     var body: some View {
         if sessions.isEmpty {
             terminalEmptyState
         } else {
-            ZStack {
-                // Keep all terminal views alive to avoid recreation on tab switch
-                // Use opacity + allowsHitTesting instead of conditional rendering
-                ForEach(sessions) { session in
-                    let isSelected = validatedSelectedSessionId == session.id
-                    SplitTerminalView(
-                        worktree: worktree,
-                        session: session,
-                        sessionManager: sessionManager,
-                        isSelected: isSelected
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .opacity(isSelected ? 1 : 0)
-                    .animation(nil, value: isSelected)
-                    .allowsHitTesting(isSelected)
-                    .zIndex(isSelected ? 1 : 0)
-                }
+            ForEach(selectedSessions) { session in
+                SplitTerminalView(
+                    worktree: worktree,
+                    session: session,
+                    sessionManager: sessionManager,
+                    isSelected: true
+                )
+                .id(session.objectID)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .task {

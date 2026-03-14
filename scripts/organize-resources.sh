@@ -115,7 +115,7 @@ for file in "${RESOURCES_DIR}"/*; do
 
     # Move to themes directory
     if mv "$file" "${RESOURCES_DIR}/ghostty/themes/"; then
-        ((THEME_COUNT++))
+        THEME_COUNT=$((THEME_COUNT + 1))
     else
         echo "Warning: Failed to move theme file: $filename" >&2
     fi

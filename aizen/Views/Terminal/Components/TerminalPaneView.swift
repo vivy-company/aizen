@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import GhosttyKit
 
 // MARK: - Voice Action
 
@@ -22,6 +23,8 @@ struct TerminalPaneView: View {
     @ObservedObject var worktree: Worktree
     @ObservedObject var session: TerminalSession
     let paneId: String
+    let effectiveThemeName: String
+    let isSplit: Bool
     let isFocused: Bool
     let sessionManager: TerminalSessionManager
     @Binding var voiceAction: VoiceAction?
@@ -31,15 +34,9 @@ struct TerminalPaneView: View {
     let onTitleChange: (String) -> Void
     let onVoiceRecordingChanged: (Bool) -> Void
 
-    @State private var shouldFocus: Bool = false
-    @State private var focusVersion: Int = 0  // Increment to force updateNSView
-    @State private var isLoading: Bool = false
-    @State private var progressState: GhosttyProgressState = .remove
-    @State private var progressValue: Int? = nil
-    @State private var isResizing: Bool = false
-    @State private var terminalColumns: UInt16 = 0
-    @State private var terminalRows: UInt16 = 0
-    @State private var hideWorkItem: DispatchWorkItem?
+    @EnvironmentObject private var ghosttyApp: Ghostty.App
+
+    @State private var surfaceView: AizenTerminalSurfaceView?
     @StateObject private var audioService = AudioService()
     @State private var showingVoiceRecording = false
     @State private var showingPermissionError = false
@@ -49,108 +46,79 @@ struct TerminalPaneView: View {
     @AppStorage("terminalProgressEnabled") private var progressEnabled = true
     @AppStorage("terminalVoiceButtonEnabled") private var voiceButtonEnabled = true
 
+    private var surfaceAdapter: AizenTerminalSurfaceAdapter {
+        AizenTerminalSurfaceAdapter(
+            session: session,
+            worktree: worktree,
+            paneId: paneId,
+            sessionManager: sessionManager,
+            onProcessExit: {
+                if notificationsEnabled && (!isFocused || !NSApp.isActive) {
+                    TerminalNotificationManager.shared.notify(
+                        title: "Terminal exited",
+                        body: session.title ?? "Shell process ended"
+                    )
+                }
+                onProcessExit()
+            },
+            onFocus: onFocus,
+            onReady: { },
+            onTitleChange: onTitleChange,
+            onProgress: { _, _ in }
+        )
+    }
+
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                TerminalViewWrapper(
-                    worktree: worktree,
-                    session: session,
-                    paneId: paneId,
-                    sessionManager: sessionManager,
-                    onProcessExit: {
-                        if notificationsEnabled && (!isFocused || !NSApp.isActive) {
-                            TerminalNotificationManager.shared.notify(
-                                title: "Terminal exited",
-                                body: session.title ?? "Shell process ended"
-                            )
-                        }
-                        onProcessExit()
-                    },
-                    onReady: { },
-                    onTitleChange: onTitleChange,
-                    onProgress: { state, value in
-                        progressState = state
-                        progressValue = value
-                        if state == .remove {
-                            isLoading = false
-                        }
-                    },
-                    shouldFocus: shouldFocus,  // Pass value directly, not binding
-                    isFocused: isFocused,      // Pass focused state to manage resignation
-                    focusVersion: focusVersion, // Version counter to force updateNSView
-                    size: geo.size
+        Group {
+            if let surfaceView {
+                AizenInspectableSurface(
+                    surfaceView: surfaceView,
+                    adapter: surfaceAdapter,
+                    effectiveThemeName: effectiveThemeName,
+                    isSplit: isSplit,
+                    isFocused: isFocused,
+                    showsProgress: progressEnabled
                 )
-
-                if progressEnabled && progressState != .remove && progressState != .unknown {
-                    progressOverlay
-                        .transition(.opacity)
-                        .padding(.horizontal, 0)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                }
-
-                if isResizing {
-                    ResizeOverlay(columns: terminalColumns, rows: terminalRows)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                        .allowsHitTesting(false)
-                        .transition(.opacity)
-                        .animation(.easeOut(duration: 0.1), value: isResizing)
-                }
-
-                if showingVoiceRecording {
-                    voiceOverlay
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                } else if isFocused && voiceButtonEnabled {
-                    voiceTriggerButton
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                        .transition(.opacity)
-                }
-            }
-            .onChange(of: geo.size) { _, _ in
-                // Defer state mutation to next run loop to avoid layout feedback.
-                // Writing @State during a layout pass re-triggers the same pass.
-                DispatchQueue.main.async {
-                    handleSizeChange()
-                }
-            }
-        }
-        .ignoresSafeArea(.container, edges: .bottom)
-        .opacity(isFocused ? 1.0 : 0.6)
-        .clipped()
-        .animation(nil, value: isFocused)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    if !isFocused {
-                        onFocus()
+                .overlay(alignment: .bottom) {
+                    if showingVoiceRecording {
+                        voiceOverlay
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
-        )
-        .onChange(of: isFocused) { _, newValue in
-            if newValue {
-                requestFocus()
-            } else {
-                focusVersion += 1
-                if showingVoiceRecording {
-                    audioService.cancelRecording()
-                    showingVoiceRecording = false
+                .overlay(alignment: .bottomTrailing) {
+                    if !showingVoiceRecording && isFocused && voiceButtonEnabled {
+                        voiceTriggerButton
+                            .transition(.opacity)
+                    }
                 }
+            } else {
+                Color.clear
+                    .onAppear {
+                        resolveSurfaceIfNeeded()
+                    }
             }
         }
         .onAppear {
+            resolveSurfaceIfNeeded()
             if isFocused {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    requestFocus()
-                }
+                requestSurfaceFocus()
+            }
+        }
+        .onChange(of: isFocused) { _, newValue in
+            if newValue {
+                requestSurfaceFocus()
+            }
+            if !newValue, showingVoiceRecording {
+                audioService.cancelRecording()
+                showingVoiceRecording = false
             }
         }
         .onChange(of: focusRequestVersion) { _, _ in
-            guard isFocused else { return }
-            requestFocus()
+            if isFocused {
+                requestSurfaceFocus()
+            }
         }
         .onDisappear {
-            hideWorkItem?.cancel()
-            hideWorkItem = nil
             if showingVoiceRecording {
                 audioService.cancelRecording()
                 showingVoiceRecording = false
@@ -172,54 +140,44 @@ struct TerminalPaneView: View {
         }
     }
 
-    private func requestFocus() {
-        shouldFocus = true
-        focusVersion += 1
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            shouldFocus = false
+    private func resolveSurfaceIfNeeded() {
+        if let existing = surfaceView {
+            surfaceAdapter.applyCallbacks(to: existing)
+            return
         }
+
+        if let sessionId = session.id,
+           let existing = sessionManager.getTerminal(for: sessionId, paneId: paneId) {
+            surfaceAdapter.applyCallbacks(to: existing)
+            surfaceView = existing
+            return
+        }
+
+        guard let app = ghosttyApp.app,
+              let worktreePath = surfaceAdapter.worktreePath else {
+            return
+        }
+
+        let created = AizenTerminalSurfaceView(
+            frame: .zero,
+            worktreePath: worktreePath,
+            ghosttyApp: app,
+            appWrapper: ghosttyApp,
+            paneId: paneId,
+            command: surfaceAdapter.initialCommand
+        )
+        surfaceAdapter.applyCallbacks(to: created)
+        surfaceAdapter.store(surface: created)
+        surfaceView = created
     }
 
-    private func handleSizeChange() {
-        guard let sessionId = session.id,
-              let terminal = sessionManager.getTerminal(for: sessionId, paneId: paneId),
-              let termSize = terminal.terminalSize() else { return }
-
-        terminalColumns = termSize.columns
-        terminalRows = termSize.rows
-
-        isResizing = true
-
-        hideWorkItem?.cancel()
-        let workItem = DispatchWorkItem {
-            isResizing = false
+    private func requestSurfaceFocus() {
+        resolveSurfaceIfNeeded()
+        guard let surface = surfaceView else {
+            return
         }
-        hideWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
-    }
 
-    private var progressOverlay: some View {
-        ZStack(alignment: .topLeading) {
-            // Background track
-            Rectangle()
-                .fill(Color.primary.opacity(0.12))
-                .frame(height: 2)
-            // Determinate bar
-            if progressState == .set, let value = progressValue {
-                GeometryReader { geo in
-                    Rectangle()
-                        .fill(Color.accentColor)
-                        .frame(width: geo.size.width * CGFloat(value) / 100.0, height: 2)
-                        .animation(.easeOut(duration: 0.12), value: value)
-                }
-                .frame(height: 2)
-            } else if progressState == .indeterminate || progressState == .pause || progressState == .error {
-                // Indeterminate "ping-pong" bar
-                IndeterminateBar(color: progressState == .error ? .red : .accentColor)
-                    .frame(height: 2)
-            }
-        }
-        .padding(.horizontal, 0.5)
+        Ghostty.moveFocus(to: surface)
     }
 
     private var voiceOverlay: some View {
@@ -308,10 +266,459 @@ struct TerminalPaneView: View {
     private func sendTranscriptionToTerminal(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        guard let sessionId = session.id,
-              let terminal = sessionManager.getTerminal(for: sessionId, paneId: paneId) else {
-            return
+        surfaceAdapter.sendText(trimmed)
+    }
+}
+
+private struct AizenInspectableSurface: View {
+    @ObservedObject var surfaceView: AizenTerminalSurfaceView
+    let adapter: AizenTerminalSurfaceAdapter
+    let effectiveThemeName: String
+    let isSplit: Bool
+    let isFocused: Bool
+    let showsProgress: Bool
+
+    @FocusState private var surfaceFocus: Bool
+    @State private var isHoveringURLLeft = false
+
+    private var isFocusedSurface: Bool {
+        surfaceFocus || isFocused
+    }
+
+    private var backgroundColor: Color {
+        Color(nsColor: GhosttyThemeParser.loadBackgroundColor(named: effectiveThemeName))
+    }
+
+    var body: some View {
+        ZStack {
+            GeometryReader { geo in
+                AizenTerminalSurfaceHost(
+                    surfaceView: surfaceView,
+                    adapter: adapter,
+                    size: geo.size
+                )
+                .focused($surfaceFocus)
+
+                if let surfaceSize = surfaceView.surfaceSize {
+                    AizenSurfaceResizeOverlay(
+                        geoSize: geo.size,
+                        size: surfaceSize,
+                        focusInstant: surfaceView.focusInstant
+                    )
+                }
+            }
+
+            if showsProgress,
+               let progressReport = surfaceView.progressReport,
+               progressReport.state != .remove {
+                VStack(spacing: 0) {
+                    AizenSurfaceProgressBar(report: progressReport)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
+
+            if let url = surfaceView.hoverUrl {
+                let padding: CGFloat = 5
+                let cornerRadius: CGFloat = 9
+                ZStack {
+                    HStack {
+                        Spacer()
+                        VStack(alignment: .leading) {
+                            Spacer()
+
+                            Text(verbatim: url)
+                                .padding(.init(top: padding, leading: padding, bottom: padding, trailing: padding))
+                                .background(
+                                    UnevenRoundedRectangle(cornerRadii: .init(topLeading: cornerRadius))
+                                        .fill(.background)
+                                )
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .opacity(isHoveringURLLeft ? 1 : 0)
+                        }
+                    }
+
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Spacer()
+
+                            Text(verbatim: url)
+                                .padding(.init(top: padding, leading: padding, bottom: padding, trailing: padding))
+                                .background(
+                                    UnevenRoundedRectangle(cornerRadii: .init(topTrailing: cornerRadius))
+                                        .fill(.background)
+                                )
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .opacity(isHoveringURLLeft ? 0 : 1)
+                                .onHover { hovering in
+                                    isHoveringURLLeft = hovering
+                                }
+                        }
+                        Spacer()
+                    }
+                }
+            }
+
+            if let searchState = surfaceView.searchState {
+                AizenSurfaceSearchOverlay(
+                    surfaceView: surfaceView,
+                    searchState: searchState,
+                    onClose: {
+                        Ghostty.moveFocus(to: surfaceView)
+                        surfaceView.searchState = nil
+                    }
+                )
+            }
+
+            AizenBellBorderOverlay(bell: surfaceView.bell)
+            AizenHighlightOverlay(highlighted: surfaceView.highlighted)
+
+            if !surfaceView.healthy {
+                Rectangle().fill(backgroundColor)
+                AizenSurfaceMessageView(
+                    title: "Renderer Failed",
+                    message: "The terminal renderer exhausted GPU resources or failed to recover."
+                )
+            } else if surfaceView.error != nil {
+                Rectangle().fill(backgroundColor)
+                AizenSurfaceMessageView(
+                    title: "Terminal Failed",
+                    message: "The terminal failed to initialize. Check logs for the underlying error."
+                )
+            }
+
+            if isSplit && !isFocusedSurface {
+                Rectangle()
+                    .fill(backgroundColor)
+                    .allowsHitTesting(false)
+                    .opacity(0.28)
+            }
         }
-        terminal.surface?.sendText(trimmed)
+    }
+}
+
+private struct AizenSurfaceResizeOverlay: View {
+    let geoSize: CGSize
+    let size: ghostty_surface_size_s
+    let focusInstant: ContinuousClock.Instant?
+
+    @State private var lastSize: CGSize?
+    @State private var ready = false
+
+    private let padding: CGFloat = 5
+    private let durationMs: UInt64 = 500
+
+    private var hidden: Bool {
+        if !ready { return true }
+        if lastSize == geoSize { return true }
+        if let instant = focusInstant {
+            let delta = instant.duration(to: ContinuousClock.now)
+            if delta < .milliseconds(500) {
+                DispatchQueue.main.async {
+                    lastSize = geoSize
+                }
+                return true
+            }
+        }
+        return false
+    }
+
+    var body: some View {
+        Text(verbatim: "\(size.columns) ⨯ \(size.rows)")
+            .padding(.init(top: padding, leading: padding, bottom: padding, trailing: padding))
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(.background)
+                    .shadow(radius: 3)
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .allowsHitTesting(false)
+            .opacity(hidden ? 0 : 1)
+            .task {
+                try? await Task.sleep(for: .milliseconds(500))
+                ready = true
+            }
+            .task(id: geoSize) {
+                if ready {
+                    try? await Task.sleep(for: .milliseconds(durationMs))
+                }
+                lastSize = geoSize
+            }
+    }
+}
+
+private struct AizenSurfaceSearchOverlay: View {
+    let surfaceView: AizenTerminalSurfaceView
+    @ObservedObject var searchState: SearchState
+    let onClose: () -> Void
+
+    @FocusState private var isSearchFieldFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            searchField
+
+            Button {
+                navigateSearch("navigate_search:next")
+            } label: {
+                Image(systemName: "chevron.up")
+            }
+            .buttonStyle(AizenSearchButtonStyle())
+
+            Button {
+                navigateSearch("navigate_search:previous")
+            } label: {
+                Image(systemName: "chevron.down")
+            }
+            .buttonStyle(AizenSearchButtonStyle())
+
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(AizenSearchButtonStyle())
+        }
+        .padding(8)
+        .background(.background)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(radius: 4)
+        .padding(8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .onAppear {
+            isSearchFieldFocused = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .ghosttySearchFocus)) { notification in
+            guard notification.object as? AizenTerminalSurfaceView === surfaceView else { return }
+            DispatchQueue.main.async {
+                isSearchFieldFocused = true
+            }
+        }
+    }
+
+    private var searchField: some View {
+        TextField("Search", text: $searchState.needle)
+            .textFieldStyle(.plain)
+            .frame(width: 180)
+            .padding(.leading, 8)
+            .padding(.trailing, 50)
+            .padding(.vertical, 6)
+            .background(Color.primary.opacity(0.1))
+            .cornerRadius(6)
+            .focused($isSearchFieldFocused)
+            .overlay(alignment: .trailing) {
+                resultLabel
+            }
+            .onSubmit {
+                navigateSearch("navigate_search:next")
+            }
+    }
+
+    @ViewBuilder
+    private var resultLabel: some View {
+        if let selected = searchState.selected {
+            Text("\(selected + 1)/\(searchState.total ?? 0)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .monospacedDigit()
+                .padding(.trailing, 8)
+        } else if let total = searchState.total {
+            Text("-/\(total)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .monospacedDigit()
+                .padding(.trailing, 8)
+        }
+    }
+
+    private func navigateSearch(_ action: String) {
+        guard let surface = surfaceView.surface else { return }
+        ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
+    }
+}
+
+private struct AizenSearchButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(isHovered || configuration.isPressed ? .primary : .secondary)
+            .padding(.horizontal, 2)
+            .frame(height: 26)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(backgroundColor(isPressed: configuration.isPressed))
+            )
+            .onHover { hovering in
+                isHovered = hovering
+            }
+    }
+
+    private func backgroundColor(isPressed: Bool) -> Color {
+        if isPressed {
+            return Color.primary.opacity(0.2)
+        } else if isHovered {
+            return Color.primary.opacity(0.1)
+        } else {
+            return Color.clear
+        }
+    }
+}
+
+private struct AizenSurfaceProgressBar: View {
+    let report: Ghostty.Action.ProgressReport
+
+    private var color: Color {
+        switch report.state {
+        case .error: return .red
+        case .pause: return .orange
+        default: return .accentColor
+        }
+    }
+
+    private var progress: UInt8? {
+        if let v = report.progress { return v }
+        if report.state == .pause { return 100 }
+        return nil
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                if let progress {
+                    Rectangle()
+                        .fill(color)
+                        .frame(width: geometry.size.width * CGFloat(progress) / 100, height: geometry.size.height)
+                        .animation(.easeInOut(duration: 0.2), value: progress)
+                } else {
+                    AizenBouncingProgressBar(color: color)
+                }
+            }
+        }
+        .frame(height: 2)
+        .clipped()
+        .allowsHitTesting(false)
+    }
+}
+
+private struct AizenBouncingProgressBar: View {
+    let color: Color
+    @State private var position: CGFloat = 0
+
+    private let barWidthRatio: CGFloat = 0.25
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(color.opacity(0.3))
+
+                Rectangle()
+                    .fill(color)
+                    .frame(width: geometry.size.width * barWidthRatio, height: geometry.size.height)
+                    .offset(x: position * (geometry.size.width * (1 - barWidthRatio)))
+            }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                position = 1
+            }
+        }
+        .onDisappear {
+            position = 0
+        }
+    }
+}
+
+private struct AizenBellBorderOverlay: View {
+    let bell: Bool
+
+    var body: some View {
+        Rectangle()
+            .strokeBorder(
+                Color(red: 1.0, green: 0.8, blue: 0.0).opacity(0.5),
+                lineWidth: 3
+            )
+            .allowsHitTesting(false)
+            .opacity(bell ? 1.0 : 0.0)
+            .animation(.easeInOut(duration: 0.3), value: bell)
+    }
+}
+
+private struct AizenHighlightOverlay: View {
+    let highlighted: Bool
+
+    @State private var borderPulse = false
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(
+                    RadialGradient(
+                        gradient: Gradient(colors: [
+                            Color.accentColor.opacity(0.12),
+                            Color.accentColor.opacity(0.03),
+                            Color.clear
+                        ]),
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 2000
+                    )
+                )
+
+            Rectangle()
+                .strokeBorder(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.accentColor.opacity(0.8),
+                            Color.accentColor.opacity(0.5),
+                            Color.accentColor.opacity(0.8)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: borderPulse ? 4 : 2
+                )
+                .shadow(color: Color.accentColor.opacity(borderPulse ? 0.8 : 0.6), radius: borderPulse ? 12 : 8)
+                .shadow(color: Color.accentColor.opacity(borderPulse ? 0.5 : 0.3), radius: borderPulse ? 24 : 16)
+        }
+        .allowsHitTesting(false)
+        .opacity(highlighted ? 1.0 : 0.0)
+        .animation(.easeOut(duration: 0.4), value: highlighted)
+        .onChange(of: highlighted) { _, newValue in
+            if newValue {
+                withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
+                    borderPulse = true
+                }
+            } else {
+                withAnimation(.easeOut(duration: 0.4)) {
+                    borderPulse = false
+                }
+            }
+        }
+    }
+}
+
+private struct AizenSurfaceMessageView: View {
+    let title: String
+    let message: String
+
+    var body: some View {
+        HStack {
+            Image("AppIconImage")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 128, height: 128)
+
+            VStack(alignment: .leading) {
+                Text(title)
+                    .font(.title)
+                Text(message)
+                    .frame(maxWidth: 350)
+            }
+        }
+        .padding()
     }
 }
