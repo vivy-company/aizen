@@ -2571,12 +2571,6 @@ struct ChatMessageList: View {
             }
             return ""
         case .read:
-            if let text = firstTextContent(for: toolCall) {
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty {
-                    return truncatedOutputBlock(trimmed, maxLines: 6)
-                }
-            }
             return ""
         case .search:
             if let text = firstTextContent(for: toolCall) {
