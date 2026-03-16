@@ -311,7 +311,7 @@ struct ChatMessageList: View {
     private func apply(entries newEntries: [VVChatTimelineEntry], scrollToBottom: Bool) {
         defer { appliedEntries = newEntries }
 
-        if appliedEntries.isEmpty || !canApplyIncrementally(from: appliedEntries, to: newEntries) {
+        if appliedEntries.isEmpty {
             controller.setEntries(
                 newEntries,
                 scrollToBottom: scrollToBottom,
@@ -320,19 +320,46 @@ struct ChatMessageList: View {
             return
         }
 
-        let oldCount = appliedEntries.count
-        let newCount = newEntries.count
-        let replacements = makeEntryReplacements(from: appliedEntries, to: newEntries)
+        if canApplyIncrementally(from: appliedEntries, to: newEntries) {
+            let oldCount = appliedEntries.count
+            let newCount = newEntries.count
+            let replacements = makeEntryReplacements(from: appliedEntries, to: newEntries)
 
-        if !replacements.isEmpty {
-            applyEntryReplacements(replacements, scrollToBottom: scrollToBottom)
+            if !replacements.isEmpty {
+                applyEntryReplacements(replacements, scrollToBottom: scrollToBottom)
+            }
+
+            if newCount > oldCount {
+                for entry in newEntries[oldCount...] {
+                    append(entry)
+                }
+            }
+            return
         }
 
-        if newCount > oldCount {
-            for entry in newEntries[oldCount...] {
-                append(entry)
+        // Structural change — use range replacement instead of full setEntries rebuild.
+        // This matches the VVDevKit playground pattern: replaceEntries preserves layout
+        // continuity and render caches, while setEntries invalidates everything.
+        if let anchorID = stableAnchorID(from: appliedEntries, to: newEntries) {
+            controller.prepareLayoutTransition(anchorItemID: anchorID)
+        }
+        controller.replaceEntries(
+            in: 0..<controller.entries.count,
+            with: newEntries,
+            scrollToBottom: scrollToBottom,
+            markUnread: false
+        )
+    }
+
+    private func stableAnchorID(from oldEntries: [VVChatTimelineEntry], to newEntries: [VVChatTimelineEntry]) -> String? {
+        let newIDs = Set(newEntries.map(\.id))
+        // Find the first old entry that still exists in the new set — best scroll anchor
+        for entry in oldEntries {
+            if newIDs.contains(entry.id) {
+                return entry.id
             }
         }
+        return newEntries.first?.id
     }
 
     private func canApplyIncrementally(from oldEntries: [VVChatTimelineEntry], to newEntries: [VVChatTimelineEntry]) -> Bool {
@@ -842,9 +869,10 @@ struct ChatMessageList: View {
         var entryID: String { "group-\(id)" }
 
         init(toolCalls: [ToolCall]) {
-            self.id = toolCalls.map(\.id).sorted().joined(separator: "|")
-            self.toolCalls = toolCalls.sorted { $0.timestamp < $1.timestamp }
-            self.timestamp = self.toolCalls.first?.timestamp ?? .distantPast
+            let sorted = toolCalls.sorted { $0.timestamp < $1.timestamp }
+            self.id = sorted.first?.id ?? UUID().uuidString
+            self.toolCalls = sorted
+            self.timestamp = sorted.first?.timestamp ?? .distantPast
         }
 
         var hasFailed: Bool {
@@ -1063,7 +1091,7 @@ struct ChatMessageList: View {
 
         func flushExplorationBuffer() {
             guard !explorationBuffer.isEmpty else { return }
-            appendBufferedToolCalls(explorationBuffer, into: &items)
+            items.append(.toolCallGroup(makeToolCallGroup(from: explorationBuffer)))
             explorationBuffer.removeAll(keepingCapacity: true)
         }
 
@@ -1326,7 +1354,28 @@ struct ChatMessageList: View {
 
         case .toolCallGroup(let group):
             if group.toolCalls.count == 1, let only = group.toolCalls.first {
-                return makeEntries(from: .toolCall(only), startsAssistantLane: startsAssistantLane)
+                let title = toolCallHeaderTitle(only)
+                let markdown = toolCallMarkdown(only)
+                let encodedBadges: [PayloadBadge]? = toolCallHeaderBadges(only)?.map { badge in
+                    PayloadBadge(text: badge.text, r: badge.color.x, g: badge.color.y, b: badge.color.z, a: badge.color.w)
+                }
+                let payload = TimelineCustomPayload(
+                    title: title,
+                    body: markdown,
+                    status: only.status.rawValue,
+                    toolKind: only.kind?.rawValue,
+                    showsAgentLaneIcon: startsAssistantLane,
+                    badges: encodedBadges
+                )
+                return [.custom(
+                    VVCustomTimelineEntry(
+                        id: group.entryID,
+                        kind: "toolCall",
+                        payload: encodeCustomPayload(payload, fallback: markdown),
+                        revision: revisionKey(markdown + only.id + only.status.rawValue),
+                        timestamp: only.timestamp
+                    )
+                )] + inlineDiffEntries(for: only, entryIDPrefix: group.entryID)
             }
             let isExpanded = expandedToolGroupIDs.contains(group.entryID)
             let title = toolCallGroupTitle(group)
