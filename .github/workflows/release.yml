@@ -107,6 +107,12 @@ jobs:
 
       - name: Build VVHighlighting grammar dylibs
         run: |
+          CACHED_COUNT=$(find "${{ env.VVDEVKIT_SWIFTPM_SCRATCH_PATH }}" -type f -name 'libTreeSitter*.dylib' -not -path '*.dSYM/*' 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$CACHED_COUNT" -gt 0 ]; then
+            echo "Skipping build — $CACHED_COUNT cached VVHighlighting grammar dylibs found"
+            exit 0
+          fi
+
           VVDEVKIT_DIR=$(find "${{ env.DERIVED_DATA_PATH }}/SourcePackages/checkouts" -maxdepth 1 -type d \( -name 'VVDevKit' -o -name 'vvdevkit' \) | head -1)
 
           if [ -z "$VVDEVKIT_DIR" ]; then
