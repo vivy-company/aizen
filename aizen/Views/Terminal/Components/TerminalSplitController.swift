@@ -52,6 +52,8 @@ final class TerminalSplitController: ObservableObject {
     private var keyMonitor: Any?
     private var focusedPaneVoiceRecording = false
     private var paneVoiceRecordingStates: [String: Bool] = [:]
+    private var closingPaneIds: Set<String> = []
+    private var isClosingSession = false
 
     init(
         worktree: Worktree,
@@ -125,6 +127,8 @@ final class TerminalSplitController: ObservableObject {
     }
 
     func handlePaneFocus(_ paneId: String) {
+        guard !isClosingSession else { return }
+        guard layout.allPaneIds().contains(paneId) else { return }
         activateSplitActions()
         focusedPaneId = paneId
     }
@@ -222,6 +226,9 @@ final class TerminalSplitController: ObservableObject {
     }
 
     func handleProcessExit(for paneId: String) {
+        guard !isClosingSession else { return }
+        guard !closingPaneIds.contains(paneId) else { return }
+
         paneVoiceRecordingStates.removeValue(forKey: paneId)
 
         if let sessionId = session.id {
@@ -230,28 +237,21 @@ final class TerminalSplitController: ObservableObject {
 
         let paneIds = layout.allPaneIds()
         guard paneIds.contains(paneId) else { return }
+        closingPaneIds.insert(paneId)
+        let shouldTransferFocus = activePaneId() == paneId
 
         if paneIds.count == 1 {
-            Task { @MainActor [weak session] in
-                try? await Task.sleep(for: .milliseconds(100))
-                guard let session,
-                      !session.isDeleted,
-                      let context = session.managedObjectContext else { return }
-                context.delete(session)
-                do {
-                    try context.save()
-                } catch {
-                    Logger.terminal.error("Failed to delete terminal session: \(error.localizedDescription)")
-                }
-            }
+            closeTab()
             return
         }
 
         if let newLayout = layout.removingPane(paneId) {
-            if focusedPaneId == paneId, let nextPane = newLayout.allPaneIds().first {
-                focusedPaneId = nextPane
+            if shouldTransferFocus {
+                transferFocus(from: paneId, to: newLayout.allPaneIds().first)
+            } else if focusedPaneId == paneId, let fallbackPaneId = newLayout.allPaneIds().first {
+                focusedPaneId = fallbackPaneId
             }
-            layout = newLayout
+            layout = newLayout.equalized()
         }
     }
 
@@ -278,6 +278,8 @@ final class TerminalSplitController: ObservableObject {
     }
 
     func executeCloseAction() {
+        showCloseConfirmation = false
+
         switch pendingCloseAction {
         case .pane:
             executeClosePaneOnly()
@@ -287,7 +289,13 @@ final class TerminalSplitController: ObservableObject {
     }
 
     private func executeClosePaneOnly() {
+        guard !isClosingSession else { return }
+
         let paneIdToClose = activePaneId()
+        guard layout.allPaneIds().contains(paneIdToClose) else { return }
+        guard !closingPaneIds.contains(paneIdToClose) else { return }
+
+        closingPaneIds.insert(paneIdToClose)
         paneVoiceRecordingStates.removeValue(forKey: paneIdToClose)
 
         guard let newLayout = layout.removingPane(paneIdToClose) else {
@@ -295,10 +303,7 @@ final class TerminalSplitController: ObservableObject {
             return
         }
 
-        if let nextPane = newLayout.allPaneIds().first {
-            focusedPaneId = nextPane
-        }
-
+        transferFocus(from: paneIdToClose, to: newLayout.allPaneIds().first)
         layout = newLayout.equalized()
 
         DispatchQueue.main.async { [session, sessionManager] in
@@ -315,7 +320,16 @@ final class TerminalSplitController: ObservableObject {
     }
 
     private func closeTab() {
+        guard !isClosingSession else { return }
+        isClosingSession = true
+        showCloseConfirmation = false
+        layoutSaveTask?.cancel()
+        focusSaveTask?.cancel()
+        contextSaveTask?.cancel()
+        deactivateSplitActions()
+
         let allPaneIds = layout.allPaneIds()
+        closingPaneIds.formUnion(allPaneIds)
         for paneId in allPaneIds {
             paneVoiceRecordingStates.removeValue(forKey: paneId)
         }
@@ -433,7 +447,7 @@ final class TerminalSplitController: ObservableObject {
     }
 
     private func persistLayout(_ layoutToSave: SplitNode? = nil) {
-        guard !session.isDeleted else { return }
+        guard !isClosingSession, !session.isDeleted else { return }
         let node = layoutToSave ?? layout
         if let json = SplitLayoutHelper.encode(node), session.splitLayout != json {
             session.splitLayout = json
@@ -442,7 +456,7 @@ final class TerminalSplitController: ObservableObject {
     }
 
     private func persistFocus(_ paneId: String? = nil) {
-        guard !session.isDeleted else { return }
+        guard !isClosingSession, !session.isDeleted else { return }
         let id = paneId ?? focusedPaneId
         guard !id.isEmpty else { return }
         guard session.focusedPaneId != id else { return }
@@ -451,7 +465,7 @@ final class TerminalSplitController: ObservableObject {
     }
 
     private func applyTitleForFocusedPane() {
-        guard !session.isDeleted else { return }
+        guard !isClosingSession, !session.isDeleted else { return }
         if let title = paneTitles[focusedPaneId], session.title != title {
             session.title = title
             saveContext()
@@ -485,10 +499,41 @@ final class TerminalSplitController: ObservableObject {
 
     private func activePaneId() -> String {
         let paneIds = layout.allPaneIds()
+        if let sessionId = session.id,
+           let responderPaneId = sessionManager.focusedPaneId(for: sessionId),
+           paneIds.contains(responderPaneId) {
+            if focusedPaneId != responderPaneId {
+                focusedPaneId = responderPaneId
+            }
+            return responderPaneId
+        }
+
         if paneIds.contains(focusedPaneId) {
             return focusedPaneId
         }
-        return paneIds.first ?? focusedPaneId
+
+        if let fallbackPaneId = paneIds.first {
+            focusedPaneId = fallbackPaneId
+            return fallbackPaneId
+        }
+
+        return focusedPaneId
+    }
+
+    private func transferFocus(from sourcePaneId: String, to targetPaneId: String?) {
+        guard let targetPaneId else { return }
+
+        if focusedPaneId != targetPaneId {
+            focusedPaneId = targetPaneId
+        }
+
+        if let sessionId = session.id,
+           let targetSurface = sessionManager.getTerminal(for: sessionId, paneId: targetPaneId) {
+            let sourceSurface = sessionManager.getTerminal(for: sessionId, paneId: sourcePaneId)
+            Ghostty.moveFocus(to: targetSurface, from: sourceSurface)
+        }
+
+        focusRequestVersion += 1
     }
 
     private static var sessionPersistenceEnabled: Bool {

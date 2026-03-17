@@ -5,6 +5,7 @@
 //  Created by Uladzislau Yakauleu on 17.10.25.
 //
 
+import AppKit
 import Foundation
 
 struct TerminalRuntimeCounts {
@@ -91,6 +92,18 @@ class TerminalSessionManager {
         }
 
         return TerminalRuntimeCounts(livePanes: livePanes, runningPanes: runningPanes)
+    }
+
+    @MainActor
+    func focusedPaneId(for sessionId: UUID) -> String? {
+        let prefix = keyPrefix(for: sessionId)
+
+        for (key, terminal) in terminals where key.hasPrefix(prefix) {
+            guard terminal.window?.firstResponder === terminal else { continue }
+            return String(key.dropFirst(prefix.count))
+        }
+
+        return nil
     }
 
     private func touch(_ key: String) {

@@ -237,7 +237,7 @@ extension Ghostty {
         var notificationIdentifiers: Set<String> = []
 
         private var markedText: NSMutableAttributedString
-        private(set) var focused: Bool = true
+        private(set) var focused: Bool = false
         private var prevPressureStage: Int = 0
         private var appearanceObserver: NSKeyValueObservation?
 
@@ -706,6 +706,10 @@ extension Ghostty {
             return false
         }
 
+        private var isCurrentFirstResponder: Bool {
+            window?.firstResponder === self
+        }
+
         private func localEventKeyUp(_ event: NSEvent) -> NSEvent? {
             // We only care about events with "command" because all others will
             // trigger the normal responder chain.
@@ -713,7 +717,7 @@ extension Ghostty {
 
             // Command keyUp events are never sent to the normal responder chain
             // so we send them here.
-            guard focused else { return event }
+            guard isCurrentFirstResponder || focused else { return event }
             self.keyUp(with: event)
             return nil
         }
@@ -1241,7 +1245,7 @@ extension Ghostty {
             // Besides C-/, its important we don't process key equivalents if unfocused
             // because there are other event listeners for that (i.e. AppDelegate's
             // local event handler).
-            if !focused {
+            if !isCurrentFirstResponder {
                 return false
             }
 
@@ -1544,6 +1548,7 @@ extension Ghostty {
         }
 
         @IBAction func paste(_ sender: Any?) {
+            focusMenuPane()
             guard let surface = self.surface else { return }
             let action = "paste_from_clipboard"
             if !ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8))) {
@@ -1552,6 +1557,7 @@ extension Ghostty {
         }
 
         @IBAction func pasteAsPlainText(_ sender: Any?) {
+            focusMenuPane()
             guard let surface = self.surface else { return }
             let action = "paste_from_clipboard"
             if !ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8))) {
@@ -1560,6 +1566,7 @@ extension Ghostty {
         }
 
         @IBAction func pasteSelection(_ sender: Any?) {
+            focusMenuPane()
             guard let surface = self.surface else { return }
             let action = "paste_from_selection"
             if !ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8))) {
@@ -1640,7 +1647,7 @@ extension Ghostty {
         }
 
         private func focusMenuPane() {
-            if !focused {
+            if !isCurrentFirstResponder {
                 Ghostty.moveFocus(to: self)
             }
             (self as? AizenTerminalSurfaceView)?.onFocus?()

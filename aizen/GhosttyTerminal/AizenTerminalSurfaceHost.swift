@@ -64,4 +64,8 @@ struct AizenTerminalSurfaceHost: NSViewRepresentable {
             }
         }
     }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: AizenTerminalSurfaceHostCoordinator) {
+        coordinator.stopMonitoring()
+    }
 }
