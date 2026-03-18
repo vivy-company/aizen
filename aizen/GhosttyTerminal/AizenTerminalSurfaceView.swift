@@ -238,6 +238,12 @@ extension Ghostty {
 
         private var markedText: NSMutableAttributedString
         private(set) var focused: Bool = false
+
+        /// Monotonic counter incremented every time any surface becomes first
+        /// responder.  ``Ghostty.moveFocus`` captures this at dispatch time and
+        /// skips execution when it has changed, preventing stale async focus
+        /// requests from stealing focus after a user click.
+        static var focusChangeCounter: Int = 0
         private var prevPressureStage: Int = 0
         private var appearanceObserver: NSKeyValueObservation?
 
@@ -692,18 +698,13 @@ extension Ghostty {
 
         private func isTopmostSurfaceHit(for event: NSEvent) -> Bool {
             guard let window else { return false }
-            guard let contentView = window.contentView else { return false }
 
-            let locationInContent = contentView.convert(event.locationInWindow, from: nil)
-            guard let hitView = contentView.hitTest(locationInContent) else { return false }
-
-            var candidate: NSView? = hitView
-            while let view = candidate {
-                if view === self { return true }
-                candidate = view.superview
-            }
-
-            return false
+            // Check whether the click falls within this surface's visible area.
+            // A simple bounds check is more reliable than contentView.hitTest
+            // in deeply nested NSViewRepresentable hierarchies where frame
+            // geometry can lag behind the actual display position.
+            let localPoint = convert(event.locationInWindow, from: nil)
+            return bounds.contains(localPoint)
         }
 
         private var isCurrentFirstResponder: Bool {
@@ -818,7 +819,10 @@ extension Ghostty {
 
         override func becomeFirstResponder() -> Bool {
             let result = super.becomeFirstResponder()
-            if result { focusDidChange(true) }
+            if result {
+                Self.focusChangeCounter &+= 1
+                focusDidChange(true)
+            }
             return result
         }
 

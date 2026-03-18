@@ -1,7 +1,7 @@
 import AppKit
 import Carbon
-import Foundation
 import CoreGraphics
+import Foundation
 
 final class CachedValue<T> {
     private var value: T?
@@ -54,13 +54,22 @@ enum KeyboardLayout {
 
 extension Ghostty {
     /// Copied from Ghostty's SurfaceView.swift and adapted for Aizen's terminal host.
+    ///
+    /// A `generation` counter is captured at dispatch time and compared at
+    /// execution time against `SurfaceView.focusChangeCounter`.  When the two
+    /// differ it means another surface claimed first-responder status (e.g. via
+    /// a user click) after this call was queued, so executing it would steal
+    /// focus.  In that case the work item is silently skipped.
     static func moveFocus(
         to: Ghostty.SurfaceView,
         from: Ghostty.SurfaceView? = nil,
-        delay: TimeInterval? = nil
+        delay: TimeInterval? = nil,
+        generation: Int? = nil
     ) {
         let maxDelay: TimeInterval = 0.5
         guard (delay ?? 0) < maxDelay else { return }
+
+        let gen = generation ?? SurfaceView.focusChangeCounter
 
         let nextDelay: TimeInterval = if let delay {
             delay * 2
@@ -69,8 +78,11 @@ extension Ghostty {
         }
 
         let work = DispatchWorkItem {
+            // Another surface became first responder since this was dispatched.
+            guard SurfaceView.focusChangeCounter == gen else { return }
+
             guard let window = to.window else {
-                moveFocus(to: to, from: from, delay: nextDelay)
+                moveFocus(to: to, from: from, delay: nextDelay, generation: gen)
                 return
             }
 

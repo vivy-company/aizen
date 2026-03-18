@@ -30,25 +30,42 @@ struct SplitView<L: View, R: View>: View {
             let rightRect = self.rightRect(for: geo.size, leftRect: leftRect)
             let splitterPoint = self.splitterPoint(for: geo.size, leftRect: leftRect)
 
-            ZStack(alignment: .topLeading) {
-                left
-                    .frame(width: leftRect.size.width, height: leftRect.size.height)
-                    .offset(x: leftRect.origin.x, y: leftRect.origin.y)
-                right
-                    .frame(width: rightRect.size.width, height: rightRect.size.height)
-                    .offset(x: rightRect.origin.x, y: rightRect.origin.y)
-                Divider(
-                    direction: direction,
-                    visibleSize: splitterVisibleSize,
-                    invisibleSize: splitterInvisibleSize,
-                    color: dividerColor,
-                    split: $split
-                )
-                .position(splitterPoint)
-                .gesture(dragGesture(geo.size))
-                .onTapGesture(count: 2) {
-                    onEqualize()
-                }
+            // Use HStack/VStack instead of ZStack+offset so that embedded
+            // NSViewRepresentable children (terminal surfaces) get correct
+            // AppKit frames for hit-testing.  ZStack+offset only applies a
+            // visual transform, leaving all NSView frames at (0,0).
+            splitStack(leftRect: leftRect, rightRect: rightRect)
+
+            // Divider overlay — positioned independently on top.
+            Divider(
+                direction: direction,
+                visibleSize: splitterVisibleSize,
+                invisibleSize: splitterInvisibleSize,
+                color: dividerColor,
+                split: $split
+            )
+            .position(splitterPoint)
+            .gesture(dragGesture(geo.size))
+            .onTapGesture(count: 2) {
+                onEqualize()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func splitStack(leftRect: CGRect, rightRect: CGRect) -> some View {
+        switch direction {
+        case .horizontal:
+            HStack(spacing: 0) {
+                left.frame(width: leftRect.size.width, height: leftRect.size.height)
+                Spacer(minLength: 0)
+                right.frame(width: rightRect.size.width, height: rightRect.size.height)
+            }
+        case .vertical:
+            VStack(spacing: 0) {
+                left.frame(width: leftRect.size.width, height: leftRect.size.height)
+                Spacer(minLength: 0)
+                right.frame(width: rightRect.size.width, height: rightRect.size.height)
             }
         }
     }

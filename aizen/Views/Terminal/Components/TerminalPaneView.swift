@@ -5,9 +5,9 @@
 //  Created by Uladzislau Yakauleu on 17.10.25.
 //
 
-import SwiftUI
 import AppKit
 import GhosttyKit
+import SwiftUI
 
 // MARK: - Voice Action
 
@@ -176,6 +176,10 @@ struct TerminalPaneView: View {
         guard let surface = surfaceView else {
             return
         }
+
+        // Already the first responder — skip the async dispatch to avoid
+        // queueing a stale moveFocus that could race with a later click.
+        guard surface.window?.firstResponder !== surface else { return }
 
         Ghostty.moveFocus(to: surface)
     }
