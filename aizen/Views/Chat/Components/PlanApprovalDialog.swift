@@ -157,36 +157,33 @@ struct PlanApprovalPickerView: View {
 
     @State private var selectedIndex = 0
     @State private var keyMonitor: Any?
-    @FocusState private var isKeyboardFocused: Bool
 
     private var options: [PermissionOption] {
         request.options ?? []
     }
 
-    private var promptText: String {
-        if let message = request.message, !message.isEmpty {
-            return message
-        }
-        return isPlanPermissionRequest ? "Implement this plan?" : "Choose an option"
+    private var prompt: PermissionRequestPrompt {
+        request.promptDescription
     }
 
     private var optionIdentityKey: String {
         options.map(\.optionId).joined(separator: "|")
     }
 
-    private var isPlanPermissionRequest: Bool {
-        guard let toolCall = request.toolCall,
-              let rawInput = toolCall.rawInput?.value as? [String: Any] else {
-            return false
-        }
-        return rawInput["plan"] as? String != nil
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(promptText)
+            Text(prompt.title)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.primary)
+
+            if let detail = prompt.detail {
+                Text(detail)
+                    .font(.system(size: 12, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             HStack(alignment: .top, spacing: 8) {
                 VStack(spacing: 4) {
@@ -260,33 +257,15 @@ struct PlanApprovalPickerView: View {
         .padding(.bottom, Layout.bottomPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { liquidGlassBackground }
-        .overlay {
-            RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
-                .strokeBorder(.separator.opacity(0.2), lineWidth: 0.5)
-        }
-        .focusable()
-        .focused($isKeyboardFocused)
         .onAppear {
             selectedIndex = min(selectedIndex, max(options.count - 1, 0))
-            isKeyboardFocused = true
             installKeyboardMonitorIfNeeded()
         }
         .onChange(of: optionIdentityKey) { _, _ in
             selectedIndex = min(selectedIndex, max(options.count - 1, 0))
-            isKeyboardFocused = true
         }
         .onDisappear {
             removeKeyboardMonitor()
-        }
-        .onMoveCommand { direction in
-            switch direction {
-            case .up:
-                moveSelection(-1)
-            case .down:
-                moveSelection(1)
-            default:
-                break
-            }
         }
     }
 
@@ -450,5 +429,179 @@ struct PlanApprovalPickerView: View {
     private var numberKeyCodeToIndex: [UInt16: Int] {
         // Top-row number key codes on macOS keyboard layout: 1...9
         [18: 0, 19: 1, 20: 2, 21: 3, 23: 4, 22: 5, 26: 6, 28: 7, 25: 8]
+    }
+}
+
+struct PermissionRequestPrompt {
+    let title: String
+    let detail: String?
+}
+
+extension RequestPermissionRequest {
+    var promptDescription: PermissionRequestPrompt {
+        if let toolCall,
+           let rawInput = toolCall.rawInput?.value as? [String: Any],
+           let plan = PermissionRequestPromptExtractor.stringValue(rawInput["plan"]),
+           !plan.isEmpty {
+            let title = normalizedMessage ?? "Implement this plan?"
+            return PermissionRequestPrompt(title: title, detail: plan)
+        }
+
+        if let command = promptCommand, !command.isEmpty {
+            return PermissionRequestPrompt(
+                title: "Allow this command to run?",
+                detail: command
+            )
+        }
+
+        if let filePath = promptFilePath, !filePath.isEmpty {
+            return PermissionRequestPrompt(
+                title: "Allow this file to be modified?",
+                detail: filePath
+            )
+        }
+
+        if let url = promptURL, !url.isEmpty {
+            return PermissionRequestPrompt(
+                title: "Allow this URL to be opened?",
+                detail: url
+            )
+        }
+
+        return PermissionRequestPrompt(
+            title: normalizedMessage ?? "Choose an option",
+            detail: nil
+        )
+    }
+
+    private var normalizedMessage: String? {
+        guard let normalized = message?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !normalized.isEmpty else {
+            return nil
+        }
+        return normalized
+    }
+
+    private var promptCommand: String? {
+        guard let toolCall,
+              let rawInput = toolCall.rawInput?.value as? [String: Any] else {
+            return nil
+        }
+        return PermissionRequestPromptExtractor.commandValue(
+            in: rawInput,
+            preferredKeys: ["command", "cmd", "shellCommand", "commandLine", "command_line", "args", "argv"]
+        )
+    }
+
+    private var promptFilePath: String? {
+        guard let toolCall,
+              let rawInput = toolCall.rawInput?.value as? [String: Any] else {
+            return nil
+        }
+        return PermissionRequestPromptExtractor.stringValue(
+            in: rawInput,
+            preferredKeys: ["file_path", "path", "filePath", "filepath", "file"]
+        )
+    }
+
+    private var promptURL: String? {
+        guard let toolCall,
+              let rawInput = toolCall.rawInput?.value as? [String: Any] else {
+            return nil
+        }
+        return PermissionRequestPromptExtractor.stringValue(
+            in: rawInput,
+            preferredKeys: ["url", "uri", "href"]
+        )
+    }
+}
+
+enum PermissionRequestPromptExtractor {
+    static func stringValue(in dict: [String: Any], preferredKeys: [String]) -> String? {
+        for key in preferredKeys {
+            if let value = stringValue(dict[key]) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    static func commandValue(in dict: [String: Any], preferredKeys: [String]) -> String? {
+        for key in preferredKeys {
+            if let value = commandValue(dict[key]) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    static func stringValue(_ value: Any?, depth: Int = 0) -> String? {
+        guard depth < 8, let value else { return nil }
+
+        if let string = value as? String {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+
+        if let dict = value as? [String: Any] {
+            for key in ["value", "text", "path", "file_path", "filePath", "filepath", "url", "uri", "href", "command"] {
+                if let nested = stringValue(dict[key], depth: depth + 1) {
+                    return nested
+                }
+            }
+        }
+
+        if let array = value as? [Any] {
+            for item in array {
+                if let nested = stringValue(item, depth: depth + 1) {
+                    return nested
+                }
+            }
+        }
+
+        return nil
+    }
+
+    static func commandValue(_ value: Any?, depth: Int = 0) -> String? {
+        guard depth < 8, let value else { return nil }
+
+        if let string = value as? String {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+
+        if let strings = value as? [String] {
+            let cleaned = strings
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            return cleaned.isEmpty ? nil : cleaned.joined(separator: " ")
+        }
+
+        if let dict = value as? [String: Any] {
+            for key in ["value", "text", "command", "cmd", "shellCommand", "commandLine", "command_line", "args", "argv"] {
+                if let nested = commandValue(dict[key], depth: depth + 1) {
+                    return nested
+                }
+            }
+        }
+
+        if let array = value as? [Any] {
+            let strings = array.compactMap { item -> String? in
+                guard let string = item as? String else { return nil }
+                let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }
+            if !strings.isEmpty {
+                return strings.joined(separator: " ")
+            }
+
+            for item in array {
+                if let nested = commandValue(item, depth: depth + 1) {
+                    return nested
+                }
+            }
+        }
+
+        return nil
     }
 }

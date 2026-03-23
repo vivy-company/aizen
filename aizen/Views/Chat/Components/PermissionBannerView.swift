@@ -45,7 +45,7 @@ struct PermissionBannerView: View {
         return PendingPermissionInfo(
             sessionId: chatSessionId,
             worktreeName: worktreeName,
-            message: request.message,
+            prompt: request.promptDescription,
             options: request.options ?? [],
             handler: agentSession.permissionHandler
         )
@@ -83,11 +83,17 @@ struct PermissionBannerView: View {
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.primary)
 
-                        if let message = info.message, !message.isEmpty {
-                            Text(message)
+                        Text(info.prompt.title)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+
+                        if let detail = info.prompt.detail, !detail.isEmpty {
+                            Text(detail)
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
+                                .textSelection(.enabled)
                         }
                     }
                     
@@ -156,7 +162,7 @@ struct PermissionBannerView: View {
 private struct PendingPermissionInfo {
     let sessionId: UUID
     let worktreeName: String
-    let message: String?
+    let prompt: PermissionRequestPrompt
     let options: [PermissionOption]
     let handler: AgentPermissionHandler
 }

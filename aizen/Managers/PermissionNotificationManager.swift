@@ -19,7 +19,8 @@ extension Notification.Name {
 struct PermissionNotificationInfo {
     let chatSessionId: UUID
     let worktreeName: String
-    let message: String
+    let title: String
+    let detail: String?
     let options: [PermissionOption]
 }
 
@@ -89,9 +90,13 @@ final class PermissionNotificationManager: NSObject, UNUserNotificationCenterDel
     private func postNotification(info: PermissionNotificationInfo) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "permission.notification.title \(info.worktreeName)")
-        content.body = info.message.isEmpty
-            ? String(localized: "permission.notification.body.default")
-            : info.message
+        if let detail = info.detail, !detail.isEmpty {
+            content.body = "\(info.title)\n\(detail)"
+        } else if !info.title.isEmpty {
+            content.body = info.title
+        } else {
+            content.body = String(localized: "permission.notification.body.default")
+        }
         content.sound = .default
         content.categoryIdentifier = "PERMISSION_REQUEST"
 

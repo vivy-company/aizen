@@ -70,10 +70,13 @@ class AgentPermissionHandler: ObservableObject {
     private func triggerSystemNotificationIfNeeded(request: RequestPermissionRequest) {
         guard let chatSessionId = chatSessionId else { return }
 
+        let prompt = request.promptDescription
+
         let info = PermissionNotificationInfo(
             chatSessionId: chatSessionId,
             worktreeName: worktreeName ?? "Chat",
-            message: request.message ?? "",
+            title: prompt.title,
+            detail: prompt.detail,
             options: request.options ?? []
         )
 
