@@ -179,7 +179,7 @@ final class TerminalSplitController: ObservableObject {
             left: .leaf(paneId: sourcePaneId),
             right: .leaf(paneId: newPaneId)
         ))
-        layout = layout.replacingPane(sourcePaneId, with: newSplit).equalized()
+        layout = layout.replacingPane(sourcePaneId, with: newSplit)
         focusedPaneId = newPaneId
         focusRequestVersion += 1
         activateSplitActions()
@@ -194,7 +194,7 @@ final class TerminalSplitController: ObservableObject {
             left: .leaf(paneId: newPaneId),
             right: .leaf(paneId: sourcePaneId)
         ))
-        layout = layout.replacingPane(sourcePaneId, with: newSplit).equalized()
+        layout = layout.replacingPane(sourcePaneId, with: newSplit)
         focusedPaneId = newPaneId
         focusRequestVersion += 1
         activateSplitActions()
@@ -209,7 +209,7 @@ final class TerminalSplitController: ObservableObject {
             left: .leaf(paneId: sourcePaneId),
             right: .leaf(paneId: newPaneId)
         ))
-        layout = layout.replacingPane(sourcePaneId, with: newSplit).equalized()
+        layout = layout.replacingPane(sourcePaneId, with: newSplit)
         focusedPaneId = newPaneId
         focusRequestVersion += 1
         activateSplitActions()
@@ -224,7 +224,7 @@ final class TerminalSplitController: ObservableObject {
             left: .leaf(paneId: newPaneId),
             right: .leaf(paneId: sourcePaneId)
         ))
-        layout = layout.replacingPane(sourcePaneId, with: newSplit).equalized()
+        layout = layout.replacingPane(sourcePaneId, with: newSplit)
         focusedPaneId = newPaneId
         focusRequestVersion += 1
         activateSplitActions()
@@ -256,7 +256,7 @@ final class TerminalSplitController: ObservableObject {
             } else if focusedPaneId == paneId, let fallbackPaneId = newLayout.allPaneIds().first {
                 focusedPaneId = fallbackPaneId
             }
-            layout = newLayout.equalized()
+            layout = newLayout
         }
     }
 
@@ -309,7 +309,7 @@ final class TerminalSplitController: ObservableObject {
         }
 
         transferFocus(from: paneIdToClose, to: newLayout.allPaneIds().first)
-        layout = newLayout.equalized()
+        layout = newLayout
 
         DispatchQueue.main.async { [session, sessionManager] in
             if let sessionId = session.id {
