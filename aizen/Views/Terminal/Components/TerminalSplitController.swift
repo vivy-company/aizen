@@ -34,6 +34,7 @@ final class TerminalSplitController: ObservableObject {
             guard isSelected else { return }
             guard !focusedPaneId.isEmpty else { return }
             focusedPaneVoiceRecording = paneVoiceRecordingStates[focusedPaneId] ?? false
+            syncGhosttySurfaceFocus()
             scheduleFocusSave()
             applyTitleForFocusedPane()
         }
@@ -94,6 +95,7 @@ final class TerminalSplitController: ObservableObject {
 
         guard isSelected else { return }
         activateSplitActions()
+        syncGhosttySurfaceFocus()
         persistLayout()
         persistFocus()
         applyTitleForFocusedPane()
@@ -105,6 +107,7 @@ final class TerminalSplitController: ObservableObject {
         focusSaveTask?.cancel()
         contextSaveTask?.cancel()
         deactivateSplitActions()
+        clearGhosttySurfaceFocus()
 
         if let monitor = keyMonitor {
             NSEvent.removeMonitor(monitor)
@@ -117,12 +120,14 @@ final class TerminalSplitController: ObservableObject {
 
         if selected {
             activateSplitActions()
+            syncGhosttySurfaceFocus()
             persistLayout()
             persistFocus()
             applyTitleForFocusedPane()
             focusRequestVersion += 1
         } else {
             deactivateSplitActions()
+            clearGhosttySurfaceFocus()
         }
     }
 
@@ -518,6 +523,26 @@ final class TerminalSplitController: ObservableObject {
         }
 
         return focusedPaneId
+    }
+
+    private func syncGhosttySurfaceFocus() {
+        guard isSelected, let sessionId = session.id else { return }
+
+        let paneIds = Set(layout.allPaneIds())
+        for paneId in paneIds {
+            guard let surface = sessionManager.getTerminal(for: sessionId, paneId: paneId) else { continue }
+            surface.setGhosttyFocused(paneId == focusedPaneId)
+        }
+    }
+
+    private func clearGhosttySurfaceFocus() {
+        guard let sessionId = session.id else { return }
+
+        let paneIds = Set(layout.allPaneIds())
+        for paneId in paneIds {
+            guard let surface = sessionManager.getTerminal(for: sessionId, paneId: paneId) else { continue }
+            surface.setGhosttyFocused(false)
+        }
     }
 
     private func transferFocus(from sourcePaneId: String, to targetPaneId: String?) {

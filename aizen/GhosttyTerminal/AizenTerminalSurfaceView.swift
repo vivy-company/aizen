@@ -2265,6 +2265,12 @@ final class AizenTerminalSurfaceView: Ghostty.SurfaceView {
         }
     }
 
+    /// Keep Ghostty's per-surface focus state in sync with Aizen's pane selection
+    /// even when AppKit responder transitions are delayed or skipped.
+    func setGhosttyFocused(_ focused: Bool) {
+        super.focusDidChange(focused)
+    }
+
     func startSearch(_ startSearch: Ghostty.Action.StartSearch) {
         if let searchState {
             searchState.needle = startSearch.needle ?? ""

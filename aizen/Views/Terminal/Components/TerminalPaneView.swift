@@ -100,11 +100,13 @@ struct TerminalPaneView: View {
         }
         .onAppear {
             resolveSurfaceIfNeeded()
+            surfaceView?.setGhosttyFocused(isFocused)
             if isFocused {
                 requestSurfaceFocus()
             }
         }
         .onChange(of: isFocused) { _, newValue in
+            surfaceView?.setGhosttyFocused(newValue)
             if newValue {
                 requestSurfaceFocus()
             }
@@ -143,12 +145,14 @@ struct TerminalPaneView: View {
     private func resolveSurfaceIfNeeded() {
         if let existing = surfaceView {
             surfaceAdapter.applyCallbacks(to: existing)
+            existing.setGhosttyFocused(isFocused)
             return
         }
 
         if let sessionId = session.id,
            let existing = sessionManager.getTerminal(for: sessionId, paneId: paneId) {
             surfaceAdapter.applyCallbacks(to: existing)
+            existing.setGhosttyFocused(isFocused)
             surfaceView = existing
             return
         }
@@ -168,6 +172,7 @@ struct TerminalPaneView: View {
         )
         surfaceAdapter.applyCallbacks(to: created)
         surfaceAdapter.store(surface: created)
+        created.setGhosttyFocused(isFocused)
         surfaceView = created
     }
 
