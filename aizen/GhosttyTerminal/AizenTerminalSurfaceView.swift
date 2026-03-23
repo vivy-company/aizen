@@ -699,12 +699,22 @@ extension Ghostty {
         private func isTopmostSurfaceHit(for event: NSEvent) -> Bool {
             guard let window else { return false }
 
-            // Check whether the click falls within this surface's visible area.
-            // A simple bounds check is more reliable than contentView.hitTest
-            // in deeply nested NSViewRepresentable hierarchies where frame
-            // geometry can lag behind the actual display position.
             let localPoint = convert(event.locationInWindow, from: nil)
-            return bounds.contains(localPoint)
+            guard bounds.contains(localPoint) else { return false }
+
+            // Bounds containment alone is not enough here because the split
+            // divider sits above terminal surfaces in the host hierarchy. If a
+            // sibling view won hit-testing for this point, we must not steal
+            // the click for focus transfer or the first drag on the divider
+            // turns into a focus-only click.
+            if let contentView = window.contentView,
+               let hitView = contentView.hitTest(event.locationInWindow),
+               hitView !== self,
+               !hitView.isDescendant(of: self) {
+                return false
+            }
+
+            return true
         }
 
         private var isCurrentFirstResponder: Bool {
