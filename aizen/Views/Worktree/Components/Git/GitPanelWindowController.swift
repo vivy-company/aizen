@@ -106,14 +106,16 @@ struct GitPanelWindowContentWithToolbar: View {
     @AppStorage(AppearanceSettings.gitDiffRenderStyleKey)
     private var diffRenderStyleRawValue: String = AppearanceSettings.defaultGitDiffRenderStyleRawValue
 
-    @ObservedObject private var gitRepositoryService: GitRepositoryService
+    private let runtime: WorktreeRuntime
+    @ObservedObject private var gitSummaryStore: GitSummaryStore
+    @ObservedObject private var gitOperationService: GitOperationService
 
     private let gitHostingService = GitHostingService.shared
 
     private var worktree: Worktree { context.worktree }
-    private var gitStatus: GitStatus { gitRepositoryService.currentStatus }
-    private var isOperationPending: Bool { gitRepositoryService.isOperationPending }
-    private var gitFeaturesAvailable: Bool { gitRepositoryService.repositoryState == .ready }
+    private var gitStatus: GitStatus { gitSummaryStore.status }
+    private var isOperationPending: Bool { gitOperationService.isOperationPending }
+    private var gitFeaturesAvailable: Bool { gitSummaryStore.repositoryState == .ready }
 
     private var diffRenderStyleBinding: Binding<VVDiffRenderStyle> {
         Binding(
@@ -130,14 +132,16 @@ struct GitPanelWindowContentWithToolbar: View {
         self.context = context
         self.repositoryManager = repositoryManager
         self.onClose = onClose
-        self._gitRepositoryService = ObservedObject(wrappedValue: context.service)
+        self.runtime = context.runtime
+        self._gitSummaryStore = ObservedObject(wrappedValue: context.runtime.summaryStore)
+        self._gitOperationService = ObservedObject(wrappedValue: context.runtime.operationService)
     }
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitPanelToolbar")
 
     private var gitOperations: WorktreeGitOperations {
         WorktreeGitOperations(
-            gitRepositoryService: gitRepositoryService,
+            gitOperationService: gitOperationService,
             repositoryManager: repositoryManager,
             worktree: worktree,
             logger: logger
@@ -369,7 +373,7 @@ struct GitPanelWindowContentWithToolbar: View {
                 .disabled(isOperationPending)
             }
         }
-        .onChange(of: gitRepositoryService.isOperationPending) { _, pending in
+        .onChange(of: gitOperationService.isOperationPending) { _, pending in
             if !pending {
                 currentOperation = nil
             }
@@ -547,7 +551,7 @@ struct GitPanelWindowContentWithToolbar: View {
                 try await gitHostingService.mergePR(repoPath: path, prNumber: number)
                 await refreshPRStatus()
                 // Refresh git status after merge
-                gitRepositoryService.reloadStatus()
+                runtime.refreshSummary(lightweight: false)
             } catch {
                 logger.error("Failed to merge PR: \(error.localizedDescription)")
             }

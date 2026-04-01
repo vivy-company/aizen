@@ -95,6 +95,7 @@ struct SessionTabsScrollView: View {
     @State private var showCloseConfirmation = false
 
     @ObservedObject private var sessionManager = ChatSessionManager.shared
+    @ObservedObject private var terminalTitleRegistry = TerminalTitleRegistry.shared
 
     var body: some View {
         HStack(spacing: 4) {
@@ -239,7 +240,7 @@ struct SessionTabsScrollView: View {
                 Image(systemName: "terminal")
                     .font(.system(size: 12))
 
-                Text(session.title ?? String(localized: "worktree.session.terminal"))
+                Text(terminalTitleRegistry.title(for: session) ?? String(localized: "worktree.session.terminal"))
                     .font(.callout)
 
                 TerminalPersistenceIndicator()

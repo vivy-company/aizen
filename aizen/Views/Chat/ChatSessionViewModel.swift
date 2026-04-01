@@ -175,8 +175,10 @@ class ChatSessionViewModel: ObservableObject {
         nearBottomStateTask = nil
         if gitPauseApplied, !worktreePathSnapshot.isEmpty {
             let path = worktreePathSnapshot
-            Task {
-                await GitIndexWatchCenter.shared.resume(worktreePath: path)
+            Task { @MainActor in
+                WorktreeRuntimeCoordinator.shared
+                    .runtime(for: path)
+                    .setGitRefreshSuspended(false)
             }
         }
         cancellables.removeAll()
@@ -975,9 +977,9 @@ class ChatSessionViewModel: ObservableObject {
                             object: nil,
                             userInfo: ["worktreePath": path]
                         )
-                        Task {
-                            await GitIndexWatchCenter.shared.pause(worktreePath: path)
-                        }
+                        WorktreeRuntimeCoordinator.shared
+                            .runtime(for: path)
+                            .setGitRefreshSuspended(true)
                     } else if !isStreaming && self.gitPauseApplied {
                         self.gitPauseApplied = false
                         NotificationCenter.default.post(
@@ -985,9 +987,9 @@ class ChatSessionViewModel: ObservableObject {
                             object: nil,
                             userInfo: ["worktreePath": path]
                         )
-                        Task {
-                            await GitIndexWatchCenter.shared.resume(worktreePath: path)
-                        }
+                        WorktreeRuntimeCoordinator.shared
+                            .runtime(for: path)
+                            .setGitRefreshSuspended(false)
                     }
                 }
 

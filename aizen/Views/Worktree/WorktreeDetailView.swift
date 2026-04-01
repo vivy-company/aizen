@@ -33,11 +33,10 @@ struct WorktreeDetailView: View {
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
     @State private var selectedTab = "chat"
     @State private var lastOpenedApp: DetectedApp?
-    @StateObject private var gitRepositoryService: GitRepositoryService
-    @StateObject private var xcodeBuildManager = XcodeBuildManager()
+    private let worktreeRuntime: WorktreeRuntime
+    @ObservedObject private var gitSummaryStore: GitSummaryStore
+    @ObservedObject private var xcodeBuildManager: XcodeBuildManager
     @StateObject private var tabConfig = TabConfigurationManager.shared
-    @State private var gitIndexWatchToken: UUID?
-    @State private var gitIndexWatchPath: String?
     @State private var fileSearchWindowController: FileSearchWindowController?
     @State private var fileToOpenFromSearch: String?
     @State private var cachedTerminalBackgroundColor: Color?
@@ -58,8 +57,11 @@ struct WorktreeDetailView: View {
         _gitChangesContext = gitChangesContext
         self.onWorktreeDeleted = onWorktreeDeleted
         self.showZenModeButton = showZenModeButton
+        let runtime = WorktreeRuntimeCoordinator.shared.runtime(for: worktree.path ?? "")
+        self.worktreeRuntime = runtime
         _viewModel = StateObject(wrappedValue: WorktreeViewModel(worktree: worktree, repositoryManager: repositoryManager))
-        _gitRepositoryService = StateObject(wrappedValue: GitRepositoryService(worktreePath: worktree.path ?? ""))
+        _gitSummaryStore = ObservedObject(wrappedValue: runtime.summaryStore)
+        _xcodeBuildManager = ObservedObject(wrappedValue: runtime.xcodeBuildManager)
     }
 
     private var sessionManager: WorktreeSessionManager {
@@ -86,9 +88,9 @@ struct WorktreeDetailView: View {
     }
 
     var hasGitChanges: Bool {
-        gitRepositoryService.currentStatus.additions > 0 ||
-        gitRepositoryService.currentStatus.deletions > 0 ||
-        gitRepositoryService.currentStatus.untrackedFiles.count > 0
+        gitSummaryStore.status.additions > 0 ||
+        gitSummaryStore.status.deletions > 0 ||
+        gitSummaryStore.status.untrackedFiles.count > 0
     }
 
     private var detailSurfaceColor: Color {
@@ -290,9 +292,9 @@ struct WorktreeDetailView: View {
     @ViewBuilder
     private var gitStatusView: some View {
         GitStatusView(
-            additions: gitRepositoryService.currentStatus.additions,
-            deletions: gitRepositoryService.currentStatus.deletions,
-            untrackedFiles: gitRepositoryService.currentStatus.untrackedFiles.count
+            additions: gitSummaryStore.status.additions,
+            deletions: gitSummaryStore.status.deletions,
+            untrackedFiles: gitSummaryStore.status.untrackedFiles.count
         )
     }
     
@@ -301,10 +303,10 @@ struct WorktreeDetailView: View {
     }
 
     private var gitStatusIcon: String {
-        if gitRepositoryService.repositoryState == .notRepository {
+        if gitSummaryStore.repositoryState == .notRepository {
             return "square.and.arrow.up.on.square"
         }
-        let status = gitRepositoryService.currentStatus
+        let status = gitSummaryStore.status
         if !status.conflictedFiles.isEmpty {
             // Has conflicts - warning state
             return "square.and.arrow.up.trianglebadge.exclamationmark"
@@ -318,10 +320,10 @@ struct WorktreeDetailView: View {
     }
 
     private var gitStatusHelp: String {
-        if gitRepositoryService.repositoryState == .notRepository {
+        if gitSummaryStore.repositoryState == .notRepository {
             return "Git is not initialized for this environment"
         }
-        let status = gitRepositoryService.currentStatus
+        let status = gitSummaryStore.status
         if !status.conflictedFiles.isEmpty {
             return "Git Changes - \(status.conflictedFiles.count) conflict(s)"
         } else if hasGitChanges {
@@ -332,10 +334,10 @@ struct WorktreeDetailView: View {
     }
 
     private var gitStatusColor: Color {
-        if gitRepositoryService.repositoryState == .notRepository {
+        if gitSummaryStore.repositoryState == .notRepository {
             return .secondary
         }
-        let status = gitRepositoryService.currentStatus
+        let status = gitSummaryStore.status
         if !status.conflictedFiles.isEmpty {
             return .red
         } else if hasGitChanges {
@@ -350,7 +352,7 @@ struct WorktreeDetailView: View {
         let button = Button(action: {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                 if gitChangesContext == nil {
-                    gitChangesContext = GitChangesContext(worktree: worktree, service: gitRepositoryService)
+                    gitChangesContext = GitChangesContext(worktree: worktree, runtime: worktreeRuntime)
                 } else {
                     gitChangesContext = nil
                 }
@@ -662,8 +664,7 @@ struct WorktreeDetailView: View {
                 loadTabState()
                 validateSelectedTab()
                 hasLoadedTabState = true
-                await setupGitMonitoring()
-                xcodeBuildManager.detectProject(at: worktree.path ?? "")
+                worktreeRuntime.attachDetail(showXcode: showXcodeBuild)
             }
     }
 
@@ -691,13 +692,10 @@ struct WorktreeDetailView: View {
                 tabStateManager.saveSessionId(newValue, for: "files", worktreeId: worktreeId)
             }
             .onDisappear {
-                if let token = gitIndexWatchToken, let path = gitIndexWatchPath {
-                    Task {
-                        await GitIndexWatchCenter.shared.removeSubscriber(worktreePath: path, id: token)
-                    }
-                }
-                gitIndexWatchToken = nil
-                gitIndexWatchPath = nil
+                worktreeRuntime.detachDetail()
+            }
+            .onChange(of: showXcodeBuild) { _, newValue in
+                worktreeRuntime.updateDetailOptions(showXcode: newValue)
             }
     }
 
@@ -727,28 +725,6 @@ struct WorktreeDetailView: View {
         guard let worktreeId = worktree.id else { return }
         tabStateManager.saveViewType(selectedTab, for: worktreeId)
     }
-
-    private func setupGitMonitoring() async {
-        guard let worktreePath = worktree.path else { return }
-
-        // Update service path and reload status
-        gitRepositoryService.updateWorktreePath(worktreePath)
-
-        // Dedupe polling per worktree path
-        if let token = gitIndexWatchToken, let path = gitIndexWatchPath {
-            await GitIndexWatchCenter.shared.removeSubscriber(worktreePath: path, id: token)
-            gitIndexWatchToken = nil
-            gitIndexWatchPath = nil
-        }
-
-        let service = gitRepositoryService
-        let token = await GitIndexWatchCenter.shared.addSubscriber(worktreePath: worktreePath) { [weak service] in
-            service?.reloadStatus(lightweight: true)
-        }
-        gitIndexWatchToken = token
-        gitIndexWatchPath = worktreePath
-    }
-
 
     // MARK: - App Actions
 

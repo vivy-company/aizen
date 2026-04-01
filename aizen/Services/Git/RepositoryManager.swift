@@ -24,7 +24,7 @@ class RepositoryManager: ObservableObject {
         let paths: [String]
         let matchBranchToEnvironment: Bool
 
-        static let disabled = LinkedEnvironmentSubmoduleOptions(
+        nonisolated static let disabled = LinkedEnvironmentSubmoduleOptions(
             initialize: false,
             recursive: true,
             paths: [],

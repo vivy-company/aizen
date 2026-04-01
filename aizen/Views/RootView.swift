@@ -100,8 +100,8 @@ struct RootView: View {
         }
 
         // Recreate the Git panel context
-        let service = GitRepositoryService(worktreePath: path)
-        gitChangesContext = GitChangesContext(worktree: worktree, service: service)
+        let runtime = WorktreeRuntimeCoordinator.shared.runtime(for: path)
+        gitChangesContext = GitChangesContext(worktree: worktree, runtime: runtime)
     }
 }
 
@@ -109,7 +109,7 @@ struct RootView: View {
 struct GitChangesContext: Identifiable, Equatable {
     let id = UUID()
     let worktree: Worktree
-    let service: GitRepositoryService
+    let runtime: WorktreeRuntime
 
     static func == (lhs: GitChangesContext, rhs: GitChangesContext) -> Bool {
         lhs.id == rhs.id

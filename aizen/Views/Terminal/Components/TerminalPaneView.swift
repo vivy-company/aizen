@@ -41,6 +41,7 @@ struct TerminalPaneView: View {
     @State private var showingVoiceRecording = false
     @State private var showingPermissionError = false
     @State private var permissionErrorMessage = ""
+    @ObservedObject private var terminalTitleRegistry = TerminalTitleRegistry.shared
 
     @AppStorage("terminalNotificationsEnabled") private var notificationsEnabled = true
     @AppStorage("terminalProgressEnabled") private var progressEnabled = true
@@ -56,7 +57,7 @@ struct TerminalPaneView: View {
                 if notificationsEnabled && (!isFocused || !NSApp.isActive) {
                     TerminalNotificationManager.shared.notify(
                         title: "Terminal exited",
-                        body: session.title ?? "Shell process ended"
+                        body: terminalTitleRegistry.title(for: session) ?? "Shell process ended"
                     )
                 }
                 onProcessExit()

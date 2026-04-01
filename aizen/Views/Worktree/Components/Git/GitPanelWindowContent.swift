@@ -153,10 +153,11 @@ struct GitPanelWindowContent: View {
     @Binding var selectedTab: GitPanelTab
     @Binding var diffRenderStyle: VVDiffRenderStyle
     let onClose: () -> Void
+    private let runtime: WorktreeRuntime
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitPanelWindow")
     @State private var selectedHistoryCommit: GitCommit?
-    @State private var diffOutput: String = ""
+    @State private var historyDiffOutput: String = ""
     @State private var leftPanelWidth: CGFloat = 350
     @State private var visibleFile: String?
     @State private var scrollToFile: String?
@@ -164,14 +165,11 @@ struct GitPanelWindowContent: View {
     @State private var commentPopoverFilePath: String?
     @State private var showAgentPicker: Bool = false
     @State private var cachedChangedFiles: [String] = []
-    @State private var gitIndexWatchToken: UUID?
     @State private var diffReloadTask: Task<Void, Never>?
     @State private var diffLoadTask: Task<Void, Never>?
 
     @StateObject private var reviewManager = ReviewSessionManager()
-    @StateObject private var workflowService = WorkflowService()
     @State private var selectedWorkflowForTrigger: Workflow?
-    @State private var workflowServiceInitialized: Bool = false
     @State private var isInitializingGit = false
     @State private var gitInitializationError: String?
 
@@ -181,29 +179,49 @@ struct GitPanelWindowContent: View {
     @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
     @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var usePerAppearanceTheme = false
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var gitSummaryStore: GitSummaryStore
+    @ObservedObject private var gitDiffStore: GitDiffRuntimeStore
+    @ObservedObject private var gitOperationService: GitOperationService
+    @ObservedObject private var workflowService: WorkflowService
 
     private let minLeftPanelWidth: CGFloat = 280
     private let maxLeftPanelWidth: CGFloat = 500
 
     private var worktree: Worktree { context.worktree }
     private var worktreePath: String { worktree.path ?? "" }
-    private var gitRepositoryService: GitRepositoryService { context.service }
+
+    init(
+        context: GitChangesContext,
+        repositoryManager: RepositoryManager,
+        selectedTab: Binding<GitPanelTab>,
+        diffRenderStyle: Binding<VVDiffRenderStyle>,
+        onClose: @escaping () -> Void
+    ) {
+        self.context = context
+        self.repositoryManager = repositoryManager
+        self._selectedTab = selectedTab
+        self._diffRenderStyle = diffRenderStyle
+        self.onClose = onClose
+        self.runtime = context.runtime
+        self._gitSummaryStore = ObservedObject(wrappedValue: context.runtime.summaryStore)
+        self._gitDiffStore = ObservedObject(wrappedValue: context.runtime.diffStore)
+        self._gitOperationService = ObservedObject(wrappedValue: context.runtime.operationService)
+        self._workflowService = ObservedObject(wrappedValue: context.runtime.workflowService)
+    }
 
     private var gitOperations: WorktreeGitOperations {
         WorktreeGitOperations(
-            gitRepositoryService: gitRepositoryService,
+            gitOperationService: gitOperationService,
             repositoryManager: repositoryManager,
             worktree: worktree,
             logger: logger
         )
     }
 
-    private var gitStatus: GitStatus {
-        gitRepositoryService.currentStatus
-    }
+    private var gitStatus: GitStatus { gitSummaryStore.status }
 
     private var repositoryState: GitRepositoryState {
-        gitRepositoryService.repositoryState
+        gitSummaryStore.repositoryState
     }
 
     private var shouldShowInitializeGitView: Bool {
@@ -249,37 +267,29 @@ struct GitPanelWindowContent: View {
         .toolbarBackground(surfaceColor, for: .windowToolbar)
         .toolbarBackground(.visible, for: .windowToolbar)
         .onAppear {
-            if let path = worktree.path {
-                gitRepositoryService.updateWorktreePath(path)
-            }
-            gitRepositoryService.reloadStatus()
+            syncRuntimeVisibility()
             reviewManager.load(for: worktreePath)
             _ = updateChangedFilesCache()
-            setupGitWatcher()
         }
         .onDisappear {
-            if let token = gitIndexWatchToken {
-                Task {
-                    await GitIndexWatchCenter.shared.removeSubscriber(worktreePath: worktreePath, id: token)
-                }
-            }
-            gitIndexWatchToken = nil
             diffReloadTask?.cancel()
             diffReloadTask = nil
             diffLoadTask?.cancel()
             diffLoadTask = nil
-            workflowService.stopAutoRefresh()
-            // Ensure any workflow log polling stops when the window closes.
-            workflowService.clearSelection()
+            runtime.setGitPanelVisible(false, showsWorkingDiff: false, showsWorkflow: false)
         }
         .onChange(of: gitStatus) { _, _ in
             let changed = updateChangedFilesCache()
-            if changed {
+            if changed && selectedHistoryCommit != nil {
                 reloadDiffDebounced()
             }
         }
         .onChange(of: selectedHistoryCommit) { _, commit in
             scheduleDiffLoad(for: commit)
+            syncRuntimeVisibility()
+        }
+        .onChange(of: selectedTab) { _, _ in
+            syncRuntimeVisibility()
         }
         .sheet(item: $commentPopoverLine) { line in
             CommentPopover(
@@ -427,26 +437,6 @@ struct GitPanelWindowContent: View {
                     selectedWorkflowForTrigger = workflow
                 }
             )
-            .onAppear {
-                if !workflowServiceInitialized {
-                    workflowServiceInitialized = true
-                    Task {
-                        await workflowService.configure(
-                            repoPath: worktreePath,
-                            branch: gitStatus.currentBranch.isEmpty ? "main" : gitStatus.currentBranch
-                        )
-                    }
-                } else {
-                    workflowService.setAutoRefreshEnabled(true)
-                    Task {
-                        await workflowService.refresh()
-                    }
-                }
-            }
-            .onDisappear {
-                workflowService.setAutoRefreshEnabled(false)
-                workflowService.clearSelection()
-            }
         case .prs:
             EmptyView()
         }
@@ -457,45 +447,36 @@ struct GitPanelWindowContent: View {
             worktreePath: worktreePath,
             onClose: onClose,
             gitStatus: gitStatus,
-            isOperationPending: gitRepositoryService.isOperationPending,
+            isOperationPending: gitOperationService.isOperationPending,
             selectedDiffFile: visibleFile,
             onStageFile: { file in
                 gitOperations.stageFile(file)
-                reloadDiff()
             },
             onUnstageFile: { file in
                 gitOperations.unstageFile(file)
-                reloadDiff()
             },
             onStageAll: { completion in
                 gitOperations.stageAll {
-                    reloadDiff()
                     completion()
                 }
             },
             onUnstageAll: {
                 gitOperations.unstageAll()
-                reloadDiff()
             },
             onDiscardAll: {
                 gitOperations.discardAll()
-                reloadDiff()
             },
             onCleanUntracked: {
                 gitOperations.cleanUntracked()
-                reloadDiff()
             },
             onCommit: { message in
                 gitOperations.commit(message)
-                reloadDiff()
             },
             onAmendCommit: { message in
                 gitOperations.amendCommit(message)
-                reloadDiff()
             },
             onCommitWithSignoff: { message in
                 gitOperations.commitWithSignoff(message)
-                reloadDiff()
             },
             onFileClick: { file in
                 visibleFile = file
@@ -577,7 +558,7 @@ struct GitPanelWindowContent: View {
 
             if selectedHistoryCommit == nil && allChangedFiles.isEmpty {
                 AllFilesDiffEmptyView()
-            } else if diffOutput.isEmpty {
+            } else if effectiveDiffOutput.isEmpty {
                 VStack {
                     Spacer()
                     ProgressView()
@@ -591,7 +572,7 @@ struct GitPanelWindowContent: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 DiffView(
-                    diffOutput: diffOutput,
+                    diffOutput: effectiveDiffOutput,
                     fontSize: diffFontSize,
                     fontFamily: editorFontFamily,
                     repoPath: worktreePath,
@@ -620,7 +601,7 @@ struct GitPanelWindowContent: View {
         .task {
             scheduleDiffLoad(for: nil)
         }
-        .onChange(of: diffOutput) { _, _ in
+        .onChange(of: effectiveDiffOutput) { _, _ in
             validateCommentsAgainstDiff()
         }
     }
@@ -682,19 +663,6 @@ struct GitPanelWindowContent: View {
 
     // MARK: - Helper Methods
 
-    private func setupGitWatcher() {
-        guard gitIndexWatchToken == nil else { return }
-        Task {
-            let service = gitRepositoryService
-            let token = await GitIndexWatchCenter.shared.addSubscriber(worktreePath: worktreePath) { [weak service] in
-                service?.reloadStatus(lightweight: true)
-            }
-            await MainActor.run {
-                gitIndexWatchToken = token
-            }
-        }
-    }
-
     private func initializeGit() {
         guard !isInitializingGit else { return }
         guard !worktreePath.isEmpty else { return }
@@ -710,7 +678,8 @@ struct GitPanelWindowContent: View {
                 }
 
                 await MainActor.run {
-                    gitRepositoryService.reloadStatus(lightweight: false)
+                    runtime.refreshSummary(lightweight: false)
+                    runtime.refreshWorkingDiffNow()
                     isInitializingGit = false
                 }
             } catch {
@@ -758,14 +727,14 @@ struct GitPanelWindowContent: View {
         }
 
         let commitID = commit?.id
+        guard let commitID else {
+            applyDiffOutput(gitDiffStore.diffOutput)
+            return
+        }
+
         diffLoadTask?.cancel()
         diffLoadTask = Task {
-            let output: String
-            if let commitID {
-                output = await Self.loadCommitDiff(path: path, commitID: commitID)
-            } else {
-                output = await Self.loadWorkingDiff(path: path)
-            }
+            let output = await Self.loadCommitDiff(path: path, commitID: commitID)
 
             guard !Task.isCancelled else { return }
             await MainActor.run {
@@ -774,10 +743,6 @@ struct GitPanelWindowContent: View {
                 applyDiffOutput(output)
             }
         }
-    }
-
-    private func reloadDiff() {
-        scheduleDiffLoad(for: selectedHistoryCommit)
     }
 
     private func reloadDiffDebounced() {
@@ -799,9 +764,18 @@ struct GitPanelWindowContent: View {
     }
 
     private func applyDiffOutput(_ output: String) {
-        if diffOutput != output {
-            diffOutput = output
+        if historyDiffOutput != output {
+            historyDiffOutput = output
         }
+    }
+
+    private var effectiveDiffOutput: String {
+        selectedHistoryCommit == nil ? gitDiffStore.diffOutput : historyDiffOutput
+    }
+
+    private func syncRuntimeVisibility() {
+        let shouldUseWorkingDiff = selectedHistoryCommit == nil && selectedTab != .workflows && selectedTab != .prs
+        runtime.setGitPanelVisible(true, showsWorkingDiff: shouldUseWorkingDiff, showsWorkflow: selectedTab == .workflows)
     }
 
     nonisolated private static func loadCommitDiff(path: String, commitID: String) async -> String {
@@ -817,67 +791,4 @@ struct GitPanelWindowContent: View {
         }
     }
 
-    nonisolated private static func loadWorkingDiff(path: String) async -> String {
-        await Task.detached {
-            do {
-                let repo = try Libgit2Repository(path: path)
-
-                // Try combined diff (HEAD to workdir with index)
-                let headDiff = try repo.diffUnified()
-                if !headDiff.isEmpty {
-                    return headDiff
-                }
-
-                // Fallback: staged diff
-                let stagedDiff = try repo.diffStagedUnified()
-                if !stagedDiff.isEmpty {
-                    return stagedDiff
-                }
-
-                // Fallback: unstaged diff
-                let unstagedDiff = try repo.diffUnstagedUnified()
-                if !unstagedDiff.isEmpty {
-                    return unstagedDiff
-                }
-
-                // Last resort: untracked files
-                let status = try repo.status()
-                if !status.untracked.isEmpty {
-                    var output = ""
-                    for entry in status.untracked.prefix(50) {
-                        output += Self.buildFileDiff(file: entry.path, basePath: path)
-                    }
-                    return output
-                }
-
-                return ""
-            } catch {
-                return ""
-            }
-        }.value
-    }
-
-    nonisolated private static func buildFileDiff(file: String, basePath: String) -> String {
-        let fullPath = (basePath as NSString).appendingPathComponent(file)
-        guard let data = FileManager.default.contents(atPath: fullPath),
-              let content = String(data: data, encoding: .utf8) else {
-            return ""
-        }
-
-        let lines = content.split(separator: "\n", omittingEmptySubsequences: false)
-        var parts = [String]()
-        parts.reserveCapacity(lines.count + 5)
-
-        parts.append("diff --git a/\(file) b/\(file)")
-        parts.append("new file mode 100644")
-        parts.append("--- /dev/null")
-        parts.append("+++ b/\(file)")
-        parts.append("@@ -0,0 +1,\(lines.count) @@")
-
-        for line in lines {
-            parts.append("+\(line)")
-        }
-
-        return parts.joined(separator: "\n") + "\n"
-    }
 }

@@ -42,48 +42,69 @@ class WorkflowService: ObservableObject {
 
     private var refreshTask: Task<Void, Never>?
     private var logPollingTask: Task<Void, Never>?
+    private var autoRefreshEnabled = false
+    private var isStateStale = true
 
     private let runsLimit = 20
 
     // MARK: - Initialization
 
     func configure(repoPath: String, branch: String) async {
+        let didChangeRepo = self.repoPath != repoPath
         self.repoPath = repoPath
         self.currentBranch = branch
         isInitializing = true
+        isStateStale = true
 
         // Ensure shell environment is preloaded
         _ = ShellEnvironment.loadUserShellEnvironment()
 
+        if didChangeRepo {
+            stopAutoRefresh()
+            stopLogPolling()
+            clearSelection()
+            workflows = []
+            runs = []
+            selectedRunJobs = []
+            runLogs = ""
+            structuredLogs = nil
+            currentLogJobId = nil
+        }
+
         // Detect provider
-        provider = await WorkflowDetector.shared.detect(repoPath: repoPath)
+        let detectedProvider = await WorkflowDetector.shared.detect(repoPath: repoPath)
+        provider = detectedProvider
 
         // Check CLI availability
         cliAvailability = await WorkflowDetector.shared.checkCLIAvailability()
 
         // Initialize appropriate provider
-        switch provider {
+        switch detectedProvider {
         case .github:
             githubProvider = GitHubWorkflowProvider()
+            gitlabProvider = nil
         case .gitlab:
             gitlabProvider = GitLabWorkflowProvider()
+            githubProvider = nil
         case .none:
+            githubProvider = nil
+            gitlabProvider = nil
             break
         }
 
         isInitializing = false
 
-        // Initial load
-        await loadWorkflows()
-        await loadRuns()
-
-        // Start auto-refresh timer (60 seconds)
-        startAutoRefresh()
+        if autoRefreshEnabled {
+            await refresh()
+            startAutoRefresh()
+        }
     }
 
     func updateBranch(_ branch: String) async {
         guard branch != currentBranch else { return }
         currentBranch = branch
+        isStateStale = true
+        guard autoRefreshEnabled else { return }
         await loadRuns()
     }
 
@@ -106,6 +127,7 @@ class WorkflowService: ObservableObject {
         }
 
         isLoading = false
+        isStateStale = false
     }
 
     func loadRuns() async {
@@ -130,9 +152,11 @@ class WorkflowService: ObservableObject {
         }
 
         isLoading = false
+        isStateStale = false
     }
 
     func refresh() async {
+        guard provider != .none else { return }
         await loadWorkflows()
         await loadRuns()
 
@@ -486,10 +510,17 @@ class WorkflowService: ObservableObject {
 
     func setAutoRefreshEnabled(_ enabled: Bool) {
         guard isConfigured else { return }
+        autoRefreshEnabled = enabled
         if enabled {
+            if isStateStale || workflows.isEmpty || runs.isEmpty {
+                Task { [weak self] in
+                    await self?.refresh()
+                }
+            }
             startAutoRefresh()
         } else {
             stopAutoRefresh()
+            stopLogPolling()
         }
     }
 

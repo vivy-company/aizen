@@ -11,6 +11,7 @@ import SwiftUI
 
 // NOTE: TmuxSessionManager lives outside Views; keep a lightweight reference here.
 private let tmuxManager = TmuxSessionManager.shared
+private let terminalTitleRegistry = TerminalTitleRegistry.shared
 
 @MainActor
 struct WorktreeSessionManager {
@@ -94,6 +95,7 @@ struct WorktreeSessionManager {
         // Clean up terminal views
         if let id = sessionId {
             TerminalSessionManager.shared.removeAllTerminals(for: id)
+            terminalTitleRegistry.clearLiveTitle(for: id)
         }
 
         // Delete from Core Data

@@ -56,7 +56,7 @@ struct DiffView: View {
         self.onAddComment = onAddComment
     }
 
-    // Init for pre-parsed lines (used by FileDiffSectionView)
+    // Init for pre-parsed lines
     init(
         lines: [DiffLine],
         fontSize: Double,

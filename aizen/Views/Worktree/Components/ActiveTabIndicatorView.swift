@@ -12,6 +12,7 @@ struct ActiveTabIndicatorView: View {
     let worktree: Worktree
     @ObservedObject var tabStateManager: WorktreeTabStateManager
     @Environment(\.managedObjectContext) private var viewContext
+    @ObservedObject private var terminalTitleRegistry = TerminalTitleRegistry.shared
 
     private var tabState: WorktreeTabState {
         guard let worktreeId = worktree.id else {
@@ -37,7 +38,7 @@ struct ActiveTabIndicatorView: View {
         case "terminal":
             if let sessionId = tabState.terminalSessionId,
                let session = fetchTerminalSession(id: sessionId) {
-                let title = session.title ?? "Terminal"
+                let title = terminalTitleRegistry.title(for: session) ?? "Terminal"
                 return ("terminal", title)
             }
             return ("terminal", "Terminal")

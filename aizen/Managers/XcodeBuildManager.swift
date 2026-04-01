@@ -40,14 +40,24 @@ class XcodeBuildManager: ObservableObject {
 
     // MARK: - Persistence
 
-    private var lastDestinationId: String {
-        get { UserDefaults.standard.string(forKey: "xcodeLastDestinationId") ?? "" }
-        set { UserDefaults.standard.set(newValue, forKey: "xcodeLastDestinationId") }
+    private func persistenceKey(prefix: String, scopedTo path: String) -> String {
+        let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
+        return "\(prefix)_\(normalizedPath)"
+    }
+
+    private var lastDestinationIdKey: String {
+        guard let path = currentWorktreePath else { return "" }
+        return persistenceKey(prefix: "xcodeLastDestinationId", scopedTo: path)
     }
 
     private var projectSchemeKey: String {
         guard let project = detectedProject else { return "" }
-        return "xcodeScheme_\(project.path.hashValue)"
+        return persistenceKey(prefix: "xcodeScheme", scopedTo: project.path)
+    }
+
+    private var destinationsCacheKey: String {
+        guard let path = currentWorktreePath else { return "" }
+        return persistenceKey(prefix: "xcodeDestinationsCache", scopedTo: path)
     }
 
     // MARK: - Services
@@ -58,12 +68,17 @@ class XcodeBuildManager: ObservableObject {
 
     private var buildTask: Task<Void, Never>?
     private var currentWorktreePath: String?
+    private var lastDestinationsRefreshAt: Date?
+    private let destinationsRefreshTTL: TimeInterval = 300
 
     init() {}
 
     // MARK: - Detection
 
     func detectProject(at path: String) {
+        if path == currentWorktreePath, detectedProject != nil {
+            return
+        }
         guard path != currentWorktreePath else { return }
         currentWorktreePath = path
 
@@ -88,9 +103,8 @@ class XcodeBuildManager: ObservableObject {
 
             // Load cached destinations off main actor (JSON decoding)
             let cachedDestinations = self.loadCachedDestinationsOffMainActor()
-            let lastDestId = UserDefaults.standard.string(forKey: "xcodeLastDestinationId") ?? ""
-            let schemeKey = "xcodeScheme_\(project.path.hashValue)"
-            let savedScheme = UserDefaults.standard.string(forKey: schemeKey)
+            let lastDestId = self.loadLastDestinationId()
+            let savedScheme = self.loadSavedScheme(for: project.path)
 
             // Update UI state on main actor
             await MainActor.run {
@@ -122,7 +136,7 @@ class XcodeBuildManager: ObservableObject {
             }
 
             // Refresh destinations in background (or load if no cache)
-            if cachedDestinations != nil {
+            if cachedDestinations != nil, self.shouldRefreshDestinations(force: false) {
                 await self.loadDestinations(force: false)
             } else {
                 await self.loadDestinations(force: true)
@@ -142,6 +156,16 @@ class XcodeBuildManager: ObservableObject {
         return cached.toDestinationDict()
     }
 
+    private func loadLastDestinationId() -> String {
+        guard !lastDestinationIdKey.isEmpty else { return "" }
+        return UserDefaults.standard.string(forKey: lastDestinationIdKey) ?? ""
+    }
+
+    private func loadSavedScheme(for projectPath: String) -> String? {
+        let key = persistenceKey(prefix: "xcodeScheme", scopedTo: projectPath)
+        return UserDefaults.standard.string(forKey: key)
+    }
+
     func refreshDestinations() {
         Task { [weak self] in
             await self?.loadDestinations(force: true)
@@ -150,13 +174,13 @@ class XcodeBuildManager: ObservableObject {
 
     // MARK: - Destination Caching
 
-    private let destinationsCacheKey = "xcodeDestinationsCache"
-
     private func cacheDestinations(_ destinations: [DestinationType: [XcodeDestination]]) {
         let allDestinations = destinations.flatMap { type, dests in
             dests.map { CachedDestination(destination: $0, type: type) }
         }
         let cached = CachedDestinations(destinations: allDestinations)
+
+        guard !destinationsCacheKey.isEmpty else { return }
 
         if let data = try? JSONEncoder().encode(cached) {
             UserDefaults.standard.set(data, forKey: destinationsCacheKey)
@@ -164,6 +188,8 @@ class XcodeBuildManager: ObservableObject {
     }
 
     private func loadDestinations(force: Bool = false) async {
+        guard force || shouldRefreshDestinations(force: false) else { return }
+
         await MainActor.run {
             isLoadingDestinations = true
         }
@@ -174,9 +200,11 @@ class XcodeBuildManager: ObservableObject {
             await MainActor.run {
                 self.availableDestinations = destinations
                 self.cacheDestinations(destinations)
+                self.lastDestinationsRefreshAt = Date()
 
                 // Restore last selected destination or pick first simulator
-                if let lastId = self.lastDestinationId.isEmpty ? nil : self.lastDestinationId,
+                let lastId = self.loadLastDestinationId()
+                if !lastId.isEmpty,
                    let destination = self.findDestination(byId: lastId) {
                     self.selectedDestination = destination
                 } else if self.selectedDestination == nil {
@@ -194,6 +222,12 @@ class XcodeBuildManager: ObservableObject {
         }
     }
 
+    private func shouldRefreshDestinations(force: Bool) -> Bool {
+        guard !force else { return true }
+        guard let lastRefreshAt = lastDestinationsRefreshAt else { return true }
+        return Date().timeIntervalSince(lastRefreshAt) >= destinationsRefreshTTL
+    }
+
     private func findDestination(byId id: String) -> XcodeDestination? {
         for (_, destinations) in availableDestinations {
             if let destination = destinations.first(where: { $0.id == id }) {
@@ -207,6 +241,7 @@ class XcodeBuildManager: ObservableObject {
 
     func selectScheme(_ scheme: String) {
         selectedScheme = scheme
+        guard !projectSchemeKey.isEmpty else { return }
         UserDefaults.standard.set(scheme, forKey: projectSchemeKey)
     }
 
@@ -214,7 +249,8 @@ class XcodeBuildManager: ObservableObject {
 
     func selectDestination(_ destination: XcodeDestination) {
         selectedDestination = destination
-        lastDestinationId = destination.id
+        guard !lastDestinationIdKey.isEmpty else { return }
+        UserDefaults.standard.set(destination.id, forKey: lastDestinationIdKey)
     }
 
     // MARK: - Build & Run

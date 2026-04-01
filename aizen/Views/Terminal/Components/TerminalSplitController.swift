@@ -21,6 +21,7 @@ final class TerminalSplitController: ObservableObject {
     let session: TerminalSession
     let sessionManager: TerminalSessionManager
     let splitActions = TerminalSplitActions()
+    private let titleRegistry = TerminalTitleRegistry.shared
 
     @Published var layout: SplitNode {
         didSet {
@@ -140,9 +141,9 @@ final class TerminalSplitController: ObservableObject {
 
     func handleTitleChange(for paneId: String, title: String) {
         paneTitles[paneId] = title
-        if paneId == focusedPaneId, session.title != title {
-            session.title = title
-            saveContext()
+        if paneId == focusedPaneId,
+           let sessionId = session.id {
+            titleRegistry.setLiveTitle(title, for: sessionId)
         }
     }
 
@@ -471,9 +472,12 @@ final class TerminalSplitController: ObservableObject {
 
     private func applyTitleForFocusedPane() {
         guard !isClosingSession, !session.isDeleted else { return }
-        if let title = paneTitles[focusedPaneId], session.title != title {
-            session.title = title
-            saveContext()
+        guard let sessionId = session.id else { return }
+
+        if let title = paneTitles[focusedPaneId] {
+            titleRegistry.setLiveTitle(title, for: sessionId)
+        } else {
+            titleRegistry.clearLiveTitle(for: sessionId)
         }
     }
 
