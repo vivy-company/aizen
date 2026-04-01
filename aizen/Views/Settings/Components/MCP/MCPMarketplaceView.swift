@@ -6,7 +6,6 @@
 //
 
 import ACP
-import Combine
 import Foundation
 import SwiftUI
 
@@ -32,7 +31,6 @@ struct MCPMarketplaceView: View {
     @State private var serverToRemove: MCPServer?
     @State private var showingRemoveConfirmation = false
 
-    @State private var searchTask: Task<Void, Never>?
     @State private var supportedTransports: Set<String> = ["stdio"]
 
     private enum ServerFilter: String, CaseIterable {
@@ -68,7 +66,9 @@ struct MCPMarketplaceView: View {
         .task {
             await loadTransportSupport()
             await mcpManager.syncInstalled(agentId: agentId)
-            await loadServers()
+        }
+        .task(id: searchQuery) {
+            await updateSearchResults(for: searchQuery)
         }
         .sheet(isPresented: $showingInstallSheet) {
             if let server = selectedServer {
@@ -106,25 +106,17 @@ struct MCPMarketplaceView: View {
                 placeholder: "Search MCP servers...",
                 text: $searchQuery,
                 iconColor: .secondary,
-                onSubmit: { Task { await search() } },
+                onSubmit: {
+                    Task { await searchImmediately() }
+                },
                 onClear: {
-                    searchTask?.cancel()
-                    Task { await loadServers() }
+                    searchQuery = ""
                 },
                 trailing: { EmptyView() }
             )
             .padding(8)
             .background(Color(NSColor.textBackgroundColor))
             .cornerRadius(8)
-            .onChange(of: searchQuery) { _, newValue in
-                // Debounced search
-                searchTask?.cancel()
-                searchTask = Task {
-                    try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
-                    guard !Task.isCancelled else { return }
-                    await search()
-                }
-            }
 
             TagBadge(
                 text: agentName,
@@ -533,19 +525,31 @@ struct MCPMarketplaceView: View {
         }
     }
 
-    private func search() async {
-        guard !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty else {
+    private func searchImmediately() async {
+        await updateSearchResults(for: searchQuery, debounce: false)
+    }
+
+    private func updateSearchResults(for query: String, debounce: Bool = true) async {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespaces)
+
+        guard !trimmedQuery.isEmpty else {
             await loadServers()
             return
+        }
+
+        if debounce {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            guard searchQuery == query else { return }
         }
 
         isLoading = true
         errorMessage = nil
 
-        print("[MCPMarketplace] Searching for: \(searchQuery)")
+        print("[MCPMarketplace] Searching for: \(query)")
 
         do {
-            let result = try await MCPRegistryService.shared.search(query: searchQuery, limit: 50)
+            let result = try await MCPRegistryService.shared.search(query: query, limit: 50)
             let filtered = result.servers
                 .map { $0.server }
                 .filter { server in

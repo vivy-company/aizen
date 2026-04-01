@@ -3,7 +3,8 @@
 ## Scope
 
 - Audit target: `aizen` Swift files using SwiftUI `.onChange(`
-- Inventory at latest validation pass: 103 call sites across 42 Swift files
+- Inventory at initial validation pass: 103 call sites across 42 Swift files
+- Inventory after current implementation pass: 48 call sites across 23 Swift files
 - Goal: reduce fragile imperative state propagation, especially:
   - event delivery disguised as observed state
   - async work kicked off from `.onChange`
@@ -11,6 +12,41 @@
   - prop-to-local-state mirroring spread across many small observers
 
 This spec is intentionally not a blanket ban on `.onChange`. Some sites are correct and should stay. The refactor target is the subset where `.onChange` is being used as a coordinator, event bus, or async trigger.
+
+## Implementation Status
+
+The refactor pass covered the highest-value coordinator, async-trigger, and event-flag sites. These items are implemented in code and should be treated as done unless follow-up cleanup is needed:
+
+- `ContentView`
+- `RootView`
+- `SessionsListView`
+- `FileSearchView`
+- `MCPMarketplaceView`
+- `ChatMessageList` style-observer consolidation
+- `ChatInputBar`
+- `WorktreeListItemView`
+- `TerminalPaneView` voice-action path
+- `ANSIParser`
+- `TranscriptionSettingsView`
+- `GeneralSettingsView`
+- `PostCreateActionsView`
+- `CustomAgentFormView`
+- `WorktreeCreateSheet`
+- `BranchSelectorView`
+- `VVCodeSnippetView`
+- `CodeEditorView`
+- `GitPanelWindowController` branch-selection path
+- `WorkflowRunDetailView`
+- `CommandPaletteWindowController`
+
+Remaining work is concentrated in the still-listed files that currently contain `.onChange(` in the app target, especially:
+
+- `ChatSessionView` draft persistence
+- `FileBrowserSessionView`
+- `AgentDetailView`
+- `PullRequestDetailPane`
+- `GitPanelWindowContent`
+- lower-priority geometry, scroll, focus, and selection-sync observers
 
 ## Decision Rules
 
@@ -27,29 +63,32 @@ Priority here means implementation order, not importance. Low-priority items are
 
 ### P0: implement first
 
-- `aizen/Views/ContentView.swift`
-- `aizen/Views/RootView.swift`
-- `aizen/Views/Chat/SessionsListView.swift`
-- `aizen/Views/Search/FileSearchView.swift`
-- `aizen/Views/Settings/Components/MCP/MCPMarketplaceView.swift`
-- `aizen/Views/Chat/Components/ChatMessageList.swift`
-- `aizen/Views/Chat/Components/ChatInputBar.swift`
-- `aizen/Views/Worktree/Components/WorktreeListItemView.swift`
-- `aizen/Views/Terminal/Components/TerminalPaneView.swift` for `voiceAction`
-- `aizen/Utilities/ANSIParser.swift`
+- Completed in current pass:
+  - `aizen/Views/ContentView.swift`
+  - `aizen/Views/RootView.swift`
+  - `aizen/Views/Chat/SessionsListView.swift`
+  - `aizen/Views/Search/FileSearchView.swift`
+  - `aizen/Views/Settings/Components/MCP/MCPMarketplaceView.swift`
+  - `aizen/Views/Chat/Components/ChatMessageList.swift`
+  - `aizen/Views/Chat/Components/ChatInputBar.swift`
+  - `aizen/Views/Worktree/Components/WorktreeListItemView.swift`
+  - `aizen/Views/Terminal/Components/TerminalPaneView.swift` for `voiceAction`
+  - `aizen/Utilities/ANSIParser.swift`
 
 ### P1: implement next
 
-- `aizen/Views/Settings/TranscriptionSettingsView.swift`
-- `aizen/Views/Settings/GeneralSettingsView.swift`
-- `aizen/Views/Settings/Components/PostCreateActionsView.swift`
-- `aizen/Views/Settings/Components/CustomAgentFormView.swift`
-- `aizen/Views/Worktree/WorktreeCreateSheet.swift`
-- `aizen/Views/Worktree/Components/BranchSelectorView.swift`
-- `aizen/Views/Components/VVCodeSnippetView.swift`
-- `aizen/Views/Components/CodeEditorView.swift`
-- `aizen/Views/Worktree/Components/Git/GitPanelWindowController.swift`
-- `aizen/Views/Worktree/Components/Git/Workflow/WorkflowRunDetailView.swift`
+- Completed in current pass:
+  - `aizen/Views/Settings/TranscriptionSettingsView.swift`
+  - `aizen/Views/Settings/GeneralSettingsView.swift`
+  - `aizen/Views/Settings/Components/PostCreateActionsView.swift`
+  - `aizen/Views/Settings/Components/CustomAgentFormView.swift`
+  - `aizen/Views/Worktree/WorktreeCreateSheet.swift`
+  - `aizen/Views/Worktree/Components/BranchSelectorView.swift`
+  - `aizen/Views/Components/VVCodeSnippetView.swift`
+  - `aizen/Views/Components/CodeEditorView.swift`
+  - `aizen/Views/Worktree/Components/Git/GitPanelWindowController.swift`
+  - `aizen/Views/Worktree/Components/Git/Workflow/WorkflowRunDetailView.swift`
+- Remaining from this tier:
 - `aizen/Views/Chat/ChatSessionView.swift` for draft persistence
 - `aizen/Views/Chat/Components/CompanionDivider.swift`
 

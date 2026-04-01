@@ -56,6 +56,10 @@ struct TranscriptionSettingsView: View {
         return configuration.presets.first(where: { $0.id == configuration.modelId.wrappedValue })
     }
 
+    private var settingsSyncKey: String {
+        "\(providerRaw)|\(whisperModelId)|\(parakeetModelId)"
+    }
+
     var body: some View {
         Form {
             Section {
@@ -166,26 +170,9 @@ struct TranscriptionSettingsView: View {
         }
         .formStyle(.grouped)
         .settingsSurface()
-        .onAppear {
+        .task(id: settingsSyncKey) {
             whisperManager.modelId = whisperModelId
             parakeetManager.modelId = parakeetModelId
-            whisperManager.refreshStatus()
-            parakeetManager.refreshStatus()
-        }
-        .onChange(of: providerRaw) { _, newValue in
-            if newValue == TranscriptionProvider.mlxWhisper.rawValue {
-                whisperManager.refreshStatus()
-            } else if newValue == TranscriptionProvider.mlxParakeet.rawValue {
-                parakeetManager.refreshStatus()
-            }
-        }
-        .onChange(of: whisperModelId) { _, newValue in
-            whisperManager.modelId = newValue
-            whisperManager.refreshStatus()
-        }
-        .onChange(of: parakeetModelId) { _, newValue in
-            parakeetManager.modelId = newValue
-            parakeetManager.refreshStatus()
         }
     }
 

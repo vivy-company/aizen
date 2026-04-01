@@ -127,6 +127,43 @@ struct WorktreeCreateSheet: View {
                     selectedSubmodulePaths.insert(path)
                 } else {
                     selectedSubmodulePaths.remove(path)
+                    if selectedSubmodulePaths.isEmpty {
+                        matchSubmoduleBranchToEnvironment = false
+                    }
+                }
+            }
+        )
+    }
+
+    private var modeBinding: Binding<EnvironmentCreationMode> {
+        Binding(
+            get: { mode },
+            set: { newMode in
+                mode = newMode
+                if newMode == .independent && !isGitProject {
+                    independentMethod = .copy
+                }
+            }
+        )
+    }
+
+    private var branchNameBinding: Binding<String> {
+        Binding(
+            get: { branchName },
+            set: { newValue in
+                branchName = newValue
+                validateBranchName()
+            }
+        )
+    }
+
+    private var initializeSubmodulesBinding: Binding<Bool> {
+        Binding(
+            get: { initializeSubmodules },
+            set: { newValue in
+                initializeSubmodules = newValue
+                if !newValue {
+                    matchSubmoduleBranchToEnvironment = false
                 }
             }
         )
@@ -241,22 +278,12 @@ struct WorktreeCreateSheet: View {
             }
             loadSubmodules()
         }
-        .onChange(of: initializeSubmodules) { _, newValue in
-            if !newValue {
-                matchSubmoduleBranchToEnvironment = false
-            }
-        }
-        .onChange(of: selectedSubmodulePaths) { _, _ in
-            if selectedSubmoduleCount == 0 {
-                matchSubmoduleBranchToEnvironment = false
-            }
-        }
     }
 
     @ViewBuilder
     private var environmentTypeSection: some View {
         Section("Environment Type") {
-            Picker("Type", selection: $mode) {
+            Picker("Type", selection: modeBinding) {
                 Text(EnvironmentCreationMode.linked.title)
                     .tag(EnvironmentCreationMode.linked)
                     .disabled(!isGitProject)
@@ -266,11 +293,6 @@ struct WorktreeCreateSheet: View {
             .pickerStyle(.radioGroup)
             .labelsHidden()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .onChange(of: mode) { _, newMode in
-                if newMode == .independent && !isGitProject {
-                    independentMethod = .copy
-                }
-            }
 
             if !isGitProject && mode == .linked {
                 warningRow("Linked environments require a git project. Use Independent mode instead.")
@@ -293,11 +315,8 @@ struct WorktreeCreateSheet: View {
             if mode == .linked {
                 LabeledContent {
                     HStack(spacing: 8) {
-                        TextField("", text: $branchName, prompt: Text(branchNamePrompt))
+                        TextField("", text: branchNameBinding, prompt: Text(branchNamePrompt))
                             .frame(maxWidth: 260)
-                            .onChange(of: branchName) { _, _ in
-                                validateBranchName()
-                            }
                             .onSubmit {
                                 if !branchName.isEmpty && validationWarning == nil {
                                     createEnvironment()
@@ -377,7 +396,7 @@ struct WorktreeCreateSheet: View {
                         .foregroundStyle(.secondary)
                 }
             } else if hasSubmodules {
-                Toggle("Initialize submodules after environment creation", isOn: $initializeSubmodules)
+                Toggle("Initialize submodules after environment creation", isOn: initializeSubmodulesBinding)
                 Toggle("Include nested submodules recursively", isOn: $includeNestedSubmodules)
                     .disabled(!initializeSubmodules)
 

@@ -239,6 +239,25 @@ struct CommandPaletteContent: View {
     @State private var hoveredIndex: Int?
     @AppStorage("selectedWorktreeId") private var currentWorktreeId: String?
 
+    private struct SnapshotSyncKey: Hashable {
+        let worktreeCount: Int
+        let workspaceCount: Int
+        let currentWorktreeId: String?
+    }
+
+    private var snapshotSyncKey: SnapshotSyncKey {
+        SnapshotSyncKey(
+            worktreeCount: allWorktrees.count,
+            workspaceCount: allWorkspaces.count,
+            currentWorktreeId: currentWorktreeId
+        )
+    }
+
+    private func syncSnapshots() {
+        viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
+        viewModel.updateWorkspaceSnapshot(Array(allWorkspaces))
+    }
+
     var body: some View {
         LiquidGlassCard(
             shadowOpacity: 0,
@@ -285,20 +304,12 @@ struct CommandPaletteContent: View {
         }
         .frame(width: 760, height: 520)
         .onAppear {
-            viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
-            viewModel.updateWorkspaceSnapshot(Array(allWorkspaces))
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isSearchFocused = true
             }
         }
-        .onChange(of: allWorktrees.count) { _, _ in
-            viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
-        }
-        .onChange(of: allWorkspaces.count) { _, _ in
-            viewModel.updateWorkspaceSnapshot(Array(allWorkspaces))
-        }
-        .onChange(of: currentWorktreeId) { _, _ in
-            viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
+        .task(id: snapshotSyncKey) {
+            syncSnapshots()
         }
         .onReceive(
             NotificationCenter.default.publisher(
@@ -306,8 +317,7 @@ struct CommandPaletteContent: View {
                 object: viewContext
             )
         ) { _ in
-            viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
-            viewModel.updateWorkspaceSnapshot(Array(allWorkspaces))
+            syncSnapshots()
         }
         .background {
             Group {
@@ -442,8 +452,8 @@ struct CommandPaletteContent: View {
             .background(Color.clear)
             .scrollIndicators(.hidden)
             .frame(maxHeight: 360)
-            .onChange(of: viewModel.selectedIndex) { _, newIndex in
-                proxy.scrollTo(newIndex, anchor: .center)
+            .task(id: viewModel.selectedIndex) {
+                proxy.scrollTo(viewModel.selectedIndex, anchor: .center)
             }
         }
         .id(viewModel.scope)

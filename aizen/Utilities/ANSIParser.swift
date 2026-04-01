@@ -494,22 +494,25 @@ struct ANSILazyLogView: View {
                 }
             }
         }
-        .onChange(of: logs) { _, newLogs in
-            parseLogsAsync(newLogs)
-        }
-        .onAppear {
-            parseLogsAsync(logs)
+        .task(id: logs) {
+            await parseLogsAsync(logs)
         }
     }
 
-    private func parseLogsAsync(_ text: String) {
+    @MainActor
+    private func parseLogsAsync(_ text: String) async {
         isProcessing = true
-        Task.detached(priority: .userInitiated) {
-            let lines = ANSIParser.parseLines(text)
-            await MainActor.run {
-                parsedLines = lines
-                isProcessing = false
-            }
+        defer {
+            isProcessing = false
         }
+
+        let parsed = await Task.detached(priority: .userInitiated) {
+            let lines = ANSIParser.parseLines(text)
+            return lines
+        }
+        .value
+
+        guard !Task.isCancelled else { return }
+        parsedLines = parsed
     }
 }

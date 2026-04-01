@@ -27,6 +27,13 @@ struct VVCodeSnippetView: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
+    private struct DocumentSyncKey: Hashable {
+        let text: String
+        let languageHint: String?
+        let filePath: String?
+        let mimeType: String?
+    }
+
     init(
         text: String,
         languageHint: String? = nil,
@@ -78,6 +85,15 @@ struct VVCodeSnippetView: View {
             .with(showGitGutter: false)
     }
 
+    private var documentSyncKey: DocumentSyncKey {
+        DocumentSyncKey(
+            text: text,
+            languageHint: languageHint,
+            filePath: filePath,
+            mimeType: mimeType
+        )
+    }
+
     var body: some View {
         VVCodeView(document: $document)
             .language(resolvedLanguage)
@@ -86,20 +102,20 @@ struct VVCodeSnippetView: View {
             .lspDisabled(true)
             .disabled(true)
             .frame(maxHeight: maxHeight)
-            .onChange(of: text) { _, newValue in
-                if document.text != newValue {
-                    document.text = newValue
-                }
+            .task(id: documentSyncKey) {
+                syncDocument()
             }
-            .onChange(of: languageHint) { _, _ in
-                document.language = resolvedLanguage
-            }
-            .onChange(of: filePath) { _, _ in
-                document.language = resolvedLanguage
-            }
-            .onChange(of: mimeType) { _, _ in
-                document.language = resolvedLanguage
-            }
+    }
+
+    private func syncDocument() {
+        if document.text != text {
+            document.text = text
+        }
+
+        let language = resolvedLanguage
+        if document.language != language {
+            document.language = language
+        }
     }
 
     private static func resolveLanguage(

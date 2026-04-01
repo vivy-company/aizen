@@ -11,7 +11,7 @@ import SwiftUI
 
 // MARK: - Voice Action
 
-enum VoiceAction {
+enum VoiceAction: Hashable {
     case toggle
     case cancel
     case accept
@@ -113,7 +113,7 @@ struct TerminalPaneView: View {
             }
             if !newValue, showingVoiceRecording {
                 audioService.cancelRecording()
-                showingVoiceRecording = false
+                setVoiceRecording(false)
             }
         }
         .onChange(of: focusRequestVersion) { _, _ in
@@ -124,17 +124,13 @@ struct TerminalPaneView: View {
         .onDisappear {
             if showingVoiceRecording {
                 audioService.cancelRecording()
-                showingVoiceRecording = false
+                setVoiceRecording(false)
             }
         }
-        .onChange(of: voiceAction) { _, action in
-            if let action = action {
-                handleVoiceAction(action)
-                voiceAction = nil
-            }
-        }
-        .onChange(of: showingVoiceRecording) { _, isRecording in
-            onVoiceRecordingChanged(isRecording)
+        .task(id: voiceAction) {
+            guard let action = voiceAction else { return }
+            handleVoiceAction(action)
+            voiceAction = nil
         }
         .alert("Voice Input Unavailable", isPresented: $showingPermissionError) {
             Button("OK", role: .cancel) { }
@@ -195,10 +191,10 @@ struct TerminalPaneView: View {
             audioService: audioService,
             onSend: { transcribedText in
                 sendTranscriptionToTerminal(transcribedText)
-                showingVoiceRecording = false
+                setVoiceRecording(false)
             },
             onCancel: {
-                showingVoiceRecording = false
+                setVoiceRecording(false)
             }
         )
         .padding(12)
@@ -231,7 +227,7 @@ struct TerminalPaneView: View {
             toggleVoiceRecording()
         case .cancel:
             audioService.cancelRecording()
-            showingVoiceRecording = false
+            setVoiceRecording(false)
         case .accept:
             toggleVoiceRecording()
         }
@@ -244,7 +240,7 @@ struct TerminalPaneView: View {
                 await MainActor.run {
                     let fallback = text.isEmpty ? audioService.partialTranscription : text
                     sendTranscriptionToTerminal(fallback)
-                    showingVoiceRecording = false
+                    setVoiceRecording(false)
                 }
             }
         } else {
@@ -255,14 +251,10 @@ struct TerminalPaneView: View {
     private func startVoiceRecording() {
         Task {
             do {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    showingVoiceRecording = true
-                }
+                setVoiceRecording(true)
                 try await audioService.startRecording()
             } catch {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    showingVoiceRecording = false
-                }
+                setVoiceRecording(false)
                 if let recordingError = error as? AudioService.RecordingError {
                     permissionErrorMessage = recordingError.localizedDescription + "\n\nEnable Microphone and Speech Recognition in System Settings."
                 } else {
@@ -277,6 +269,13 @@ struct TerminalPaneView: View {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         surfaceAdapter.sendText(trimmed)
+    }
+
+    private func setVoiceRecording(_ isRecording: Bool) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            showingVoiceRecording = isRecording
+        }
+        onVoiceRecordingChanged(isRecording)
     }
 }
 

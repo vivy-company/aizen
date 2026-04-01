@@ -55,15 +55,43 @@ struct ContentView: View {
         _gitChangesContext = gitChangesContext
     }
 
+    private var selectedWorkspaceBinding: Binding<Workspace?> {
+        Binding(
+            get: { selectedWorkspace },
+            set: { selectWorkspace($0) }
+        )
+    }
+
+    private var crossProjectSelectionBinding: Binding<Bool> {
+        Binding(
+            get: { isCrossProjectSelected },
+            set: { setCrossProjectSelected($0) }
+        )
+    }
+
+    private var selectedRepositoryBinding: Binding<Repository?> {
+        Binding(
+            get: { selectedRepository },
+            set: { selectRepository($0) }
+        )
+    }
+
+    private var selectedWorktreeBinding: Binding<Worktree?> {
+        Binding(
+            get: { selectedWorktree },
+            set: { selectWorktree($0) }
+        )
+    }
+
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             // Left sidebar - workspaces and repositories
             WorkspaceSidebarView(
                 workspaces: Array(workspaces),
-                selectedWorkspace: $selectedWorkspace,
-                isCrossProjectSelected: $isCrossProjectSelected,
-                selectedRepository: $selectedRepository,
-                selectedWorktree: $selectedWorktree,
+                selectedWorkspace: selectedWorkspaceBinding,
+                isCrossProjectSelected: crossProjectSelectionBinding,
+                selectedRepository: selectedRepositoryBinding,
+                selectedWorktree: selectedWorktreeBinding,
                 searchText: $searchText,
                 showingAddRepository: $showingAddRepository,
                 repositoryManager: repositoryManager
@@ -77,7 +105,7 @@ struct ContentView: View {
                 } else if let repository = selectedRepository {
                     WorktreeListView(
                         repository: repository,
-                        selectedWorktree: $selectedWorktree,
+                        selectedWorktree: selectedWorktreeBinding,
                         repositoryManager: repositoryManager,
                         tabStateManager: tabStateManager
                     )
@@ -106,7 +134,7 @@ struct ContentView: View {
                     tabStateManager: tabStateManager,
                     gitChangesContext: $gitChangesContext,
                     onWorktreeDeleted: { _ in
-                        crossProjectWorktree = nil
+                        selectCrossProjectWorktree(nil)
                         prepareCrossProjectWorkspaceIfNeeded()
                     },
                     showZenModeButton: false
@@ -124,7 +152,7 @@ struct ContentView: View {
                     tabStateManager: tabStateManager,
                     gitChangesContext: $gitChangesContext,
                     onWorktreeDeleted: { nextWorktree in
-                        selectedWorktree = nextWorktree
+                        selectWorktree(nextWorktree)
                     },
                     showZenModeButton: true
                 )
@@ -143,9 +171,7 @@ struct ContentView: View {
                     workspace: workspace,
                     repositoryManager: repositoryManager,
                     onRepositoryAdded: { repository in
-                        isCrossProjectSelected = false
-                        selectedWorktree = nil
-                        selectedRepository = repository
+                        selectRepository(repository)
                     }
                 )
             }
@@ -158,7 +184,7 @@ struct ContentView: View {
         }
         .onAppear {
             if isCrossProjectSelected && crossProjectWorktree == nil {
-                isCrossProjectSelected = false
+                setCrossProjectSelected(false)
             }
 
             // Restore selected workspace from persistent storage
@@ -166,155 +192,15 @@ struct ContentView: View {
                 if let workspaceId = selectedWorkspaceId,
                    let uuid = UUID(uuidString: workspaceId),
                    let workspace = workspaces.first(where: { $0.id == uuid }) {
-                    selectedWorkspace = workspace
+                    selectWorkspace(workspace)
                 } else {
-                    selectedWorkspace = workspaces.first
-                }
-            }
-
-            // Restore selected repository from persistent storage
-            if selectedRepository == nil,
-               let repositoryId = selectedRepositoryId,
-               let uuid = UUID(uuidString: repositoryId),
-               let workspace = selectedWorkspace {
-                let repositories = visibleRepositories(in: workspace)
-                selectedRepository = repositories.first(where: { $0.id == uuid })
-            }
-
-            // Restore selected worktree from repository-specific storage first.
-            if selectedWorktree == nil, let repository = selectedRepository {
-                let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-                if let restoredWorktreeId = getStoredWorktreeId(for: repository) {
-                    selectedWorktree = worktrees.first(where: { $0.id == restoredWorktreeId && !$0.isDeleted })
-                }
-
-                // Fallback to global selection if repository-specific value is missing.
-                if selectedWorktree == nil,
-                   let worktreeId = selectedWorktreeId,
-                   let uuid = UUID(uuidString: worktreeId) {
-                    selectedWorktree = worktrees.first(where: { $0.id == uuid && !$0.isDeleted })
-                }
-
-                if selectedWorktree == nil {
-                    let candidates = worktrees.filter { !$0.isDeleted }
-                    selectedWorktree = candidates.first(where: { $0.isPrimary }) ?? candidates.first
+                    selectWorkspace(workspaces.first)
                 }
             }
 
             if !hasShownOnboarding {
                 showingOnboarding = true
                 hasShownOnboarding = true
-            }
-        }
-        .onChange(of: selectedWorkspace) { _, newValue in
-            selectedWorkspaceId = newValue?.id?.uuidString
-
-            if suppressWorkspaceAutoSelection {
-                suppressWorkspaceAutoSelection = false
-                return
-            }
-
-            if isCrossProjectSelected {
-                isCrossProjectSelected = false
-                selectedRepository = nil
-                selectedWorktree = nil
-            }
-
-            // Restore last selected repository for this workspace
-            if let workspace = newValue {
-                let repositories = visibleRepositories(in: workspace)
-                if let lastRepoId = workspace.lastSelectedRepositoryId,
-                   let lastRepo = repositories.first(where: { $0.id == lastRepoId }) {
-                    selectedRepository = lastRepo
-                } else {
-                    // Fall back to first repository if last selected does not exist
-                    selectedRepository = repositories.first
-                }
-            } else {
-                selectedRepository = nil
-            }
-        }
-        .onChange(of: selectedRepository) { _, newValue in
-            selectedRepositoryId = newValue?.id?.uuidString
-
-            if let repo = newValue, isCrossProjectRepository(repo) {
-                selectedRepository = nil
-                isCrossProjectSelected = true
-                prepareCrossProjectWorkspaceIfNeeded()
-                return
-            }
-
-            if let repo = newValue, repo.isDeleted || repo.isFault {
-                selectedRepository = nil
-                selectedWorktree = nil
-            } else if let repo = newValue {
-                isCrossProjectSelected = false
-
-                // Save last selected repository to workspace (debounced to avoid blocking)
-                if let workspace = selectedWorkspace {
-                    workspace.lastSelectedRepositoryId = repo.id
-                    saveTask?.cancel()
-                    saveTask = Task {
-                        try? await Task.sleep(for: .milliseconds(500))
-                        guard !Task.isCancelled else { return }
-                        try? viewContext.save()
-                    }
-                }
-
-                // Restore previously selected worktree for this repository.
-                let worktrees = (repo.worktrees as? Set<Worktree>) ?? []
-                if let restoredWorktreeId = getStoredWorktreeId(for: repo),
-                   let restoredWorktree = worktrees.first(where: { $0.id == restoredWorktreeId && !$0.isDeleted }) {
-                    selectedWorktree = restoredWorktree
-                } else {
-                    let candidates = worktrees.filter { !$0.isDeleted }
-                    selectedWorktree = candidates.first(where: { $0.isPrimary }) ?? candidates.first
-                }
-            }
-        }
-        .onChange(of: selectedWorktree) { _, newValue in
-            selectedWorktreeId = newValue?.id?.uuidString
-
-            if let newWorktree = newValue, !newWorktree.isDeleted {
-                recordWorktreeInMRU(newWorktree)
-                if let repository = selectedRepository {
-                    storeWorktreeSelection(newWorktree.id, for: repository)
-                }
-                // Update worktree access asynchronously to avoid blocking UI
-                Task { @MainActor in
-                    try? repositoryManager.updateWorktreeAccess(newWorktree)
-                }
-            } else if newValue?.isDeleted == true {
-                // Worktree was deleted, fall back to primary worktree
-                selectedWorktree = nil
-                if let repository = selectedRepository {
-                    let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-                    selectedWorktree = worktrees.first(where: { $0.isPrimary && !$0.isDeleted })
-                }
-            }
-        }
-        .onChange(of: crossProjectWorktree?.id?.uuidString) { _, _ in
-            guard isCrossProjectSelected, let worktree = crossProjectWorktree, !worktree.isDeleted else {
-                return
-            }
-            recordWorktreeInMRU(worktree)
-        }
-        .onChange(of: isCrossProjectSelected) { _, newValue in
-            if newValue {
-                if zenModeBeforeCrossProjectSelection == nil {
-                    zenModeBeforeCrossProjectSelection = zenModeEnabled
-                }
-                zenModeEnabled = true
-                selectedRepository = nil
-                selectedWorktree = nil
-                prepareCrossProjectWorkspaceIfNeeded()
-                presentCrossProjectOnboardingIfNeeded()
-            } else {
-                if let previousZenMode = zenModeBeforeCrossProjectSelection {
-                    zenModeEnabled = previousZenMode
-                    zenModeBeforeCrossProjectSelection = nil
-                }
-                crossProjectWorktree = nil
             }
         }
         .onChange(of: zenModeEnabled) { _, newValue in
@@ -461,14 +347,14 @@ struct ContentView: View {
 
     private func prepareCrossProjectWorkspaceIfNeeded() {
         guard isCrossProjectSelected, let workspace = selectedWorkspace else {
-            crossProjectWorktree = nil
+            selectCrossProjectWorktree(nil)
             return
         }
 
         do {
-            crossProjectWorktree = try ensureCrossProjectWorktree(for: workspace)
+            selectCrossProjectWorktree(try ensureCrossProjectWorktree(for: workspace))
         } catch {
-            crossProjectWorktree = nil
+            selectCrossProjectWorktree(nil)
         }
     }
 
@@ -740,10 +626,7 @@ struct ContentView: View {
             return
         }
 
-        if selectedWorkspace?.id != workspaceId {
-            suppressWorkspaceAutoSelection = true
-        }
-        selectedWorkspace = workspace
+        selectWorkspace(workspace, preserveSelection: true)
 
         let allRepositories = (workspace.repositories as? Set<Repository>) ?? []
         let allWorkspaceWorktrees = allRepositories.flatMap { (repository) -> [Worktree] in
@@ -753,42 +636,186 @@ struct ContentView: View {
         if let targetWorktree = allWorkspaceWorktrees.first(where: { $0.id == worktreeId }),
            let targetRepository = targetWorktree.repository {
             if isCrossProjectRepository(targetRepository) {
-                isCrossProjectSelected = true
-                selectedRepository = nil
-                selectedWorktree = nil
-                crossProjectWorktree = targetWorktree
+                setCrossProjectSelected(true, preferredWorktree: targetWorktree)
                 return
             }
 
-            isCrossProjectSelected = false
-            selectedRepository = targetRepository
-            selectedWorktree = targetWorktree
+            selectRepository(targetRepository)
+            selectWorktree(targetWorktree)
             return
         }
 
         if let crossProjectRepository = allRepositories.first(where: { $0.id == repoId && isCrossProjectRepository($0) }) {
-            isCrossProjectSelected = true
-            selectedRepository = nil
-            selectedWorktree = nil
-
             let worktrees = (crossProjectRepository.worktrees as? Set<Worktree>) ?? []
             if let worktree = worktrees.first(where: { $0.id == worktreeId && !$0.isDeleted }) {
-                crossProjectWorktree = worktree
+                setCrossProjectSelected(true, preferredWorktree: worktree)
             } else {
-                prepareCrossProjectWorkspaceIfNeeded()
+                setCrossProjectSelected(true)
             }
             return
         }
 
-        isCrossProjectSelected = false
         let repositories = visibleRepositories(in: workspace)
         if let repository = repositories.first(where: { $0.id == repoId }) {
-            selectedRepository = repository
+            selectRepository(repository)
             let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
             if let worktree = worktrees.first(where: { $0.id == worktreeId }) {
-                selectedWorktree = worktree
+                selectWorktree(worktree)
             }
         }
+    }
+
+    private func selectWorkspace(_ workspace: Workspace?, preserveSelection: Bool = false) {
+        selectedWorkspace = workspace
+        selectedWorkspaceId = workspace?.id?.uuidString
+
+        if preserveSelection {
+            return
+        }
+
+        if suppressWorkspaceAutoSelection {
+            suppressWorkspaceAutoSelection = false
+            return
+        }
+
+        if isCrossProjectSelected {
+            setCrossProjectSelected(false)
+        }
+
+        guard let workspace else {
+            selectRepository(nil)
+            return
+        }
+
+        let repositories = visibleRepositories(in: workspace)
+        if let lastRepoId = workspace.lastSelectedRepositoryId,
+           let lastRepo = repositories.first(where: { $0.id == lastRepoId }) {
+            selectRepository(lastRepo)
+        } else {
+            selectRepository(repositories.first)
+        }
+    }
+
+    private func selectRepository(_ repository: Repository?) {
+        selectedRepository = repository
+        selectedRepositoryId = repository?.id?.uuidString
+
+        guard let repository else {
+            selectWorktree(nil)
+            return
+        }
+
+        if isCrossProjectRepository(repository) {
+            selectedRepository = nil
+            selectedRepositoryId = nil
+            setCrossProjectSelected(true)
+            return
+        }
+
+        if repository.isDeleted || repository.isFault {
+            selectedRepository = nil
+            selectedRepositoryId = nil
+            selectWorktree(nil)
+            return
+        }
+
+        if isCrossProjectSelected {
+            setCrossProjectSelected(false)
+        }
+
+        if let workspace = selectedWorkspace {
+            workspace.lastSelectedRepositoryId = repository.id
+            saveTask?.cancel()
+            saveTask = Task {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
+                try? viewContext.save()
+            }
+        }
+
+        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
+        if let restoredWorktreeId = getStoredWorktreeId(for: repository),
+           let restoredWorktree = worktrees.first(where: { $0.id == restoredWorktreeId && !$0.isDeleted }) {
+            selectWorktree(restoredWorktree)
+            return
+        }
+
+        if let worktreeId = selectedWorktreeId,
+           let uuid = UUID(uuidString: worktreeId),
+           let restoredWorktree = worktrees.first(where: { $0.id == uuid && !$0.isDeleted }) {
+            selectWorktree(restoredWorktree)
+            return
+        }
+
+        let candidates = worktrees.filter { !$0.isDeleted }
+        selectWorktree(candidates.first(where: { $0.isPrimary }) ?? candidates.first)
+    }
+
+    private func selectWorktree(_ worktree: Worktree?) {
+        if let worktree, worktree.isDeleted {
+            selectedWorktree = nil
+            selectedWorktreeId = nil
+            if let repository = selectedRepository {
+                let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
+                let fallback = worktrees.first(where: { $0.isPrimary && !$0.isDeleted })
+                if let fallback {
+                    selectWorktree(fallback)
+                }
+            }
+            return
+        }
+
+        selectedWorktree = worktree
+        selectedWorktreeId = worktree?.id?.uuidString
+
+        guard let worktree else { return }
+
+        recordWorktreeInMRU(worktree)
+        if let repository = selectedRepository {
+            storeWorktreeSelection(worktree.id, for: repository)
+        }
+        Task { @MainActor in
+            try? repositoryManager.updateWorktreeAccess(worktree)
+        }
+    }
+
+    private func selectCrossProjectWorktree(_ worktree: Worktree?) {
+        crossProjectWorktree = worktree
+        guard isCrossProjectSelected, let worktree, !worktree.isDeleted else {
+            return
+        }
+        recordWorktreeInMRU(worktree)
+    }
+
+    private func setCrossProjectSelected(_ isSelected: Bool, preferredWorktree: Worktree? = nil) {
+        if !isSelected {
+            isCrossProjectSelected = false
+            if let previousZenMode = zenModeBeforeCrossProjectSelection {
+                zenModeEnabled = previousZenMode
+                zenModeBeforeCrossProjectSelection = nil
+            }
+            selectCrossProjectWorktree(nil)
+            return
+        }
+
+        if zenModeBeforeCrossProjectSelection == nil {
+            zenModeBeforeCrossProjectSelection = zenModeEnabled
+        }
+
+        isCrossProjectSelected = true
+        zenModeEnabled = true
+        selectedRepository = nil
+        selectedRepositoryId = nil
+        selectedWorktree = nil
+        selectedWorktreeId = nil
+
+        if let preferredWorktree, !preferredWorktree.isDeleted {
+            selectCrossProjectWorktree(preferredWorktree)
+        } else {
+            prepareCrossProjectWorkspaceIfNeeded()
+        }
+
+        presentCrossProjectOnboardingIfNeeded()
     }
 }
 

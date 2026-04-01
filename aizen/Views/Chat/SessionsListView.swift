@@ -65,24 +65,27 @@ struct SessionsListView: View {
                 Text(errorMessage)
             }
         }
-        .task {
+        .task(id: reloadKey) {
             await viewModel.reloadSessions(in: viewContext)
         }
-        .onChange(of: viewModel.selectedFilter) { _, _ in
-            Task { await viewModel.reloadSessions(in: viewContext) }
-        }
-        .onChange(of: viewModel.searchText) { _, _ in
-            Task { await viewModel.reloadSessions(in: viewContext) }
-        }
-        .onChange(of: viewModel.selectedWorktreeId) { _, _ in
-            Task { await viewModel.reloadSessions(in: viewContext) }
-        }
-        .onChange(of: viewModel.selectedAgentName) { _, _ in
-            Task { await viewModel.reloadSessions(in: viewContext) }
-        }
-        .onChange(of: viewModel.fetchLimit) { _, _ in
-            Task { await viewModel.reloadSessions(in: viewContext) }
-        }
+    }
+
+    private var reloadKey: ReloadKey {
+        ReloadKey(
+            selectedFilter: viewModel.selectedFilter,
+            searchText: viewModel.searchText,
+            selectedWorktreeId: viewModel.selectedWorktreeId,
+            selectedAgentName: viewModel.selectedAgentName,
+            fetchLimit: viewModel.fetchLimit
+        )
+    }
+
+    private struct ReloadKey: Hashable {
+        let selectedFilter: SessionsListViewModel.SessionFilter
+        let searchText: String
+        let selectedWorktreeId: UUID?
+        let selectedAgentName: String?
+        let fetchLimit: Int
     }
     
     private var headerView: some View {

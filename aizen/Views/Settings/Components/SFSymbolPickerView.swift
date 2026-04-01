@@ -191,12 +191,6 @@ struct SFSymbolPickerView: View {
         }
         .frame(width: 540, height: 480)
         .settingsSheetChrome()
-        .onChange(of: searchText) { _, _ in
-            displayLimit = pageSize
-        }
-        .onChange(of: selectedCategory) { _, _ in
-            displayLimit = pageSize
-        }
     }
 
     // MARK: - Header
@@ -205,7 +199,7 @@ struct SFSymbolPickerView: View {
         HStack(spacing: 12) {
             SearchField(
                 placeholder: "Search symbols...",
-                text: $searchText,
+                text: searchTextBinding,
                 iconColor: .secondary,
                 trailing: { EmptyView() }
             )
@@ -242,7 +236,7 @@ struct SFSymbolPickerView: View {
 
     private func categoryTab(key: String, icon: String, name: String) -> some View {
         Button {
-            selectedCategory = key
+            selectCategory(key)
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: icon)
@@ -261,6 +255,21 @@ struct SFSymbolPickerView: View {
             .cornerRadius(6)
         }
         .buttonStyle(.plain)
+    }
+
+    private var searchTextBinding: Binding<String> {
+        Binding(
+            get: { searchText },
+            set: { newValue in
+                searchText = newValue
+                displayLimit = pageSize
+            }
+        )
+    }
+
+    private func selectCategory(_ category: String) {
+        selectedCategory = category
+        displayLimit = pageSize
     }
 
     // MARK: - Symbol Grid

@@ -22,7 +22,6 @@ struct ChatSessionView: View {
     @StateObject private var viewModel: ChatSessionViewModel
 
     // UI-only state
-    @State private var showingAttachmentPicker = false
     @State private var showingVoiceRecording = false
     @State private var showingPermissionError = false
     @State private var permissionErrorMessage = ""
@@ -174,7 +173,6 @@ struct ChatSessionView: View {
                             attachments: $viewModel.attachments,
                             isProcessing: $viewModel.isProcessing,
                             showingVoiceRecording: $showingVoiceRecording,
-                            showingAttachmentPicker: $showingAttachmentPicker,
                             showingPermissionError: $showingPermissionError,
                             permissionErrorMessage: $permissionErrorMessage,
                             worktreePath: viewModel.worktree.path ?? "",

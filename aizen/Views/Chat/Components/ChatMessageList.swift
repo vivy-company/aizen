@@ -89,6 +89,18 @@ struct ChatMessageList: View {
         return "req-\(toolId)-\(optionIds)-\(request.message ?? "")"
     }
 
+    private var timelineStyleSignature: Int {
+        var hasher = Hasher()
+        hasher.combine(colorScheme)
+        hasher.combine(markdownFontSize)
+        hasher.combine(markdownFontFamily)
+        hasher.combine(markdownParagraphSpacing)
+        hasher.combine(markdownHeadingSpacing)
+        hasher.combine(markdownContentPadding)
+        hasher.combine(effectiveTerminalThemeName)
+        return hasher.finalize()
+    }
+
     private var timelineStyle: VVChatTimelineStyle {
         let horizontalInset: CGFloat = 10
         let basePointSize = CGFloat(markdownFontSize)
@@ -269,31 +281,7 @@ struct ChatMessageList: View {
             }
             syncTimeline(scrollToBottom: isAutoScrollEnabled())
         }
-        .onChange(of: colorScheme) { _, _ in
-            controller.updateStyle(timelineStyle)
-            syncTimeline(scrollToBottom: false)
-        }
-        .onChange(of: markdownFontSize) { _, _ in
-            controller.updateStyle(timelineStyle)
-            syncTimeline(scrollToBottom: false)
-        }
-        .onChange(of: markdownFontFamily) { _, _ in
-            controller.updateStyle(timelineStyle)
-            syncTimeline(scrollToBottom: false)
-        }
-        .onChange(of: markdownParagraphSpacing) { _, _ in
-            controller.updateStyle(timelineStyle)
-            syncTimeline(scrollToBottom: false)
-        }
-        .onChange(of: markdownHeadingSpacing) { _, _ in
-            controller.updateStyle(timelineStyle)
-            syncTimeline(scrollToBottom: false)
-        }
-        .onChange(of: markdownContentPadding) { _, _ in
-            controller.updateStyle(timelineStyle)
-            syncTimeline(scrollToBottom: false)
-        }
-        .onChange(of: effectiveTerminalThemeName) { _, _ in
+        .onChange(of: timelineStyleSignature) { _, _ in
             controller.updateStyle(timelineStyle)
             syncTimeline(scrollToBottom: false)
         }

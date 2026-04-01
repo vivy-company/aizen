@@ -74,9 +74,6 @@ struct FileSearchView: View {
         .onDisappear {
             removeKeyboardMonitoring()
         }
-        .onChange(of: viewModel.searchQuery) { _, _ in
-            viewModel.performSearch()
-        }
     }
 
     private var resultsCard: some View {

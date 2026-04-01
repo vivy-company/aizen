@@ -243,14 +243,10 @@ struct GeneralSettingsView: View {
             // MARK: - Language
 
             Section("Language") {
-                Picker("Language", selection: $selectedLanguage) {
+                Picker("Language", selection: languageSelectionBinding) {
                     ForEach(AppLanguage.allCases) { language in
                         Text(language.displayName).tag(language)
                     }
-                }
-                .onChange(of: selectedLanguage) { _, newValue in
-                    guard hasLoadedLanguage else { return }
-                    applyLanguage(newValue)
                 }
             }
 
@@ -508,6 +504,17 @@ struct GeneralSettingsView: View {
         case "browser": return showBrowserTab
         default: return false
         }
+    }
+
+    private var languageSelectionBinding: Binding<AppLanguage> {
+        Binding(
+            get: { selectedLanguage },
+            set: { newValue in
+                selectedLanguage = newValue
+                guard hasLoadedLanguage else { return }
+                applyLanguage(newValue)
+            }
+        )
     }
 
     // MARK: - Language

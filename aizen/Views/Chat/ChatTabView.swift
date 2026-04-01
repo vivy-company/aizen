@@ -66,6 +66,10 @@ struct ChatTabView: View {
         CompanionPanel.allCases.filter { $0.rawValue != leftPanelType }
     }
 
+    private var sessionIdentitySnapshot: [UUID] {
+        sessions.compactMap(\.id)
+    }
+
     @FetchRequest private var sessions: FetchedResults<ChatSession>
     @FetchRequest private var recentSessions: FetchedResults<ChatSession>
 
@@ -123,9 +127,9 @@ struct ChatTabView: View {
                     .onChange(of: selectedSessionId) { _, _ in
                         updateCacheForSelection()
                     }
-                    .onChange(of: sessions.count) { _, _ in
+                    .onChange(of: sessionIdentitySnapshot) { _, _ in
                         syncSelectionAndCache()
-                }
+                    }
             }
         }
     }

@@ -8,11 +8,10 @@ import CoreData
 
 struct PostCreateActionsView: View {
     @ObservedObject var repository: Repository
-    @Binding var addActionRequested: Bool
+    @Binding var showingAddAction: Bool
     @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var templateManager = PostCreateTemplateManager.shared
 
-    @State private var showingAddAction = false
     @State private var showingTemplates = false
     @State private var editingAction: PostCreateAction?
     @State private var showGeneratedScript = false
@@ -46,11 +45,6 @@ struct PostCreateActionsView: View {
         }
         .formStyle(.grouped)
         .settingsSurface()
-        .onChange(of: addActionRequested) { _, requested in
-            guard requested else { return }
-            showingAddAction = true
-            addActionRequested = false
-        }
         .alert("Replace current actions?", isPresented: Binding(
             get: { pendingTemplate != nil },
             set: { newValue in
@@ -1084,7 +1078,7 @@ struct PostCreateActionsSheet: View {
     @ObservedObject var repository: Repository
     @Environment(\.dismiss) private var dismiss
     @Environment(\.managedObjectContext) private var viewContext
-    @State private var addActionRequested = false
+    @State private var showingAddAction = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1100,7 +1094,7 @@ struct PostCreateActionsSheet: View {
                 }
             } trailing: {
                 Button {
-                    addActionRequested = true
+                    showingAddAction = true
                 } label: {
                     Label("Add Action", systemImage: "plus")
                 }
@@ -1110,7 +1104,7 @@ struct PostCreateActionsSheet: View {
             Divider()
 
             // Content
-            PostCreateActionsView(repository: repository, addActionRequested: $addActionRequested)
+            PostCreateActionsView(repository: repository, showingAddAction: $showingAddAction)
 
             Divider()
 

@@ -95,12 +95,9 @@ struct CustomAgentFormView: View {
 
                 Section("ACP Executable") {
                     HStack(spacing: 8) {
-                        TextField("Path", text: $executablePath)
+                        TextField("Path", text: executablePathBinding)
                             .textFieldStyle(.roundedBorder)
                             .help("Enter or paste executable path, or use Browse button")
-                            .onChange(of: executablePath) { _, _ in
-                                pathValidationResult = nil
-                            }
                             .onSubmit {
                                 Task {
                                     await validateExecutablePath()
@@ -113,12 +110,9 @@ struct CustomAgentFormView: View {
                         .buttonStyle(.bordered)
                     }
 
-                    TextField("Launch arguments (optional)", text: $launchArgsText)
+                    TextField("Launch arguments (optional)", text: launchArgsTextBinding)
                         .textFieldStyle(.roundedBorder)
                         .help("Space-separated arguments (e.g., agent stdio, --experimental-acp)")
-                        .onChange(of: launchArgsText) { _, _ in
-                            pathValidationResult = nil
-                        }
                         .onSubmit {
                             Task {
                                 await validateExecutablePath()
@@ -161,7 +155,7 @@ struct CustomAgentFormView: View {
                 }
 
                 AgentEnvironmentVariablesEditor(
-                    variables: $environmentVariables,
+                    variables: environmentVariablesBinding,
                     helperText: "Merged on top of your shell environment during validation and when the agent launches."
                 )
 
@@ -221,9 +215,6 @@ struct CustomAgentFormView: View {
         .sheet(isPresented: $showingSFSymbolPicker) {
             SFSymbolPickerView(selectedSymbol: $selectedSFSymbol, isPresented: $showingSFSymbolPicker)
         }
-        .onChange(of: environmentVariables) { _, _ in
-            pathValidationResult = nil
-        }
     }
 
     private func selectExecutableFile() {
@@ -239,7 +230,7 @@ struct CustomAgentFormView: View {
         if let window = NSApp.keyWindow {
             panel.beginSheetModal(for: window) { response in
                 if response == .OK, let url = panel.url {
-                    executablePath = url.path
+                    updateExecutablePath(url.path)
                     // Auto-validate after selection
                     Task {
                         await validateExecutablePath()
@@ -250,7 +241,7 @@ struct CustomAgentFormView: View {
             // Fallback to modal panel
             let response = panel.runModal()
             if response == .OK, let url = panel.url {
-                executablePath = url.path
+                updateExecutablePath(url.path)
                 // Auto-validate after selection
                 Task {
                     await validateExecutablePath()
@@ -337,6 +328,42 @@ struct CustomAgentFormView: View {
         await MainActor.run {
             isValidatingPath = false
         }
+    }
+
+    private var executablePathBinding: Binding<String> {
+        Binding(
+            get: { executablePath },
+            set: { updateExecutablePath($0) }
+        )
+    }
+
+    private var launchArgsTextBinding: Binding<String> {
+        Binding(
+            get: { launchArgsText },
+            set: { updateLaunchArgsText($0) }
+        )
+    }
+
+    private var environmentVariablesBinding: Binding<[AgentEnvironmentVariable]> {
+        Binding(
+            get: { environmentVariables },
+            set: { updateEnvironmentVariables($0) }
+        )
+    }
+
+    private func updateExecutablePath(_ newValue: String) {
+        executablePath = newValue
+        pathValidationResult = nil
+    }
+
+    private func updateLaunchArgsText(_ newValue: String) {
+        launchArgsText = newValue
+        pathValidationResult = nil
+    }
+
+    private func updateEnvironmentVariables(_ newValue: [AgentEnvironmentVariable]) {
+        environmentVariables = newValue
+        pathValidationResult = nil
     }
 
     private var isValid: Bool {

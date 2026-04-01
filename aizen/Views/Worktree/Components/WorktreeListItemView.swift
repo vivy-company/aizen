@@ -60,7 +60,6 @@ struct WorktreeListItemView: View {
     @State private var isLoadingBranches = false
     @State private var showingBranchSelector = false
     @State private var branchSwitchError: String?
-    @State private var selectedBranchForSwitch: BranchInfo?
     @State private var showingNoteEditor = false
 
     private var worktreeStatus: ItemStatus {
@@ -123,12 +122,121 @@ struct WorktreeListItemView: View {
         return Color(nsColor: base).opacity(alpha)
     }
 
+    private var mergeSourceStatuses: [WorktreeStatusInfo] {
+        worktreeStatuses.filter { $0.worktree.id != worktree.id }
+    }
+
     private func sessionIconColor(for viewType: String) -> Color {
         let isActive = activeViewType == viewType
         if isSelected {
             return selectedForegroundColor.opacity(isActive ? 1.0 : 0.75)
         }
         return isActive ? .primary : .secondary
+    }
+
+    private func mergeSourceButton(for statusInfo: WorktreeStatusInfo) -> some View {
+        Button {
+            performMerge(from: statusInfo.worktree, to: worktree)
+        } label: {
+            HStack {
+                Text(statusInfo.branch)
+                if statusInfo.hasUncommittedChanges {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+
+    private var mergeOperationsMenu: some View {
+        Menu {
+            ForEach(mergeSourceStatuses, id: \.worktree.id) { statusInfo in
+                mergeSourceButton(for: statusInfo)
+            }
+        } label: {
+            Label(String(localized: "worktree.merge.pullFrom"), systemImage: "arrow.down.circle")
+        }
+    }
+
+    private func terminalOptionButton(_ terminal: DetectedApp) -> some View {
+        Button {
+            if let path = worktree.path {
+                AppDetector.shared.openPath(path, with: terminal)
+            }
+        } label: {
+            HStack {
+                AppMenuLabel(app: terminal)
+                if terminal.bundleIdentifier == defaultTerminalBundleId {
+                    Spacer()
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+    }
+
+    private func editorOptionButton(_ editor: DetectedApp) -> some View {
+        Button {
+            if let path = worktree.path {
+                AppDetector.shared.openPath(path, with: editor)
+            }
+        } label: {
+            HStack {
+                AppMenuLabel(app: editor)
+                if editor.bundleIdentifier == defaultEditorBundleId {
+                    Spacer()
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+    }
+
+    private var openInAppsMenu: some View {
+        Menu {
+            Text(String(localized: "worktree.openIn.terminals"))
+                .font(.caption)
+
+            ForEach(sortedApps(AppDetector.shared.getTerminals(), defaultBundleId: defaultTerminalBundleId)) { terminal in
+                terminalOptionButton(terminal)
+            }
+
+            Divider()
+
+            Text(String(localized: "worktree.openIn.editors"))
+                .font(.caption)
+
+            ForEach(sortedApps(AppDetector.shared.getEditors(), defaultBundleId: defaultEditorBundleId)) { editor in
+                editorOptionButton(editor)
+            }
+        } label: {
+            Label(String(localized: "worktree.openIn.title"), systemImage: "arrow.up.forward.app")
+        }
+    }
+
+    private func statusMenuButton(for status: ItemStatus) -> some View {
+        Button {
+            setWorktreeStatus(status)
+        } label: {
+            HStack {
+                Circle()
+                    .fill(status.color)
+                    .frame(width: 8, height: 8)
+                Text(status.title)
+                if worktreeStatus == status {
+                    Spacer()
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+    }
+
+    private var statusMenu: some View {
+        Menu {
+            ForEach(ItemStatus.allCases) { status in
+                statusMenuButton(for: status)
+            }
+        } label: {
+            Label("worktree.setStatus", systemImage: "circle.fill")
+        }
     }
 
     @ViewBuilder
@@ -262,49 +370,7 @@ struct WorktreeListItemView: View {
             }
 
             // Open in... submenu
-            Menu {
-                Text(String(localized: "worktree.openIn.terminals"))
-                    .font(.caption)
-
-                ForEach(sortedApps(AppDetector.shared.getTerminals(), defaultBundleId: defaultTerminalBundleId)) { terminal in
-                    Button {
-                        if let path = worktree.path {
-                            AppDetector.shared.openPath(path, with: terminal)
-                        }
-                    } label: {
-                        HStack {
-                            AppMenuLabel(app: terminal)
-                            if terminal.bundleIdentifier == defaultTerminalBundleId {
-                                Spacer()
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-
-                Divider()
-
-                Text(String(localized: "worktree.openIn.editors"))
-                    .font(.caption)
-
-                ForEach(sortedApps(AppDetector.shared.getEditors(), defaultBundleId: defaultEditorBundleId)) { editor in
-                    Button {
-                        if let path = worktree.path {
-                            AppDetector.shared.openPath(path, with: editor)
-                        }
-                    } label: {
-                        HStack {
-                            AppMenuLabel(app: editor)
-                            if editor.bundleIdentifier == defaultEditorBundleId {
-                                Spacer()
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                Label(String(localized: "worktree.openIn.title"), systemImage: "arrow.up.forward.app")
-            }
+            openInAppsMenu
 
             if isGitEnvironment {
                 Button {
@@ -327,104 +393,25 @@ struct WorktreeListItemView: View {
             Divider()
 
             if supportsMergeOperations {
-                Menu {
-                    ForEach(worktreeStatuses.filter { $0.worktree.id != worktree.id }, id: \.worktree.id) { statusInfo in
-                        Button {
-                            performMerge(from: statusInfo.worktree, to: worktree)
-                        } label: {
-                            HStack {
-                                Text(statusInfo.branch)
-                                if statusInfo.hasUncommittedChanges {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .foregroundStyle(.orange)
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Label(String(localized: "worktree.merge.pullFrom"), systemImage: "arrow.down.circle")
-                }
-
+                mergeOperationsMenu
                 Divider()
             }
 
             if supportsBranchOperations {
-                Menu {
-                    if availableBranches.isEmpty && !isLoadingBranches {
-                        Text(String(localized: "general.loading"))
-                            .foregroundStyle(.secondary)
-                            .onAppear { loadAvailableBranches() }
-                    } else if isLoadingBranches {
-                        Text(String(localized: "general.loading"))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(availableBranches.filter { !$0.isRemote && $0.name != worktree.branch }) { branch in
-                            Button {
-                                switchToBranch(branch)
-                            } label: {
-                                HStack {
-                                    Image(systemName: "arrow.triangle.branch")
-                                        .font(.caption)
-                                    Text(branch.name)
-                                }
-                            }
-                        }
-
-                        if !availableBranches.filter({ $0.isRemote }).isEmpty {
-                            Divider()
-
-                            ForEach(availableBranches.filter { $0.isRemote }) { branch in
-                                Button {
-                                    switchToBranch(branch)
-                                } label: {
-                                    HStack {
-                                        Image(systemName: "arrow.triangle.branch")
-                                            .font(.caption)
-                                        Text(branch.name)
-                                        Text(String(localized: "worktree.branch.remote"))
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                        }
-
-                        Divider()
-
-                        Button {
-                            showingBranchSelector = true
-                        } label: {
-                            Label(String(localized: "worktree.branch.browseOrCreate"), systemImage: "ellipsis.circle")
-                        }
-                    }
-                } label: {
-                    Label(String(localized: "worktree.branch.switch"), systemImage: "arrow.triangle.swap")
-                }
+                BranchSwitchMenu(
+                    worktreeBranch: worktree.branch,
+                    availableBranches: availableBranches,
+                    isLoadingBranches: isLoadingBranches,
+                    onLoadBranches: loadAvailableBranches,
+                    onSelectBranch: switchToBranch,
+                    onOpenSelector: { showingBranchSelector = true }
+                )
 
                 Divider()
             }
 
             // Status submenu
-            Menu {
-                ForEach(ItemStatus.allCases) { status in
-                    Button {
-                        setWorktreeStatus(status)
-                    } label: {
-                        HStack {
-                            Circle()
-                                .fill(status.color)
-                                .frame(width: 8, height: 8)
-                            Text(status.title)
-                            if worktreeStatus == status {
-                                Spacer()
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                Label("worktree.setStatus", systemImage: "circle.fill")
-            }
+            statusMenu
 
             Button {
                 showingNoteEditor = true
@@ -450,7 +437,8 @@ struct WorktreeListItemView: View {
                 BranchSelectorView(
                     repository: repo,
                     repositoryManager: repositoryManager,
-                    selectedBranch: $selectedBranchForSwitch,
+                    selectedBranch: .constant(nil),
+                    onSelectBranch: switchToBranch,
                     allowCreation: true,
                     onCreateBranch: { branchName in
                         createNewBranch(name: branchName)
@@ -469,12 +457,6 @@ struct WorktreeListItemView: View {
                     try? repositoryManager.updateWorktreeNote(worktree, note: worktree.note)
                 }
             )
-        }
-        .onChange(of: selectedBranchForSwitch) { _, newBranch in
-            if let branch = newBranch {
-                switchToBranch(branch)
-                selectedBranchForSwitch = nil
-            }
         }
         .alert(hasUnsavedChanges ? String(localized: "worktree.detail.unsavedChangesTitle") : String(localized: "worktree.detail.deleteConfirmTitle"), isPresented: $showingDeleteConfirmation) {
             Button(String(localized: "worktree.create.cancel"), role: .cancel) {}
@@ -768,6 +750,88 @@ struct WorktreeListItemView: View {
             } catch {
                 await MainActor.run {
                     branchSwitchError = error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+private struct BranchSwitchMenu: View {
+    let worktreeBranch: String?
+    let availableBranches: [BranchInfo]
+    let isLoadingBranches: Bool
+    let onLoadBranches: () -> Void
+    let onSelectBranch: (BranchInfo) -> Void
+    let onOpenSelector: () -> Void
+
+    private var localBranches: [BranchInfo] {
+        availableBranches.filter { !$0.isRemote && $0.name != worktreeBranch }
+    }
+
+    private var remoteBranches: [BranchInfo] {
+        availableBranches.filter(\.isRemote)
+    }
+
+    var body: some View {
+        Menu {
+            content
+        } label: {
+            Label(String(localized: "worktree.branch.switch"), systemImage: "arrow.triangle.swap")
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if availableBranches.isEmpty && !isLoadingBranches {
+            Text(String(localized: "general.loading"))
+                .foregroundStyle(.secondary)
+                .onAppear(perform: onLoadBranches)
+        } else if isLoadingBranches {
+            Text(String(localized: "general.loading"))
+                .foregroundStyle(.secondary)
+        } else {
+            branchButtons
+
+            if !remoteBranches.isEmpty {
+                Divider()
+                remoteBranchButtons
+            }
+
+            Divider()
+            Button {
+                onOpenSelector()
+            } label: {
+                Label(String(localized: "worktree.branch.browseOrCreate"), systemImage: "ellipsis.circle")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var branchButtons: some View {
+        ForEach(localBranches) { branch in
+            branchButton(branch, isRemote: false)
+        }
+    }
+
+    @ViewBuilder
+    private var remoteBranchButtons: some View {
+        ForEach(remoteBranches) { branch in
+            branchButton(branch, isRemote: true)
+        }
+    }
+
+    private func branchButton(_ branch: BranchInfo, isRemote: Bool) -> some View {
+        Button {
+            onSelectBranch(branch)
+        } label: {
+            HStack {
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.caption)
+                Text(branch.name)
+                if isRemote {
+                    Text(String(localized: "worktree.branch.remote"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
         }

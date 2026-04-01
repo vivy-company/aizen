@@ -11,12 +11,18 @@ struct WorkflowRunDetailView: View {
     @ObservedObject var service: WorkflowService
 
     @State private var selectedJobId: String?
+    @State private var selectedRunId: String?
     @State private var showCancelConfirmation: Bool = false
 
     @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
 
     private var run: WorkflowRun? { service.selectedRun }
     private var jobs: [WorkflowJob] { service.selectedRunJobs }
+
+    private struct SelectionSyncKey: Hashable {
+        let runId: String
+        let jobs: [WorkflowJob]
+    }
 
     /// Check if runLogs contains a status message rather than actual logs
     private var isStatusMessage: Bool {
@@ -55,24 +61,17 @@ struct WorkflowRunDetailView: View {
                 GitWindowDivider()
 
                 // Jobs and logs
-                HSplitView {
-                    // Jobs panel
-                    jobsPanel
-                        .frame(minWidth: 200, idealWidth: 250, maxWidth: 350)
+            HSplitView {
+                // Jobs panel
+                jobsPanel
+                    .frame(minWidth: 200, idealWidth: 250, maxWidth: 350)
 
                     // Logs panel
                     logsPanel
                 }
             }
-            .onChange(of: jobs) { _, newJobs in
-                // Auto-select first failed job or first job when jobs load
-                if selectedJobId == nil && !newJobs.isEmpty {
-                    selectedJobId = newJobs.first(where: { $0.conclusion == .failure })?.id ?? newJobs.first?.id
-                }
-            }
-            .onChange(of: run.id) { _, _ in
-                // Reset job selection when run changes
-                selectedJobId = nil
+            .task(id: SelectionSyncKey(runId: run.id, jobs: jobs)) {
+                syncSelectedJob(for: run, jobs: jobs)
             }
         } else {
             Text("No run selected")
@@ -168,6 +167,19 @@ struct WorkflowRunDetailView: View {
 
     private func statusBackgroundColor(_ run: WorkflowRun) -> Color {
         WorkflowStatusIcon.badgeBackgroundColor(status: run.status, conclusion: run.conclusion)
+    }
+
+    private func syncSelectedJob(for run: WorkflowRun, jobs: [WorkflowJob]) {
+        if selectedRunId != run.id {
+            selectedRunId = run.id
+            selectedJobId = nil
+        } else if let selectedJobId, !jobs.contains(where: { $0.id == selectedJobId }) {
+            self.selectedJobId = nil
+        }
+
+        if selectedJobId == nil && !jobs.isEmpty {
+            selectedJobId = jobs.first(where: { $0.conclusion == .failure })?.id ?? jobs.first?.id
+        }
     }
 
     // MARK: - Jobs Panel

@@ -93,7 +93,6 @@ struct GitPanelWindowContentWithToolbar: View {
     let onClose: () -> Void
 
     @State private var selectedTab: GitPanelTab = .git
-    @State private var selectedBranchInfo: BranchInfo?
     @State private var showingBranchPicker: Bool = false
     @State private var currentOperation: GitToolbarOperation?
 
@@ -256,17 +255,15 @@ struct GitPanelWindowContentWithToolbar: View {
             BranchSelectorView(
                 repository: worktree.repository!,
                 repositoryManager: repositoryManager,
-                selectedBranch: $selectedBranchInfo,
+                selectedBranch: .constant(nil),
+                onSelectBranch: { branch in
+                    gitOperations.switchBranch(branch.name)
+                },
                 allowCreation: true,
                 onCreateBranch: { branchName in
                     gitOperations.createBranch(branchName)
                 }
             )
-        }
-        .onChange(of: selectedBranchInfo) { _, newBranch in
-            if let branch = newBranch {
-                gitOperations.switchBranch(branch.name)
-            }
         }
     }
 

@@ -37,7 +37,7 @@ struct RootView: View {
         ContentView(
             context: context,
             repositoryManager: repositoryManager,
-            gitChangesContext: $gitChangesContext
+            gitChangesContext: gitChangesContextBinding
         )
         .background(surfaceColor)
         .background(WindowBackgroundSync(color: surfaceNSColor))
@@ -45,32 +45,6 @@ struct RootView: View {
             restoreGitPanelIfNeeded()
             if LicenseManager.shared.hasPendingDeepLink {
                 showingLicenseDeepLinkSheet = true
-            }
-        }
-        .onChange(of: gitChangesContext) { _, newContext in
-            if let ctx = newContext, !ctx.worktree.isDeleted {
-                // Close existing window if any
-                gitPanelController?.close()
-
-                // Persist worktree URI for restoration
-                openGitPanelWorktreeURI = ctx.worktree.objectID.uriRepresentation().absoluteString
-
-                // Create and show new window
-                gitPanelController = GitPanelWindowController(
-                    context: ctx,
-                    repositoryManager: repositoryManager,
-                    onClose: {
-                        openGitPanelWorktreeURI = ""
-                        gitChangesContext = nil
-                        gitPanelController = nil
-                    }
-                )
-                gitPanelController?.showWindow(nil)
-            } else if newContext == nil {
-                // Close window when context is cleared
-                openGitPanelWorktreeURI = ""
-                gitPanelController?.close()
-                gitPanelController = nil
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openLicenseDeepLink)) { _ in
@@ -87,6 +61,37 @@ struct RootView: View {
         }
     }
 
+    private var gitChangesContextBinding: Binding<GitChangesContext?> {
+        Binding(
+            get: { gitChangesContext },
+            set: { setGitChangesContext($0) }
+        )
+    }
+
+    private func setGitChangesContext(_ newContext: GitChangesContext?) {
+        gitChangesContext = newContext
+
+        if let ctx = newContext, !ctx.worktree.isDeleted {
+            gitPanelController?.close()
+            openGitPanelWorktreeURI = ctx.worktree.objectID.uriRepresentation().absoluteString
+            gitPanelController = GitPanelWindowController(
+                context: ctx,
+                repositoryManager: repositoryManager,
+                onClose: {
+                    openGitPanelWorktreeURI = ""
+                    gitChangesContext = nil
+                    gitPanelController = nil
+                }
+            )
+            gitPanelController?.showWindow(nil)
+            return
+        }
+
+        openGitPanelWorktreeURI = ""
+        gitPanelController?.close()
+        gitPanelController = nil
+    }
+
     private func restoreGitPanelIfNeeded() {
         guard !openGitPanelWorktreeURI.isEmpty,
               let url = URL(string: openGitPanelWorktreeURI),
@@ -101,7 +106,7 @@ struct RootView: View {
 
         // Recreate the Git panel context
         let runtime = WorktreeRuntimeCoordinator.shared.runtime(for: path)
-        gitChangesContext = GitChangesContext(worktree: worktree, runtime: runtime)
+        setGitChangesContext(GitChangesContext(worktree: worktree, runtime: runtime))
     }
 }
 

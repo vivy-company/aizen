@@ -4,6 +4,7 @@ struct BranchSelectorView: View {
     let repository: Repository
     let repositoryManager: RepositoryManager
     @Binding var selectedBranch: BranchInfo?
+    var onSelectBranch: ((BranchInfo) -> Void)? = nil
 
     // Optional: Allow branch creation
     var allowCreation: Bool = false
@@ -11,7 +12,6 @@ struct BranchSelectorView: View {
 
     @State private var searchText: String = ""
     @State private var branches: [BranchInfo] = []
-    @State private var filteredBranches: [BranchInfo] = []
     @State private var isLoading: Bool = true
     @State private var errorMessage: String?
 
@@ -20,13 +20,32 @@ struct BranchSelectorView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    private var filteredBranches: [BranchInfo] {
+        if searchText.isEmpty {
+            return branches
+        }
+        return branches.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    private var searchBinding: Binding<String> {
+        Binding(
+            get: { searchText },
+            set: { newValue in
+                searchText = newValue
+                displayedCount = pageSize
+            }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header with search and close
             HStack(spacing: 12) {
                 SearchField(
                     placeholder: allowCreation ? "git.branch.searchOrCreate" : "git.branch.search",
-                    text: $searchText,
+                    text: searchBinding,
                     iconColor: .secondary,
                     onSubmit: {
                         if allowCreation && !searchText.isEmpty && filteredBranches.isEmpty {
@@ -76,6 +95,15 @@ struct BranchSelectorView: View {
                     Text(searchText.isEmpty ? String(localized: "git.branch.noBranches") : String(localized: "git.branch.noMatch \(searchText)"))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+
+                    if allowCreation && !searchText.isEmpty {
+                        Button {
+                            createBranch()
+                        } label: {
+                            Label(String(localized: "git.branch.create \(searchText)"), systemImage: "plus.circle")
+                        }
+                        .buttonStyle(.bordered)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -94,28 +122,6 @@ struct BranchSelectorView: View {
 
                         ForEach(Array(filteredBranches.prefix(displayedCount)), id: \.id) { branch in
                             branchRow(branch)
-                        }
-
-                        // Create branch option if no matches and creation allowed
-                        if allowCreation && !searchText.isEmpty && filteredBranches.isEmpty {
-                            Button {
-                                createBranch()
-                            } label: {
-                                HStack {
-                                    Image(systemName: "plus.circle")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(Color.accentColor)
-
-                                    Text(String(localized: "git.branch.create \(searchText)"))
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.primary)
-
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 12)
-                            }
-                            .buttonStyle(.plain)
                         }
 
                         // Load more row
@@ -144,14 +150,12 @@ struct BranchSelectorView: View {
         .onAppear {
             loadBranches()
         }
-        .onChange(of: searchText) { _, _ in
-            filterBranches()
-        }
     }
 
     private func branchRow(_ branch: BranchInfo) -> some View {
         Button {
             selectedBranch = branch
+            onSelectBranch?(branch)
             if !allowCreation {
                 dismiss()
             }
@@ -197,7 +201,7 @@ struct BranchSelectorView: View {
                 let loadedBranches = try await repositoryManager.getBranches(for: repository)
                 await MainActor.run {
                     branches = loadedBranches
-                    filterBranches()
+                    displayedCount = pageSize
                     isLoading = false
                 }
             } catch {
@@ -207,18 +211,6 @@ struct BranchSelectorView: View {
                 }
             }
         }
-    }
-
-    private func filterBranches() {
-        if searchText.isEmpty {
-            filteredBranches = branches
-        } else {
-            filteredBranches = branches.filter {
-                $0.name.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-        // Reset pagination when filtering changes
-        displayedCount = pageSize
     }
 }
 

@@ -20,7 +20,6 @@ struct CodeEditorView: View {
 
     @State private var document: VVDocument
     @State private var gitDiffText: String?
-    @State private var diffReloadTask: Task<Void, Never>?
 
     // Editor settings from AppStorage
     @AppStorage(AppearanceSettings.codeFontFamilyKey) private var editorFontFamily: String = AppearanceSettings.defaultCodeFontFamily
@@ -29,6 +28,18 @@ struct CodeEditorView: View {
     @AppStorage("editorShowGutter") private var editorShowGutter: Bool = true
     @AppStorage("editorIndentSpaces") private var editorIndentSpaces: Int = 4
     @Environment(\.colorScheme) private var colorScheme
+
+    private struct DocumentSyncKey: Hashable {
+        let content: String
+        let language: String?
+    }
+
+    private struct DiffReloadKey: Hashable {
+        let content: String
+        let filePath: String?
+        let repoPath: String?
+        let hasUnsavedChanges: Bool
+    }
 
     private var detectedLanguage: VVLanguage? {
         VVLanguageBridge.language(from: language)
@@ -53,6 +64,19 @@ struct CodeEditorView: View {
             .with(showLineNumbers: editorShowGutter)
             .with(showGutter: editorShowGutter)
             .with(showGitGutter: editorShowGutter)
+    }
+
+    private var documentSyncKey: DocumentSyncKey {
+        DocumentSyncKey(content: content, language: language)
+    }
+
+    private var diffReloadKey: DiffReloadKey {
+        DiffReloadKey(
+            content: content,
+            filePath: filePath,
+            repoPath: repoPath,
+            hasUnsavedChanges: hasUnsavedChanges
+        )
     }
 
     init(
@@ -90,41 +114,36 @@ struct CodeEditorView: View {
             }
             .disabled(!isEditable)
             .clipped()
-            .onChange(of: content) { _, newValue in
-                if document.text != newValue {
-                    document.text = newValue
-                }
-                if !hasUnsavedChanges {
-                    scheduleDiffReload()
-                }
+            .task(id: documentSyncKey) {
+                syncDocument()
             }
-            .onChange(of: language) { _, newValue in
-                document.language = VVLanguageBridge.language(from: newValue)
-            }
-            .task {
-                scheduleDiffReload()
-            }
-            .onChange(of: hasUnsavedChanges) { _, isDirty in
-                if isDirty {
-                    diffReloadTask?.cancel()
-                } else {
-                    scheduleDiffReload()
-                }
+            .task(id: diffReloadKey) {
+                await reloadGitDiffIfNeeded()
             }
     }
 
-    private func scheduleDiffReload() {
-        diffReloadTask?.cancel()
-        diffReloadTask = Task { [hasUnsavedChanges] in
-            guard !hasUnsavedChanges else { return }
-            do {
-                try await Task.sleep(for: .milliseconds(300))
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else { return }
-            await loadGitDiff()
+    private func syncDocument() {
+        if document.text != content {
+            document.text = content
         }
+
+        let resolvedLanguage = VVLanguageBridge.language(from: language)
+        if document.language != resolvedLanguage {
+            document.language = resolvedLanguage
+        }
+    }
+
+    private func reloadGitDiffIfNeeded() async {
+        guard !hasUnsavedChanges else { return }
+
+        do {
+            try await Task.sleep(for: .milliseconds(300))
+        } catch {
+            return
+        }
+
+        guard !Task.isCancelled else { return }
+        await loadGitDiff()
     }
 
     private func loadGitDiff() async {

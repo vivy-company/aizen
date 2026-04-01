@@ -33,7 +33,6 @@ struct ChatInputBar: View {
     @Binding var attachments: [ChatAttachment]
     @Binding var isProcessing: Bool
     @Binding var showingVoiceRecording: Bool
-    @Binding var showingAttachmentPicker: Bool
     @Binding var showingPermissionError: Bool
     @Binding var permissionErrorMessage: String
 
@@ -147,7 +146,7 @@ struct ChatInputBar: View {
 
             if !showingVoiceRecording {
                 HStack(spacing: Layout.rowSpacing) {
-                    Button(action: { showingAttachmentPicker.toggle() }) {
+                    Button(action: presentAttachmentPicker) {
                         Image(systemName: "paperclip")
                             .font(.system(size: Layout.iconSize, weight: .medium))
                             .foregroundStyle(!isSessionReady ? .tertiary : .secondary)
@@ -270,28 +269,6 @@ struct ChatInputBar: View {
                 .allowsHitTesting(false)
             }
         }
-        .onChange(of: showingAttachmentPicker) { _, isShowing in
-            guard isShowing else { return }
-            showingAttachmentPicker = false
-
-            let panel = NSOpenPanel()
-            panel.allowsMultipleSelection = true
-            panel.canChooseDirectories = false
-            panel.canChooseFiles = true
-            panel.allowedContentTypes = [.item]
-
-            if !worktreePath.isEmpty {
-                panel.directoryURL = URL(fileURLWithPath: worktreePath)
-            }
-
-            panel.begin { response in
-                if response == .OK {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        attachments.append(contentsOf: panel.urls.map { .file($0) })
-                    }
-                }
-            }
-        }
     }
 
     @ViewBuilder
@@ -327,6 +304,26 @@ struct ChatInputBar: View {
         case .dismiss:
             autocompleteHandler.dismissAutocomplete()
             return true
+        }
+    }
+
+    private func presentAttachmentPicker() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.item]
+
+        if !worktreePath.isEmpty {
+            panel.directoryURL = URL(fileURLWithPath: worktreePath)
+        }
+
+        panel.begin { response in
+            if response == .OK {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    attachments.append(contentsOf: panel.urls.map { .file($0) })
+                }
+            }
         }
     }
 
