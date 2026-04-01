@@ -9,108 +9,6 @@ import Foundation
 import AppKit
 import os.log
 
-// MARK: - Types
-
-nonisolated enum GitHostingProvider: String, Sendable {
-    case github
-    case gitlab
-    case bitbucket
-    case azureDevOps
-    case unknown
-
-    var displayName: String {
-        switch self {
-        case .github: return "GitHub"
-        case .gitlab: return "GitLab"
-        case .bitbucket: return "Bitbucket"
-        case .azureDevOps: return "Azure DevOps"
-        case .unknown: return "Unknown"
-        }
-    }
-
-    var cliName: String? {
-        switch self {
-        case .github: return "gh"
-        case .gitlab: return "glab"
-        case .azureDevOps: return "az"
-        case .bitbucket, .unknown: return nil
-        }
-    }
-
-    var prTerminology: String {
-        switch self {
-        case .gitlab: return "Merge Request"
-        default: return "Pull Request"
-        }
-    }
-
-    var installInstructions: String {
-        switch self {
-        case .github: return "brew install gh && gh auth login"
-        case .gitlab: return "brew install glab && glab auth login"
-        case .azureDevOps: return "brew install azure-cli && az login"
-        case .bitbucket, .unknown: return ""
-        }
-    }
-}
-
-struct GitHostingInfo: Sendable {
-    let provider: GitHostingProvider
-    let owner: String
-    let repo: String
-    let baseURL: String
-    let cliInstalled: Bool
-    let cliAuthenticated: Bool
-}
-
-enum PRStatus: Sendable, Equatable {
-    case unknown
-    case noPR
-    case open(number: Int, url: String, mergeable: Bool, title: String)
-    case merged
-    case closed
-
-    static func == (lhs: PRStatus, rhs: PRStatus) -> Bool {
-        switch (lhs, rhs) {
-        case (.unknown, .unknown), (.noPR, .noPR), (.merged, .merged), (.closed, .closed):
-            return true
-        case let (.open(n1, u1, m1, t1), .open(n2, u2, m2, t2)):
-            return n1 == n2 && u1 == u2 && m1 == m2 && t1 == t2
-        default:
-            return false
-        }
-    }
-}
-
-enum GitHostingAction {
-    case createPR(sourceBranch: String, targetBranch: String?)
-    case viewPR(number: Int)
-    case viewRepo
-}
-
-enum GitHostingError: LocalizedError {
-    case cliNotInstalled(provider: GitHostingProvider)
-    case cliNotAuthenticated(provider: GitHostingProvider)
-    case commandFailed(message: String)
-    case unsupportedProvider
-    case noRemoteFound
-
-    var errorDescription: String? {
-        switch self {
-        case .cliNotInstalled(let provider):
-            return "\(provider.cliName ?? "CLI") is not installed"
-        case .cliNotAuthenticated(let provider):
-            return "\(provider.cliName ?? "CLI") is not authenticated"
-        case .commandFailed(let message):
-            return message
-        case .unsupportedProvider:
-            return "This Git hosting provider is not supported"
-        case .noRemoteFound:
-            return "No remote project found"
-        }
-    }
-}
-
 // MARK: - Service
 
 actor GitHostingService {
@@ -154,57 +52,7 @@ actor GitHostingService {
         return result
     }
 
-    private func parseISO8601Date(_ value: String) -> Date {
-        ISO8601DateParser.shared.parse(value) ?? Date()
-    }
-
     // MARK: - Provider Detection
-
-    func detectProvider(from remoteURL: String) -> GitHostingProvider {
-        let lowercased = remoteURL.lowercased()
-
-        if lowercased.contains("github.com") {
-            return .github
-        } else if lowercased.contains("gitlab.com") || lowercased.contains("gitlab.") {
-            return .gitlab
-        } else if lowercased.contains("bitbucket.org") {
-            return .bitbucket
-        } else if lowercased.contains("dev.azure.com") || lowercased.contains("visualstudio.com") {
-            return .azureDevOps
-        }
-
-        return .unknown
-    }
-
-    func parseOwnerRepo(from remoteURL: String) -> (owner: String, repo: String)? {
-        // Handle SSH format: git@github.com:owner/repo.git
-        if remoteURL.contains("@") && remoteURL.contains(":") {
-            let parts = remoteURL.components(separatedBy: ":")
-            guard parts.count >= 2 else { return nil }
-            let pathPart = parts[1]
-            return parsePathComponents(pathPart)
-        }
-
-        // Handle HTTPS format: https://github.com/owner/repo.git
-        guard let url = URL(string: remoteURL) else { return nil }
-        let path = url.path
-        return parsePathComponents(path)
-    }
-
-    private func parsePathComponents(_ path: String) -> (owner: String, repo: String)? {
-        var cleanPath = path
-        if cleanPath.hasPrefix("/") {
-            cleanPath = String(cleanPath.dropFirst())
-        }
-        if cleanPath.hasSuffix(".git") {
-            cleanPath = String(cleanPath.dropLast(4))
-        }
-
-        let components = cleanPath.components(separatedBy: "/")
-        guard components.count >= 2 else { return nil }
-
-        return (owner: components[0], repo: components[1])
-    }
 
     func getHostingInfo(for repoPath: String) async -> GitHostingInfo? {
         if let cached = hostingInfoCache[repoPath],
@@ -251,14 +99,14 @@ actor GitHostingService {
         switch workflowProvider {
         case .github: provider = .github
         case .gitlab: provider = .gitlab
-        case .none: provider = detectProvider(from: remoteURL)  // Fallback to URL-based detection
+        case .none: provider = GitHostingRemoteSupport.detectProvider(from: remoteURL)  // Fallback to URL-based detection
         }
 
-        guard let (owner, repo) = parseOwnerRepo(from: remoteURL) else {
+        guard let (owner, repo) = GitHostingRemoteSupport.parseOwnerRepo(from: remoteURL) else {
             return nil
         }
 
-        let baseURL = extractBaseURL(from: remoteURL, provider: provider)
+        let baseURL = GitHostingRemoteSupport.extractBaseURL(from: remoteURL, provider: provider)
         let (cliInstalled, _) = await checkCLIInstalled(for: provider)
         let cliAuthenticated = cliInstalled ? await checkCLIAuthenticated(for: provider, repoPath: repoPath) : false
 
@@ -270,27 +118,6 @@ actor GitHostingService {
             cliInstalled: cliInstalled,
             cliAuthenticated: cliAuthenticated
         )
-    }
-
-    private func extractBaseURL(from remoteURL: String, provider: GitHostingProvider) -> String {
-        switch provider {
-        case .github:
-            return "https://github.com"
-        case .gitlab:
-            if let url = URL(string: remoteURL), let host = url.host {
-                return "https://\(host)"
-            }
-            return "https://gitlab.com"
-        case .bitbucket:
-            return "https://bitbucket.org"
-        case .azureDevOps:
-            if let url = URL(string: remoteURL), let host = url.host {
-                return "https://\(host)"
-            }
-            return "https://dev.azure.com"
-        case .unknown:
-            return ""
-        }
     }
 
     // MARK: - CLI Detection
@@ -801,8 +628,8 @@ actor GitHostingService {
             default: state = .open
             }
 
-            let createdAt = parseISO8601Date(mr.createdAt)
-            let updatedAt = parseISO8601Date(mr.updatedAt)
+            let createdAt = GitHostingRemoteSupport.parseISO8601Date(mr.createdAt)
+            let updatedAt = GitHostingRemoteSupport.parseISO8601Date(mr.updatedAt)
 
             return PullRequest(
                 id: mr.iid,
@@ -1042,8 +869,8 @@ actor GitHostingService {
         default: state = .open
         }
 
-        let createdAt = parseISO8601Date(mr.createdAt)
-        let updatedAt = parseISO8601Date(mr.updatedAt)
+        let createdAt = GitHostingRemoteSupport.parseISO8601Date(mr.createdAt)
+        let updatedAt = GitHostingRemoteSupport.parseISO8601Date(mr.updatedAt)
 
         return PullRequest(
             id: mr.iid,
@@ -1223,7 +1050,7 @@ actor GitHostingService {
         return notes
             .filter { !($0.system ?? false) }
             .map { note in
-                let createdAt = parseISO8601Date(note.created_at)
+                let createdAt = GitHostingRemoteSupport.parseISO8601Date(note.created_at)
                 return PRComment(
                     id: String(note.id),
                     author: note.author.username,
@@ -1449,7 +1276,7 @@ actor GitHostingService {
     // MARK: - Browser Fallback
 
     func openInBrowser(info: GitHostingInfo, action: GitHostingAction) {
-        guard let url = buildURL(info: info, action: action) else {
+        guard let url = GitHostingURLBuilder.buildURL(info: info, action: action) else {
             logger.error("Failed to build URL for action")
             return
         }
@@ -1458,66 +1285,6 @@ actor GitHostingService {
     }
 
     nonisolated func buildURL(info: GitHostingInfo, action: GitHostingAction) -> URL? {
-        switch action {
-        case .createPR(let sourceBranch, let targetBranch):
-            return buildCreatePRURL(info: info, sourceBranch: sourceBranch, targetBranch: targetBranch)
-        case .viewPR(let number):
-            return buildViewPRURL(info: info, number: number)
-        case .viewRepo:
-            return buildRepoURL(info: info)
-        }
-    }
-
-    private nonisolated func buildCreatePRURL(info: GitHostingInfo, sourceBranch: String, targetBranch: String?) -> URL? {
-        let target = targetBranch ?? "main"
-        let encodedSource = sourceBranch.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? sourceBranch
-        let encodedTarget = target.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? target
-
-        switch info.provider {
-        case .github:
-            return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)/compare/\(encodedTarget)...\(encodedSource)?expand=1")
-
-        case .gitlab:
-            return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)/-/merge_requests/new?merge_request[source_branch]=\(encodedSource)&merge_request[target_branch]=\(encodedTarget)")
-
-        case .bitbucket:
-            return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)/pull-requests/new?source=\(encodedSource)&dest=\(encodedTarget)")
-
-        case .azureDevOps:
-            return URL(string: "\(info.baseURL)/\(info.owner)/_git/\(info.repo)/pullrequestcreate?sourceRef=\(encodedSource)&targetRef=\(encodedTarget)")
-
-        case .unknown:
-            return nil
-        }
-    }
-
-    private nonisolated func buildViewPRURL(info: GitHostingInfo, number: Int) -> URL? {
-        switch info.provider {
-        case .github:
-            return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)/pull/\(number)")
-        case .gitlab:
-            return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)/-/merge_requests/\(number)")
-        case .bitbucket:
-            return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)/pull-requests/\(number)")
-        case .azureDevOps:
-            return URL(string: "\(info.baseURL)/\(info.owner)/_git/\(info.repo)/pullrequest/\(number)")
-        case .unknown:
-            return nil
-        }
-    }
-
-    private nonisolated func buildRepoURL(info: GitHostingInfo) -> URL? {
-        switch info.provider {
-        case .github:
-            return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)")
-        case .gitlab:
-            return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)")
-        case .bitbucket:
-            return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)")
-        case .azureDevOps:
-            return URL(string: "\(info.baseURL)/\(info.owner)/_git/\(info.repo)")
-        case .unknown:
-            return nil
-        }
+        GitHostingURLBuilder.buildURL(info: info, action: action)
     }
 }

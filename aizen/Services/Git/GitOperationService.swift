@@ -14,11 +14,7 @@ final class GitOperationService: ObservableObject {
     @Published private(set) var isOperationPending = false
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "GitOperationService")
-
-    private let stagingService = GitStagingService()
-    private let branchService = GitBranchService()
-    private let remoteService = GitRemoteService()
-    private let statusService = GitStatusService()
+    private let operationRunner = GitOperationRunner()
 
     private let worktreePath: String
     private let onMutationCompleted: @MainActor () -> Void
@@ -32,234 +28,171 @@ final class GitOperationService: ObservableObject {
 
     func stageFile(_ file: String, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let stagingService = self.stagingService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await stagingService.stageFile(at: worktreePath, file: file) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.stageFile(at: worktreePath, file: file) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     func unstageFile(_ file: String, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let stagingService = self.stagingService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await stagingService.unstageFile(at: worktreePath, file: file) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.unstageFile(at: worktreePath, file: file) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     func stageAll(onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let stagingService = self.stagingService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await stagingService.stageAll(at: worktreePath) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.stageAll(at: worktreePath) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     func unstageAll(onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let stagingService = self.stagingService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await stagingService.unstageAll(at: worktreePath) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.unstageAll(at: worktreePath) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     func discardAll(onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let stagingService = self.stagingService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await stagingService.discardAll(at: worktreePath) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.discardAll(at: worktreePath) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     func cleanUntracked(onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let stagingService = self.stagingService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await stagingService.cleanUntracked(at: worktreePath) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.cleanUntracked(at: worktreePath) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     // MARK: - Commit Operations
 
     func commit(message: String, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let stagingService = self.stagingService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await stagingService.commit(at: worktreePath, message: message) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.commit(at: worktreePath, message: message) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     func amendCommit(message: String, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let stagingService = self.stagingService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await stagingService.amendCommit(at: worktreePath, message: message) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.amendCommit(at: worktreePath, message: message) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     func commitWithSignoff(message: String, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let stagingService = self.stagingService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await stagingService.commitWithSignoff(at: worktreePath, message: message) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.commitWithSignoff(at: worktreePath, message: message) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     // MARK: - Branch Operations
 
     func checkoutBranch(_ branch: String, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let branchService = self.branchService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await branchService.checkoutBranch(at: worktreePath, branch: branch) },
-                onSuccess: self.makeMutationOnlySuccessHandler(),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.checkoutBranch(at: worktreePath, branch: branch) },
+            onSuccess: makeMutationOnlySuccessHandler(),
+            onError: onError
+        )
     }
 
     func createBranch(_ name: String, from: String? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let branchService = self.branchService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await branchService.createBranch(at: worktreePath, name: name, from: from) },
-                onSuccess: self.makeMutationOnlySuccessHandler(),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.createBranch(at: worktreePath, name: name, from: from) },
+            onSuccess: makeMutationOnlySuccessHandler(),
+            onError: onError
+        )
     }
 
     // MARK: - Remote Operations
 
     func fetch(onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let remoteService = self.remoteService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await remoteService.fetch(at: worktreePath) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.fetch(at: worktreePath) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     func pull(onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let remoteService = self.remoteService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await remoteService.pull(at: worktreePath) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.pull(at: worktreePath) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     func push(setUpstream: Bool = false, onSuccess: (() -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let remoteService = self.remoteService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await remoteService.push(at: worktreePath, setUpstream: setUpstream) },
-                onSuccess: self.makeRefreshingSuccessHandler(original: onSuccess),
-                onError: onError
-            )
-        }
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.push(at: worktreePath, setUpstream: setUpstream) },
+            onSuccess: makeRefreshingSuccessHandler(original: onSuccess),
+            onError: onError
+        )
     }
 
     func fetchThenPush(setUpstream: Bool = false, onSuccess: ((Bool) -> Void)? = nil, onError: ((Error) -> Void)? = nil) {
         let worktreePath = self.worktreePath
-        let remoteService = self.remoteService
-        let statusService = self.statusService
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(
-                { try await remoteService.fetch(at: worktreePath) },
-                onSuccess: {
-                    let behindCount: Int
-                    do {
-                        let branchStatus = try await statusService.getBranchStatus(at: worktreePath)
-                        behindCount = branchStatus.behind
-                    } catch {
-                        behindCount = 0
+        let operationRunner = self.operationRunner
+        enqueueOperation(
+            { try await operationRunner.fetchThenPush(at: worktreePath, setUpstream: setUpstream) },
+            onSuccess: { [weak self] didPush in
+                guard let self else { return }
+                await MainActor.run {
+                    if didPush {
+                        self.onMutationCompleted()
                     }
-
-                    if behindCount > 0 {
-                        await MainActor.run { onSuccess?(false) }
-                        return
-                    }
-
-                    do {
-                        try await remoteService.push(at: worktreePath, setUpstream: setUpstream)
-                        await MainActor.run {
-                            self.onMutationCompleted()
-                            onSuccess?(true)
-                        }
-                    } catch {
-                        await MainActor.run {
-                            onError?(error)
-                        }
-                    }
-                },
-                onError: onError
-            )
-        }
+                    onSuccess?(didPush)
+                }
+            },
+            onError: onError
+        )
     }
 
     // MARK: - Helpers
 
-    private func makeRefreshingSuccessHandler(original: (() -> Void)?) -> () async -> Void {
+    private func makeRefreshingSuccessHandler(original: (() -> Void)?) -> (() async -> Void) {
         return { [weak self] in
             guard let self else {
                 await MainActor.run { original?() }
@@ -272,7 +205,7 @@ final class GitOperationService: ObservableObject {
         }
     }
 
-    private func makeMutationOnlySuccessHandler() -> () async -> Void {
+    private func makeMutationOnlySuccessHandler() -> (() async -> Void) {
         return { [weak self] in
             guard let self else { return }
             await MainActor.run {
@@ -281,9 +214,20 @@ final class GitOperationService: ObservableObject {
         }
     }
 
-    private func executeOperationBackground(
-        _ operation: @escaping () async throws -> Void,
-        onSuccess: (() async -> Void)? = nil,
+    private func enqueueOperation<T>(
+        _ operation: @escaping () async throws -> T,
+        onSuccess: ((T) async -> Void)? = nil,
+        onError: ((Error) -> Void)? = nil
+    ) {
+        Task { [weak self] in
+            guard let self else { return }
+            await self.executeOperationBackground(operation, onSuccess: onSuccess, onError: onError)
+        }
+    }
+
+    private func executeOperationBackground<T>(
+        _ operation: @escaping () async throws -> T,
+        onSuccess: ((T) async -> Void)? = nil,
         onError: ((Error) -> Void)? = nil
     ) async {
         await MainActor.run {
@@ -291,9 +235,9 @@ final class GitOperationService: ObservableObject {
         }
 
         do {
-            try await operation()
+            let result = try await operation()
             if let onSuccess {
-                await onSuccess()
+                await onSuccess(result)
             }
         } catch {
             await MainActor.run {

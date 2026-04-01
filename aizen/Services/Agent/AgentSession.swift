@@ -32,7 +32,7 @@ enum SessionState: Equatable {
 
 /// ObservableObject that wraps Client for managing an agent session
 @MainActor
-class AgentSession: ObservableObject, ClientDelegate {
+class AgentSession: ObservableObject {
     static let maxMessageCount = 500
     static let maxToolCallCount = 500
     // MARK: - Published Properties
@@ -115,9 +115,9 @@ class AgentSession: ObservableObject, ClientDelegate {
     var pendingToolCallUpdatesById: [String: [ToolCallUpdateDetails]] = [:]
 
     // Delegates
-    private let fileSystemDelegate = AgentFileSystemDelegate()
     private let terminalDelegate = AgentTerminalDelegate()
     let permissionHandler = AgentPermissionHandler()
+    private var clientDelegateBridge: AgentSessionClientDelegate!
     private var agentCapabilities: AgentCapabilities?
     var promptCapabilities: PromptCapabilities? { agentCapabilities?.promptCapabilities }
 
@@ -126,6 +126,7 @@ class AgentSession: ObservableObject, ClientDelegate {
     init(agentName: String = "", workingDirectory: String = "") {
         self.agentName = agentName
         self.workingDirectory = workingDirectory
+        self.clientDelegateBridge = AgentSessionClientDelegate(session: self)
     }
 
     // MARK: - Streaming Finalization
@@ -597,7 +598,7 @@ class AgentSession: ObservableObject, ClientDelegate {
         let launchArgs = AgentRegistry.shared.getAgentLaunchArgs(for: agentName)
         let launchEnvironment = await AgentRegistry.shared.resolvedAgentLaunchEnvironment(for: agentName)
         let client = Client()
-        await client.setDelegate(self)
+        await client.setDelegate(clientDelegateBridge)
 
         do {
             try await client.launch(
@@ -633,6 +634,7 @@ class AgentSession: ObservableObject, ClientDelegate {
                 timeout: 120.0
             )
         } catch {
+            await client.setDelegate(nil)
             await client.terminate()
             isActive = false
             sessionState = .failed("Initialize failed: \(error.localizedDescription)")
@@ -908,23 +910,7 @@ class AgentSession: ObservableObject, ClientDelegate {
         setupError = nil
     }
 
-    // MARK: - ClientDelegate Methods
-
-    // File operations are nonisolated to avoid blocking MainActor during large file I/O
-    nonisolated func handleFileReadRequest(_ path: String, sessionId: String, line: Int?, limit: Int?)
-        async throws -> ReadTextFileResponse
-    {
-        return try await fileSystemDelegate.handleFileReadRequest(
-            path, sessionId: sessionId, line: line, limit: limit)
-    }
-
-    // File operations are nonisolated to avoid blocking MainActor during large file I/O
-    nonisolated func handleFileWriteRequest(_ path: String, content: String, sessionId: String) async throws
-        -> WriteTextFileResponse
-    {
-        return try await fileSystemDelegate.handleFileWriteRequest(
-            path, content: content, sessionId: sessionId)
-    }
+    // MARK: - ACP Delegate Forwarding
 
     func handleTerminalCreate(
         command: String, sessionId: String, args: [String]?, cwd: String?, env: [EnvVariable]?,

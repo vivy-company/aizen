@@ -12,7 +12,7 @@ import CoreData
 import AppKit
 import os.log
 
-enum FileGitStatus {
+enum FileGitStatus: Sendable {
     case modified      // Orange - file has unstaged changes
     case staged        // Green - file has staged changes
     case untracked     // Blue - file is not tracked by git
@@ -79,6 +79,8 @@ class FileBrowserViewModel: ObservableObject {
     private let viewContext: NSManagedObjectContext
     private var session: FileBrowserSession?
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "FileBrowser")
+    private let fileService = FileService()
+    private let gitRuntime = FileBrowserGitRuntime()
 
     init(worktree: Worktree, context: NSManagedObjectContext) {
         self.worktree = worktree
@@ -256,7 +258,7 @@ class FileBrowserViewModel: ObservableObject {
             return
         }
 
-        guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else {
+        guard let content = try? await fileService.readFile(path: path) else {
             ToastManager.shared.show("Unable to open file (not UTF-8 text).", type: .info)
             return
         }
@@ -321,8 +323,6 @@ class FileBrowserViewModel: ObservableObject {
     }
 
     // MARK: - File Operations
-
-    private let fileService = FileService()
 
     func createNewFile(parentPath: String, name: String) async {
         let filePath = (parentPath as NSString).appendingPathComponent(name)
@@ -428,113 +428,15 @@ class FileBrowserViewModel: ObservableObject {
 
     func loadGitStatus() async {
         guard let worktreePath = worktree.path else { return }
-
-        do {
-            // Load git status using libgit2 on background thread to avoid blocking UI
-            let newStatus = try await Task.detached {
-                let repo = try Libgit2Repository(path: worktreePath)
-                let status = try repo.status()
-
-                // Convert to file status map
-                var statusMap: [String: FileGitStatus] = [:]
-
-                for entry in status.staged {
-                    let absolutePath = (worktreePath as NSString).appendingPathComponent(entry.path)
-                    statusMap[absolutePath] = .staged
-                }
-
-                for entry in status.modified {
-                    let absolutePath = (worktreePath as NSString).appendingPathComponent(entry.path)
-                    statusMap[absolutePath] = .modified
-                }
-
-                for entry in status.untracked {
-                    let absolutePath = (worktreePath as NSString).appendingPathComponent(entry.path)
-                    statusMap[absolutePath] = .untracked
-                }
-
-                for entry in status.conflicted {
-                    let absolutePath = (worktreePath as NSString).appendingPathComponent(entry.path)
-                    statusMap[absolutePath] = .conflicted
-                }
-
-                return statusMap
-            }.value
-
-            gitFileStatus = newStatus
-
-            // Load gitignored files for visible directories
-            await loadGitIgnored(for: worktreePath)
-
-            // Refresh tree to reflect new status
-            refreshTree()
-        } catch {
-            logger.debug("Failed to load git status: \(error.localizedDescription)")
-        }
-    }
-
-    private func loadGitIgnored(for basePath: String) async {
-        var ignoredPaths = Set<String>()
-
-        // Get expanded paths snapshot before going off main thread
         let expandedPathsSnapshot = expandedPaths
+        let snapshot = await gitRuntime.loadGitSnapshot(
+            basePath: worktreePath,
+            expandedPaths: expandedPathsSnapshot
+        )
 
-        // Get list of all files/dirs in expanded paths plus root (run off main thread)
-        let pathsToCheck: [String] = await Task.detached {
-            var paths: [String] = []
-
-            // Add root level items
-            if let items = try? FileManager.default.contentsOfDirectory(atPath: basePath) {
-                paths.append(contentsOf: items)
-            }
-
-            // Add items from expanded directories
-            for expandedPath in expandedPathsSnapshot {
-                let relativePath = expandedPath.hasPrefix(basePath)
-                    ? String(expandedPath.dropFirst(basePath.count + 1))
-                    : ""
-                if let items = try? FileManager.default.contentsOfDirectory(atPath: expandedPath) {
-                    for item in items {
-                        let itemRelPath = relativePath.isEmpty ? item : "\(relativePath)/\(item)"
-                        paths.append(itemRelPath)
-                    }
-                }
-            }
-
-            return paths
-        }.value
-
-        guard !pathsToCheck.isEmpty else { return }
-
-        // Process in batches to avoid argument list too long error
-        let batchSize = 100
-        for batchStart in stride(from: 0, to: pathsToCheck.count, by: batchSize) {
-            let batchEnd = min(batchStart + batchSize, pathsToCheck.count)
-            let batch = Array(pathsToCheck[batchStart..<batchEnd])
-
-            // Use git check-ignore command with async execution (non-blocking)
-            do {
-                let result = try await ProcessExecutor.shared.executeWithOutput(
-                    executable: "/usr/bin/git",
-                    arguments: ["check-ignore"] + batch,
-                    workingDirectory: basePath
-                )
-
-                // git check-ignore returns exit code 1 when no files are ignored, which is fine
-                for line in result.stdout.split(separator: "\n") {
-                    let path = String(line).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !path.isEmpty {
-                        ignoredPaths.insert(path)
-                        let absolutePath = (basePath as NSString).appendingPathComponent(path)
-                        ignoredPaths.insert(absolutePath)
-                    }
-                }
-            } catch {
-                logger.debug("git check-ignore: \(error.localizedDescription)")
-            }
-        }
-
-        gitIgnoredPaths = ignoredPaths
+        gitFileStatus = snapshot.fileStatus
+        gitIgnoredPaths = snapshot.ignoredPaths
+        refreshTree()
     }
 
     func refreshGitStatus() {

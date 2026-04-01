@@ -2,166 +2,61 @@
 //  AgentRegistry.swift
 //  aizen
 //
-//  Created by Uladzislau Yakauleu on 17.10.25.
+//  Coordinator for agent metadata, auth preferences, launch resolution, and validation.
 //
 
-import ACP
 import Foundation
-import SwiftUI
 
 extension Notification.Name {
     static let agentMetadataDidChange = Notification.Name("agentMetadataDidChange")
 }
 
-/// Manages discovery and configuration of available ACP agents
-actor AgentRegistry {
+nonisolated final class AgentRegistry {
     static let shared = AgentRegistry()
 
-    // SAFETY: UserDefaults is thread-safe for read/write operations
-    private nonisolated(unsafe) let defaults: UserDefaults
-    private let authPreferencesKey = "acpAgentAuthPreferences"
-    private let metadataStoreKey = "agentMetadataStore"
+    private let defaults: UserDefaults
+    private let store: AgentRegistryStore
+    private let authPreferences: AgentAuthPreferences
+    private let launchResolver = AgentLaunchResolver()
 
-    // MARK: - Persistence
-
-    /// Agent metadata storage with in-memory cache
-    private var metadataCache: [String: AgentMetadata]?
-    private static var cachedMetadata: [String: AgentMetadata] = [:]
-    private static var cacheLoaded: Bool = false
-    private static let cacheLock = NSLock()
-
-    internal var agentMetadata: [String: AgentMetadata] {
-        get {
-            if let cache = metadataCache {
-                Self.updateNonisolatedCache(cache)
-                return cache
-            }
-
-            guard let data = defaults.data(forKey: metadataStoreKey) else {
-                Self.updateNonisolatedCache([:])
-                return [:]
-            }
-
-            do {
-                let decoder = JSONDecoder()
-                let decoded = try decoder.decode([String: AgentMetadata].self, from: data)
-                let validated = Self.validStoredMetadata(decoded)
-                if validated.count != decoded.count {
-                    persistValidatedMetadata(validated)
-                }
-                metadataCache = validated
-                Self.updateNonisolatedCache(validated)
-                return validated
-            } catch {
-                Self.updateNonisolatedCache([:])
-                return [:]
-            }
-        }
-        set {
-            metadataCache = newValue
-            do {
-                let encoder = JSONEncoder()
-                let data = try encoder.encode(newValue)
-                defaults.set(data, forKey: metadataStoreKey)
-                Self.updateNonisolatedCache(newValue)
-                Task { @MainActor in
-                    NotificationCenter.default.post(name: .agentMetadataDidChange, object: nil)
-                }
-            } catch {
-                // Ignore encoding failure - metadata will be stale but not lost
-            }
-        }
-    }
+    private let stateLock = NSLock()
+    private var cachedSnapshot: AgentRegistrySnapshot
+    private var bootstrapTask: Task<Void, Never>?
+    private let mutationGate = AgentRegistryMutationGate()
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        Task {
-            await initializeDefaultAgents()
+        self.store = AgentRegistryStore(defaults: defaults)
+        self.authPreferences = AgentAuthPreferences(defaults: defaults)
+        self.cachedSnapshot = AgentRegistryPersistence.loadSnapshot(defaults: defaults)
+        applySnapshot(cachedSnapshot, notify: false)
+
+        bootstrapTask = Task { [weak self] in
+            guard let self else { return }
+            await self.initializeDefaultAgents()
         }
     }
 
-    // MARK: - Metadata Management
-
-    /// Load metadata directly from UserDefaults (thread-safe)
-    private nonisolated func loadMetadataFromDefaults() -> [String: AgentMetadata] {
-        if let cached = Self.readNonisolatedCache() {
-            return cached
-        }
-
-        guard let data = defaults.data(forKey: metadataStoreKey) else {
-            Self.updateNonisolatedCache([:])
-            return [:]
-        }
-
-        do {
-            let decoder = JSONDecoder()
-            let decoded = try decoder.decode([String: AgentMetadata].self, from: data)
-            let validated = Self.validStoredMetadata(decoded)
-            if validated.count != decoded.count {
-                persistValidatedMetadata(validated)
-            }
-            Self.updateNonisolatedCache(validated)
-            return validated
-        } catch {
-            Self.updateNonisolatedCache([:])
-            return [:]
-        }
+    deinit {
+        bootstrapTask?.cancel()
     }
 
-    private nonisolated func persistValidatedMetadata(_ metadata: [String: AgentMetadata]) {
-        do {
-            let data = try JSONEncoder().encode(metadata)
-            defaults.set(data, forKey: metadataStoreKey)
-        } catch {
-        }
+    // MARK: - Snapshot
+
+    func getAllAgents() -> [AgentMetadata] {
+        AgentRegistryQueries.allAgents(from: snapshotValue())
     }
 
-    private nonisolated static func readNonisolatedCache() -> [String: AgentMetadata]? {
-        cacheLock.lock()
-        defer { cacheLock.unlock() }
-        guard cacheLoaded else { return nil }
-        return cachedMetadata
+    func getEnabledAgents() -> [AgentMetadata] {
+        AgentRegistryQueries.enabledAgents(from: snapshotValue())
     }
 
-    private nonisolated static func updateNonisolatedCache(_ metadata: [String: AgentMetadata]) {
-        cacheLock.lock()
-        cachedMetadata = metadata
-        cacheLoaded = true
-        cacheLock.unlock()
+    func getMetadata(for agentId: String) -> AgentMetadata? {
+        AgentRegistryQueries.metadata(for: agentId, from: snapshotValue())
     }
 
-    private nonisolated static func validStoredMetadata(_ metadata: [String: AgentMetadata]) -> [String: AgentMetadata] {
-        metadata.filter { _, agent in
-            switch agent.source {
-            case .custom:
-                return true
-            case .registry:
-                return agent.registryDistributionType != nil
-            }
-        }
-    }
+    // MARK: - Mutation
 
-    /// Get all agents (enabled and disabled)
-    nonisolated func getAllAgents() -> [AgentMetadata] {
-        let metadata = loadMetadataFromDefaults()
-        return Array(metadata.values)
-            .map { AgentEnvironmentStore.shared.hydrate($0) }
-            .sorted { $0.name < $1.name }
-    }
-
-    /// Get only enabled agents
-    nonisolated func getEnabledAgents() -> [AgentMetadata] {
-        getAllAgents().filter { $0.isEnabled }
-    }
-
-    /// Get metadata for specific agent
-    nonisolated func getMetadata(for agentId: String) -> AgentMetadata? {
-        let metadata = loadMetadataFromDefaults()
-        guard let stored = metadata[agentId] else { return nil }
-        return AgentEnvironmentStore.shared.hydrate(stored)
-    }
-
-    /// Add custom agent
     func addCustomAgent(
         name: String,
         description: String?,
@@ -169,183 +64,163 @@ actor AgentRegistry {
         executablePath: String,
         launchArgs: [String],
         environmentVariables: [AgentEnvironmentVariable] = []
-    ) -> AgentMetadata {
-        let id = "custom-\(UUID().uuidString)"
-        let storedEnvironmentVariables = AgentEnvironmentStore.shared.persistedVariables(
-            from: environmentVariables,
-            previous: [],
-            agentId: id
-        )
-        let metadata = AgentMetadata(
-            id: id,
-            name: name,
-            description: description,
-            iconType: iconType,
-            source: .custom,
-            isEnabled: true,
-            executablePath: executablePath,
-            command: nil,
-            launchArgs: launchArgs,
-            environmentVariables: storedEnvironmentVariables
-        )
+    ) async -> AgentMetadata {
+        await mutationGate.perform {
+            let id = "custom-\(UUID().uuidString)"
+            let storedEnvironmentVariables = AgentEnvironmentStore.shared.persistedVariables(
+                from: environmentVariables,
+                previous: [],
+                agentId: id
+            )
 
-        var store = agentMetadata
-        store[id] = metadata
-        agentMetadata = store
+            let metadata = AgentMetadata(
+                id: id,
+                name: name,
+                description: description,
+                iconType: iconType,
+                source: .custom,
+                isEnabled: true,
+                executablePath: executablePath,
+                command: nil,
+                launchArgs: launchArgs,
+                environmentVariables: storedEnvironmentVariables
+            )
 
-        return AgentEnvironmentStore.shared.hydrate(metadata)
-    }
-
-    func upsertRegistryAgent(_ metadata: AgentMetadata) {
-        updateAgent(metadata)
-    }
-
-    /// Update agent metadata
-    func updateAgent(_ metadata: AgentMetadata) {
-        let previousStoredMetadata = agentMetadata[metadata.id]
-        let storedEnvironmentVariables = AgentEnvironmentStore.shared.persistedVariables(
-            from: metadata.environmentVariables,
-            previous: previousStoredMetadata?.environmentVariables ?? [],
-            agentId: metadata.id
-        )
-
-        var storedMetadata = metadata
-        storedMetadata.environmentVariables = storedEnvironmentVariables
-
-        var store = agentMetadata
-        store[storedMetadata.id] = storedMetadata
-        agentMetadata = store
-    }
-
-    /// Delete custom agent
-    func deleteAgent(id: String) {
-        guard let metadata = agentMetadata[id], metadata.isCustom || metadata.isRegistry else {
-            return
+            let result = await store.upsertAgent(metadata)
+            applySnapshot(result.snapshot)
+            return AgentEnvironmentStore.shared.hydrate(metadata)
         }
-
-        AgentEnvironmentStore.shared.deleteSecrets(for: metadata.environmentVariables, agentId: metadata.id)
-
-        var store = agentMetadata
-        store.removeValue(forKey: id)
-        agentMetadata = store
     }
 
-    /// Toggle agent enabled status
-    func toggleEnabled(for agentId: String) {
-        guard var metadata = getMetadata(for: agentId) else {
-            return
-        }
-
-        metadata.isEnabled = !metadata.isEnabled
-        updateAgent(metadata)
+    func upsertRegistryAgent(_ metadata: AgentMetadata) async {
+        await updateAgent(metadata)
     }
 
-    // MARK: - Agent Path Management
+    func updateAgent(_ metadata: AgentMetadata) async {
+        await mutationGate.perform {
+            let previousStoredMetadata = await store.snapshotMetadata(for: metadata.id)
+            let storedEnvironmentVariables = AgentEnvironmentStore.shared.persistedVariables(
+                from: metadata.environmentVariables,
+                previous: previousStoredMetadata?.environmentVariables ?? [],
+                agentId: metadata.id
+            )
 
-    /// Get executable path for a specific agent by name
-    nonisolated func getAgentPath(for agentName: String) -> String? {
-        let metadata = loadMetadataFromDefaults()
-        guard let metadata = metadata[agentName] else { return nil }
-        if metadata.command != nil {
-            return "/usr/bin/env"
+            var storedMetadata = metadata
+            storedMetadata.environmentVariables = storedEnvironmentVariables
+
+            let result = await store.upsertAgent(storedMetadata)
+            applySnapshot(result.snapshot)
         }
-        return metadata.executablePath
     }
 
-    /// Get launch arguments for a specific agent
-    nonisolated func getAgentLaunchArgs(for agentName: String) -> [String] {
-        let metadata = loadMetadataFromDefaults()
-        guard let metadata = metadata[agentName] else { return [] }
-        if let command = metadata.command {
-            return [command] + metadata.launchArgs
+    func deleteAgent(id: String) async {
+        await mutationGate.perform {
+            guard let metadata = await store.snapshotMetadata(for: id),
+                  metadata.isCustom || metadata.isRegistry else {
+                return
+            }
+
+            AgentEnvironmentStore.shared.deleteSecrets(for: metadata.environmentVariables, agentId: metadata.id)
+
+            let result = await store.removeAgent(id: id)
+            applySnapshot(result.snapshot)
         }
-        return metadata.launchArgs
     }
 
-    /// Get environment overrides for a specific agent launch
-    nonisolated func getAgentLaunchEnvironment(for agentName: String) -> [String: String] {
-        let metadata = loadMetadataFromDefaults()
-        guard let storedMetadata = metadata[agentName] else { return [:] }
-        var launchEnvironment = storedMetadata.baseEnvironment
-        let userEnvironment = AgentEnvironmentStore.shared.launchEnvironment(
-            from: storedMetadata.environmentVariables,
-            agentId: storedMetadata.id
-        )
-        for (key, value) in userEnvironment {
-            launchEnvironment[key] = value
+    func toggleEnabled(for agentId: String) async {
+        await mutationGate.perform {
+            let current = await store.snapshotMetadata(for: agentId)
+            let nextEnabled = !(current?.isEnabled ?? true)
+            let result = await store.updateEnabledState(agentId: agentId, isEnabled: nextEnabled)
+            applySnapshot(result.snapshot)
         }
-        return launchEnvironment
     }
 
-    /// Get the full launch environment for a specific agent, merged with the user's login-shell environment.
-    nonisolated func resolvedAgentLaunchEnvironment(for agentName: String) async -> [String: String] {
-        let metadata = loadMetadataFromDefaults()
-        guard let storedMetadata = metadata[agentName] else { return [:] }
+    // MARK: - Launch
 
-        var launchEnvironment = await ShellEnvironmentLoader.loadShellEnvironment()
-
-        for (key, value) in storedMetadata.baseEnvironment {
-            launchEnvironment[key] = value
-        }
-
-        let userEnvironment = AgentEnvironmentStore.shared.launchEnvironment(
-            from: storedMetadata.environmentVariables,
-            agentId: storedMetadata.id
-        )
-        for (key, value) in userEnvironment {
-            launchEnvironment[key] = value
-        }
-
-        return launchEnvironment
+    func getAgentPath(for agentName: String) -> String? {
+        AgentRegistryQueries.agentPath(for: agentName, from: snapshotValue())
     }
 
-    /// Remove agent configuration
-    func removeAgent(named agentName: String) {
-        deleteAgent(id: agentName)
+    func getAgentLaunchArgs(for agentName: String) -> [String] {
+        AgentRegistryQueries.launchArguments(for: agentName, from: snapshotValue())
+    }
+
+    func getAgentLaunchEnvironment(for agentName: String) -> [String: String] {
+        AgentRegistryQueries.launchEnvironment(for: agentName, from: snapshotValue())
+    }
+
+    func resolvedAgentLaunchEnvironment(for agentName: String) async -> [String: String] {
+        await launchResolver.resolvedEnvironment(for: agentName, snapshot: snapshotValue())
     }
 
     // MARK: - Auth Preferences
 
-    /// Save preferred auth method for an agent
-    nonisolated func saveAuthPreference(agentName: String, authMethodId: String) {
-        var prefs = defaults.dictionary(forKey: authPreferencesKey) as? [String: String] ?? [:]
-        prefs[agentName] = authMethodId
-        defaults.set(prefs, forKey: authPreferencesKey)
+    func saveAuthPreference(agentName: String, authMethodId: String) {
+        authPreferences.savePreference(agentName: agentName, authMethodId: authMethodId)
     }
 
-    /// Get saved auth preference for an agent
-    nonisolated func getAuthPreference(for agentName: String) -> String? {
-        let prefs = defaults.dictionary(forKey: authPreferencesKey) as? [String: String] ?? [:]
-        return prefs[agentName]
+    func getAuthPreference(for agentName: String) -> String? {
+        authPreferences.preference(for: agentName)
     }
 
-    /// Save that an agent should skip authentication
-    nonisolated func saveSkipAuth(for agentName: String) {
-        saveAuthPreference(agentName: agentName, authMethodId: "skip")
+    func saveSkipAuth(for agentName: String) {
+        authPreferences.saveSkipAuth(for: agentName)
     }
 
-    /// Check if agent should skip authentication
-    nonisolated func shouldSkipAuth(for agentName: String) -> Bool {
-        return getAuthPreference(for: agentName) == "skip"
+    func shouldSkipAuth(for agentName: String) -> Bool {
+        authPreferences.shouldSkipAuth(for: agentName)
     }
 
-    /// Clear saved auth preference for an agent
-    nonisolated func clearAuthPreference(for agentName: String) {
-        var prefs = defaults.dictionary(forKey: authPreferencesKey) as? [String: String] ?? [:]
-        prefs.removeValue(forKey: agentName)
-        defaults.set(prefs, forKey: authPreferencesKey)
+    func clearAuthPreference(for agentName: String) {
+        authPreferences.clearPreference(for: agentName)
     }
 
-    /// Get displayable auth method name for an agent
-    nonisolated func getAuthMethodName(for agentName: String) -> String? {
-        guard let authMethodId = getAuthPreference(for: agentName) else {
-            return nil
+    func getAuthMethodName(for agentName: String) -> String? {
+        authPreferences.displayableAuthMethodName(for: agentName)
+    }
+
+    // MARK: - Internal
+
+    func bootstrapDefaultAgents() async {
+        await mutationGate.perform {
+            let currentSnapshot = snapshotValue()
+            let mergedSnapshot = await store.bootstrapSnapshot(from: currentSnapshot)
+            applySnapshot(mergedSnapshot)
+            ensureDefaultAgentPreference(for: mergedSnapshot)
+        }
+    }
+
+    private func snapshotValue() -> AgentRegistrySnapshot {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return cachedSnapshot
+    }
+
+    private func applySnapshot(_ snapshot: AgentRegistrySnapshot, notify: Bool = true) {
+        stateLock.lock()
+        cachedSnapshot = snapshot
+        stateLock.unlock()
+
+        Task { @MainActor in
+            AgentCatalogStore.shared.update(snapshot: snapshot)
         }
 
-        if authMethodId == "skip" {
-            return "None"
+        if notify {
+            NotificationCenter.default.post(name: .agentMetadataDidChange, object: nil)
         }
+    }
 
-        return authMethodId
+    private func ensureDefaultAgentPreference(for snapshot: AgentRegistrySnapshot) {
+        let defaultAgent = defaults.string(forKey: "defaultACPAgent")
+        if defaultAgent == nil || snapshot.metadata(for: defaultAgent ?? "") == nil {
+            defaults.set(Self.defaultAgentID, forKey: "defaultACPAgent")
+        }
+    }
+}
+
+private actor AgentRegistryMutationGate {
+    func perform<T>(_ operation: () async -> T) async -> T {
+        await operation()
     }
 }
