@@ -93,6 +93,22 @@ aizen/
 
 ## Development Guidelines
 
+### Architecture Policy
+
+- Treat Aizen as greenfield for internal architecture work, not as a legacy codebase that must preserve internal structure.
+- Apply this policy to refactors, bug fixes, and new feature work.
+- Prefer root-cause changes over local patches that merely fit the current shape.
+- When adding something new, prefer the design that makes the system more scalable, maintainable, and coherent, even if that means reworking surrounding code.
+- Do not preserve internal backward compatibility just to avoid touching call sites.
+- Do not add shims, adapter layers, parallel code paths, or temporary wrappers unless there is a real external compatibility requirement.
+- When a design is wrong, replace it from the ground up so the resulting code is simpler and more maintainable.
+- Keep compatibility only at genuine external boundaries:
+  - persisted Core Data / on-disk data
+  - user-visible behavior that must intentionally remain stable
+  - external protocols, CLIs, APIs, and integrations
+- Remove dead code when changing systems instead of leaving legacy paths in place.
+- If improving a feature or fixing a bug requires breaking internal structure to make the system better, prefer the cleaner break.
+
 ### When Working on Features
 
 1. Respect domain boundaries:

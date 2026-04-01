@@ -88,11 +88,11 @@ struct CompanionGitDiffView: View {
         .onDisappear {
             runtime.setCompanionDiffVisible(false)
         }
-        .onChange(of: gitStatus) { _, _ in
+        .task(id: gitStatus) {
             publishSummary()
         }
-        .onChange(of: worktreePath) { _, newPath in
-            guard !newPath.isEmpty else { return }
+        .task(id: worktreePath) {
+            guard !worktreePath.isEmpty else { return }
             publishSummary()
         }
         .onReceive(NotificationCenter.default.publisher(for: .agentStreamingDidStart)) { notification in

@@ -128,9 +128,9 @@ struct FileSearchView: View {
                 .padding(.vertical, 6)
             }
             .frame(maxHeight: 400)
-            .onChange(of: viewModel.selectedIndex) { _, newIndex in
+            .task(id: viewModel.selectedIndex) {
                 withAnimation(.easeOut(duration: 0.1)) {
-                    proxy.scrollTo(newIndex, anchor: .center)
+                    proxy.scrollTo(viewModel.selectedIndex, anchor: .center)
                 }
             }
         }

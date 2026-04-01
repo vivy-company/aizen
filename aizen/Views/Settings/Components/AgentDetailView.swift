@@ -645,10 +645,7 @@ struct AgentDetailView: View {
                 Text("Remove \(server.displayName) from Aizen's MCP defaults for \(metadata.name)?")
             }
         }
-        .onAppear {
-            loadEnvironmentDraft()
-        }
-        .onChange(of: metadata.id) { _, _ in
+        .task(id: metadata.id) {
             loadEnvironmentDraft()
         }
         .onDisappear {

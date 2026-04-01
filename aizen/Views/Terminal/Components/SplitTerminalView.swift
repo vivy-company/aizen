@@ -66,8 +66,8 @@ struct SplitTerminalView: View {
         .onAppear {
             controller.handleAppear()
         }
-        .onChange(of: isSelected) { _, newValue in
-            controller.handleSelectionChange(newValue)
+        .task(id: isSelected) {
+            controller.handleSelectionChange(isSelected)
         }
         .onDisappear {
             controller.handleDisappear()

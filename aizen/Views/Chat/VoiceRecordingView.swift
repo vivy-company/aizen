@@ -127,7 +127,7 @@ struct AnimatedWaveformView: View {
             .onAppear {
                 initializeHeights()
             }
-            .onChange(of: timeline.date) { _, _ in
+            .task(id: timeline.date) {
                 updateWaveform()
             }
         }

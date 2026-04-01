@@ -106,17 +106,17 @@ struct TerminalPaneView: View {
                 requestSurfaceFocus()
             }
         }
-        .onChange(of: isFocused) { _, newValue in
-            surfaceView?.setGhosttyFocused(newValue)
-            if newValue {
+        .task(id: isFocused) {
+            surfaceView?.setGhosttyFocused(isFocused)
+            if isFocused {
                 requestSurfaceFocus()
             }
-            if !newValue, showingVoiceRecording {
+            if !isFocused, showingVoiceRecording {
                 audioService.cancelRecording()
                 setVoiceRecording(false)
             }
         }
-        .onChange(of: focusRequestVersion) { _, _ in
+        .task(id: focusRequestVersion) {
             if isFocused {
                 requestSurfaceFocus()
             }
@@ -696,8 +696,8 @@ private struct AizenHighlightOverlay: View {
         .allowsHitTesting(false)
         .opacity(highlighted ? 1.0 : 0.0)
         .animation(.easeOut(duration: 0.4), value: highlighted)
-        .onChange(of: highlighted) { _, newValue in
-            if newValue {
+        .task(id: highlighted) {
+            if highlighted {
                 withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
                     borderPulse = true
                 }

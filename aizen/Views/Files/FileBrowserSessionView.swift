@@ -70,11 +70,8 @@ struct FileBrowserSessionView: View {
                     .frame(minWidth: 300)
             }
         }
-        .onAppear {
-            openPendingFileIfNeeded()
-        }
-        .onChange(of: fileToOpenFromSearch) { _, _ in
-            openPendingFileIfNeeded()
+        .task(id: fileToOpenFromSearch) {
+            await openPendingFileIfNeeded()
         }
     }
 
@@ -99,12 +96,10 @@ struct FileBrowserSessionView: View {
         .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
     }
 
-    private func openPendingFileIfNeeded() {
+    @MainActor
+    private func openPendingFileIfNeeded() async {
         guard let path = fileToOpenFromSearch else { return }
-
-        Task { @MainActor in
-            await viewModel.openFile(path: path)
-            fileToOpenFromSearch = nil
-        }
+        await viewModel.openFile(path: path)
+        fileToOpenFromSearch = nil
     }
 }

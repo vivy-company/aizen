@@ -165,8 +165,6 @@ struct GitPanelWindowContent: View {
     @State private var commentPopoverFilePath: String?
     @State private var showAgentPicker: Bool = false
     @State private var cachedChangedFiles: [String] = []
-    @State private var diffReloadTask: Task<Void, Never>?
-    @State private var diffLoadTask: Task<Void, Never>?
 
     @StateObject private var reviewManager = ReviewSessionManager()
     @State private var selectedWorkflowForTrigger: Workflow?
@@ -237,6 +235,18 @@ struct GitPanelWindowContent: View {
         return AppearanceSettings.effectiveThemeName(colorScheme: colorScheme)
     }
 
+    private struct RuntimeVisibilityKey: Equatable {
+        let selectedTab: GitPanelTab
+        let selectedHistoryCommitID: String?
+    }
+
+    private var runtimeVisibilityKey: RuntimeVisibilityKey {
+        RuntimeVisibilityKey(
+            selectedTab: selectedTab,
+            selectedHistoryCommitID: selectedHistoryCommit?.id
+        )
+    }
+
     private var surfaceColor: Color {
         Color(nsColor: GhosttyThemeParser.loadBackgroundColor(named: effectiveThemeName))
     }
@@ -272,23 +282,19 @@ struct GitPanelWindowContent: View {
             _ = updateChangedFilesCache()
         }
         .onDisappear {
-            diffReloadTask?.cancel()
-            diffReloadTask = nil
-            diffLoadTask?.cancel()
-            diffLoadTask = nil
             runtime.setGitPanelVisible(false, showsWorkingDiff: false, showsWorkflow: false)
         }
-        .onChange(of: gitStatus) { _, _ in
+        .task(id: gitStatus) {
             let changed = updateChangedFilesCache()
-            if changed && selectedHistoryCommit != nil {
-                reloadDiffDebounced()
-            }
+            guard changed, selectedHistoryCommit != nil else { return }
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            await synchronizeDiffOutput(for: selectedHistoryCommit)
         }
-        .onChange(of: selectedHistoryCommit) { _, commit in
-            scheduleDiffLoad(for: commit)
-            syncRuntimeVisibility()
+        .task(id: selectedHistoryCommit?.id) {
+            await synchronizeDiffOutput(for: selectedHistoryCommit)
         }
-        .onChange(of: selectedTab) { _, _ in
+        .task(id: runtimeVisibilityKey) {
             syncRuntimeVisibility()
         }
         .sheet(item: $commentPopoverLine) { line in
@@ -598,10 +604,7 @@ struct GitPanelWindowContent: View {
                 )
             }
         }
-        .task {
-            scheduleDiffLoad(for: nil)
-        }
-        .onChange(of: effectiveDiffOutput) { _, _ in
+        .task(id: effectiveDiffOutput) {
             validateCommentsAgainstDiff()
         }
     }
@@ -717,11 +720,10 @@ struct GitPanelWindowContent: View {
         }
     }
 
-    private func scheduleDiffLoad(for commit: GitCommit?) {
+    @MainActor
+    private func synchronizeDiffOutput(for commit: GitCommit?) async {
         let path = worktreePath
         guard !path.isEmpty else {
-            diffLoadTask?.cancel()
-            diffLoadTask = nil
             applyDiffOutput("")
             return
         }
@@ -732,35 +734,11 @@ struct GitPanelWindowContent: View {
             return
         }
 
-        diffLoadTask?.cancel()
-        diffLoadTask = Task {
-            let output = await Self.loadCommitDiff(path: path, commitID: commitID)
-
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                guard worktreePath == path else { return }
-                guard selectedHistoryCommit?.id == commitID else { return }
-                applyDiffOutput(output)
-            }
-        }
-    }
-
-    private func reloadDiffDebounced() {
-        // Cancel any pending reload
-        diffReloadTask?.cancel()
-
-        // Debounce by 300ms to avoid rapid reloads
-        diffReloadTask = Task {
-            do {
-                try await Task.sleep(for: .milliseconds(300))
-            } catch {
-                return  // Cancelled
-            }
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                scheduleDiffLoad(for: selectedHistoryCommit)
-            }
-        }
+        let output = await Self.loadCommitDiff(path: path, commitID: commitID)
+        guard !Task.isCancelled else { return }
+        guard worktreePath == path else { return }
+        guard selectedHistoryCommit?.id == commitID else { return }
+        applyDiffOutput(output)
     }
 
     private func applyDiffOutput(_ output: String) {

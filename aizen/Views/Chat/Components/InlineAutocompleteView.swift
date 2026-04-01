@@ -104,16 +104,16 @@ private struct AutocompleteListView: View {
                 }
             }
             .frame(minHeight: minListHeight, maxHeight: 240)
-            .onChange(of: itemsVersion) { _, _ in
+            .task(id: itemsVersion) {
                 // Scroll to top when items list changes (user typed new chars)
                 withAnimation(.easeOut(duration: 0.1)) {
                     proxy.scrollTo("autocomplete-top", anchor: .top)
                 }
             }
-            .onChange(of: selectedIndex) { _, newValue in
-                guard newValue >= 0 && newValue < items.count else { return }
+            .task(id: selectedIndex) {
+                guard selectedIndex >= 0 && selectedIndex < items.count else { return }
                 withAnimation(.easeOut(duration: 0.1)) {
-                    proxy.scrollTo(items[newValue].id, anchor: .center)
+                    proxy.scrollTo(items[selectedIndex].id, anchor: .center)
                 }
             }
         }

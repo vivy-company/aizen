@@ -282,12 +282,8 @@ struct ActiveWorktreesView: View {
         .onDisappear {
             metrics.stop()
         }
-        .onChange(of: activeWorktreeIDs) { _, _ in
+        .task(id: activeWorktreeIDs) {
             syncScopeIfNeeded()
-        }
-        .onChange(of: selectedMode) { _, mode in
-            selectedRowID = nil
-            updateSortOrder(for: mode)
         }
         .alert("Terminate all sessions?", isPresented: $showTerminateAllConfirm) {
             Button("Cancel", role: .cancel) {}
@@ -517,8 +513,19 @@ struct ActiveWorktreesView: View {
         .pickerStyle(.menu)
     }
 
+    private var selectedModeBinding: Binding<MonitorMode> {
+        Binding(
+            get: { selectedMode },
+            set: { mode in
+                selectedMode = mode
+                selectedRowID = nil
+                updateSortOrder(for: mode)
+            }
+        )
+    }
+
     private var monitorModePicker: some View {
-        Picker("Mode", selection: $selectedMode) {
+        Picker("Mode", selection: selectedModeBinding) {
             ForEach(MonitorMode.allCases) { mode in
                 Text(mode.title).tag(mode)
             }

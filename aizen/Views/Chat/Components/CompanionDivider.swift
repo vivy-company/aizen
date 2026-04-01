@@ -23,9 +23,6 @@ struct CompanionDivider: View {
     @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
     @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var usePerAppearanceTheme = false
     @State private var didPushCursor = false
-    @State private var cachedDividerColor: Color = Color(
-        nsColor: GhosttyThemeParser.loadDividerColor(named: "Aizen Dark")
-    )
     private let lineWidth: CGFloat = 1
     private let hitWidth: CGFloat = 14
 
@@ -34,10 +31,14 @@ struct CompanionDivider: View {
         return AppearanceSettings.effectiveThemeName(colorScheme: colorScheme)
     }
 
+    private var dividerColor: Color {
+        Color(nsColor: GhosttyThemeParser.loadDividerColor(named: effectiveThemeName))
+    }
+
     var body: some View {
         ZStack {
             Rectangle()
-                .fill(cachedDividerColor)
+                .fill(dividerColor)
                 .frame(width: lineWidth)
         }
         .frame(width: hitWidth)
@@ -75,12 +76,6 @@ struct CompanionDivider: View {
                     onDragEnd?()
                 }
         )
-            .onAppear {
-                cachedDividerColor = Color(nsColor: GhosttyThemeParser.loadDividerColor(named: effectiveThemeName))
-            }
-            .onChange(of: effectiveThemeName) { _, _ in
-                cachedDividerColor = Color(nsColor: GhosttyThemeParser.loadDividerColor(named: effectiveThemeName))
-            }
             .onDisappear {
                 if didPushCursor {
                     NSCursor.pop()

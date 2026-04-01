@@ -352,9 +352,9 @@ struct FileSearchWindowContent: View {
             .background(Color.clear)
             .scrollIndicators(.hidden)
             .frame(maxHeight: 380)
-            .onChange(of: viewModel.selectedIndex) { _, newIndex in
+            .task(id: viewModel.selectedIndex) {
                 // No animation for smoother single-item navigation
-                proxy.scrollTo(newIndex, anchor: .center)
+                proxy.scrollTo(viewModel.selectedIndex, anchor: .center)
             }
         }
     }

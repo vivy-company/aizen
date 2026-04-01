@@ -124,10 +124,10 @@ struct ChatTabView: View {
                     .onAppear {
                         syncSelectionAndCache()
                     }
-                    .onChange(of: selectedSessionId) { _, _ in
+                    .task(id: selectedSessionId) {
                         updateCacheForSelection()
                     }
-                    .onChange(of: sessionIdentitySnapshot) { _, _ in
+                    .task(id: sessionIdentitySnapshot) {
                         syncSelectionAndCache()
                     }
             }
@@ -247,19 +247,19 @@ struct ChatTabView: View {
                     didLoadWidths = true
                 }
             }
-            .onChange(of: geometry.size.width) { _, newWidth in
+            .task(id: geometry.size.width) {
                 // Defer to next run loop to break synchronous layout feedback cycle.
                 // Writing @State during layout can re-trigger the same layout pass.
-                DispatchQueue.main.async {
-                    clampPanelWidths(containerWidth: newWidth)
-                }
-            }
-            .onChange(of: leftPanelType) { _, _ in
                 DispatchQueue.main.async {
                     clampPanelWidths(containerWidth: geometry.size.width)
                 }
             }
-            .onChange(of: rightPanelType) { _, _ in
+            .task(id: leftPanelType) {
+                DispatchQueue.main.async {
+                    clampPanelWidths(containerWidth: geometry.size.width)
+                }
+            }
+            .task(id: rightPanelType) {
                 DispatchQueue.main.async {
                     clampPanelWidths(containerWidth: geometry.size.width)
                 }

@@ -261,7 +261,7 @@ struct PlanApprovalPickerView: View {
             selectedIndex = min(selectedIndex, max(options.count - 1, 0))
             installKeyboardMonitorIfNeeded()
         }
-        .onChange(of: optionIdentityKey) { _, _ in
+        .task(id: optionIdentityKey) {
             selectedIndex = min(selectedIndex, max(options.count - 1, 0))
         }
         .onDisappear {

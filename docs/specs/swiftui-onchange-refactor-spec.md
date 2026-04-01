@@ -4,7 +4,7 @@
 
 - Audit target: `aizen` Swift files using SwiftUI `.onChange(`
 - Inventory at initial validation pass: 103 call sites across 42 Swift files
-- Inventory after current implementation pass: 48 call sites across 23 Swift files
+- Inventory after full implementation pass: 0 call sites across 0 Swift files
 - Goal: reduce fragile imperative state propagation, especially:
   - event delivery disguised as observed state
   - async work kicked off from `.onChange`
@@ -15,7 +15,9 @@ This spec is intentionally not a blanket ban on `.onChange`. Some sites are corr
 
 ## Implementation Status
 
-The refactor pass covered the highest-value coordinator, async-trigger, and event-flag sites. These items are implemented in code and should be treated as done unless follow-up cleanup is needed:
+The refactor is now fully implemented in the app target. Literal SwiftUI `.onChange(` usage has been removed from `aizen` Swift files. The earlier high-value coordinator, async-trigger, event-flag, geometry, scroll, focus, and selection-sync sites are all converted to `.task(id:)`, explicit bindings/actions, or derived state as appropriate.
+
+Completed in code:
 
 - `ContentView`
 - `RootView`
@@ -38,15 +40,24 @@ The refactor pass covered the highest-value coordinator, async-trigger, and even
 - `GitPanelWindowController` branch-selection path
 - `WorkflowRunDetailView`
 - `CommandPaletteWindowController`
-
-Remaining work is concentrated in the still-listed files that currently contain `.onChange(` in the app target, especially:
-
-- `ChatSessionView` draft persistence
+- `ChatSessionView`
 - `FileBrowserSessionView`
 - `AgentDetailView`
 - `PullRequestDetailPane`
 - `GitPanelWindowContent`
-- lower-priority geometry, scroll, focus, and selection-sync observers
+- `ChatTabView`
+- `WorktreeDetailView`
+- `FileContentView`
+- `FileSearchWindowController`
+- `InlineAutocompleteView`
+- `PlanApprovalDialog`
+- `CompanionDivider`
+- `CompanionGitDiffView`
+- `DiffView`
+- `ActiveWorktreesView`
+- `XcodeLogSheetView`
+- `VoiceRecordingView`
+- `SplitTerminalView`
 
 ## Decision Rules
 
@@ -88,14 +99,17 @@ Priority here means implementation order, not importance. Low-priority items are
   - `aizen/Views/Components/CodeEditorView.swift`
   - `aizen/Views/Worktree/Components/Git/GitPanelWindowController.swift`
   - `aizen/Views/Worktree/Components/Git/Workflow/WorkflowRunDetailView.swift`
-- Remaining from this tier:
-- `aizen/Views/Chat/ChatSessionView.swift` for draft persistence
-- `aizen/Views/Chat/Components/CompanionDivider.swift`
+  - `aizen/Views/Chat/ChatSessionView.swift`
+  - `aizen/Views/Chat/Components/CompanionDivider.swift`
 
 ### P2: implement later / optional cleanup
 
-- Scroll syncing, selection highlighting, geometry reaction, and lightweight runtime visibility toggles in the remaining files
-- These are still in scope for cleanup or consolidation, but they are not the first changes to make.
+- Completed in current pass:
+  - scroll syncing conversions
+  - selection highlighting conversions
+  - geometry reaction conversions
+  - lightweight runtime visibility conversions
+- This tier is complete for the app target.
 
 ## File-by-File Spec
 

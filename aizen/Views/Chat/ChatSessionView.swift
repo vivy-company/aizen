@@ -208,11 +208,8 @@ struct ChatSessionView: View {
                         .background {
                             GeometryReader { geometry in
                                 Color.clear
-                                    .onAppear {
+                                    .task(id: geometry.size.width) {
                                         updateInputBarWidth(geometry.size.width)
-                                    }
-                                    .onChange(of: geometry.size.width) { _, newWidth in
-                                        updateInputBarWidth(newWidth)
                                     }
                             }
                         }
@@ -241,23 +238,16 @@ struct ChatSessionView: View {
             \.chatActions,
             isSelected ? chatActions : nil
         )
-        .onChange(of: isLayoutResizing) { _, resizing in
+        .task(id: isLayoutResizing) {
             // Defer to avoid publishing ObservableObject changes during an active view update/layout pass.
             DispatchQueue.main.async {
-                handleLayoutResizingChange(resizing)
+                handleLayoutResizingChange(isLayoutResizing)
             }
         }
         .onAppear {
             // Load draft input text if available
             if let draft = viewModel.loadDraftInputText() {
                 inputText = draft
-            }
-            if isSelected {
-                chatActions.configure(cycleModeForward: viewModel.cycleModeForward)
-                viewModel.setupAgentSession()
-                setupAutocompleteWindow()
-                NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
-                startKeyMonitorIfNeeded()
             }
         }
         .onDisappear {
@@ -273,8 +263,8 @@ struct ChatSessionView: View {
                 showingVoiceRecording = false
             }
         }
-        .onChange(of: isSelected) { _, selected in
-            if selected {
+        .task(id: isSelected) {
+            if isSelected {
                 chatActions.configure(cycleModeForward: viewModel.cycleModeForward)
                 viewModel.setupAgentSession()
                 setupAutocompleteWindow()
@@ -293,8 +283,8 @@ struct ChatSessionView: View {
                 }
             }
         }
-        .onChange(of: inputText) { _, newText in
-            viewModel.debouncedPersistDraft(inputText: newText)
+        .task(id: inputText) {
+            viewModel.debouncedPersistDraft(inputText: inputText)
         }
         .onReceive(viewModel.autocompleteHandler.$state) { state in
             updateAutocompleteWindow(state: state)

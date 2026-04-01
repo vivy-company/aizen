@@ -274,14 +274,14 @@ struct ChatMessageList: View {
             syncTimeline(scrollToBottom: true)
             reportTimelineStateIfNeeded(controller.state)
         }
-        .onChange(of: timelineSignature) { _, _ in
+        .task(id: timelineSignature) {
             if suppressNextTimelineSignatureSync {
                 suppressNextTimelineSignatureSync = false
                 return
             }
             syncTimeline(scrollToBottom: isAutoScrollEnabled())
         }
-        .onChange(of: timelineStyleSignature) { _, _ in
+        .task(id: timelineStyleSignature) {
             controller.updateStyle(timelineStyle)
             syncTimeline(scrollToBottom: false)
         }
@@ -3525,8 +3525,8 @@ struct ChatProcessingIndicator: View {
         .onAppear {
             updateCachedThought(currentThought)
         }
-        .onChange(of: currentThought) { _, newThought in
-            updateCachedThought(newThought)
+        .task(id: currentThought) {
+            updateCachedThought(currentThought)
         }
     }
 

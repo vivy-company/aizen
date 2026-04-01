@@ -217,15 +217,12 @@ struct GitPanelWindowContentWithToolbar: View {
                 }
             }
         }
-        .onChange(of: selectedTab) { _, newTab in
-            if newTab == .prs {
-                loadHostingInfoIfNeeded()
-            }
+        .task(id: selectedTab) {
+            guard selectedTab == .prs else { return }
+            loadHostingInfoIfNeeded()
         }
-        .onChange(of: gitStatus.currentBranch) { _, _ in
-            Task {
-                await refreshPRStatus()
-            }
+        .task(id: gitStatus.currentBranch) {
+            await refreshPRStatus()
         }
         .alert("CLI Not Installed", isPresented: $showCLIInstallAlert) {
             if let info = hostingInfo {
@@ -370,10 +367,9 @@ struct GitPanelWindowContentWithToolbar: View {
                 .disabled(isOperationPending)
             }
         }
-        .onChange(of: gitOperationService.isOperationPending) { _, pending in
-            if !pending {
-                currentOperation = nil
-            }
+        .task(id: gitOperationService.isOperationPending) {
+            guard !gitOperationService.isOperationPending else { return }
+            currentOperation = nil
         }
     }
 

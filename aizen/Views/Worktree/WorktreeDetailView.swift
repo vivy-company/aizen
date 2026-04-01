@@ -622,7 +622,7 @@ struct WorktreeDetailView: View {
             .onAppear {
                 cachedTerminalBackgroundColor = getTerminalBackgroundColor()
             }
-            .onChange(of: colorScheme) { _, _ in
+            .task(id: colorScheme) {
                 cachedTerminalBackgroundColor = getTerminalBackgroundColor()
             }
             .toolbar {
@@ -671,31 +671,31 @@ struct WorktreeDetailView: View {
     @ViewBuilder
     private var navigationContent: some View {
         contentWithBasicModifiers
-            .onChange(of: selectedTab) { _, _ in
+            .task(id: selectedTab) {
                 guard hasLoadedTabState else { return }
                 saveTabState()
             }
-            .onChange(of: viewModel.selectedChatSessionId) { _, newValue in
+            .task(id: viewModel.selectedChatSessionId) {
                 guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(newValue, for: "chat", worktreeId: worktreeId)
+                tabStateManager.saveSessionId(viewModel.selectedChatSessionId, for: "chat", worktreeId: worktreeId)
             }
-            .onChange(of: viewModel.selectedTerminalSessionId) { _, newValue in
+            .task(id: viewModel.selectedTerminalSessionId) {
                 guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(newValue, for: "terminal", worktreeId: worktreeId)
+                tabStateManager.saveSessionId(viewModel.selectedTerminalSessionId, for: "terminal", worktreeId: worktreeId)
             }
-            .onChange(of: viewModel.selectedBrowserSessionId) { _, newValue in
+            .task(id: viewModel.selectedBrowserSessionId) {
                 guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(newValue, for: "browser", worktreeId: worktreeId)
+                tabStateManager.saveSessionId(viewModel.selectedBrowserSessionId, for: "browser", worktreeId: worktreeId)
             }
-            .onChange(of: viewModel.selectedFileSessionId) { _, newValue in
+            .task(id: viewModel.selectedFileSessionId) {
                 guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(newValue, for: "files", worktreeId: worktreeId)
+                tabStateManager.saveSessionId(viewModel.selectedFileSessionId, for: "files", worktreeId: worktreeId)
             }
             .onDisappear {
                 worktreeRuntime.detachDetail()
             }
-            .onChange(of: showXcodeBuild) { _, newValue in
-                worktreeRuntime.updateDetailOptions(showXcode: newValue)
+            .task(id: showXcodeBuild) {
+                worktreeRuntime.updateDetailOptions(showXcode: showXcodeBuild)
             }
     }
 

@@ -203,8 +203,8 @@ struct ContentView: View {
                 hasShownOnboarding = true
             }
         }
-        .onChange(of: zenModeEnabled) { _, newValue in
-            if isCrossProjectSelected && !newValue {
+        .task(id: zenModeEnabled) {
+            if isCrossProjectSelected && !zenModeEnabled {
                 zenModeEnabled = true
             }
         }

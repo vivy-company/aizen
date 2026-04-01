@@ -154,9 +154,11 @@ struct DiffView: View {
                 onFileVisible?(first)
             }
         }
-        .onChange(of: scrollToFile) { _, newValue in
-            if let newValue {
-                onFileVisible?(newValue)
+        .task(id: scrollToFile) {
+            guard let scrollToFile else { return }
+            guard scrollToFile != filePaths.first else { return }
+            await MainActor.run {
+                onFileVisible?(scrollToFile)
             }
         }
     }
