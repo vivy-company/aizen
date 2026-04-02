@@ -8,13 +8,13 @@
 import SwiftUI
 
 struct XcodeBuildButton: View {
-    @ObservedObject var buildManager: XcodeBuildManager
+    @ObservedObject var buildManager: XcodeBuildStore
     let worktree: Worktree?
 
     @State private var showingLogPopover = false
     @State private var showingDebugLogs = false
 
-    init(buildManager: XcodeBuildManager, worktree: Worktree? = nil) {
+    init(buildManager: XcodeBuildStore, worktree: Worktree? = nil) {
         self.buildManager = buildManager
         self.worktree = worktree
     }
@@ -144,6 +144,6 @@ struct XcodeBuildButton: View {
 }
 
 #Preview {
-    XcodeBuildButton(buildManager: XcodeBuildManager())
+    XcodeBuildButton(buildManager: XcodeBuildStore())
         .padding()
 }

@@ -22,7 +22,7 @@ final class WorktreeRuntime: ObservableObject {
     let diffStore: GitDiffRuntimeStore
     let operationService: GitOperationService
     let workflowService = WorkflowService()
-    let xcodeBuildManager = XcodeBuildManager()
+    let xcodeBuildManager = XcodeBuildStore()
 
     private var attachedSurfaces = Set<WorktreeRuntimeSurface>()
     private var gitPanelShowsWorkingDiff = false

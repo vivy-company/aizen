@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct XcodeLogSheetView: View {
-    @ObservedObject var buildManager: XcodeBuildManager
+    @ObservedObject var buildManager: XcodeBuildStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var autoScroll = true
@@ -151,5 +151,5 @@ struct LogLineView: View {
 }
 
 #Preview {
-    XcodeLogSheetView(buildManager: XcodeBuildManager())
+    XcodeLogSheetView(buildManager: XcodeBuildStore())
 }

@@ -1,5 +1,5 @@
 //
-//  XcodeBuildManager.swift
+//  XcodeBuildStore.swift
 //  aizen
 //
 //  Xcode build and run management
@@ -11,8 +11,8 @@ import Combine
 import os.log
 
 @MainActor
-final class XcodeBuildManager: ObservableObject {
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "XcodeBuildManager")
+final class XcodeBuildStore: ObservableObject {
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "XcodeBuildStore")
 
     // MARK: - Published State
 

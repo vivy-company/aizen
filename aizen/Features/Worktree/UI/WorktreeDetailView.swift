@@ -35,7 +35,7 @@ struct WorktreeDetailView: View {
     @State private var lastOpenedApp: DetectedApp?
     private let worktreeRuntime: WorktreeRuntime
     @ObservedObject private var gitSummaryStore: GitSummaryStore
-    @ObservedObject private var xcodeBuildManager: XcodeBuildManager
+    @ObservedObject private var xcodeBuildManager: XcodeBuildStore
     @StateObject private var tabConfig = TabConfigurationStore.shared
     @State private var fileSearchWindowController: FileSearchWindowController?
     @State private var fileToOpenFromSearch: String?

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct XcodeDestinationPicker: View {
-    @ObservedObject var buildManager: XcodeBuildManager
+    @ObservedObject var buildManager: XcodeBuildStore
 
     var body: some View {
         Menu {
@@ -190,6 +190,6 @@ struct XcodeDestinationPicker: View {
 }
 
 #Preview {
-    XcodeDestinationPicker(buildManager: XcodeBuildManager())
+    XcodeDestinationPicker(buildManager: XcodeBuildStore())
         .padding()
 }
