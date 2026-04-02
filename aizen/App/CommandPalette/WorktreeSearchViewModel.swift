@@ -276,12 +276,12 @@ final class WorktreeSearchViewModel: ObservableObject {
                     .sorted { $0.score > $1.score }
             }
 
-            let recent = uniqueSlice(from: recentCandidates, taking: 8, consumedIds: &consumedIds)
+            let recent = CommandPaletteResultSlice.uniqueSlice(from: recentCandidates, taking: 8, consumedIds: &consumedIds)
             if !recent.isEmpty {
                 sections.append(CommandPaletteSection(id: "recent", title: "Recent", items: recent))
             }
 
-            let currentProject = uniqueSlice(
+            let currentProject = CommandPaletteResultSlice.uniqueSlice(
                 from: worktreeItems.filter { item in
                     guard let repoId = item.repoId?.uuidString, let currentRepositoryId else {
                         return false
@@ -295,7 +295,7 @@ final class WorktreeSearchViewModel: ObservableObject {
                 sections.append(CommandPaletteSection(id: "current-project", title: "Current Project", items: currentProject))
             }
 
-            let others = uniqueSlice(
+            let others = CommandPaletteResultSlice.uniqueSlice(
                 from: worktreeItems,
                 taking: 24,
                 consumedIds: &consumedIds
@@ -484,17 +484,17 @@ final class WorktreeSearchViewModel: ObservableObject {
             if worktree.isPrimary {
                 score += 12
             }
-            if isCrossProjectWorktree(worktree) {
+            if CommandPaletteWorkspaceSupport.isCrossProjectWorktree(worktree, marker: crossProjectRepositoryMarker) {
                 score -= 18
             }
 
             return CommandPaletteItem(
                 id: "worktree-\(worktreeId.uuidString)",
                 kind: .worktree,
-                title: isCrossProjectWorktree(worktree) ? workspaceName : branchName,
-                subtitle: isCrossProjectWorktree(worktree) ? "All Projects" : subtitle,
-                icon: isCrossProjectWorktree(worktree) ? "square.stack.3d.up.fill" : (worktree.isPrimary ? "arrow.triangle.branch" : "arrow.triangle.2.circlepath"),
-                badgeText: isCrossProjectWorktree(worktree) ? "cross-project" : (worktree.isPrimary ? "main" : nil),
+                title: CommandPaletteWorkspaceSupport.isCrossProjectWorktree(worktree, marker: crossProjectRepositoryMarker) ? workspaceName : branchName,
+                subtitle: CommandPaletteWorkspaceSupport.isCrossProjectWorktree(worktree, marker: crossProjectRepositoryMarker) ? "All Projects" : subtitle,
+                icon: CommandPaletteWorkspaceSupport.isCrossProjectWorktree(worktree, marker: crossProjectRepositoryMarker) ? "square.stack.3d.up.fill" : (worktree.isPrimary ? "arrow.triangle.branch" : "arrow.triangle.2.circlepath"),
+                badgeText: CommandPaletteWorkspaceSupport.isCrossProjectWorktree(worktree, marker: crossProjectRepositoryMarker) ? "cross-project" : (worktree.isPrimary ? "main" : nil),
                 score: score,
                 lastAccessed: worktree.lastAccessed,
                 workspaceId: workspaceId,
@@ -530,7 +530,7 @@ final class WorktreeSearchViewModel: ObservableObject {
         let ranked = base.compactMap { workspace -> CommandPaletteItem? in
             guard let workspaceId = workspace.id else { return nil }
             let workspaceName = workspace.name ?? "Workspace"
-            let fallbackWorktree = bestWorkspaceWorktree(workspace)
+            let fallbackWorktree = CommandPaletteWorkspaceSupport.bestWorktree(for: workspace)
 
             guard let worktreeId = fallbackWorktree?.id,
                   let repoId = fallbackWorktree?.repository?.id else {
@@ -609,10 +609,10 @@ final class WorktreeSearchViewModel: ObservableObject {
             prioritized = eligible
         }
 
-        let tabDefs = visibleTabDefinitions()
-        let includeChatSessions = isTabVisible("chat")
-        let includeTerminalSessions = isTabVisible("terminal")
-        let includeBrowserSessions = isTabVisible("browser")
+        let tabDefs = CommandPaletteTabCatalog.visibleDefinitions(using: defaults)
+        let includeChatSessions = CommandPaletteTabCatalog.isTabVisible("chat", using: defaults)
+        let includeTerminalSessions = CommandPaletteTabCatalog.isTabVisible("terminal", using: defaults)
+        let includeBrowserSessions = CommandPaletteTabCatalog.isTabVisible("browser", using: defaults)
 
         if tabDefs.isEmpty && !includeChatSessions && !includeTerminalSessions && !includeBrowserSessions {
             return []
@@ -797,73 +797,6 @@ final class WorktreeSearchViewModel: ObservableObject {
         }
         .prefix(isEmptyQuery ? 40 : 80)
         .map { $0 }
-    }
-
-    private func visibleTabDefinitions() -> [(id: String, title: String, icon: String)] {
-        let definitions: [(id: String, title: String, icon: String)] = [
-            ("chat", "Chat", "message"),
-            ("terminal", "Terminal", "terminal"),
-            ("files", "Files", "folder"),
-            ("browser", "Browser", "globe")
-        ]
-        return definitions.filter { isTabVisible($0.id) }
-    }
-
-    private func isTabVisible(_ tabId: String) -> Bool {
-        switch tabId {
-        case "chat":
-            return defaults.object(forKey: "showChatTab") as? Bool ?? true
-        case "terminal":
-            return defaults.object(forKey: "showTerminalTab") as? Bool ?? true
-        case "files":
-            return defaults.object(forKey: "showFilesTab") as? Bool ?? true
-        case "browser":
-            return defaults.object(forKey: "showBrowserTab") as? Bool ?? true
-        default:
-            return false
-        }
-    }
-
-    private func bestWorkspaceWorktree(_ workspace: Workspace) -> Worktree? {
-        let repositories = (workspace.repositories as? Set<Repository>) ?? []
-        let worktrees = repositories
-            .flatMap { repository -> [Worktree] in
-                ((repository.worktrees as? Set<Worktree>) ?? []).filter { !$0.isDeleted }
-            }
-            .sorted { left, right in
-                if left.isPrimary != right.isPrimary { return left.isPrimary }
-                if left.lastAccessed != right.lastAccessed {
-                    return (left.lastAccessed ?? .distantPast) > (right.lastAccessed ?? .distantPast)
-                }
-                return (left.branch ?? "") < (right.branch ?? "")
-            }
-
-        return worktrees.first
-    }
-
-    private func isCrossProjectWorktree(_ worktree: Worktree) -> Bool {
-        guard let repository = worktree.repository else {
-            return false
-        }
-        return repository.isCrossProject || repository.note == crossProjectRepositoryMarker
-    }
-
-    private func uniqueSlice(
-        from source: [CommandPaletteItem],
-        taking limit: Int,
-        consumedIds: inout Set<String>
-    ) -> [CommandPaletteItem] {
-        var result: [CommandPaletteItem] = []
-        result.reserveCapacity(limit)
-        for item in source {
-            guard !consumedIds.contains(item.id) else { continue }
-            consumedIds.insert(item.id)
-            result.append(item)
-            if result.count >= limit {
-                break
-            }
-        }
-        return result
     }
 
 }
