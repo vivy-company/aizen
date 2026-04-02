@@ -10,10 +10,10 @@ class AudioService: NSObject, ObservableObject {
     @Published var partialTranscription = ""
     @Published var audioLevel: Float = 0.0
     @Published var recordingDuration: TimeInterval = 0
-    @Published var permissionStatus: AudioPermissionManager.PermissionStatus = .notDetermined
+    @Published var permissionStatus: AudioPermissionStore.PermissionStatus = .notDetermined
 
     // Services
-    private let permissionManager = AudioPermissionManager()
+    private let permissionManager = AudioPermissionStore()
     private let speechRecognitionService = SpeechRecognitionService()
     private let audioCaptureService = AudioCaptureService()
     private let mlxWhisperProvider = MLXWhisperProvider.shared

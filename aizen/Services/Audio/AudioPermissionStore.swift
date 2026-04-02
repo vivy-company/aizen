@@ -4,7 +4,7 @@ import AVFoundation
 import Speech
 
 @MainActor
-class AudioPermissionManager: ObservableObject {
+class AudioPermissionStore: ObservableObject {
     @Published var permissionStatus: PermissionStatus = .notDetermined
 
     enum PermissionStatus {
