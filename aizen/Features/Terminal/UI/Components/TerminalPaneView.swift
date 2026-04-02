@@ -55,7 +55,7 @@ struct TerminalPaneView: View {
             sessionManager: sessionManager,
             onProcessExit: {
                 if notificationsEnabled && (!isFocused || !NSApp.isActive) {
-                    TerminalNotificationManager.shared.notify(
+                    TerminalNotificationCoordinator.shared.notify(
                         title: "Terminal exited",
                         body: terminalTitleRegistry.title(for: session) ?? "Shell process ended"
                     )

@@ -1,5 +1,5 @@
 //
-//  TerminalNotificationManager.swift
+//  TerminalNotificationCoordinator.swift
 //  aizen
 //
 //  Lightweight helper to send user notifications for terminal events.
@@ -9,8 +9,8 @@ import Foundation
 import UserNotifications
 import os.log
 
-final class TerminalNotificationManager: NSObject, UNUserNotificationCenterDelegate {
-    static let shared = TerminalNotificationManager()
+final class TerminalNotificationCoordinator: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = TerminalNotificationCoordinator()
     private let center = UNUserNotificationCenter.current()
     private let logger = Logger.terminal
     private var permissionRequested = false
