@@ -76,7 +76,7 @@ final class WorktreeSearchViewModel: ObservableObject {
         let currentWorktreeId = currentWorktreeId
         let currentRepositoryId = currentRepositoryId
         let currentWorkspaceId = currentWorkspaceId
-        let parsed = parseQuery(query, fallbackScope: scope)
+        let parsed = CommandPaletteQueryParser.parse(query, fallbackScope: scope)
         let effectiveScope = (parsed.isExplicit && !ignoreExplicitScope) ? parsed.scope : scope
 
         if !ignoreExplicitScope,
@@ -272,7 +272,7 @@ final class WorktreeSearchViewModel: ObservableObject {
                     .sorted { ($0.lastAccessed ?? .distantPast) > ($1.lastAccessed ?? .distantPast) }
             } else {
                 recentCandidates = worktreeItems
-                    .filter { isRecent($0.lastAccessed) }
+                    .filter { CommandPaletteRecency.isRecent($0.lastAccessed) }
                     .sorted { $0.score > $1.score }
             }
 
@@ -468,12 +468,12 @@ final class WorktreeSearchViewModel: ObservableObject {
             if lowerQuery.isEmpty {
                 queryScore = 1
             } else {
-                queryScore = matchScore(query: lowerQuery, fields: fields)
+                queryScore = CommandPaletteScorer.matchScore(query: lowerQuery, fields: fields)
             }
             guard queryScore > 0 else { return nil }
 
             var score = queryScore
-            score += recencyBoost(for: worktree.lastAccessed)
+            score += CommandPaletteRecency.boost(for: worktree.lastAccessed)
 
             if repoId.uuidString == currentRepositoryId {
                 score += 120
@@ -542,13 +542,13 @@ final class WorktreeSearchViewModel: ObservableObject {
             if lowerQuery.isEmpty {
                 queryScore = 1
             } else {
-                queryScore = matchScore(query: lowerQuery, fields: fields)
+                queryScore = CommandPaletteScorer.matchScore(query: lowerQuery, fields: fields)
             }
             guard queryScore > 0 else { return nil }
 
             var score = queryScore
             score += workspaceId.uuidString == currentWorkspaceId ? 120 : 0
-            score += recencyBoost(for: fallbackWorktree?.lastAccessed)
+            score += CommandPaletteRecency.boost(for: fallbackWorktree?.lastAccessed)
 
             return CommandPaletteItem(
                 id: "workspace-\(workspaceId.uuidString)",
@@ -639,12 +639,12 @@ final class WorktreeSearchViewModel: ObservableObject {
                 if isEmptyQuery {
                     queryScore = worktree.id?.uuidString == currentWorktreeId ? 260 : 0
                 } else {
-                    queryScore = matchScore(query: lowerQuery, fields: fields)
+                    queryScore = CommandPaletteScorer.matchScore(query: lowerQuery, fields: fields)
                 }
                 guard queryScore > 0 else { continue }
 
                 var score = queryScore
-                score += recencyBoost(for: worktree.lastAccessed)
+                score += CommandPaletteRecency.boost(for: worktree.lastAccessed)
                 if repoId.uuidString == currentRepositoryId {
                     score += 44
                 }
@@ -684,11 +684,11 @@ final class WorktreeSearchViewModel: ObservableObject {
                     let fields = [title, branchName, repoName, workspaceName, "chat", session.agentName ?? ""]
                     let queryScore = isEmptyQuery
                         ? (worktree.id?.uuidString == currentWorktreeId ? 220 : 0)
-                        : matchScore(query: lowerQuery, fields: fields)
+                        : CommandPaletteScorer.matchScore(query: lowerQuery, fields: fields)
                     guard queryScore > 0 else { continue }
 
                     var score = queryScore
-                    score += recencyBoost(for: worktree.lastAccessed)
+                    score += CommandPaletteRecency.boost(for: worktree.lastAccessed)
                     if worktree.id?.uuidString == currentWorktreeId { score += 58 }
 
                     items.append(
@@ -721,11 +721,11 @@ final class WorktreeSearchViewModel: ObservableObject {
                     let fields = [title, branchName, repoName, workspaceName, "terminal", "shell"]
                     let queryScore = isEmptyQuery
                         ? (worktree.id?.uuidString == currentWorktreeId ? 200 : 0)
-                        : matchScore(query: lowerQuery, fields: fields)
+                        : CommandPaletteScorer.matchScore(query: lowerQuery, fields: fields)
                     guard queryScore > 0 else { continue }
 
                     var score = queryScore
-                    score += recencyBoost(for: worktree.lastAccessed)
+                    score += CommandPaletteRecency.boost(for: worktree.lastAccessed)
                     if worktree.id?.uuidString == currentWorktreeId { score += 48 }
 
                     items.append(
@@ -758,11 +758,11 @@ final class WorktreeSearchViewModel: ObservableObject {
                     let fields = [title, branchName, repoName, workspaceName, "browser", session.url ?? ""]
                     let queryScore = isEmptyQuery
                         ? (worktree.id?.uuidString == currentWorktreeId ? 180 : 0)
-                        : matchScore(query: lowerQuery, fields: fields)
+                        : CommandPaletteScorer.matchScore(query: lowerQuery, fields: fields)
                     guard queryScore > 0 else { continue }
 
                     var score = queryScore
-                    score += recencyBoost(for: worktree.lastAccessed)
+                    score += CommandPaletteRecency.boost(for: worktree.lastAccessed)
                     if worktree.id?.uuidString == currentWorktreeId { score += 40 }
 
                     items.append(
@@ -824,57 +824,6 @@ final class WorktreeSearchViewModel: ObservableObject {
         }
     }
 
-    private func parseQuery(
-        _ query: String,
-        fallbackScope: CommandPaletteScope
-    ) -> (scope: CommandPaletteScope, query: String, isExplicit: Bool) {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return (fallbackScope, "", false) }
-
-        let lower = trimmed.lowercased()
-        let commandPairs: [(String, CommandPaletteScope)] = [
-            ("all:", .all),
-            ("all ", .all),
-            ("a:", .all),
-            ("a ", .all),
-            ("workspace:", .workspace),
-            ("workspace ", .workspace),
-            ("w:", .workspace),
-            ("w ", .workspace),
-            ("ws:", .workspace),
-            ("ws ", .workspace),
-            ("tabs:", .tabs),
-            ("tabs ", .tabs),
-            ("tab:", .tabs),
-            ("tab ", .tabs),
-            ("t:", .tabs),
-            ("t ", .tabs),
-            ("project:", .currentProject),
-            ("project ", .currentProject),
-            ("repo:", .currentProject),
-            ("repo ", .currentProject),
-            ("current:", .currentProject),
-            ("current ", .currentProject),
-            ("local:", .currentProject),
-            ("local ", .currentProject),
-            ("cp:", .currentProject),
-            ("cp ", .currentProject),
-            ("env:", .all),
-            ("env ", .all),
-            ("environment:", .all),
-            ("environment ", .all),
-            ("e:", .all),
-            ("e ", .all)
-        ]
-
-        for (prefix, parsedScope) in commandPairs where lower.hasPrefix(prefix) {
-            let stripped = String(trimmed.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
-            return (parsedScope, stripped, true)
-        }
-
-        return (fallbackScope, trimmed, false)
-    }
-
     private func bestWorkspaceWorktree(_ workspace: Workspace) -> Worktree? {
         let repositories = (workspace.repositories as? Set<Repository>) ?? []
         let worktrees = repositories
@@ -917,119 +866,4 @@ final class WorktreeSearchViewModel: ObservableObject {
         return result
     }
 
-    private func isRecent(_ date: Date?) -> Bool {
-        guard let date else { return false }
-        return Date().timeIntervalSince(date) <= 14 * 24 * 60 * 60
-    }
-
-    private func recencyBoost(for date: Date?) -> Double {
-        guard let date else { return 0 }
-        let age = Date().timeIntervalSince(date)
-        if age <= 60 * 10 {
-            return 80
-        }
-        if age <= 60 * 60 {
-            return 60
-        }
-        if age <= 60 * 60 * 24 {
-            return 36
-        }
-        if age <= 60 * 60 * 24 * 7 {
-            return 22
-        }
-        if age <= 60 * 60 * 24 * 30 {
-            return 10
-        }
-        return 0
-    }
-
-    private func matchScore(query: String, fields: [String]) -> Double {
-        guard !query.isEmpty else { return 0 }
-
-        let loweredFields = fields
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-            .filter { !$0.isEmpty }
-        guard !loweredFields.isEmpty else { return 0 }
-
-        var best: Double = 0
-        for field in loweredFields {
-            if field == query {
-                best = max(best, 1200)
-            } else if field.hasPrefix(query) {
-                best = max(best, 720 + Double(query.count))
-            } else if field.localizedCaseInsensitiveContains(query) {
-                best = max(best, 420 + Double(query.count) - Double(field.count) * 0.1)
-            }
-
-            let fuzzy = fuzzyMatch(query: query, target: field)
-            best = max(best, fuzzy)
-        }
-
-        if best > 0 {
-            return best
-        }
-
-        let tokens = query.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-        guard tokens.count > 1 else {
-            return 0
-        }
-
-        let tokenMatch = tokens.allSatisfy { token in
-            loweredFields.contains { $0.localizedCaseInsensitiveContains(token) }
-        }
-        return tokenMatch ? 260 + Double(tokens.count) * 10 : 0
-    }
-
-    private func fuzzyMatch(query: String, target: String) -> Double {
-        guard !query.isEmpty else { return 0 }
-
-        var score: Double = 0
-        var queryIndex = query.startIndex
-        var lastMatchIndex: String.Index?
-        var consecutiveMatches = 0
-
-        if target == query {
-            return 1000
-        }
-
-        if target.hasPrefix(query) {
-            return 500 + Double(query.count)
-        }
-
-        var targetIndex = target.startIndex
-        while targetIndex < target.endIndex {
-            let targetChar = target[targetIndex]
-            if queryIndex < query.endIndex && targetChar == query[queryIndex] {
-                score += 10
-
-                if let last = lastMatchIndex, target.index(after: last) == targetIndex {
-                    consecutiveMatches += 1
-                    score += Double(consecutiveMatches) * 5
-                } else {
-                    consecutiveMatches = 0
-                }
-
-                if targetIndex == target.startIndex {
-                    score += 15
-                } else {
-                    let prev = target[target.index(before: targetIndex)]
-                    if prev == "/" || prev == "." || prev == " " || prev == "-" {
-                        score += 15
-                    }
-                }
-
-                lastMatchIndex = targetIndex
-                queryIndex = query.index(after: queryIndex)
-            }
-
-            targetIndex = target.index(after: targetIndex)
-        }
-
-        if queryIndex == query.endIndex {
-            score -= Double(target.count) * 0.1
-            return score
-        }
-
-        return 0
-    }
 }
