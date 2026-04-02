@@ -18,7 +18,7 @@ extension ChatSessionStore {
 
     func removeAttachment(at index: Int) {
         guard attachments.indices.contains(index) else { return }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        _ = withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             attachments.remove(at: index)
         }
     }
