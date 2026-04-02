@@ -638,7 +638,7 @@ struct ChatTabView: View {
     private func sessionAgentLabel(_ session: ChatSession) -> String {
         let name = session.agentName ?? ""
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? SessionsListViewModel.unknownAgentLabel : trimmed
+        return trimmed.isEmpty ? SessionsListStore.unknownAgentLabel : trimmed
     }
 
     private func relativeTimestamp(for session: ChatSession) -> String {

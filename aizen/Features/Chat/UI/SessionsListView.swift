@@ -10,7 +10,7 @@ import CoreData
 import SwiftUI
 
 struct SessionsListView: View {
-    @StateObject private var viewModel: SessionsListViewModel
+    @StateObject private var viewModel: SessionsListStore
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     
@@ -19,7 +19,7 @@ struct SessionsListView: View {
     }
 
     init(worktreeId: UUID? = nil) {
-        let vm = SessionsListViewModel(worktreeId: worktreeId)
+        let vm = SessionsListStore(worktreeId: worktreeId)
         _viewModel = StateObject(wrappedValue: vm)
     }
     
@@ -36,9 +36,9 @@ struct SessionsListView: View {
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Picker("", selection: $viewModel.selectedFilter) {
-                    Label("All", systemImage: "square.grid.2x2").tag(SessionsListViewModel.SessionFilter.all)
-                    Label("Active", systemImage: "bolt.fill").tag(SessionsListViewModel.SessionFilter.active)
-                    Label("Archived", systemImage: "archivebox").tag(SessionsListViewModel.SessionFilter.archived)
+                    Label("All", systemImage: "square.grid.2x2").tag(SessionsListStore.SessionFilter.all)
+                    Label("Active", systemImage: "bolt.fill").tag(SessionsListStore.SessionFilter.active)
+                    Label("Archived", systemImage: "archivebox").tag(SessionsListStore.SessionFilter.archived)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -81,7 +81,7 @@ struct SessionsListView: View {
     }
 
     private struct ReloadKey: Hashable {
-        let selectedFilter: SessionsListViewModel.SessionFilter
+        let selectedFilter: SessionsListStore.SessionFilter
         let searchText: String
         let selectedWorktreeId: UUID?
         let selectedAgentName: String?
@@ -265,7 +265,7 @@ struct SessionRowView: View {
     private var agentName: String {
         let name = session.agentName ?? ""
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? SessionsListViewModel.unknownAgentLabel : trimmed
+        return trimmed.isEmpty ? SessionsListStore.unknownAgentLabel : trimmed
     }
 
     private var sessionTitle: String {

@@ -1,5 +1,5 @@
 //
-//  SessionsListViewModel.swift
+//  SessionsListStore.swift
 //  aizen
 //
 //  ViewModel for managing the sessions list view
@@ -13,7 +13,7 @@ import Foundation
 import os.log
 
 @MainActor
-final class SessionsListViewModel: ObservableObject {
+final class SessionsListStore: ObservableObject {
     private static let pageSize = 10
 
     @Published var selectedFilter: SessionFilter = .active
@@ -22,7 +22,7 @@ final class SessionsListViewModel: ObservableObject {
     @Published var selectedAgentName: String?
     @Published var availableAgents: [String] = []
     @Published var errorMessage: String?
-    @Published var fetchLimit: Int = SessionsListViewModel.pageSize
+    @Published var fetchLimit: Int = SessionsListStore.pageSize
     @Published var sessions: [ChatSession] = []
     @Published var isLoading: Bool = false
     
