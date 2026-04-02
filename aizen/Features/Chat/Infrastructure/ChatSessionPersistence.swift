@@ -11,8 +11,8 @@ import Foundation
 import CoreData
 import os.log
 
-/// Errors related to session persistence operations
-enum SessionPersistenceError: LocalizedError {
+/// Errors related to chat session persistence operations
+enum ChatSessionPersistenceError: LocalizedError {
     case chatSessionNotFound(UUID)
     case contextNotAvailable
     case saveFailed(Error)
@@ -59,7 +59,7 @@ final class ChatSessionPersistence {
             fetchRequest.fetchLimit = 1
             
             guard let chatSession = try context.fetch(fetchRequest).first else {
-                throw SessionPersistenceError.chatSessionNotFound(sessionId)
+                throw ChatSessionPersistenceError.chatSessionNotFound(sessionId)
             }
             
             try modifier(chatSession)
@@ -67,7 +67,7 @@ final class ChatSessionPersistence {
             do {
                 try context.save()
             } catch {
-                throw SessionPersistenceError.saveFailed(error)
+                throw ChatSessionPersistenceError.saveFailed(error)
             }
         }
     }
