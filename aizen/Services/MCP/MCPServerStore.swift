@@ -1,5 +1,5 @@
 //
-//  MCPConfigManager.swift
+//  MCPServerStore.swift
 //  aizen
 //
 //  Aizen-managed MCP server store for ACP sessions.
