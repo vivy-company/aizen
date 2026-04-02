@@ -3,7 +3,7 @@
 //  aizen
 //
 //  Service for persisting ACP session IDs to Core Data
-//  Single Responsibility: Bridging between AgentSession (runtime) and ChatSession (persistence)
+//  Single Responsibility: Bridging between ChatAgentSession (runtime) and ChatSession (persistence)
 //
 
 import ACP

@@ -13,7 +13,7 @@ import Combine
 class ChatSessionRegistry: ObservableObject {
     static let shared = ChatSessionRegistry()
 
-    private var agentSessions: [UUID: AgentSession] = [:]
+    private var agentSessions: [UUID: ChatAgentSession] = [:]
 
     /// Sessions with pending permission requests (for UI indicators)
     @Published private(set) var sessionsWithPendingPermissions: Set<UUID> = []
@@ -27,7 +27,7 @@ class ChatSessionRegistry: ObservableObject {
 
     private init() {}
 
-    func getAgentSession(for chatSessionId: UUID) -> AgentSession? {
+    func getAgentSession(for chatSessionId: UUID) -> ChatAgentSession? {
         if let session = agentSessions[chatSessionId] {
             touch(chatSessionId)
             return session
@@ -35,7 +35,7 @@ class ChatSessionRegistry: ObservableObject {
         return nil
     }
 
-    func setAgentSession(_ session: AgentSession, for chatSessionId: UUID, worktreeName: String? = nil) {
+    func setAgentSession(_ session: ChatAgentSession, for chatSessionId: UUID, worktreeName: String? = nil) {
         agentSessions[chatSessionId] = session
         touch(chatSessionId)
         evictIfNeeded()
@@ -50,7 +50,7 @@ class ChatSessionRegistry: ObservableObject {
         observePermissionState(for: chatSessionId, session: session)
     }
 
-    private func observePermissionState(for chatSessionId: UUID, session: AgentSession) {
+    private func observePermissionState(for chatSessionId: UUID, session: ChatAgentSession) {
         // Remove existing observer
         permissionObservers[chatSessionId]?.cancel()
 

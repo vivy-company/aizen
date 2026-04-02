@@ -1,17 +1,17 @@
 //
-//  AgentSessionAuth.swift
+//  ChatAgentSessionAuth.swift
 //  aizen
 //
-//  Authentication logic for AgentSession
+//  Authentication logic for ChatAgentSession
 //
 
 import ACP
 import Foundation
 
-// MARK: - AgentSession + Authentication
+// MARK: - ChatAgentSession + Authentication
 
 @MainActor
-extension AgentSession {
+extension ChatAgentSession {
     /// Helper to create session directly without authentication
     func createSessionDirectly(workingDir: String, client: Client, timeout: TimeInterval = 60.0) async throws {
         let mcpServers = await resolveMCPServers()
@@ -66,7 +66,7 @@ extension AgentSession {
         )
 
         if !authResponse.success {
-            throw NSError(domain: "AgentSession", code: -1, userInfo: [
+            throw NSError(domain: "ChatAgentSession", code: -1, userInfo: [
                 NSLocalizedDescriptionKey: authResponse.error ?? "Authentication failed"
             ])
         }

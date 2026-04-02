@@ -8,7 +8,7 @@ import ACP
 import SwiftUI
 
 struct ModelSelectorMenu: View {
-    @ObservedObject var session: AgentSession
+    @ObservedObject var session: ChatAgentSession
     let selectedAgent: String
     let onAgentSelect: (String) -> Void
     var showsBackground: Bool = true

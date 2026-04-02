@@ -1,5 +1,5 @@
 //
-//  AgentSession.swift
+//  ChatAgentSession.swift
 //  aizen
 //
 //  Created by Uladzislau Yakauleu on 17.10.25.
@@ -32,7 +32,7 @@ enum SessionState: Equatable {
 
 /// ObservableObject that wraps Client for managing an agent session
 @MainActor
-class AgentSession: ObservableObject {
+class ChatAgentSession: ObservableObject {
     static let maxMessageCount = 500
     static let maxToolCallCount = 500
     // MARK: - Published Properties
@@ -117,7 +117,7 @@ class AgentSession: ObservableObject {
     // Delegates
     private let terminalDelegate = AgentTerminalDelegate()
     let permissionHandler = AgentPermissionHandler()
-    private var clientDelegateBridge: AgentSessionClientDelegate!
+    private var clientDelegateBridge: ChatAgentSessionClientDelegate!
     private var agentCapabilities: AgentCapabilities?
     var promptCapabilities: PromptCapabilities? { agentCapabilities?.promptCapabilities }
 
@@ -126,7 +126,7 @@ class AgentSession: ObservableObject {
     init(agentName: String = "", workingDirectory: String = "") {
         self.agentName = agentName
         self.workingDirectory = workingDirectory
-        self.clientDelegateBridge = AgentSessionClientDelegate(session: self)
+        self.clientDelegateBridge = ChatAgentSessionClientDelegate(session: self)
     }
 
     // MARK: - Streaming Finalization

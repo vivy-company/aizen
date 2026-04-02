@@ -1,18 +1,18 @@
 //
-//  AgentSessionNotifications.swift
+//  ChatAgentSessionNotifications.swift
 //  aizen
 //
-//  Notification handling logic for AgentSession
+//  Notification handling logic for ChatAgentSession
 //
 
 import ACP
 import Foundation
 import Combine
 
-// MARK: - AgentSession + Notifications
+// MARK: - ChatAgentSession + Notifications
 
 @MainActor
-extension AgentSession {
+extension ChatAgentSession {
     /// Start listening for notifications from the ACP client
     func startNotificationListener(client: Client) {
         notificationTask = Task { @MainActor in

@@ -10,7 +10,7 @@ import ACP
 import SwiftUI
 
 struct PlanApprovalDialog: View {
-    let session: AgentSession?
+    let session: ChatAgentSession?
     let request: RequestPermissionRequest
     @Binding var isPresented: Bool
     var showsActions: Bool = true
@@ -151,7 +151,7 @@ struct PlanApprovalPickerView: View {
         static let bottomPadding: CGFloat = 12
     }
 
-    @ObservedObject var session: AgentSession
+    @ObservedObject var session: ChatAgentSession
     let request: RequestPermissionRequest
     let onDismissWithoutResponse: () -> Void
 

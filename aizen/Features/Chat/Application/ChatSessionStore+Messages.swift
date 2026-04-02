@@ -81,7 +81,7 @@ extension ChatSessionStore {
 
                 // Scroll behavior handled when the user message is inserted.
             } catch {
-                // Add error to AgentSession (messages are derived from session)
+                // Add error to ChatAgentSession (messages are derived from session)
                 self.currentAgentSession?.addSystemMessage(
                     String(localized: "chat.error.prefix \(error.localizedDescription)")
                 )

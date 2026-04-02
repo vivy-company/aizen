@@ -8,7 +8,7 @@ import SwiftUI
 
 struct InlineTerminalView: View {
     let terminalId: String
-    var agentSession: AgentSession?
+    var agentSession: ChatAgentSession?
 
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0

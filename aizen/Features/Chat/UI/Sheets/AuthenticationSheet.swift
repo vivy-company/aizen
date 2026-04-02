@@ -11,7 +11,7 @@ import SwiftUI
 
 struct AuthenticationSheet: View {
     private let logger = Logger.chat
-    @ObservedObject var session: AgentSession
+    @ObservedObject var session: ChatAgentSession
     @Environment(\.dismiss) private var dismiss
     @State private var selectedMethodId: String?
     @State private var isAuthenticating = false

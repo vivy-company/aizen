@@ -9,7 +9,7 @@ import ACP
 import SwiftUI
 
 struct ModeSelectorView: View {
-    @ObservedObject var session: AgentSession
+    @ObservedObject var session: ChatAgentSession
     var showsBackground: Bool = true
 
     var body: some View {

@@ -1,18 +1,18 @@
 //
-//  AgentSessionClientDelegate.swift
+//  ChatAgentSessionClientDelegate.swift
 //  aizen
 //
-//  ACP client delegate bridge for AgentSession.
+//  ACP client delegate bridge for ChatAgentSession.
 //
 
 import ACP
 import Foundation
 
-final class AgentSessionClientDelegate: ClientDelegate, @unchecked Sendable {
-    private weak var session: AgentSession?
+final class ChatAgentSessionClientDelegate: ClientDelegate, @unchecked Sendable {
+    private weak var session: ChatAgentSession?
     private let fileSystemDelegate = AgentFileSystemDelegate()
 
-    init(session: AgentSession) {
+    init(session: ChatAgentSession) {
         self.session = session
     }
 

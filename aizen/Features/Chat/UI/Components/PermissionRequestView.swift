@@ -9,7 +9,7 @@ import ACP
 import SwiftUI
 
 struct PermissionRequestView: View {
-    @ObservedObject var session: AgentSession
+    @ObservedObject var session: ChatAgentSession
     let request: RequestPermissionRequest
 
     var body: some View {

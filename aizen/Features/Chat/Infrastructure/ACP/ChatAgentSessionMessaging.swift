@@ -1,8 +1,8 @@
 //
-//  AgentSessionMessaging.swift
+//  ChatAgentSessionMessaging.swift
 //  aizen
 //
-//  Messaging logic for AgentSession
+//  Messaging logic for ChatAgentSession
 //
 
 import ACP
@@ -10,10 +10,10 @@ import Foundation
 import UniformTypeIdentifiers
 import CoreData
 
-// MARK: - AgentSession + Messaging
+// MARK: - ChatAgentSession + Messaging
 
 @MainActor
-extension AgentSession {
+extension ChatAgentSession {
     /// Send a message to the agent with optional file attachments
     func sendMessage(content: String, attachments: [ChatAttachment] = []) async throws {
         // Check session state - must be ready to send messages
@@ -559,7 +559,7 @@ extension AgentSession {
             fetchRequest.fetchLimit = 1
             
             guard let chatSession = try context.fetch(fetchRequest).first else {
-                throw NSError(domain: "AgentSession", code: 1, userInfo: [NSLocalizedDescriptionKey: "ChatSession not found"])
+                throw NSError(domain: "ChatAgentSession", code: 1, userInfo: [NSLocalizedDescriptionKey: "ChatSession not found"])
             }
             
             let chatMessage = ChatMessage(context: context)

@@ -37,7 +37,7 @@ struct ChatInputBar: View {
     @Binding var permissionErrorMessage: String
 
     let worktreePath: String
-    let session: AgentSession?
+    let session: ChatAgentSession?
     let currentModeId: String?
     let selectedAgent: String
     let isSessionReady: Bool

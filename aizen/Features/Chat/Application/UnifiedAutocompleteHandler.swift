@@ -21,7 +21,7 @@ class UnifiedAutocompleteHandler: ObservableObject {
     private var isIndexing = false
 
     // Dependencies
-    weak var agentSession: AgentSession?
+    weak var agentSession: ChatAgentSession?
     var worktreePath: String = ""
     private var lastSearchedText: String = ""
     private var isNavigating = false  // Prevents search from resetting selection during navigation

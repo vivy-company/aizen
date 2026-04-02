@@ -35,7 +35,7 @@ class ChatSessionStore: ObservableObject {
     // MARK: - State
 
     @Published var isProcessing = false
-    @Published var currentAgentSession: AgentSession?
+    @Published var currentAgentSession: ChatAgentSession?
     @Published var currentPermissionRequest: RequestPermissionRequest?
     @Published var attachments: [ChatAttachment] = []
     @Published var timelineRenderEpoch: UInt64 = 0
@@ -57,7 +57,7 @@ class ChatSessionStore: ObservableObject {
         }
     }
 
-    /// Tool calls - derives from AgentSession (no duplicate storage)
+    /// Tool calls - derives from ChatAgentSession (no duplicate storage)
     var toolCalls: [ToolCall] {
         currentAgentSession?.toolCalls ?? []
     }
@@ -68,7 +68,7 @@ class ChatSessionStore: ObservableObject {
     @Published var showingAgentSwitchWarning = false
     @Published var pendingAgentSwitch: String?
 
-    // MARK: - Derived State (bridges nested AgentSession properties for reliable observation)
+    // MARK: - Derived State (bridges nested ChatAgentSession properties for reliable observation)
     @Published var needsAuth: Bool = false
     @Published var needsSetup: Bool = false
     @Published var needsUpdate: Bool = false
@@ -493,7 +493,7 @@ class ChatSessionStore: ObservableObject {
             return
         }
 
-        let newSession = AgentSession(agentName: self.selectedAgent, workingDirectory: worktreePath)
+        let newSession = ChatAgentSession(agentName: self.selectedAgent, workingDirectory: worktreePath)
         if !historicalMessages.isEmpty {
             newSession.messages = historicalMessages
         }
@@ -592,7 +592,7 @@ class ChatSessionStore: ObservableObject {
     }
 
     private func startOrResumeSession(
-        _ agentSession: AgentSession,
+        _ agentSession: ChatAgentSession,
         sessionId: UUID,
         worktreePath: String
     ) async throws {
@@ -683,7 +683,7 @@ class ChatSessionStore: ObservableObject {
     }
 
     // MARK: - Derived State Updates
-    private func updateDerivedState(from session: AgentSession) {
+    private func updateDerivedState(from session: ChatAgentSession) {
         needsAuth = session.needsAuthentication
         needsSetup = session.needsAgentSetup
         needsUpdate = session.needsUpdate
@@ -766,7 +766,7 @@ class ChatSessionStore: ObservableObject {
                 )
                 
                 let worktreePath = worktree.path ?? ""
-                let freshAgentSession = AgentSession(agentName: selectedAgent, workingDirectory: worktreePath)
+                let freshAgentSession = ChatAgentSession(agentName: selectedAgent, workingDirectory: worktreePath)
                 sessionManager.setAgentSession(freshAgentSession, for: newChatSession.id!, worktreeName: worktree.branch)
                 currentAgentSession = freshAgentSession
                 autocompleteHandler.agentSession = freshAgentSession
@@ -835,7 +835,7 @@ class ChatSessionStore: ObservableObject {
             .store(in: &notificationCancellables)
     }
 
-    private func setupSessionObservers(session: AgentSession) {
+    private func setupSessionObservers(session: ChatAgentSession) {
         // Only skip if we're ALREADY observing THIS EXACT session object for THIS ViewModel's ChatSession
         if currentAgentSession === session && 
            observedSessionId == self.session.id &&
@@ -1058,7 +1058,7 @@ class ChatSessionStore: ObservableObject {
         skipNextToolCallsEmission = false
     }
 
-    private func bootstrapTimelineState(from session: AgentSession) {
+    private func bootstrapTimelineState(from session: ChatAgentSession) {
         previousMessageIds = Set(messages.map { $0.id })
         previousToolCallIds = Set(session.toolCalls.map { $0.id })
 

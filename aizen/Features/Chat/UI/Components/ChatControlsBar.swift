@@ -18,7 +18,7 @@ struct ChatControlsBar: View {
         static let horizontalPadding: CGFloat = 10
     }
 
-    let currentAgentSession: AgentSession?
+    let currentAgentSession: ChatAgentSession?
     let hasModes: Bool
     let onShowUsage: () -> Void
     let onShowHistory: () -> Void
