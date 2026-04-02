@@ -12,7 +12,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @ObservedObject var repositoryManager: RepositoryManager
-    @StateObject private var tabStateManager = WorktreeTabStateManager()
+    @StateObject private var tabStateManager = WorktreeTabStateStore()
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)],

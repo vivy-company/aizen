@@ -14,7 +14,7 @@ struct WorktreeListItemView: View {
     @ObservedObject var repositoryManager: RepositoryManager
     let allWorktrees: [Worktree]
     @Binding var selectedWorktree: Worktree?
-    @ObservedObject var tabStateManager: WorktreeTabStateManager
+    @ObservedObject var tabStateManager: WorktreeTabStateStore
     @Environment(\.controlActiveState) private var controlActiveState
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "WorktreeListItemView")

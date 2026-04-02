@@ -1,5 +1,5 @@
 //
-//  WorktreeTabStateManager.swift
+//  WorktreeTabStateStore.swift
 //  aizen
 //
 //  Created by Uladzislau Yakauleu on 17.10.25.
@@ -31,9 +31,9 @@ struct WorktreeTabState: Codable {
     }
 }
 
-// MARK: - WorktreeTabStateManager
+// MARK: - WorktreeTabStateStore
 
-class WorktreeTabStateManager: ObservableObject {
+class WorktreeTabStateStore: ObservableObject {
     @Published private var tabStates: [String: WorktreeTabState] = [:]
     @AppStorage("worktreeTabStates") private var tabStatesData: String = "{}"
 

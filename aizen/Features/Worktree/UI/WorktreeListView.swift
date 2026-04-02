@@ -11,7 +11,7 @@ struct WorktreeListView: View {
     @ObservedObject var repository: Repository
     @Binding var selectedWorktree: Worktree?
     @ObservedObject var repositoryManager: RepositoryManager
-    @ObservedObject var tabStateManager: WorktreeTabStateManager
+    @ObservedObject var tabStateManager: WorktreeTabStateStore
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var showingCreateWorktree = false
@@ -211,6 +211,6 @@ struct WorktreeListView: View {
         repository: Repository(),
         selectedWorktree: .constant(nil),
         repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext),
-        tabStateManager: WorktreeTabStateManager()
+        tabStateManager: WorktreeTabStateStore()
     )
 }

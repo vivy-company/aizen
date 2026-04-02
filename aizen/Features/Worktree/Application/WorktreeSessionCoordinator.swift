@@ -1,5 +1,5 @@
 //
-//  WorktreeSessionManager.swift
+//  WorktreeSessionCoordinator.swift
 //  aizen
 //
 //  Created by Uladzislau Yakauleu on 17.10.25.
@@ -14,7 +14,7 @@ private let tmuxManager = TmuxSessionManager.shared
 private let terminalTitleRegistry = TerminalTitleRegistry.shared
 
 @MainActor
-struct WorktreeSessionManager {
+struct WorktreeSessionCoordinator {
     let worktree: Worktree
     let viewModel: WorktreeDetailStore
     let logger: Logger

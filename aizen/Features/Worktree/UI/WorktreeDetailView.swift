@@ -21,7 +21,7 @@ struct WorktreeDetailView: View {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "WorktreeDetailView")
 
     @StateObject private var viewModel: WorktreeDetailStore
-    @ObservedObject var tabStateManager: WorktreeTabStateManager
+    @ObservedObject var tabStateManager: WorktreeTabStateStore
 
     @AppStorage("showChatTab") private var showChatTab = true
     @AppStorage("showTerminalTab") private var showTerminalTab = true
@@ -46,7 +46,7 @@ struct WorktreeDetailView: View {
     init(
         worktree: Worktree,
         repositoryManager: RepositoryManager,
-        tabStateManager: WorktreeTabStateManager,
+        tabStateManager: WorktreeTabStateStore,
         gitChangesContext: Binding<GitChangesContext?>,
         onWorktreeDeleted: ((Worktree?) -> Void)? = nil,
         showZenModeButton: Bool = true
@@ -64,8 +64,8 @@ struct WorktreeDetailView: View {
         _xcodeBuildManager = ObservedObject(wrappedValue: runtime.xcodeBuildManager)
     }
 
-    private var sessionManager: WorktreeSessionManager {
-        WorktreeSessionManager(
+    private var sessionManager: WorktreeSessionCoordinator {
+        WorktreeSessionCoordinator(
             worktree: worktree,
             viewModel: viewModel,
             logger: logger
@@ -749,7 +749,7 @@ struct WorktreeDetailView: View {
     WorktreeDetailView(
         worktree: Worktree(),
         repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext),
-        tabStateManager: WorktreeTabStateManager(),
+        tabStateManager: WorktreeTabStateStore(),
         gitChangesContext: .constant(nil)
     )
 }

@@ -10,7 +10,7 @@ import SwiftUI
 
 struct ActiveTabIndicatorView: View {
     let worktree: Worktree
-    @ObservedObject var tabStateManager: WorktreeTabStateManager
+    @ObservedObject var tabStateManager: WorktreeTabStateStore
     @Environment(\.managedObjectContext) private var viewContext
     @ObservedObject private var terminalTitleRegistry = TerminalTitleRegistry.shared
 
