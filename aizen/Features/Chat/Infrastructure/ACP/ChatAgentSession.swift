@@ -75,9 +75,9 @@ class ChatAgentSession: ObservableObject {
     private static let finalizeIdleDelay: TimeInterval = 0.2
     var isModeChanging = false
     @Published var isResumingSession = false
-    private var resumeReplayAgentMessages: [String] = []
-    private var resumeReplayIndex: Int = 0
-    private var resumeReplayBuffer: String = ""
+    var resumeReplayAgentMessages: [String] = []
+    var resumeReplayIndex: Int = 0
+    var resumeReplayBuffer: String = ""
     var suppressResumedAgentMessages = false
     var persistedToolCallIds: Set<String> = []
     private var thoughtBuffer: String = ""
@@ -501,63 +501,6 @@ class ChatAgentSession: ObservableObject {
         }
     }
 
-    private func prepareResumeReplayState() {
-        resumeReplayAgentMessages = messages
-            .filter { $0.role == .agent }
-            .map { $0.content }
-        resumeReplayIndex = 0
-        resumeReplayBuffer = ""
-    }
-
-    func clearResumeReplayState() {
-        resumeReplayAgentMessages.removeAll()
-        resumeReplayIndex = 0
-        resumeReplayBuffer = ""
-        suppressResumedAgentMessages = false
-    }
-
-    func shouldSkipResumedAgentChunk(text: String, hasContentBlocks: Bool) -> Bool {
-        if suppressResumedAgentMessages {
-            return true
-        }
-        guard isResumingSession else { return false }
-
-        guard !text.isEmpty else {
-            if hasContentBlocks {
-                isResumingSession = false
-                clearResumeReplayState()
-                return false
-            }
-            return true
-        }
-
-        guard resumeReplayIndex < resumeReplayAgentMessages.count else {
-            isResumingSession = false
-            clearResumeReplayState()
-            return false
-        }
-
-        let target = resumeReplayAgentMessages[resumeReplayIndex]
-        let candidate = resumeReplayBuffer + text
-
-        if target.hasPrefix(candidate) {
-            resumeReplayBuffer = candidate
-            if candidate == target {
-                resumeReplayIndex += 1
-                resumeReplayBuffer = ""
-                if resumeReplayIndex >= resumeReplayAgentMessages.count {
-                    isResumingSession = false
-                    clearResumeReplayState()
-                }
-            }
-            return true
-        }
-
-        isResumingSession = false
-        clearResumeReplayState()
-        return false
-    }
-    
     private func initializeClient(
         agentName: String,
         workingDir: String,
