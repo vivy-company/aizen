@@ -395,16 +395,11 @@ struct ContentView: View {
     }
 
     private func decodeSelectedWorktreeByRepository() -> [String: String] {
-        guard let data = selectedWorktreeByRepositoryData.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
-            return [:]
-        }
-        return decoded
+        WorktreeSelectionPersistence.decodeRepositorySelections(from: selectedWorktreeByRepositoryData)
     }
 
     private func encodeSelectedWorktreeByRepository(_ map: [String: String]) {
-        guard let encoded = try? JSONEncoder().encode(map),
-              let json = String(data: encoded, encoding: .utf8) else {
+        guard let json = WorktreeSelectionPersistence.encodeRepositorySelections(map) else {
             return
         }
         selectedWorktreeByRepositoryData = json
@@ -412,33 +407,30 @@ struct ContentView: View {
 
     private func getStoredWorktreeId(for repository: Repository) -> UUID? {
         guard let repositoryId = repository.id?.uuidString else { return nil }
-        let map = decodeSelectedWorktreeByRepository()
-        guard let worktreeIdString = map[repositoryId] else { return nil }
-        return UUID(uuidString: worktreeIdString)
+        return WorktreeSelectionPersistence.storedWorktreeId(
+            for: repositoryId,
+            repositorySelectionsJSON: selectedWorktreeByRepositoryData
+        )
     }
 
     private func storeWorktreeSelection(_ worktreeId: UUID?, for repository: Repository) {
         guard let repositoryId = repository.id?.uuidString else { return }
-        var map = decodeSelectedWorktreeByRepository()
-        if let worktreeId {
-            map[repositoryId] = worktreeId.uuidString
-        } else {
-            map.removeValue(forKey: repositoryId)
+        guard let json = WorktreeSelectionPersistence.updatingRepositorySelectionsJSON(
+            repositorySelectionsJSON: selectedWorktreeByRepositoryData,
+            repositoryId: repositoryId,
+            worktreeId: worktreeId
+        ) else {
+            return
         }
-        encodeSelectedWorktreeByRepository(map)
+        selectedWorktreeByRepositoryData = json
     }
 
     private func decodeWorktreeMRUOrder() -> [String] {
-        guard let data = worktreeMRUOrderData.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
-            return []
-        }
-        return decoded
+        WorktreeSelectionPersistence.decodeMRUOrder(from: worktreeMRUOrderData)
     }
 
     private func encodeWorktreeMRUOrder(_ order: [String]) {
-        guard let encoded = try? JSONEncoder().encode(order),
-              let json = String(data: encoded, encoding: .utf8) else {
+        guard let json = WorktreeSelectionPersistence.encodeMRUOrder(order) else {
             return
         }
         worktreeMRUOrderData = json
