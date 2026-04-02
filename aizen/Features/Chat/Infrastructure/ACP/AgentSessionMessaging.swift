@@ -432,7 +432,7 @@ extension AgentSession {
                         fetchRequest.fetchLimit = 1
                         
                         guard let session = try bgContext.fetch(fetchRequest).first else {
-                            throw SessionPersistenceError.chatSessionNotFound(chatSessionId)
+                            throw ChatSessionPersistenceError.chatSessionNotFound(chatSessionId)
                         }
                         
                         session.messageCount += 1
