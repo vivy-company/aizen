@@ -67,7 +67,7 @@ struct aizenApp: App {
 
     // Sparkle updater controller
     private let updaterController: SPUStandardUpdaterController
-    private let shortcutManager = KeyboardShortcutManager()
+    private let shortcutMonitor = KeyboardShortcutMonitor()
     @State private var aboutWindow: NSWindow?
 
     // Terminal settings observers
@@ -106,7 +106,7 @@ struct aizenApp: App {
         updaterController.updater.updateCheckInterval = 3600 // Check every hour
 
         // Shortcut manager handles global shortcuts
-        _ = shortcutManager
+        _ = shortcutMonitor
     }
 
     var body: some Scene {

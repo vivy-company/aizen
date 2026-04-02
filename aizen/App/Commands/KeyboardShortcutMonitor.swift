@@ -1,8 +1,8 @@
 //
-//  KeyboardShortcutManager.swift
+//  KeyboardShortcutMonitor.swift
 //  aizen
 //
-//  Manages global keyboard shortcuts and event monitoring
+//  Monitors app-wide keyboard shortcuts and posts routing notifications.
 //
 
 import AppKit
@@ -17,10 +17,10 @@ enum KeyCode {
     static let k: UInt16 = 40
 }
 
-// MARK: - Keyboard Shortcut Manager
+// MARK: - Keyboard Shortcut Monitor
 
 @MainActor
-class KeyboardShortcutManager {
+final class KeyboardShortcutMonitor {
     private var isChatViewActive = false
     private var eventMonitor: Any?
 
