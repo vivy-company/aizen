@@ -227,7 +227,7 @@ struct GeneralSettingsView: View {
     @StateObject private var tabConfig = TabConfigurationStore.shared
 
     @State private var showingResetConfirmation = false
-    @State private var cliStatus = CLISymlinkManager.status()
+    @State private var cliStatus = CLISymlinkService.status()
     @State private var showingCLIAlert = false
     @State private var cliAlertMessage = ""
 
@@ -568,11 +568,11 @@ struct GeneralSettingsView: View {
     // MARK: - CLI
 
     private func refreshCLIStatus() {
-        cliStatus = CLISymlinkManager.status()
+        cliStatus = CLISymlinkService.status()
     }
 
     private func installCLI() {
-        let result = CLISymlinkManager.install()
+        let result = CLISymlinkService.install()
         cliAlertMessage = result.message
         showingCLIAlert = true
         refreshCLIStatus()

@@ -1,6 +1,6 @@
 import Foundation
 
-enum CLISymlinkManager {
+enum CLISymlinkService {
     private static let cliName = "aizen"
     private static let bundledCLIName = "aizen-cli"
 

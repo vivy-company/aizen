@@ -42,8 +42,8 @@ class AizenAppDelegate: NSObject, NSApplicationDelegate {
 
         // Best-effort CLI symlink install (non-blocking)
         DispatchQueue.global(qos: .utility).async {
-            if CLISymlinkManager.installedSymlinkURL() == nil {
-                _ = CLISymlinkManager.install()
+            if CLISymlinkService.installedSymlinkURL() == nil {
+                _ = CLISymlinkService.install()
             }
         }
     }
@@ -248,7 +248,7 @@ struct aizenApp: App {
     }
 
     private func installCLIFromMenu() {
-        let result = CLISymlinkManager.install()
+        let result = CLISymlinkService.install()
         let alert = NSAlert()
         alert.messageText = "CLI Installation"
         alert.informativeText = result.message
