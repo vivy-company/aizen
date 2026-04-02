@@ -32,139 +32,23 @@ class RepositoryManager: ObservableObject {
         )
     }
 
-    private let viewContext: NSManagedObjectContext
-    private let container: NSPersistentContainer
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "RepositoryManager")
+    let viewContext: NSManagedObjectContext
+    let container: NSPersistentContainer
+    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "RepositoryManager")
 
     // Domain services (using libgit2)
-    private let statusService = GitStatusService()
-    private let branchService = GitBranchService()
-    private let worktreeService = GitWorktreeService()
-    private let remoteService = GitRemoteService()
-    private let submoduleService = GitSubmoduleService()
-    private let fileSystemManager: RepositoryFileSystemManager
-    private let postCreateExecutor = PostCreateActionExecutor()
+    let statusService = GitStatusService()
+    let branchService = GitBranchService()
+    let worktreeService = GitWorktreeService()
+    let remoteService = GitRemoteService()
+    let submoduleService = GitSubmoduleService()
+    let fileSystemManager: RepositoryFileSystemManager
+    let postCreateExecutor = PostCreateActionExecutor()
 
     init(viewContext: NSManagedObjectContext) {
         self.viewContext = viewContext
         self.container = PersistenceController.shared.container
         self.fileSystemManager = RepositoryFileSystemManager()
-    }
-
-    // MARK: - Workspace Operations
-
-    func createWorkspace(name: String, colorHex: String? = nil) throws -> Workspace {
-        let workspace = Workspace(context: viewContext)
-        workspace.id = UUID()
-        workspace.name = name
-        workspace.colorHex = colorHex
-
-        // Get max order and increment
-        let fetchRequest: NSFetchRequest<Workspace> = Workspace.fetchRequest()
-        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \Workspace.order, ascending: false)]
-        fetchRequest.fetchLimit = 1
-
-        if let lastWorkspace = try? viewContext.fetch(fetchRequest).first {
-            workspace.order = lastWorkspace.order + 1
-        } else {
-            workspace.order = 0
-        }
-
-        try viewContext.save()
-        return workspace
-    }
-
-    func deleteWorkspace(_ workspace: Workspace) throws {
-        viewContext.delete(workspace)
-        try viewContext.save()
-    }
-
-    func updateWorkspace(_ workspace: Workspace, name: String? = nil, colorHex: String? = nil) throws {
-        if let name = name {
-            workspace.name = name
-        }
-        if let colorHex = colorHex {
-            workspace.colorHex = colorHex
-        }
-        try viewContext.save()
-    }
-
-    private func normalizedPath(_ path: String) -> String {
-        URL(fileURLWithPath: path).standardizedFileURL.path
-    }
-
-    private func defaultEnvironmentName(for path: String) -> String {
-        let name = URL(fileURLWithPath: path).lastPathComponent
-        return name.isEmpty ? "Environment" : name
-    }
-
-    private func ensurePrimaryEnvironment(for repository: Repository, rootPath: String) {
-        let environments = (repository.worktrees as? Set<Worktree>) ?? []
-        let fallbackName = defaultEnvironmentName(for: rootPath)
-
-        if let primary = environments.first(where: { $0.isPrimary }) {
-            primary.path = rootPath
-            primary.isPrimary = true
-            if primary.branch?.isEmpty ?? true {
-                primary.branch = fallbackName
-            }
-            primary.checkoutTypeValue = .primary
-            return
-        }
-
-        let primary = Worktree(context: viewContext)
-        primary.id = UUID()
-        primary.path = rootPath
-        primary.branch = fallbackName
-        primary.isPrimary = true
-        primary.checkoutTypeValue = .primary
-        primary.repository = repository
-        primary.lastAccessed = Date()
-    }
-
-    private func environmentRootDirectory(for repositoryPath: String) -> URL {
-        let repoName = URL(fileURLWithPath: repositoryPath).lastPathComponent
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("aizen/worktrees")
-            .appendingPathComponent(repoName)
-    }
-
-    // MARK: - Repository Path Validation
-
-    /// Represents a repository with a missing or invalid path
-    struct MissingRepository: Identifiable {
-        let id: UUID
-        let repository: Repository
-        let lastKnownPath: String
-    }
-
-    /// Check if a repository path exists and is valid
-    func validateRepositoryPath(_ repository: Repository) -> Bool {
-        guard let path = repository.path else { return false }
-        return FileManager.default.fileExists(atPath: path)
-    }
-
-    /// Update a repository with a new path (relocate)
-    func relocateRepository(_ repository: Repository, to newPath: String) async throws {
-        let resolvedPath = normalizedPath(newPath)
-        let canonicalPath = GitUtils.isGitRepository(at: resolvedPath)
-            ? GitUtils.getMainRepositoryPath(at: resolvedPath)
-            : resolvedPath
-
-        repository.path = canonicalPath
-        repository.lastUpdated = Date()
-
-        // Update name based on new folder name
-        let newName = URL(fileURLWithPath: canonicalPath).lastPathComponent
-        repository.name = newName
-
-        if GitUtils.isGitRepository(at: canonicalPath) {
-            try await scanWorktrees(for: repository)
-        } else {
-            ensurePrimaryEnvironment(for: repository, rootPath: canonicalPath)
-        }
-
-        try viewContext.save()
     }
 
     // MARK: - Repository Operations
