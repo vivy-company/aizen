@@ -360,69 +360,33 @@ struct ContentView: View {
         encodeWorktreeMRUOrder(order)
     }
 
-    private func sanitizedMRUOrder(with availableById: [String: Worktree], currentId: String?) -> [String] {
-        var cleaned: [String] = []
-        var seen = Set<String>()
-
-        for id in decodeWorktreeMRUOrder() where availableById[id] != nil {
-            if seen.insert(id).inserted {
-                cleaned.append(id)
-            }
-        }
-
-        if let currentId,
-           availableById[currentId] != nil,
-           !cleaned.contains(currentId) {
-            cleaned.insert(currentId, at: 0)
-        }
-
-        encodeWorktreeMRUOrder(cleaned)
-        return cleaned
-    }
-
     private func quickSwitchToPreviousWorktree() {
         let request: NSFetchRequest<Worktree> = Worktree.fetchRequest()
         request.sortDescriptors = [NSSortDescriptor(keyPath: \Worktree.lastAccessed, ascending: false)]
 
         guard let fetchedWorktrees = try? viewContext.fetch(request) else { return }
 
-        let available = fetchedWorktrees.filter { worktree in
-            guard !worktree.isDeleted else { return false }
-            guard worktree.id != nil else { return false }
-            guard worktree.repository?.id != nil else { return false }
-            guard worktree.repository?.workspace?.id != nil else { return false }
-            return true
-        }
-
-        let availableById: [String: Worktree] = Dictionary(
-            uniqueKeysWithValues: available.compactMap { worktree in
-                guard let id = worktree.id?.uuidString else { return nil }
-                return (id, worktree)
-            }
-        )
-
-        let currentId = currentActiveWorktree()?.id?.uuidString
-        let mruOrder = sanitizedMRUOrder(with: availableById, currentId: currentId)
-
-        let targetId: String?
-        if let currentId,
-           mruOrder.first == currentId {
-            targetId = mruOrder.dropFirst().first
-        } else {
-            targetId = mruOrder.first(where: { $0 != currentId })
-        }
-
-        guard let resolvedTargetId = targetId ?? available.first(where: { $0.id?.uuidString != currentId })?.id?.uuidString,
-              let target = availableById[resolvedTargetId],
-              let worktreeId = target.id,
-              let repoId = target.repository?.id,
-              let workspaceId = target.repository?.workspace?.id else {
+        guard let target = WorktreeQuickSwitcher.nextTarget(
+            from: fetchedWorktrees,
+            currentWorktreeId: currentActiveWorktree()?.id?.uuidString,
+            mruOrder: decodeWorktreeMRUOrder()
+        ) else {
             return
         }
 
-        target.lastAccessed = Date()
+        encodeWorktreeMRUOrder(target.updatedMRUOrder)
+
+        guard let selectedTarget = fetchedWorktrees.first(where: { $0.id == target.worktreeId }) else {
+            return
+        }
+
+        selectedTarget.lastAccessed = Date()
         try? viewContext.save()
-        navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
+        navigateToWorktree(
+            workspaceId: target.workspaceId,
+            repoId: target.repositoryId,
+            worktreeId: target.worktreeId
+        )
     }
 
     private func navigateToWorktree(workspaceId: UUID, repoId: UUID, worktreeId: UUID) {
