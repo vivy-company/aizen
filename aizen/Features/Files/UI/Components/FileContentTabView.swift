@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct FileContentTabView: View {
-    @ObservedObject var viewModel: FileBrowserViewModel
+    @ObservedObject var viewModel: FileBrowserStore
     @Binding var showTree: Bool
     var showTopDivider: Bool = true
     @State private var isHoveringToggle = false

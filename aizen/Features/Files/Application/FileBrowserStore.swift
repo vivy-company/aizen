@@ -1,8 +1,8 @@
 //
-//  FileBrowserViewModel.swift
+//  FileBrowserStore.swift
 //  aizen
 //
-//  View model for file browser state management
+//  Application store for file browser state management
 //
 
 import Foundation
@@ -63,7 +63,7 @@ struct OpenFileInfo: Identifiable, Equatable {
 }
 
 @MainActor
-class FileBrowserViewModel: ObservableObject {
+class FileBrowserStore: ObservableObject {
     @Published var currentPath: String
     @Published var openFiles: [OpenFileInfo] = []
     @Published var selectedFileId: UUID?

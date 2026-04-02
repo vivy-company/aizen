@@ -14,7 +14,7 @@ struct FileTreeView: View {
     @Binding var expandedPaths: Set<String>
     let listDirectory: (String) throws -> [FileItem]
     let onOpenFile: (String) -> Void
-    let viewModel: FileBrowserViewModel
+    let viewModel: FileBrowserStore
 
     init(
         currentPath: String,
@@ -23,7 +23,7 @@ struct FileTreeView: View {
         expandedPaths: Binding<Set<String>>,
         listDirectory: @escaping (String) throws -> [FileItem],
         onOpenFile: @escaping (String) -> Void,
-        viewModel: FileBrowserViewModel
+        viewModel: FileBrowserStore
     ) {
         self.currentPath = currentPath
         self.path = path ?? currentPath
@@ -59,7 +59,7 @@ struct FileTreeItem: View {
     @Binding var expandedPaths: Set<String>
     let listDirectory: (String) throws -> [FileItem]
     let onOpenFile: (String) -> Void
-    let viewModel: FileBrowserViewModel
+    let viewModel: FileBrowserStore
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false

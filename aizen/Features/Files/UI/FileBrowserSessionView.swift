@@ -9,7 +9,7 @@ import SwiftUI
 import CoreData
 
 struct FileBrowserSessionView: View {
-    @StateObject private var viewModel: FileBrowserViewModel
+    @StateObject private var viewModel: FileBrowserStore
     @Binding private var fileToOpenFromSearch: String?
     let showPathHeader: Bool
     @AppStorage("fileBrowserShowTree") private var showTree = true
@@ -20,7 +20,7 @@ struct FileBrowserSessionView: View {
         fileToOpenFromSearch: Binding<String?>,
         showPathHeader: Bool = true
     ) {
-        _viewModel = StateObject(wrappedValue: FileBrowserViewModel(worktree: worktree, context: context))
+        _viewModel = StateObject(wrappedValue: FileBrowserStore(worktree: worktree, context: context))
         _fileToOpenFromSearch = fileToOpenFromSearch
         self.showPathHeader = showPathHeader
     }
