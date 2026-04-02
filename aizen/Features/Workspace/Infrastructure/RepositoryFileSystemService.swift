@@ -1,5 +1,5 @@
 //
-//  RepositoryFileSystemManager.swift
+//  RepositoryFileSystemService.swift
 //  aizen
 //
 //  Created by Uladzislau Yakauleu on 17.10.25.
@@ -10,7 +10,7 @@ import AppKit
 
 /// Manages file system operations for repositories and worktrees
 @MainActor
-class RepositoryFileSystemManager {
+class RepositoryFileSystemService {
 
     // MARK: - File System Operations
 

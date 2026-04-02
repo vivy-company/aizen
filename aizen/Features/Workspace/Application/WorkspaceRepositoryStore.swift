@@ -42,12 +42,12 @@ class WorkspaceRepositoryStore: ObservableObject {
     let worktreeService = GitWorktreeService()
     let remoteService = GitRemoteService()
     let submoduleService = GitSubmoduleService()
-    let fileSystemManager: RepositoryFileSystemManager
+    let fileSystemManager: RepositoryFileSystemService
     let postCreateExecutor = PostCreateActionExecutor()
 
     init(viewContext: NSManagedObjectContext) {
         self.viewContext = viewContext
         self.container = PersistenceController.shared.container
-        self.fileSystemManager = RepositoryFileSystemManager()
+        self.fileSystemManager = RepositoryFileSystemService()
     }
 }
