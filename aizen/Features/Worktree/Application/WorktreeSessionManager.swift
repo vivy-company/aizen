@@ -16,7 +16,7 @@ private let terminalTitleRegistry = TerminalTitleRegistry.shared
 @MainActor
 struct WorktreeSessionManager {
     let worktree: Worktree
-    let viewModel: WorktreeViewModel
+    let viewModel: WorktreeDetailStore
     let logger: Logger
 
     var chatSessions: [ChatSession] {

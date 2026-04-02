@@ -1,8 +1,8 @@
 //
-//  WorktreeViewModel.swift
+//  WorktreeDetailStore.swift
 //  aizen
 //
-//  ViewModel for worktree detail view managing session selection
+//  Application store for worktree detail session selection
 //
 
 import ACP
@@ -11,7 +11,7 @@ import Foundation
 import SwiftUI
 
 @MainActor
-class WorktreeViewModel: ObservableObject {
+class WorktreeDetailStore: ObservableObject {
     @Published var selectedChatSessionId: UUID?
     @Published var selectedTerminalSessionId: UUID?
     @Published var selectedFileSessionId: UUID?

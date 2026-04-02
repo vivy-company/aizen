@@ -20,7 +20,7 @@ struct WorktreeDetailView: View {
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "WorktreeDetailView")
 
-    @StateObject private var viewModel: WorktreeViewModel
+    @StateObject private var viewModel: WorktreeDetailStore
     @ObservedObject var tabStateManager: WorktreeTabStateManager
 
     @AppStorage("showChatTab") private var showChatTab = true
@@ -59,7 +59,7 @@ struct WorktreeDetailView: View {
         self.showZenModeButton = showZenModeButton
         let runtime = WorktreeRuntimeCoordinator.shared.runtime(for: worktree.path ?? "")
         self.worktreeRuntime = runtime
-        _viewModel = StateObject(wrappedValue: WorktreeViewModel(worktree: worktree, repositoryManager: repositoryManager))
+        _viewModel = StateObject(wrappedValue: WorktreeDetailStore(worktree: worktree, repositoryManager: repositoryManager))
         _gitSummaryStore = ObservedObject(wrappedValue: runtime.summaryStore)
         _xcodeBuildManager = ObservedObject(wrappedValue: runtime.xcodeBuildManager)
     }
