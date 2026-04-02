@@ -13,6 +13,7 @@ struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @ObservedObject var repositoryManager: RepositoryManager
     @StateObject private var tabStateManager = WorktreeTabStateStore()
+    @StateObject private var navigator = AppWorktreeNavigator()
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)],
@@ -34,8 +35,6 @@ struct ContentView: View {
     @State private var showingCrossProjectOnboarding = false
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
 
-    // Command palette state
-    @State private var commandPaletteController: CommandPaletteWindowController?
     @State private var saveTask: Task<Void, Never>?
 
     // Git changes overlay state (passed from RootView)
@@ -227,7 +226,11 @@ struct ContentView: View {
             guard let chatSessionId = notification.userInfo?["chatSessionId"] as? UUID else {
                 return
             }
-            navigateToChatSession(chatSessionId: chatSessionId)
+            navigator.navigateToChatSession(
+                chatSessionId: chatSessionId,
+                viewContext: viewContext,
+                navigateToWorktree: navigateToWorktree
+            )
         }
     }
 
@@ -367,120 +370,21 @@ struct ContentView: View {
         showingCrossProjectOnboarding = true
     }
 
-    private func navigateToChatSession(chatSessionId: UUID) {
-        // Lookup chat session and navigate to its worktree
-        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", chatSessionId as CVarArg)
-        request.fetchLimit = 1
-
-        guard let chatSession = try? viewContext.fetch(request).first,
-              let worktree = chatSession.worktree,
-              let worktreeId = worktree.id,
-              let repository = worktree.repository,
-              let repoId = repository.id,
-              let workspace = repository.workspace,
-              let workspaceId = workspace.id else {
-            return
-        }
-
-        navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
-
-        // Post notification to switch to chat tab with the specific session
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            NotificationCenter.default.post(
-                name: .switchToChatSession,
-                object: nil,
-                userInfo: ["chatSessionId": chatSessionId]
-            )
-        }
-    }
-
     private func showCommandPalette() {
-        // Toggle behavior: close if already visible
-        if let existing = commandPaletteController, existing.window?.isVisible == true {
-            existing.closeWindow()
-            commandPaletteController = nil
-            return
-        }
-
         let activeWorktree = currentActiveWorktree()
         let currentRepositoryId = selectedRepository?.id?.uuidString
             ?? activeWorktree?.repository?.id?.uuidString
         let currentWorkspaceId = selectedWorkspace?.id?.uuidString
             ?? activeWorktree?.repository?.workspace?.id?.uuidString
 
-        let controller = CommandPaletteWindowController(
-            managedObjectContext: viewContext,
+        navigator.showCommandPalette(
+            viewContext: viewContext,
             currentRepositoryId: currentRepositoryId,
             currentWorkspaceId: currentWorkspaceId,
             onNavigate: { action in
-                handleCommandPaletteNavigation(action)
+                navigator.handleCommandPaletteNavigation(action, navigateToWorktree: navigateToWorktree)
             }
         )
-        commandPaletteController = controller
-        controller.showWindow(nil)
-    }
-
-    private func handleCommandPaletteNavigation(_ action: CommandPaletteNavigationAction) {
-        switch action {
-        case .worktree(let workspaceId, let repoId, let worktreeId):
-            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
-        case .tab(let workspaceId, let repoId, let worktreeId, let tabId):
-            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
-            postNavigationNotification(
-                name: .switchToWorktreeTab,
-                userInfo: [
-                    "worktreeId": worktreeId,
-                    "tabId": tabId
-                ],
-                primaryDelay: 0.08,
-                retryDelay: 0.22
-            )
-        case .chatSession(let workspaceId, let repoId, let worktreeId, let sessionId):
-            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
-            postNavigationNotification(
-                name: .switchToChatSession,
-                userInfo: ["chatSessionId": sessionId],
-                primaryDelay: 0.1,
-                retryDelay: 0.24
-            )
-        case .terminalSession(let workspaceId, let repoId, let worktreeId, let sessionId):
-            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
-            postNavigationNotification(
-                name: .switchToTerminalSession,
-                userInfo: [
-                    "worktreeId": worktreeId,
-                    "sessionId": sessionId
-                ],
-                primaryDelay: 0.1,
-                retryDelay: 0.24
-            )
-        case .browserSession(let workspaceId, let repoId, let worktreeId, let sessionId):
-            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
-            postNavigationNotification(
-                name: .switchToBrowserSession,
-                userInfo: [
-                    "worktreeId": worktreeId,
-                    "sessionId": sessionId
-                ],
-                primaryDelay: 0.1,
-                retryDelay: 0.24
-            )
-        }
-    }
-
-    private func postNavigationNotification(
-        name: Notification.Name,
-        userInfo: [String: Any],
-        primaryDelay: TimeInterval,
-        retryDelay: TimeInterval
-    ) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + primaryDelay) {
-            NotificationCenter.default.post(name: name, object: nil, userInfo: userInfo)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + retryDelay) {
-            NotificationCenter.default.post(name: name, object: nil, userInfo: userInfo)
-        }
     }
 
     private func currentActiveWorktree() -> Worktree? {
