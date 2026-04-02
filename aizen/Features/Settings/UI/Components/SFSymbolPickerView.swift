@@ -131,10 +131,10 @@ class SFSymbolsProvider {
     }
 }
 
-// MARK: - Recent Symbols Manager
+// MARK: - Recent Symbols Store
 
-class RecentSymbolsManager: ObservableObject {
-    static let shared = RecentSymbolsManager()
+class RecentSymbolsStore: ObservableObject {
+    static let shared = RecentSymbolsStore()
 
     private let key = "recentSFSymbols"
     private let maxRecent = 24
@@ -171,7 +171,7 @@ struct SFSymbolPickerView: View {
     @State private var searchText = ""
     @State private var selectedCategory = "all"
     @State private var displayLimit = 200
-    @StateObject private var recentManager = RecentSymbolsManager.shared
+    @StateObject private var recentManager = RecentSymbolsStore.shared
 
     private let provider = SFSymbolsProvider.shared
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 8)
