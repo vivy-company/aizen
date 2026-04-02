@@ -24,11 +24,11 @@ struct ActiveWorktreesView: View {
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
 
     @State private var searchText = ""
-    @State private var selectedMode: MonitorMode = .chats
-    @State private var selectedScope: ScopeSelection = .all
-    @State private var selectedRowID: MonitorRow.ID?
+    @State private var selectedMode: ActiveWorktreesMonitorMode = .chats
+    @State private var selectedScope: ActiveWorktreesScopeSelection = .all
+    @State private var selectedRowID: ActiveWorktreesMonitorRow.ID?
     @State private var showTerminateAllConfirm = false
-    @State private var sortOrder: [KeyPathComparator<MonitorRow>] = [
+    @State private var sortOrder: [KeyPathComparator<ActiveWorktreesMonitorRow>] = [
         KeyPathComparator(\.chatSessions, order: .reverse),
         KeyPathComparator(\.lastAccessed, order: .reverse)
     ]
@@ -52,8 +52,8 @@ struct ActiveWorktreesView: View {
         activeWorktrees.map { $0.objectID }
     }
 
-    private var workspaceGroups: [WorkspaceGroup] {
-        var groups: [NSManagedObjectID: WorkspaceGroup] = [:]
+    private var workspaceGroups: [ActiveWorktreesWorkspaceGroup] {
+        var groups: [NSManagedObjectID: ActiveWorktreesWorkspaceGroup] = [:]
         var otherWorktrees: [Worktree] = []
 
         for worktree in activeWorktrees {
@@ -67,7 +67,7 @@ struct ActiveWorktreesView: View {
                 existing.worktrees.append(worktree)
                 groups[id] = existing
             } else {
-                groups[id] = WorkspaceGroup(
+                groups[id] = ActiveWorktreesWorkspaceGroup(
                     id: id.uriRepresentation().absoluteString,
                     workspaceId: id,
                     name: workspace.name ?? "Workspace",
@@ -86,7 +86,7 @@ struct ActiveWorktreesView: View {
 
         if !otherWorktrees.isEmpty {
             sorted.append(
-                WorkspaceGroup(
+                ActiveWorktreesWorkspaceGroup(
                     id: "other",
                     workspaceId: nil,
                     name: "Other",
@@ -132,14 +132,14 @@ struct ActiveWorktreesView: View {
         .sorted(by: worktreeSort)
     }
 
-    private var monitorRows: [MonitorRow] {
+    private var monitorRows: [ActiveWorktreesMonitorRow] {
         let seeds = filteredWorktrees.map(buildSeed(for:))
         guard !seeds.isEmpty else { return [] }
 
         let scores = seeds.map(activityScore(for:))
         let scoreTotal = max(scores.reduce(0, +), 0.001)
 
-        var rows: [MonitorRow] = []
+        var rows: [ActiveWorktreesMonitorRow] = []
         rows.reserveCapacity(seeds.count)
 
         for index in seeds.indices {
@@ -180,7 +180,7 @@ struct ActiveWorktreesView: View {
             let idleWakeUps = Int((energyImpact * 1.8).rounded()) + (threads / 3)
 
             rows.append(
-                MonitorRow(
+                ActiveWorktreesMonitorRow(
                     id: seed.id,
                     worktree: seed.worktree,
                     processName: seed.processName,
@@ -202,11 +202,11 @@ struct ActiveWorktreesView: View {
         return rows
     }
 
-    private var visibleRows: [MonitorRow] {
+    private var visibleRows: [ActiveWorktreesMonitorRow] {
         monitorRows.filter(rowMatchesSelectedMode)
     }
 
-    private var sortedRows: [MonitorRow] {
+    private var sortedRows: [ActiveWorktreesMonitorRow] {
         var rows = visibleRows
         rows.sort(using: sortOrder)
         return rows
@@ -501,19 +501,19 @@ struct ActiveWorktreesView: View {
 
     private var scopePicker: some View {
         Picker("Scope", selection: $selectedScope) {
-            Text("All Environments").tag(ScopeSelection.all)
+            Text("All Environments").tag(ActiveWorktreesScopeSelection.all)
             ForEach(workspaceGroups) { group in
                 if group.isOther {
-                    Text("Other").tag(ScopeSelection.other)
+                    Text("Other").tag(ActiveWorktreesScopeSelection.other)
                 } else if let workspaceId = group.workspaceId {
-                    Text(group.name).tag(ScopeSelection.workspace(workspaceId))
+                    Text(group.name).tag(ActiveWorktreesScopeSelection.workspace(workspaceId))
                 }
             }
         }
         .pickerStyle(.menu)
     }
 
-    private var selectedModeBinding: Binding<MonitorMode> {
+    private var selectedModeBinding: Binding<ActiveWorktreesMonitorMode> {
         Binding(
             get: { selectedMode },
             set: { mode in
@@ -526,7 +526,7 @@ struct ActiveWorktreesView: View {
 
     private var monitorModePicker: some View {
         Picker("Mode", selection: selectedModeBinding) {
-            ForEach(MonitorMode.allCases) { mode in
+            ForEach(ActiveWorktreesMonitorMode.allCases) { mode in
                 Text(mode.title).tag(mode)
             }
         }
@@ -536,7 +536,7 @@ struct ActiveWorktreesView: View {
     }
 
     @ViewBuilder
-    private func processCell(for row: MonitorRow) -> some View {
+    private func processCell(for row: ActiveWorktreesMonitorRow) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(row.processName)
                 .font(.body.weight(.medium))
@@ -561,20 +561,20 @@ struct ActiveWorktreesView: View {
         }
     }
 
-    private func energyCell(for row: MonitorRow) -> some View {
+    private func energyCell(for row: ActiveWorktreesMonitorRow) -> some View {
         Text(String(format: "%.0f", row.energyImpact))
             .font(.system(.body, design: .monospaced))
             .foregroundStyle(energyColor(for: row.energyImpact))
     }
 
-    private func lastAccessedCell(for row: MonitorRow) -> some View {
+    private func lastAccessedCell(for row: ActiveWorktreesMonitorRow) -> some View {
         Text(row.lastAccessed, format: .dateTime.month(.abbreviated).day().hour().minute())
             .font(.caption)
             .foregroundStyle(.secondary)
             .lineLimit(1)
     }
 
-    private func terminalStateCell(for row: MonitorRow) -> some View {
+    private func terminalStateCell(for row: ActiveWorktreesMonitorRow) -> some View {
         let status = row.terminalStatus
         return Text(status.title)
             .font(.caption)
@@ -584,7 +584,7 @@ struct ActiveWorktreesView: View {
             .background(status.color.opacity(0.12), in: Capsule())
     }
 
-    private func actionCell(for row: MonitorRow) -> some View {
+    private func actionCell(for row: ActiveWorktreesMonitorRow) -> some View {
         HStack(spacing: 8) {
             Button {
                 navigate(to: row.worktree)
@@ -661,13 +661,13 @@ struct ActiveWorktreesView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func buildSeed(for worktree: Worktree) -> MonitorRowSeed {
+    private func buildSeed(for worktree: Worktree) -> ActiveWorktreesMonitorRowSeed {
         let counts = sessionCounts(for: worktree)
         let runtime = terminalRuntime(for: worktree)
         let repository = worktree.repository?.name ?? "Environment"
         let branch = worktree.branch?.isEmpty == false ? worktree.branch! : "detached"
 
-        return MonitorRowSeed(
+        return ActiveWorktreesMonitorRowSeed(
             id: worktree.objectID.uriRepresentation().absoluteString,
             worktree: worktree,
             processName: "\(repository) • \(branch)",
@@ -679,7 +679,7 @@ struct ActiveWorktreesView: View {
         )
     }
 
-    private func activityScore(for seed: MonitorRowSeed) -> Double {
+    private func activityScore(for seed: ActiveWorktreesMonitorRowSeed) -> Double {
         let minutesSinceAccess = max(0, Date().timeIntervalSince(seed.lastAccessed) / 60)
         let recency = max(0.25, min(1.0, 1.15 - (minutesSinceAccess / 240.0)))
 
@@ -696,7 +696,7 @@ struct ActiveWorktreesView: View {
         return max(0.2, (sessionWeight + runtimeWeight + 0.4) * recency)
     }
 
-    private func updateSortOrder(for mode: MonitorMode) {
+    private func updateSortOrder(for mode: ActiveWorktreesMonitorMode) {
         switch mode {
         case .chats:
             sortOrder = [
@@ -722,7 +722,7 @@ struct ActiveWorktreesView: View {
         }
     }
 
-    private func rowMatchesSelectedMode(_ row: MonitorRow) -> Bool {
+    private func rowMatchesSelectedMode(_ row: ActiveWorktreesMonitorRow) -> Bool {
         switch selectedMode {
         case .chats:
             return row.chatSessions > 0
@@ -792,8 +792,8 @@ struct ActiveWorktreesView: View {
         return 0
     }
 
-    private func sessionCounts(for worktree: Worktree) -> SessionCounts {
-        SessionCounts(
+    private func sessionCounts(for worktree: Worktree) -> ActiveWorktreesSessionCounts {
+        ActiveWorktreesSessionCounts(
             chats: chatCount(for: worktree),
             terminals: terminalCount(for: worktree),
             browsers: browserCount(for: worktree),
@@ -801,7 +801,7 @@ struct ActiveWorktreesView: View {
         )
     }
 
-    private func terminalRuntime(for worktree: Worktree) -> TerminalRuntimeSnapshot {
+    private func terminalRuntime(for worktree: Worktree) -> ActiveWorktreesTerminalRuntimeSnapshot {
         let terminalSessions = ((worktree.terminalSessions as? Set<TerminalSession>) ?? [])
             .filter { !$0.isDeleted }
 
@@ -832,7 +832,7 @@ struct ActiveWorktreesView: View {
             runningPanes += runtimeCounts.runningPanes
         }
 
-        return TerminalRuntimeSnapshot(
+        return ActiveWorktreesTerminalRuntimeSnapshot(
             expectedPanes: expectedPanes,
             livePanes: livePanes,
             runningPanes: runningPanes
@@ -921,154 +921,6 @@ struct ActiveWorktreesView: View {
             try viewContext.save()
         } catch {
             Logger.workspace.error("Failed to terminate sessions: \(error.localizedDescription)")
-        }
-    }
-}
-
-private enum MonitorMode: String, CaseIterable, Identifiable {
-    case chats
-    case terminals
-    case files
-    case browsers
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .chats: return "Chats"
-        case .terminals: return "Terminals"
-        case .files: return "Files"
-        case .browsers: return "Browsers"
-        }
-    }
-
-    var tintColor: Color {
-        switch self {
-        case .chats: return .blue
-        case .terminals: return .green
-        case .files: return .orange
-        case .browsers: return .teal
-        }
-    }
-}
-
-private enum ScopeSelection: Hashable {
-    case all
-    case workspace(NSManagedObjectID)
-    case other
-}
-
-private struct WorkspaceGroup: Identifiable {
-    let id: String
-    let workspaceId: NSManagedObjectID?
-    let name: String
-    let colorHex: String?
-    let order: Int
-    var worktrees: [Worktree]
-    let isOther: Bool
-}
-
-private struct SessionCounts {
-    var chats: Int = 0
-    var terminals: Int = 0
-    var browsers: Int = 0
-    var files: Int = 0
-
-    var total: Int {
-        chats + terminals + browsers + files
-    }
-}
-
-private struct MonitorRowSeed {
-    let id: String
-    let worktree: Worktree
-    let processName: String
-    let workspaceName: String
-    let path: String
-    let counts: SessionCounts
-    let runtime: TerminalRuntimeSnapshot
-    let lastAccessed: Date
-}
-
-private struct MonitorRow: Identifiable {
-    let id: String
-    let worktree: Worktree
-    let processName: String
-    let workspaceName: String
-    let path: String
-    let cpuPercent: Double
-    let memoryBytes: UInt64
-    let energyImpact: Double
-    let threadCount: Int
-    let idleWakeUps: Int
-    let totalSessions: Int
-    let counts: SessionCounts
-    let runtime: TerminalRuntimeSnapshot
-    let lastAccessed: Date
-
-    var chatSessions: Int { counts.chats }
-    var terminalSessions: Int { counts.terminals }
-    var fileSessions: Int { counts.files }
-    var browserSessions: Int { counts.browsers }
-    var runningPanes: Int { runtime.runningPanes }
-    var livePanes: Int { runtime.livePanes }
-    var terminalStateSortOrder: Int {
-        switch terminalStatus {
-        case .running: return 3
-        case .ready: return 2
-        case .detached: return 1
-        case .none: return 0
-        }
-    }
-
-    var terminalStatus: TerminalState {
-        if counts.terminals == 0 {
-            return .none
-        }
-
-        if runtime.runningPanes > 0 {
-            return .running
-        }
-
-        if runtime.livePanes > 0 {
-            return .ready
-        }
-
-        if runtime.expectedPanes > 0 {
-            return .detached
-        }
-
-        return .none
-    }
-}
-
-private struct TerminalRuntimeSnapshot {
-    let expectedPanes: Int
-    let livePanes: Int
-    let runningPanes: Int
-}
-
-private enum TerminalState {
-    case running
-    case ready
-    case detached
-    case none
-
-    var title: String {
-        switch self {
-        case .running: return "Running"
-        case .ready: return "Ready"
-        case .detached: return "Detached"
-        case .none: return "None"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .running: return .green
-        case .ready: return .blue
-        case .detached: return .orange
-        case .none: return .secondary
         }
     }
 }
