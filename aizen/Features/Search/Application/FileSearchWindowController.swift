@@ -207,7 +207,7 @@ struct FileSearchWindowContent: View {
     let onFileSelected: (String) -> Void
     let onClose: () -> Void
 
-    @StateObject private var viewModel: FileSearchViewModel
+    @StateObject private var viewModel: FileSearchStore
     @FocusState private var isSearchFocused: Bool
     @EnvironmentObject private var interaction: PaletteInteractionState
     @State private var hoveredIndex: Int?
@@ -216,7 +216,7 @@ struct FileSearchWindowContent: View {
         self.worktreePath = worktreePath
         self.onFileSelected = onFileSelected
         self.onClose = onClose
-        self._viewModel = StateObject(wrappedValue: FileSearchViewModel(worktreePath: worktreePath))
+        self._viewModel = StateObject(wrappedValue: FileSearchStore(worktreePath: worktreePath))
     }
 
     var body: some View {

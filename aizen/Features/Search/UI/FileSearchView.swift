@@ -13,7 +13,7 @@ struct FileSearchView: View {
     @Binding var isPresented: Bool
     let onFileSelected: (String) -> Void
 
-    @StateObject private var viewModel: FileSearchViewModel
+    @StateObject private var viewModel: FileSearchStore
     @FocusState private var isSearchFocused: Bool
     @State private var eventMonitor: Any?
 
@@ -21,7 +21,7 @@ struct FileSearchView: View {
         self.worktreePath = worktreePath
         self._isPresented = isPresented
         self.onFileSelected = onFileSelected
-        self._viewModel = StateObject(wrappedValue: FileSearchViewModel(worktreePath: worktreePath))
+        self._viewModel = StateObject(wrappedValue: FileSearchStore(worktreePath: worktreePath))
     }
 
     var body: some View {

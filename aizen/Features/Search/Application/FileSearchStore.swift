@@ -1,5 +1,5 @@
 //
-//  FileSearchViewModel.swift
+//  FileSearchStore.swift
 //  aizen
 //
 //  Created on 2025-11-19.
@@ -10,7 +10,7 @@ import SwiftUI
 import Combine
 
 @MainActor
-class FileSearchViewModel: ObservableObject {
+class FileSearchStore: ObservableObject {
     @Published var searchQuery = ""
     @Published var results: [FileSearchResult] = []
     @Published var selectedIndex = 0
