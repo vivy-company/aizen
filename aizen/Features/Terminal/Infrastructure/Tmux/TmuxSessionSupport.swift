@@ -8,33 +8,33 @@
 import Foundation
 
 enum TmuxSessionSupport {
-    static let sessionPrefix = "aizen-"
+    nonisolated static let sessionPrefix = "aizen-"
 
-    private static let candidatePaths = [
+    nonisolated private static let candidatePaths = [
         "/opt/homebrew/bin/tmux",
         "/usr/local/bin/tmux",
         "/usr/bin/tmux"
     ]
 
-    static var configFileURL: URL {
+    nonisolated static var configFileURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".aizen")
             .appendingPathComponent("tmux.conf")
     }
 
-    static func isTmuxAvailable() -> Bool {
+    nonisolated static func isTmuxAvailable() -> Bool {
         candidatePaths.contains { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    static func tmuxPath() -> String? {
+    nonisolated static func tmuxPath() -> String? {
         candidatePaths.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    static func sessionName(for paneId: String) -> String {
+    nonisolated static func sessionName(for paneId: String) -> String {
         sessionPrefix + paneId
     }
 
-    static func configContents(themeName: String, modeStyle: String) -> String {
+    nonisolated static func configContents(themeName: String, modeStyle: String) -> String {
         """
         # Aizen tmux configuration
         # This file is auto-generated - changes will be overwritten
@@ -67,7 +67,7 @@ enum TmuxSessionSupport {
         """
     }
 
-    static func attachOrCreateCommand(
+    nonisolated static func attachOrCreateCommand(
         paneId: String,
         workingDirectory: String,
         tmuxPath: String?
