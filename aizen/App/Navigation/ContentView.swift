@@ -10,16 +10,16 @@ import CoreData
 import SwiftUI
 
 struct ContentView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.managedObjectContext) var viewContext
     @ObservedObject var repositoryManager: RepositoryManager
-    @StateObject private var selectionStore = AppNavigationSelectionStore()
+    @StateObject var selectionStore = AppNavigationSelectionStore()
     @StateObject private var tabStateManager = WorktreeTabStateStore()
     @StateObject private var navigator = AppWorktreeNavigator()
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)],
         animation: .default)
-    private var workspaces: FetchedResults<Workspace>
+    var workspaces: FetchedResults<Workspace>
 
     @State private var searchText = ""
     @State private var showingAddRepository = false
@@ -28,19 +28,19 @@ struct ContentView: View {
     @AppStorage("hasShownCrossProjectOnboarding") private var hasShownCrossProjectOnboarding = false
     @State private var showingOnboarding = false
     @State private var showingCrossProjectOnboarding = false
-    @AppStorage("zenModeEnabled") private var zenModeEnabled = false
+    @AppStorage("zenModeEnabled") var zenModeEnabled = false
 
-    @State private var saveTask: Task<Void, Never>?
+    @State var saveTask: Task<Void, Never>?
 
     // Git changes overlay state (passed from RootView)
     @Binding var gitChangesContext: GitChangesContext?
 
     // Persistent selection storage
-    @AppStorage("selectedWorkspaceId") private var selectedWorkspaceId: String?
-    @AppStorage("selectedRepositoryId") private var selectedRepositoryId: String?
-    @AppStorage("selectedWorktreeId") private var selectedWorktreeId: String?
-    @AppStorage("selectedWorktreeByRepository") private var selectedWorktreeByRepositoryData: String = "{}"
-    @AppStorage("worktreeMRUOrder") private var worktreeMRUOrderData: String = "[]"
+    @AppStorage("selectedWorkspaceId") var selectedWorkspaceId: String?
+    @AppStorage("selectedRepositoryId") var selectedRepositoryId: String?
+    @AppStorage("selectedWorktreeId") var selectedWorktreeId: String?
+    @AppStorage("selectedWorktreeByRepository") var selectedWorktreeByRepositoryData: String = "{}"
+    @AppStorage("worktreeMRUOrder") var worktreeMRUOrderData: String = "[]"
     private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
     init(context: NSManagedObjectContext, repositoryManager: RepositoryManager, gitChangesContext: Binding<GitChangesContext?>) {
@@ -226,74 +226,6 @@ struct ContentView: View {
                 navigateToWorktree: navigateToWorktree
             )
         }
-    }
-
-    private func isCrossProjectRepository(_ repository: Repository) -> Bool {
-        repository.isCrossProject || repository.note == crossProjectRepositoryMarker
-    }
-
-    private func visibleRepositories(in workspace: Workspace) -> [Repository] {
-        let repositories = (workspace.repositories as? Set<Repository>) ?? []
-        return repositories
-            .filter { !$0.isDeleted && !isCrossProjectRepository($0) }
-            .sorted { ($0.name ?? "") < ($1.name ?? "") }
-    }
-
-    private func ensureCrossProjectWorktree(for workspace: Workspace) throws -> Worktree {
-        try CrossProjectWorkspaceCoordinator(
-            viewContext: viewContext,
-            repositoryMarker: crossProjectRepositoryMarker
-        )
-        .ensureWorktree(
-            for: workspace,
-            visibleRepositories: visibleRepositories(in: workspace)
-        )
-    }
-
-    private func prepareCrossProjectWorkspaceIfNeeded() {
-        guard selectionStore.isCrossProjectSelected, let workspace = selectionStore.selectedWorkspace else {
-            selectCrossProjectWorktree(nil)
-            return
-        }
-
-        do {
-            selectCrossProjectWorktree(try ensureCrossProjectWorktree(for: workspace))
-        } catch {
-            selectCrossProjectWorktree(nil)
-        }
-    }
-
-    private func presentCrossProjectOnboardingIfNeeded() {
-        guard !hasShownCrossProjectOnboarding else {
-            return
-        }
-
-        hasShownCrossProjectOnboarding = true
-        showingCrossProjectOnboarding = true
-    }
-
-    private func showCommandPalette() {
-        let activeWorktree = currentActiveWorktree()
-        let currentRepositoryId = selectionStore.selectedRepository?.id?.uuidString
-            ?? activeWorktree?.repository?.id?.uuidString
-        let currentWorkspaceId = selectionStore.selectedWorkspace?.id?.uuidString
-            ?? activeWorktree?.repository?.workspace?.id?.uuidString
-
-        navigator.showCommandPalette(
-            viewContext: viewContext,
-            currentRepositoryId: currentRepositoryId,
-            currentWorkspaceId: currentWorkspaceId,
-            onNavigate: { action in
-                navigator.handleCommandPaletteNavigation(action, navigateToWorktree: navigateToWorktree)
-            }
-        )
-    }
-
-    private func currentActiveWorktree() -> Worktree? {
-        if selectionStore.isCrossProjectSelected {
-            return selectionStore.crossProjectWorktree
-        }
-        return selectionStore.selectedWorktree
     }
 
 }
