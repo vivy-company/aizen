@@ -9,7 +9,7 @@ import SwiftUI
 
 struct MCPInstallConfigSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var mcpManager = MCPManager.shared
+    @ObservedObject private var mcpManager = MCPManagementStore.shared
 
     let server: MCPServer
     let agentId: String

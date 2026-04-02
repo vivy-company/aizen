@@ -42,7 +42,7 @@ struct AgentDetailView: View {
     @State private var showingUsageDetails = false
     @State private var environmentSaveTask: Task<Void, Never>?
     @State private var environmentVariablesDraft: [AgentEnvironmentVariable] = []
-    @ObservedObject private var mcpManager = MCPManager.shared
+    @ObservedObject private var mcpManager = MCPManagementStore.shared
     @ObservedObject private var usageMetricsStore = AgentUsageMetricsStore.shared
 
     private var configSpec: AgentConfigSpec {
@@ -388,7 +388,7 @@ struct AgentDetailView: View {
 
                 // MARK: - MCP Servers
 
-                if MCPManager.supportsMCPManagement(agentId: metadata.id) {
+                if MCPManagementStore.supportsMCPManagement(agentId: metadata.id) {
                     Section {
                         if mcpManager.isSyncingServers(for: metadata.id) {
                             HStack(spacing: 8) {

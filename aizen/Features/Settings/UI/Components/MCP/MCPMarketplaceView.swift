@@ -12,7 +12,7 @@ import SwiftUI
 struct MCPMarketplaceView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject private var mcpManager = MCPManager.shared
+    @ObservedObject private var mcpManager = MCPManagementStore.shared
 
     let agentId: String
     let agentPath: String?

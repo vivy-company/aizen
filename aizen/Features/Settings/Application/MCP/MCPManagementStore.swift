@@ -1,18 +1,18 @@
 //
-//  MCPManager.swift
+//  MCPManagementStore.swift
 //  aizen
 //
-//  Orchestrates Aizen-managed MCP server defaults for ACP sessions
+//  Stores Aizen-managed MCP server installation and sync state for settings UI.
 //
 
 import Combine
 import Foundation
 
-// MARK: - MCP Manager
+// MARK: - MCP Management Store
 
 @MainActor
-class MCPManager: ObservableObject {
-    static let shared = MCPManager()
+final class MCPManagementStore: ObservableObject {
+    static let shared = MCPManagementStore()
 
     @Published var installedServers: [String: [MCPInstalledServer]] = [:]
     @Published var isSyncing: Set<String> = []
