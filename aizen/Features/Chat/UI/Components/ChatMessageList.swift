@@ -21,7 +21,7 @@ struct ChatMessageList: View {
     let pendingPlanRequest: RequestPermissionRequest?
     let worktreePath: String?
     let selectedAgent: String
-    let scrollRequest: ChatSessionViewModel.ScrollRequest?
+    let scrollRequest: ChatSessionStore.ScrollRequest?
     var isAutoScrollEnabled: () -> Bool = { true }
     let onAppear: () -> Void
     var onTimelineStateChange: (VVChatTimelineState) -> Void = { _ in }
@@ -3122,7 +3122,7 @@ private enum CopyFooterState {
 
 private struct ChatTimelineHost: NSViewRepresentable {
     let controller: VVChatTimelineController
-    let scrollRequest: ChatSessionViewModel.ScrollRequest?
+    let scrollRequest: ChatSessionStore.ScrollRequest?
     let onStateChange: (VVChatTimelineState) -> Void
     let onUserMessageCopyAction: (String) -> Void
     let onUserMessageCopyHoverChange: (String?) -> Void
@@ -3165,7 +3165,7 @@ private struct ChatTimelineHost: NSViewRepresentable {
         var lastHandledScrollRequestID: UUID?
 
         func handleScrollRequest(
-            _ request: ChatSessionViewModel.ScrollRequest?,
+            _ request: ChatSessionStore.ScrollRequest?,
             in view: VVChatTimelineView,
             controller: VVChatTimelineController
         ) {

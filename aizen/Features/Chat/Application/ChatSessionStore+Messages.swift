@@ -1,5 +1,5 @@
 //
-//  ChatSessionViewModel+Messages.swift
+//  ChatSessionStore+Messages.swift
 //  aizen
 //
 //  Message operations for chat sessions
@@ -9,7 +9,7 @@ import ACP
 import Foundation
 import SwiftUI
 
-extension ChatSessionViewModel {
+extension ChatSessionStore {
     // MARK: - Message Operations
 
     func sendMessage(_ text: String) {

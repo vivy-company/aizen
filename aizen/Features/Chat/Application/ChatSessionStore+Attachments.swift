@@ -1,5 +1,5 @@
 //
-//  ChatSessionViewModel+Attachments.swift
+//  ChatSessionStore+Attachments.swift
 //  aizen
 //
 //  Attachment handling for chat sessions
@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-extension ChatSessionViewModel {
+extension ChatSessionStore {
     // MARK: - Attachment Management
 
     func removeAttachment(_ attachment: ChatAttachment) {

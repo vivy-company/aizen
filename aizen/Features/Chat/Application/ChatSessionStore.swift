@@ -1,5 +1,5 @@
 //
-//  ChatSessionViewModel.swift
+//  ChatSessionStore.swift
 //  aizen
 //
 //  Business logic and state management for chat sessions
@@ -12,9 +12,9 @@ import Markdown
 import os.log
 import SwiftUI
 
-// MARK: - Main ViewModel
+// MARK: - Main Store
 @MainActor
-class ChatSessionViewModel: ObservableObject {
+class ChatSessionStore: ObservableObject {
     // MARK: - Dependencies
 
     let worktree: Worktree

@@ -19,7 +19,7 @@ struct ChatSessionView: View {
 
     @Environment(\.managedObjectContext) private var viewContext
 
-    @StateObject private var viewModel: ChatSessionViewModel
+    @StateObject private var viewModel: ChatSessionStore
 
     // UI-only state
     @State private var showingVoiceRecording = false
@@ -63,7 +63,7 @@ struct ChatSessionView: View {
         self.isCompanionResizing = isCompanionResizing
         self._viewContext = Environment(\.managedObjectContext)
 
-        let vm = ChatSessionViewModel(
+        let vm = ChatSessionStore(
             worktree: worktree,
             session: session,
             sessionManager: sessionManager,
@@ -703,7 +703,7 @@ private struct ChatTimelineContainer: View, Equatable {
     let pendingPlanRequest: RequestPermissionRequest?
     let worktreePath: String?
     let selectedAgent: String
-    let scrollRequest: ChatSessionViewModel.ScrollRequest?
+    let scrollRequest: ChatSessionStore.ScrollRequest?
     let isAutoScrollEnabled: () -> Bool
     let onAppear: () -> Void
     let onTimelineStateChange: (VVChatTimelineState) -> Void

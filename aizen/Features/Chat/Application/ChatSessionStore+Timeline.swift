@@ -1,5 +1,5 @@
 //
-//  ChatSessionViewModel+Timeline.swift
+//  ChatSessionStore+Timeline.swift
 //  aizen
 //
 //  Timeline invalidation and scroll operations for chat sessions
@@ -8,7 +8,7 @@
 import ACP
 import Foundation
 
-extension ChatSessionViewModel {
+extension ChatSessionStore {
     struct ScrollRequest: Equatable {
         enum Target: Equatable {
             case bottom
