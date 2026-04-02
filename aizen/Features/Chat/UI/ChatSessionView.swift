@@ -221,7 +221,7 @@ struct ChatSessionView: View {
                         hasModes: viewModel.hasModes,
                         onShowUsage: { showingUsageSheet = true },
                         onShowHistory: {
-                            SessionsWindowManager.shared.show(context: viewContext, worktreeId: worktree.id)
+                            SessionsWindowController.shared.show(context: viewContext, worktreeId: worktree.id)
                         },
                         showsUsage: supportsUsageMetrics
                     )

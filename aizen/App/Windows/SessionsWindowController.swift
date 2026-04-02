@@ -1,5 +1,5 @@
 //
-//  SessionsWindowManager.swift
+//  SessionsWindowController.swift
 //  aizen
 //
 //  Window to manage chat sessions
@@ -10,8 +10,8 @@ import CoreData
 import SwiftUI
 
 @MainActor
-final class SessionsWindowManager {
-    static let shared = SessionsWindowManager()
+final class SessionsWindowController {
+    static let shared = SessionsWindowController()
 
     private var window: NSWindow?
 

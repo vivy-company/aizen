@@ -1,5 +1,5 @@
 //
-//  SettingsWindowManager.swift
+//  SettingsWindowController.swift
 //  aizen
 //
 //  Centralized settings window presenter
@@ -8,8 +8,8 @@
 import SwiftUI
 
 @MainActor
-final class SettingsWindowManager {
-    static let shared = SettingsWindowManager()
+final class SettingsWindowController {
+    static let shared = SettingsWindowController()
 
     private var settingsWindow: NSWindow?
 

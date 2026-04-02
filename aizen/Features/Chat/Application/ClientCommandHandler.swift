@@ -30,7 +30,7 @@ final class ClientCommandHandler {
             aliases: ["session"],
             description: "View and manage chat session history",
             execute: { context in
-                SessionsWindowManager.shared.show(context: context)
+                SessionsWindowController.shared.show(context: context)
             }
         )
     ]

@@ -54,7 +54,7 @@ struct RootView: View {
             LicenseDeepLinkSheet(
                 licenseManager: LicenseStateStore.shared,
                 onOpenSettings: {
-                    SettingsWindowManager.shared.show()
+                    SettingsWindowController.shared.show()
                     NotificationCenter.default.post(name: .openSettingsPro, object: nil)
                 }
             )

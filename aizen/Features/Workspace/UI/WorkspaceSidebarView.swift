@@ -548,7 +548,7 @@ struct WorkspaceSidebarView: View {
             // Support Aizen (only when not licensed)
             if !isLicenseActive {
                 Button {
-                    SettingsWindowManager.shared.show()
+                    SettingsWindowController.shared.show()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         NotificationCenter.default.post(name: .openSettingsPro, object: nil)
                     }
@@ -592,7 +592,7 @@ struct WorkspaceSidebarView: View {
                 .help("sidebar.support")
 
                 Button {
-                    SettingsWindowManager.shared.show()
+                    SettingsWindowController.shared.show()
                 } label: {
                     Image(systemName: "gear")
                         .foregroundStyle(.secondary)

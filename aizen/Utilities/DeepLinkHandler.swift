@@ -55,7 +55,7 @@ final class DeepLinkHandler {
         let shouldOpenSettings = host == "settings" || path == "settings"
         guard shouldOpenSettings else { return }
 
-        SettingsWindowManager.shared.show()
+        SettingsWindowController.shared.show()
         NotificationCenter.default.post(name: .openSettingsPro, object: nil)
     }
 

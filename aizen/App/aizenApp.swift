@@ -152,7 +152,7 @@ struct aizenApp: App {
 
             CommandGroup(replacing: .appSettings) {
                 Button {
-                    SettingsWindowManager.shared.show()
+                    SettingsWindowController.shared.show()
                 } label: {
                     Label("Settings...", systemImage: "gearshape")
                 }
@@ -174,7 +174,7 @@ struct aizenApp: App {
                 .keyboardShortcut("a", modifiers: [.command, .shift])
 
                 Button("Chat Sessions...") {
-                    SessionsWindowManager.shared.show(context: persistenceController.container.viewContext)
+                    SessionsWindowController.shared.show(context: persistenceController.container.viewContext)
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
 
