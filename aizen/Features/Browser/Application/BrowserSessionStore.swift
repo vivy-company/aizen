@@ -6,7 +6,7 @@ import SwiftUI
 import WebKit
 
 @MainActor
-class BrowserSessionManager: ObservableObject {
+class BrowserSessionStore: ObservableObject {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "BrowserSession")
     @Published var sessions: [BrowserSession] = []
     @Published var activeSessionId: UUID?

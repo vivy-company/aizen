@@ -8,7 +8,7 @@ struct BrowserTabView: View {
     @Binding var selectedSessionId: UUID?
 
     @Environment(\.managedObjectContext) private var viewContext
-    @StateObject private var manager: BrowserSessionManager
+    @StateObject private var manager: BrowserSessionStore
 
     init(worktree: Worktree, selectedSessionId: Binding<UUID?>) {
         self.worktree = worktree
@@ -16,7 +16,7 @@ struct BrowserTabView: View {
 
         // Initialize manager with worktree and viewContext
         let context = PersistenceController.shared.container.viewContext
-        _manager = StateObject(wrappedValue: BrowserSessionManager(viewContext: context, worktree: worktree))
+        _manager = StateObject(wrappedValue: BrowserSessionStore(viewContext: context, worktree: worktree))
     }
 
     var body: some View {
@@ -336,7 +336,7 @@ struct BrowserTab: View {
 // MARK: - Empty Tab State Component
 
 struct EmptyTabStateView: View {
-    @ObservedObject var manager: BrowserSessionManager
+    @ObservedObject var manager: BrowserSessionStore
     @State private var urlInput: String = ""
 
     var body: some View {
