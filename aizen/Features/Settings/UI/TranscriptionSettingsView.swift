@@ -6,14 +6,14 @@ struct TranscriptionSettingsView: View {
     @AppStorage(TranscriptionSettingsKeys.mlxWhisperModelId) private var whisperModelId = TranscriptionSettingsDefaults.mlxWhisperModelId
     @AppStorage(TranscriptionSettingsKeys.mlxParakeetModelId) private var parakeetModelId = TranscriptionSettingsDefaults.mlxParakeetModelId
 
-    @StateObject private var whisperManager: MLXModelManager
-    @StateObject private var parakeetManager: MLXModelManager
+    @StateObject private var whisperManager: MLXModelStore
+    @StateObject private var parakeetManager: MLXModelStore
 
     init() {
         let whisperId = TranscriptionSettingsStore.currentWhisperModelId()
         let parakeetId = TranscriptionSettingsStore.currentParakeetModelId()
-        _whisperManager = StateObject(wrappedValue: MLXModelManager(kind: .whisper, modelId: whisperId))
-        _parakeetManager = StateObject(wrappedValue: MLXModelManager(kind: .parakeetTDT, modelId: parakeetId))
+        _whisperManager = StateObject(wrappedValue: MLXModelStore(kind: .whisper, modelId: whisperId))
+        _parakeetManager = StateObject(wrappedValue: MLXModelStore(kind: .parakeetTDT, modelId: parakeetId))
     }
 
     private var provider: TranscriptionProvider {
@@ -129,14 +129,14 @@ struct TranscriptionSettingsView: View {
                         Text("Location")
                         Spacer()
                         Button("Reveal in Finder") {
-                            revealModelFolder(directory: MLXModelManager.modelsRoot)
+                            revealModelFolder(directory: MLXModelStore.modelsRoot)
                         }
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Path")
                             .foregroundStyle(.secondary)
-                        Text(MLXModelManager.modelsRoot.path)
+                        Text(MLXModelStore.modelsRoot.path)
                             .font(.system(.caption, design: .monospaced))
                             .textSelection(.enabled)
                     }
@@ -211,7 +211,7 @@ struct TranscriptionSettingsView: View {
         return suffixes.isEmpty ? preset.title : "\(preset.title) (\(suffixes.joined(separator: ", ")))"
     }
 
-    private func modelActionTitle(for manager: MLXModelManager) -> String {
+    private func modelActionTitle(for manager: MLXModelStore) -> String {
         switch manager.state {
         case .downloading:
             return "Downloading…"
@@ -222,7 +222,7 @@ struct TranscriptionSettingsView: View {
         }
     }
 
-    private func modelActionDisabled(for manager: MLXModelManager) -> Bool {
+    private func modelActionDisabled(for manager: MLXModelStore) -> Bool {
         if case .downloading = manager.state { return true }
         return false
     }
@@ -234,7 +234,7 @@ struct TranscriptionSettingsView: View {
         }
     }
 
-    private func modelStatusText(for manager: MLXModelManager) -> String {
+    private func modelStatusText(for manager: MLXModelStore) -> String {
         switch manager.state {
         case .idle:
             return manager.isModelAvailable ? "Ready" : "Not downloaded"
@@ -247,7 +247,7 @@ struct TranscriptionSettingsView: View {
         }
     }
 
-    private func downloadSizeText(for manager: MLXModelManager) -> String? {
+    private func downloadSizeText(for manager: MLXModelStore) -> String? {
         guard let repoSizeBytes = manager.repoSizeBytes else { return nil }
         return formatBytes(repoSizeBytes)
     }
@@ -281,7 +281,7 @@ private struct ModelConfiguration {
     let title: String
     let subtitle: String
     let modelId: Binding<String>
-    let manager: MLXModelManager
+    let manager: MLXModelStore
     let presets: [MLXModelOption]
     let resetTitle: String
     let resetModelId: String

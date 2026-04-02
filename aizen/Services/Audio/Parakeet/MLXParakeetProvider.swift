@@ -13,7 +13,7 @@ final class MLXParakeetProvider {
         #if arch(arm64)
         let modelId = TranscriptionSettingsStore.currentParakeetModelId()
         let modelDirectory = await MainActor.run {
-            MLXModelManager.modelDirectory(for: .parakeetTDT, modelId: modelId)
+            MLXModelStore.modelDirectory(for: .parakeetTDT, modelId: modelId)
         }
 
         return try await Task.detached(priority: .userInitiated) {

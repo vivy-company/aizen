@@ -28,7 +28,7 @@ enum MLXModelKind: String, CaseIterable, Identifiable {
 }
 
 @MainActor
-final class MLXModelManager: NSObject, ObservableObject {
+final class MLXModelStore: NSObject, ObservableObject {
     enum DownloadState: Equatable {
         case idle
         case downloading(progress: Double)
@@ -283,7 +283,7 @@ final class MLXModelManager: NSObject, ObservableObject {
         }
 
         guard !weightPaths.isEmpty else {
-            throw NSError(domain: "MLXModelManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "No compatible weights found for this model"])
+            throw NSError(domain: "MLXModelStore", code: 404, userInfo: [NSLocalizedDescriptionKey: "No compatible weights found for this model"])
         }
 
         let configURL = URL(string: "\(base)/\(configPath!)")!
@@ -343,7 +343,7 @@ final class MLXModelManager: NSObject, ObservableObject {
     }
 }
 
-extension MLXModelManager: @preconcurrency URLSessionDownloadDelegate {
+extension MLXModelStore: @preconcurrency URLSessionDownloadDelegate {
     @MainActor
     func urlSession(
         _ session: URLSession,
@@ -355,7 +355,7 @@ extension MLXModelManager: @preconcurrency URLSessionDownloadDelegate {
            !(200..<300).contains(response.statusCode) {
             let status = response.statusCode
             activeContinuation?.resume(throwing: NSError(
-                domain: "MLXModelManager",
+                domain: "MLXModelStore",
                 code: status,
                 userInfo: [NSLocalizedDescriptionKey: "Download failed with status \(status)"]
             ))

@@ -13,7 +13,7 @@ final class MLXWhisperProvider {
         #if arch(arm64)
         let modelId = TranscriptionSettingsStore.currentWhisperModelId()
         let modelDirectory = await MainActor.run {
-            MLXModelManager.modelDirectory(for: .whisper, modelId: modelId)
+            MLXModelStore.modelDirectory(for: .whisper, modelId: modelId)
         }
         return try await Task.detached(priority: .userInitiated) {
             guard !samples.isEmpty else { return "" }

@@ -174,12 +174,12 @@ class AudioService: NSObject, ObservableObject {
         case .mlxWhisper:
             guard MLXWhisperProvider.isSupported else { return .system }
             let modelId = TranscriptionSettingsStore.currentWhisperModelId()
-            guard MLXModelManager.isModelAvailable(kind: .whisper, modelId: modelId) else { return .system }
+            guard MLXModelStore.isModelAvailable(kind: .whisper, modelId: modelId) else { return .system }
             return .mlxWhisper
         case .mlxParakeet:
             guard MLXParakeetProvider.isSupported else { return .system }
             let modelId = TranscriptionSettingsStore.currentParakeetModelId()
-            guard MLXModelManager.isModelAvailable(kind: .parakeetTDT, modelId: modelId) else { return .system }
+            guard MLXModelStore.isModelAvailable(kind: .parakeetTDT, modelId: modelId) else { return .system }
             return .mlxParakeet
         }
     }
