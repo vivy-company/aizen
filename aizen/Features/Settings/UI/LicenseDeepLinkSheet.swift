@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct LicenseDeepLinkSheet: View {
-    @ObservedObject var licenseManager: LicenseManager
+    @ObservedObject var licenseManager: LicenseStateStore
     let onOpenSettings: () -> Void
 
     @State private var state: ActivationState = .idle

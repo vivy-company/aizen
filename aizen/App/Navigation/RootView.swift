@@ -43,7 +43,7 @@ struct RootView: View {
         .background(WindowBackgroundSync(color: surfaceNSColor))
         .onAppear {
             restoreGitPanelIfNeeded()
-            if LicenseManager.shared.hasPendingDeepLink {
+            if LicenseStateStore.shared.hasPendingDeepLink {
                 showingLicenseDeepLinkSheet = true
             }
         }
@@ -52,7 +52,7 @@ struct RootView: View {
         }
         .sheet(isPresented: $showingLicenseDeepLinkSheet) {
             LicenseDeepLinkSheet(
-                licenseManager: LicenseManager.shared,
+                licenseManager: LicenseStateStore.shared,
                 onOpenSettings: {
                     SettingsWindowManager.shared.show()
                     NotificationCenter.default.post(name: .openSettingsPro, object: nil)

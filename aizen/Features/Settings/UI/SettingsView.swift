@@ -39,7 +39,7 @@ struct SettingsView: View {
     @State private var selection: SettingsSelection? = .general
     @State private var agents: [AgentMetadata] = []
     @State private var showingAddCustomAgent = false
-    @StateObject private var licenseManager = LicenseManager.shared
+    @StateObject private var licenseManager = LicenseStateStore.shared
 
     var body: some View {
         NavigationSplitView {

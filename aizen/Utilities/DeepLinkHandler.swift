@@ -29,7 +29,7 @@ final class DeepLinkHandler {
         let autoActivate = host == "activate" || path == "activate" || activateFlag == "1" || activateFlag == "true"
 
         if token != nil || autoActivate {
-            LicenseManager.shared.setPendingDeepLink(token: token, autoActivate: autoActivate)
+            LicenseStateStore.shared.setPendingDeepLink(token: token, autoActivate: autoActivate)
         }
 
         NSApp.activate(ignoringOtherApps: true)

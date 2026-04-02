@@ -1,8 +1,8 @@
 //
-//  LicenseManager.swift
+//  LicenseStateStore.swift
 //  aizen
 //
-//  Client-side license state management
+//  Client-side license state and actions for paid plan management.
 //
 
 import Foundation
@@ -14,8 +14,8 @@ import Darwin
 import Combine
 
 @MainActor
-final class LicenseManager: ObservableObject {
-    static let shared = LicenseManager()
+final class LicenseStateStore: ObservableObject {
+    static let shared = LicenseStateStore()
 
     enum Status: Equatable {
         case unlicensed

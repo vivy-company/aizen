@@ -10,7 +10,7 @@ import Foundation
 import SwiftUI
 
 struct AizenProSettingsView: View {
-    @ObservedObject var licenseManager: LicenseManager
+    @ObservedObject var licenseManager: LicenseStateStore
 
     @State private var tokenInput: String = ""
     @State private var showingResendPrompt = false
@@ -190,7 +190,7 @@ struct AizenProSettingsView: View {
         )
     }
 
-    private func statusPresentation(for status: LicenseManager.Status) -> (String, Color) {
+    private func statusPresentation(for status: LicenseStateStore.Status) -> (String, Color) {
         switch status {
         case .unlicensed:
             return ("Not Activated", .gray)

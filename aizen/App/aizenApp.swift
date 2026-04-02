@@ -116,7 +116,7 @@ struct aizenApp: App {
                 .environmentObject(ghosttyApp)
                 .modifier(AppearanceModifier())
                 .task {
-                    LicenseManager.shared.start()
+                    LicenseStateStore.shared.start()
                 }
                 .task(id: "\(terminalFontName)\(terminalFontSize)\(terminalThemeName)\(terminalThemeNameLight)\(terminalUsePerAppearanceTheme)") {
                     ghosttyApp.reloadConfig()

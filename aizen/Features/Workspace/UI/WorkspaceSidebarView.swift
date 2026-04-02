@@ -22,7 +22,7 @@ struct WorkspaceSidebarView: View {
 
     @ObservedObject var repositoryManager: RepositoryManager
     @Environment(\.controlActiveState) private var controlActiveState
-    @StateObject private var licenseManager = LicenseManager.shared
+    @StateObject private var licenseManager = LicenseStateStore.shared
     @State private var showingWorkspaceSheet = false
     @State private var showingWorkspaceSwitcher = false
     @State private var showingSupportSheet = false
