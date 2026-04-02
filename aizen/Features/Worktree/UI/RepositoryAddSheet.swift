@@ -27,7 +27,7 @@ enum AddRepositoryMode: CaseIterable {
 struct RepositoryAddSheet: View {
     @Environment(\.dismiss) private var dismiss
     let workspace: Workspace
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     var onRepositoryAdded: ((Repository) -> Void)?
 
     @State private var mode: AddRepositoryMode = .existing
@@ -327,6 +327,6 @@ struct RepositoryAddSheet: View {
 #Preview {
     RepositoryAddSheet(
         workspace: Workspace(),
-        repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext)
+        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext)
     )
 }

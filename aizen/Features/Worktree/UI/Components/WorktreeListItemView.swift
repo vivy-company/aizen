@@ -11,7 +11,7 @@ import os.log
 struct WorktreeListItemView: View {
     @ObservedObject var worktree: Worktree
     let isSelected: Bool
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     let allWorktrees: [Worktree]
     @Binding var selectedWorktree: Worktree?
     @ObservedObject var tabStateManager: WorktreeTabStateStore

@@ -9,7 +9,7 @@ import SwiftUI
 
 struct WorkspaceSwitcherSheet: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
 
     let workspaces: [Workspace]
     @Binding var selectedWorkspace: Workspace?
@@ -102,7 +102,7 @@ struct WorkspaceSwitcherSheet: View {
 
 #Preview {
     WorkspaceSwitcherSheet(
-        repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext),
+        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext),
         workspaces: [],
         selectedWorkspace: .constant(nil)
     )

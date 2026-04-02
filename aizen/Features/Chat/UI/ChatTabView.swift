@@ -13,7 +13,7 @@ import SwiftUI
 
 struct ChatTabView: View {
     let worktree: Worktree
-    let repositoryManager: RepositoryManager
+    let repositoryManager: WorkspaceRepositoryStore
     @Binding var selectedSessionId: UUID?
     @Binding var selectedTerminalSessionId: UUID?
     @Binding var selectedBrowserSessionId: UUID?
@@ -75,7 +75,7 @@ struct ChatTabView: View {
 
     init(
         worktree: Worktree,
-        repositoryManager: RepositoryManager,
+        repositoryManager: WorkspaceRepositoryStore,
         selectedSessionId: Binding<UUID?>,
         selectedTerminalSessionId: Binding<UUID?>,
         selectedBrowserSessionId: Binding<UUID?>

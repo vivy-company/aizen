@@ -2,7 +2,7 @@ import SwiftUI
 
 struct BranchSelectorView: View {
     let repository: Repository
-    let repositoryManager: RepositoryManager
+    let repositoryManager: WorkspaceRepositoryStore
     @Binding var selectedBranch: BranchInfo?
     var onSelectBranch: ((BranchInfo) -> Void)? = nil
 
@@ -255,7 +255,7 @@ struct BranchSelectorButton: View {
 #Preview {
     BranchSelectorView(
         repository: Repository(),
-        repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext),
+        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext),
         selectedBranch: .constant(nil)
     )
 }

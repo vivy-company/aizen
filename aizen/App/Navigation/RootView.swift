@@ -15,14 +15,14 @@ struct RootView: View {
     @State private var gitChangesContext: GitChangesContext?
     @State private var gitPanelController: GitPanelWindowController?
     @State private var showingLicenseDeepLinkSheet = false
-    @StateObject private var repositoryManager: RepositoryManager
+    @StateObject private var repositoryManager: WorkspaceRepositoryStore
 
     // Persist open Git panel worktree for restoration
     @AppStorage("openGitPanelWorktreeURI") private var openGitPanelWorktreeURI: String = ""
 
     init(context: NSManagedObjectContext) {
         self.context = context
-        _repositoryManager = StateObject(wrappedValue: RepositoryManager(viewContext: context))
+        _repositoryManager = StateObject(wrappedValue: WorkspaceRepositoryStore(viewContext: context))
     }
 
     private var surfaceColor: Color {

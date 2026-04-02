@@ -10,7 +10,7 @@ import SwiftUI
 struct WorkspaceEditSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var workspace: Workspace
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
 
     @State private var workspaceName = ""
     @State private var selectedColor: Color = .blue
@@ -157,6 +157,6 @@ extension Color {
 #Preview {
     WorkspaceEditSheet(
         workspace: Workspace(),
-        repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext)
+        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext)
     )
 }

@@ -10,7 +10,7 @@ import os.log
 
 struct DetailsTabView: View {
     @ObservedObject var worktree: Worktree
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     var onWorktreeDeleted: ((Worktree?) -> Void)?
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "DetailsTabView")

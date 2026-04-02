@@ -11,7 +11,7 @@ import SwiftUI
 struct CompanionPanelView: View {
     let panel: CompanionPanel
     let worktree: Worktree
-    let repositoryManager: RepositoryManager
+    let repositoryManager: WorkspaceRepositoryStore
     let side: CompanionSide
     let onClose: () -> Void
     let isResizing: Bool

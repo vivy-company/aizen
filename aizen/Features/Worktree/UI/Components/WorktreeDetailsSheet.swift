@@ -9,7 +9,7 @@ import SwiftUI
 
 struct WorktreeDetailsSheet: View {
     @ObservedObject var worktree: Worktree
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var currentBranch = ""

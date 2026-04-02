@@ -10,7 +10,7 @@ import SwiftUI
 struct WorktreeListView: View {
     @ObservedObject var repository: Repository
     @Binding var selectedWorktree: Worktree?
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @ObservedObject var tabStateManager: WorktreeTabStateStore
     @Environment(\.colorScheme) private var colorScheme
 
@@ -210,7 +210,7 @@ struct WorktreeListView: View {
     WorktreeListView(
         repository: Repository(),
         selectedWorktree: .constant(nil),
-        repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext),
+        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext),
         tabStateManager: WorktreeTabStateStore()
     )
 }

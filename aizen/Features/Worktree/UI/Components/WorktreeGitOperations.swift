@@ -11,7 +11,7 @@ import os.log
 @MainActor
 struct WorktreeGitOperations {
     let gitOperationService: GitOperationService
-    let repositoryManager: RepositoryManager
+    let repositoryManager: WorkspaceRepositoryStore
     let worktree: Worktree
     let logger: Logger
 

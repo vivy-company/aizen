@@ -1,5 +1,5 @@
 //
-//  RepositoryManager+Repositories.swift
+//  WorkspaceRepositoryStore+Repositories.swift
 //  aizen
 //
 //  Repository CRUD, refresh, and metadata operations.
@@ -10,7 +10,7 @@ import CoreData
 import Foundation
 import os.log
 
-extension RepositoryManager {
+extension WorkspaceRepositoryStore {
     // MARK: - Repository Operations
 
     func addExistingRepository(path: String, workspace: Workspace) async throws -> Repository {
@@ -156,7 +156,7 @@ extension RepositoryManager {
     }
 }
 
-extension RepositoryManager {
+extension WorkspaceRepositoryStore {
     func extractRepoName(from url: String) -> String {
         var name = URL(string: url)?.lastPathComponent ?? url
 

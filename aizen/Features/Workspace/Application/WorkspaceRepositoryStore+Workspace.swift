@@ -1,5 +1,5 @@
 //
-//  RepositoryManager+Workspace.swift
+//  WorkspaceRepositoryStore+Workspace.swift
 //  aizen
 //
 //  Workspace and repository-path management helpers.
@@ -8,7 +8,7 @@
 import CoreData
 import Foundation
 
-extension RepositoryManager {
+extension WorkspaceRepositoryStore {
     // MARK: - Workspace Operations
 
     func createWorkspace(name: String, colorHex: String? = nil) throws -> Workspace {
@@ -79,7 +79,7 @@ extension RepositoryManager {
     }
 }
 
-extension RepositoryManager {
+extension WorkspaceRepositoryStore {
     func normalizedPath(_ path: String) -> String {
         URL(fileURLWithPath: path).standardizedFileURL.path
     }

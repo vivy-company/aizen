@@ -11,7 +11,7 @@ struct AppNavigationDetailColumn: View {
     let isCrossProjectSelected: Bool
     let crossProjectWorktree: Worktree?
     let selectedWorktree: Worktree?
-    let repositoryManager: RepositoryManager
+    let repositoryManager: WorkspaceRepositoryStore
     let tabStateManager: WorktreeTabStateStore
     @Binding var gitChangesContext: GitChangesContext?
     let onSelectCrossProjectWorktree: (Worktree?) -> Void

@@ -11,7 +11,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) var viewContext
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @StateObject var selectionStore = AppNavigationSelectionStore()
     @StateObject var tabStateManager = WorktreeTabStateStore()
     @StateObject var navigator = AppWorktreeNavigator()
@@ -43,7 +43,7 @@ struct ContentView: View {
     @AppStorage("worktreeMRUOrder") var worktreeMRUOrderData: String = "[]"
     let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
-    init(context: NSManagedObjectContext, repositoryManager: RepositoryManager, gitChangesContext: Binding<GitChangesContext?>) {
+    init(context: NSManagedObjectContext, repositoryManager: WorkspaceRepositoryStore, gitChangesContext: Binding<GitChangesContext?>) {
         self.repositoryManager = repositoryManager
         _gitChangesContext = gitChangesContext
     }

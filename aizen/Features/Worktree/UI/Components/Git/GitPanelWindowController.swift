@@ -13,7 +13,7 @@ import VVCode
 class GitPanelWindowController: NSWindowController {
     private var windowDelegate: GitPanelWindowDelegate?
 
-    convenience init(context: GitChangesContext, repositoryManager: RepositoryManager, onClose: @escaping () -> Void) {
+    convenience init(context: GitChangesContext, repositoryManager: WorkspaceRepositoryStore, onClose: @escaping () -> Void) {
         // Calculate 80% of main window size, with fallback defaults
         let mainWindowFrame = NSApp.mainWindow?.frame ?? NSRect(x: 0, y: 0, width: 1400, height: 900)
         let width = max(900, mainWindowFrame.width * 0.8)
@@ -89,7 +89,7 @@ private class GitPanelWindowDelegate: NSObject, NSWindowDelegate {
 
 struct GitPanelWindowContentWithToolbar: View {
     let context: GitChangesContext
-    let repositoryManager: RepositoryManager
+    let repositoryManager: WorkspaceRepositoryStore
     let onClose: () -> Void
 
     @State private var selectedTab: GitPanelTab = .git
@@ -127,7 +127,7 @@ struct GitPanelWindowContentWithToolbar: View {
         )
     }
 
-    init(context: GitChangesContext, repositoryManager: RepositoryManager, onClose: @escaping () -> Void) {
+    init(context: GitChangesContext, repositoryManager: WorkspaceRepositoryStore, onClose: @escaping () -> Void) {
         self.context = context
         self.repositoryManager = repositoryManager
         self.onClose = onClose

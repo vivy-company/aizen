@@ -1,5 +1,5 @@
 //
-//  RepositoryManager+Branches.swift
+//  WorkspaceRepositoryStore+Branches.swift
 //  aizen
 //
 //  Branch and file-system operations for repositories and worktrees.
@@ -9,7 +9,7 @@ import CoreData
 import Foundation
 import os.log
 
-extension RepositoryManager {
+extension WorkspaceRepositoryStore {
     // MARK: - Branch Operations
 
     func getBranches(for repository: Repository) async throws -> [BranchInfo] {

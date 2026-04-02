@@ -20,7 +20,7 @@ struct WorkspaceSidebarView: View {
     @Binding var searchText: String
     @Binding var showingAddRepository: Bool
 
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @Environment(\.controlActiveState) private var controlActiveState
     @StateObject private var licenseManager = LicenseStateStore.shared
     @State private var showingWorkspaceSheet = false
@@ -30,7 +30,7 @@ struct WorkspaceSidebarView: View {
     @State private var showingRepositoryFilters = false
     @State private var workspaceToEdit: Workspace?
     @State private var refreshTask: Task<Void, Never>?
-    @State private var missingRepository: RepositoryManager.MissingRepository?
+    @State private var missingRepository: WorkspaceRepositoryStore.MissingRepository?
     @AppStorage("repositoryStatusFilters") private var storedStatusFilters: String = ""
 
     private var selectedStatusFilters: Set<ItemStatus> {
@@ -418,7 +418,7 @@ struct WorkspaceSidebarView: View {
         guard let id = repository.id else { return }
         // Only show if not already showing one
         guard missingRepository == nil else { return }
-        missingRepository = RepositoryManager.MissingRepository(
+        missingRepository = WorkspaceRepositoryStore.MissingRepository(
             id: id,
             repository: repository,
             lastKnownPath: path
@@ -641,8 +641,8 @@ struct WorkspaceSidebarView: View {
 // MARK: - Missing Repository Sheet
 
 struct MissingRepositorySheet: View {
-    let missing: RepositoryManager.MissingRepository
-    @ObservedObject var repositoryManager: RepositoryManager
+    let missing: WorkspaceRepositoryStore.MissingRepository
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @Binding var selectedRepository: Repository?
     @Binding var selectedWorktree: Worktree?
     let onDismiss: () -> Void
@@ -761,7 +761,7 @@ struct RepositoryRow: View {
     private let logger = Logger.workspace
     @ObservedObject var repository: Repository
     let isSelected: Bool
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     let onSelect: () -> Void
     let onRemove: () -> Void
     @Environment(\.controlActiveState) private var controlActiveState
@@ -1343,6 +1343,6 @@ struct SupportSheet: View {
         selectedWorktree: .constant(nil),
         searchText: .constant(""),
         showingAddRepository: .constant(false),
-        repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext)
+        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext)
     )
 }

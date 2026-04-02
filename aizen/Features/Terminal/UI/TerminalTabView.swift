@@ -12,7 +12,7 @@ import SwiftUI
 struct TerminalTabView: View {
     @ObservedObject var worktree: Worktree
     @Binding var selectedSessionId: UUID?
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @Environment(\.colorScheme) private var colorScheme
 
     private let sessionManager = TerminalSessionManager.shared
@@ -262,6 +262,6 @@ struct TerminalTabView: View {
     TerminalTabView(
         worktree: Worktree(),
         selectedSessionId: .constant(nil),
-        repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext)
+        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext)
     )
 }

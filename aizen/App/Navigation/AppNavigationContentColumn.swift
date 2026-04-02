@@ -11,7 +11,7 @@ struct AppNavigationContentColumn: View {
     let isCrossProjectSelected: Bool
     let repository: Repository?
     @Binding var selectedWorktree: Worktree?
-    let repositoryManager: RepositoryManager
+    let repositoryManager: WorkspaceRepositoryStore
     let tabStateManager: WorktreeTabStateStore
     let zenModeEnabled: Bool
 

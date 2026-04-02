@@ -18,9 +18,9 @@ class WorktreeDetailStore: ObservableObject {
     @Published var selectedBrowserSessionId: UUID?
 
     private let worktree: Worktree
-    private let repositoryManager: RepositoryManager
+    private let repositoryManager: WorkspaceRepositoryStore
 
-    init(worktree: Worktree, repositoryManager: RepositoryManager) {
+    init(worktree: Worktree, repositoryManager: WorkspaceRepositoryStore) {
         self.worktree = worktree
         self.repositoryManager = repositoryManager
     }

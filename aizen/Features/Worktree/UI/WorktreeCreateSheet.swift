@@ -24,7 +24,7 @@ private enum EnvironmentCreationMode: String, CaseIterable {
 struct WorktreeCreateSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var repository: Repository
-    @ObservedObject var repositoryManager: RepositoryManager
+    @ObservedObject var repositoryManager: WorkspaceRepositoryStore
 
     @State private var mode: EnvironmentCreationMode = .linked
     @State private var environmentName = ""
@@ -37,7 +37,7 @@ struct WorktreeCreateSheet: View {
     @State private var selectedTemplateIndex: Int?
     @State private var showingPostCreateActions = false
     @State private var shouldRunPostCreateActions = true
-    @State private var independentMethod: RepositoryManager.IndependentEnvironmentMethod = .clone
+    @State private var independentMethod: WorkspaceRepositoryStore.IndependentEnvironmentMethod = .clone
     @State private var detectedSubmodules: [GitSubmoduleInfo] = []
     @State private var loadingSubmodules = false
     @State private var initializeSubmodules = true
@@ -462,9 +462,9 @@ struct WorktreeCreateSheet: View {
             Section("Method") {
                 Picker("Method", selection: $independentMethod) {
                     Text("Clone")
-                        .tag(RepositoryManager.IndependentEnvironmentMethod.clone)
+                        .tag(WorkspaceRepositoryStore.IndependentEnvironmentMethod.clone)
                     Text("Copy")
-                        .tag(RepositoryManager.IndependentEnvironmentMethod.copy)
+                        .tag(WorkspaceRepositoryStore.IndependentEnvironmentMethod.copy)
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
@@ -650,12 +650,12 @@ struct WorktreeCreateSheet: View {
             do {
                 switch mode {
                 case .linked:
-                    let submoduleOptions: RepositoryManager.LinkedEnvironmentSubmoduleOptions
+                    let submoduleOptions: WorkspaceRepositoryStore.LinkedEnvironmentSubmoduleOptions
                     let selectedPaths = detectedSubmodules
                         .map(\.path)
                         .filter { selectedSubmodulePaths.contains($0) }
                     if initializeSubmodules && !selectedPaths.isEmpty {
-                        submoduleOptions = RepositoryManager.LinkedEnvironmentSubmoduleOptions(
+                        submoduleOptions = WorkspaceRepositoryStore.LinkedEnvironmentSubmoduleOptions(
                             initialize: true,
                             recursive: includeNestedSubmodules,
                             paths: selectedPaths,
@@ -678,7 +678,7 @@ struct WorktreeCreateSheet: View {
                     guard let source else {
                         throw Libgit2Error.invalidPath("Source path is unavailable")
                     }
-                    let method: RepositoryManager.IndependentEnvironmentMethod = isGitProject ? independentMethod : .copy
+                    let method: WorkspaceRepositoryStore.IndependentEnvironmentMethod = isGitProject ? independentMethod : .copy
                     _ = try await repositoryManager.addIndependentEnvironment(
                         to: repository,
                         path: destinationPath,
@@ -708,6 +708,6 @@ struct WorktreeCreateSheet: View {
 #Preview {
     WorktreeCreateSheet(
         repository: Repository(),
-        repositoryManager: RepositoryManager(viewContext: PersistenceController.preview.container.viewContext)
+        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext)
     )
 }

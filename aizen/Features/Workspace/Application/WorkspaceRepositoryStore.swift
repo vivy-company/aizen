@@ -1,5 +1,5 @@
 //
-//  RepositoryManager.swift
+//  WorkspaceRepositoryStore.swift
 //  aizen
 //
 //  Created by Uladzislau Yakauleu on 17.10.25.
@@ -12,7 +12,7 @@ import Combine
 import os.log
 
 @MainActor
-class RepositoryManager: ObservableObject {
+class WorkspaceRepositoryStore: ObservableObject {
     enum IndependentEnvironmentMethod: String, CaseIterable {
         case clone
         case copy
@@ -34,7 +34,7 @@ class RepositoryManager: ObservableObject {
 
     let viewContext: NSManagedObjectContext
     let container: NSPersistentContainer
-    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "RepositoryManager")
+    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "WorkspaceRepositoryStore")
 
     // Domain services (using libgit2)
     let statusService = GitStatusService()

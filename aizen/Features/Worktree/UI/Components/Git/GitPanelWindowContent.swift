@@ -149,7 +149,7 @@ enum GitPanelTab: String, CaseIterable {
 
 struct GitPanelWindowContent: View {
     let context: GitChangesContext
-    let repositoryManager: RepositoryManager
+    let repositoryManager: WorkspaceRepositoryStore
     @Binding var selectedTab: GitPanelTab
     @Binding var diffRenderStyle: VVDiffRenderStyle
     let onClose: () -> Void
@@ -190,7 +190,7 @@ struct GitPanelWindowContent: View {
 
     init(
         context: GitChangesContext,
-        repositoryManager: RepositoryManager,
+        repositoryManager: WorkspaceRepositoryStore,
         selectedTab: Binding<GitPanelTab>,
         diffRenderStyle: Binding<VVDiffRenderStyle>,
         onClose: @escaping () -> Void

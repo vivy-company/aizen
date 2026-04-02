@@ -1,5 +1,5 @@
 //
-//  RepositoryManager+Worktrees.swift
+//  WorkspaceRepositoryStore+Worktrees.swift
 //  aizen
 //
 //  Worktree lifecycle and post-create orchestration.
@@ -9,7 +9,7 @@ import CoreData
 import Foundation
 import os.log
 
-extension RepositoryManager {
+extension WorkspaceRepositoryStore {
     // MARK: - Worktree Operations
 
     func scanWorktrees(for repository: Repository) async throws {
@@ -290,7 +290,7 @@ extension RepositoryManager {
     }
 }
 
-extension RepositoryManager {
+extension WorkspaceRepositoryStore {
     func executePostCreateActions(for repository: Repository, newWorktreePath: String) async {
         let actions = repository.postCreateActions
         guard !actions.isEmpty else { return }
