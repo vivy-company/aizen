@@ -88,7 +88,7 @@ struct SettingsView: View {
                         }
 
                         Button {
-                            RegistryAgentsWindowManager.shared.show()
+                            RegistryAgentsWindowController.shared.show()
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "plus.square.on.square")

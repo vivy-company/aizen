@@ -1,5 +1,5 @@
 //
-//  RegistryAgentsWindowManager.swift
+//  RegistryAgentsWindowController.swift
 //  aizen
 //
 
@@ -7,8 +7,8 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class RegistryAgentsWindowManager {
-    static let shared = RegistryAgentsWindowManager()
+final class RegistryAgentsWindowController {
+    static let shared = RegistryAgentsWindowController()
 
     private var window: NSWindow?
 

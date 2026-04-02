@@ -516,7 +516,7 @@ struct ChatTabView: View {
 
     private var registryButton: some View {
         Button {
-            RegistryAgentsWindowManager.shared.show()
+            RegistryAgentsWindowController.shared.show()
         } label: {
             Image(systemName: "plus.square.on.square")
                 .font(.system(size: 18, weight: .semibold))
