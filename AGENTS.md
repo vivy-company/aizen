@@ -6,42 +6,49 @@ Aizen is a macOS developer tool for managing Git worktrees with integrated termi
 
 ## Architecture
 
-### Domain Organization
+### Current Direction
 
-```
+Aizen is migrating incrementally from top-level technical buckets toward a feature-first architecture.
+
+Target direction:
+
+```text
 aizen/
-├── App/                    # Application entry point
-├── Models/                 # Data models and protocol types (17 domains)
-│   ├── ACP/                # ACP protocol types (11 files)
-│   ├── Agent/              # Agent metadata and config
-│   ├── Chat/               # Chat attachments
-│   ├── Git/                # Git models (diff, merge, branch templates)
-│   ├── MCP/                # Model Context Protocol types
-│   ├── Tab/                # Tab state types
-│   └── Terminal/           # Terminal preset config
-├── Services/               # Business logic (17 service domains)
-│   ├── Agent/              # ACP client, session, installers, delegates
-│   ├── Git/                # Repository, libgit2, domain services
-│   ├── Audio/              # Voice recording and speech recognition
-│   ├── License/            # License management
-│   ├── MCP/                # MCP server management
-│   ├── Workflow/           # GitHub/GitLab CI/CD integration
-│   └── Xcode/              # Xcode build and device management
-├── Views/                  # SwiftUI views (18+ feature folders)
-│   ├── Chat/               # Chat interface (18 files + 30 components)
-│   ├── Worktree/           # Worktree management (12 files + 60 components)
-│   ├── Terminal/           # Terminal views and split panes
-│   ├── Files/              # File browser
-│   ├── Browser/            # Web browser tabs
-│   ├── Settings/           # Settings UI (8 primary + 15 components)
-│   ├── Search/             # File search
-│   └── CommandPalette/     # Spotlight-like command palette
-├── GhosttyTerminal/        # GPU-accelerated terminal (15 files)
-├── Managers/               # State managers (10 files)
-├── Utilities/              # Helper functions (18 files)
-├── Assets.xcassets/        # Icons and images
-└── Resources/              # Shell integration, themes, terminfo
+├── App/
+├── Features/
+│   ├── Chat/
+│   ├── Worktree/
+│   ├── Repository/
+│   ├── Browser/
+│   ├── Files/
+│   ├── Terminal/
+│   ├── Workspace/
+│   ├── Settings/
+│   └── Search/
+├── Platform/
+├── Integrations/
+├── Persistence/
+├── Shared/
+├── Assets.xcassets/
+├── Resources/
+└── cli/
 ```
+
+Each migrated feature should use:
+
+```text
+FeatureName/
+├── Domain/
+├── Application/
+├── Infrastructure/
+├── UI/
+└── Testing/
+```
+
+This is an incremental migration, not a single rewrite. Legacy folders still exist during transition, but new substantial work should prefer the target feature structure instead of deepening the old buckets.
+
+See:
+- `docs/specs/feature-first-architecture-migration-spec.md`
 
 ### Design Patterns
 
@@ -109,13 +116,27 @@ aizen/
 - Remove dead code when changing systems instead of leaving legacy paths in place.
 - If improving a feature or fixing a bug requires breaking internal structure to make the system better, prefer the cleaner break.
 
+### Feature-First Migration Policy
+
+- New substantial feature work should land in `Features/<FeatureName>/` whenever the ownership boundary is clear.
+- For migrated features, keep all new code inside that feature subtree.
+- Do not add new broad top-level `Manager` types unless they are truly app-global.
+- Do not place non-view feature orchestration in `Views/`.
+- Do not place feature-specific orchestration in `Utilities/`.
+- Prefer explicit ownership names such as `Store`, `Coordinator`, `Repository`, `Registry`, or `Service` based on actual responsibility.
+- `Domain` is for pure feature types and policies.
+- `Application` is for feature state and orchestration.
+- `Infrastructure` is for Core Data, ACP, libgit2, WebKit, filesystem, and other external integrations.
+- `UI` is for SwiftUI/AppKit presentation only.
+
 ### When Working on Features
 
-1. Respect domain boundaries:
-   - Agent logic -> Services/Agent/
-   - Git operations -> Services/Git/ (use domain services)
-   - UI components -> Views/{feature}/
-   - Terminal -> GhosttyTerminal/
+1. Respect feature boundaries first:
+   - migrated feature code -> `Features/<FeatureName>/`
+   - app entry/composition/window wiring -> `App/`
+   - platform wrappers such as Ghostty/libgit2/Xcode -> `Platform/` or feature `Infrastructure/`
+   - cross-feature external integrations -> `Integrations/`
+   - persistence implementation -> `Persistence/` or feature `Infrastructure/`
 
 2. Keep files focused:
    - Extract large views into components.
@@ -130,11 +151,23 @@ aizen/
 
 ### File Organization Rules
 
-- Place new agent-related code in Services/Agent/.
-- Place new Git functionality in Services/Git/Domain/.
-- Create new view folders when adding major features.
-- Extract components to Components/ subfolder when reused 3+ times.
-- Keep utilities generic in Utilities/.
+- If a feature subtree exists, place new feature code there instead of legacy buckets.
+- If a feature is large and scattered, prefer creating `Features/<FeatureName>/` rather than adding more files under `Services/`, `Views/`, or `Managers/`.
+- Keep reusable cross-feature UI in `Shared/` once that subtree exists; otherwise use the existing shared-components area until migrated.
+- Keep utilities generic. If logic is feature-specific, it does not belong in `Utilities/`.
+- Use `git mv` for moves when practical to preserve history.
+
+### Commit Policy
+
+- Prefer atomic commits.
+- Each commit should represent one coherent change with a clear purpose.
+- Do not mix structural refactors, behavior changes, and incidental cleanup in the same commit unless they are inseparable.
+- For feature-first migrations, prefer a sequence such as:
+  1. compile-stable file moves
+  2. ownership split / dependency updates
+  3. behavior-preserving cleanup
+  4. tests
+- Before creating a commit, review the diff and exclude unrelated changes.
 
 ### Protocol Communication
 
