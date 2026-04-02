@@ -49,155 +49,106 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            // Left sidebar - workspaces and repositories
-            WorkspaceSidebarView(
-                workspaces: Array(workspaces),
-                selectedWorkspace: selectedWorkspaceBinding,
-                isCrossProjectSelected: crossProjectSelectionBinding,
-                selectedRepository: selectedRepositoryBinding,
-                selectedWorktree: selectedWorktreeBinding,
-                searchText: $searchText,
-                showingAddRepository: $showingAddRepository,
-                repositoryManager: repositoryManager
-            )
-            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
-        } content: {
-            // Middle panel - worktree list or detail
-            Group {
-                if selectionStore.isCrossProjectSelected {
-                    Color.clear
-                } else if let repository = selectionStore.selectedRepository {
-                    WorktreeListView(
-                        repository: repository,
-                        selectedWorktree: selectedWorktreeBinding,
+        withLifecycleHandlers(
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                // Left sidebar - workspaces and repositories
+                WorkspaceSidebarView(
+                    workspaces: Array(workspaces),
+                    selectedWorkspace: selectedWorkspaceBinding,
+                    isCrossProjectSelected: crossProjectSelectionBinding,
+                    selectedRepository: selectedRepositoryBinding,
+                    selectedWorktree: selectedWorktreeBinding,
+                    searchText: $searchText,
+                    showingAddRepository: $showingAddRepository,
+                    repositoryManager: repositoryManager
+                )
+                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
+            } content: {
+                // Middle panel - worktree list or detail
+                Group {
+                    if selectionStore.isCrossProjectSelected {
+                        Color.clear
+                    } else if let repository = selectionStore.selectedRepository {
+                        WorktreeListView(
+                            repository: repository,
+                            selectedWorktree: selectedWorktreeBinding,
+                            repositoryManager: repositoryManager,
+                            tabStateManager: tabStateManager
+                        )
+                    } else {
+                        placeholderView(
+                            titleKey: "contentView.selectRepository",
+                            systemImage: "folder.badge.gearshape",
+                            descriptionKey: "contentView.selectRepositoryDescription"
+                        )
+                    }
+                }
+                .navigationSplitViewColumnWidth(
+                    min: zenModeEnabled ? 0 : 250,
+                    ideal: zenModeEnabled ? 0 : 300,
+                    max: zenModeEnabled ? 0 : 400
+                )
+                .opacity(zenModeEnabled ? 0 : 1)
+                .allowsHitTesting(!zenModeEnabled)
+                .animation(.easeInOut(duration: 0.25), value: zenModeEnabled)
+            } detail: {
+                // Right panel - worktree details
+                if selectionStore.isCrossProjectSelected, let worktree = selectionStore.crossProjectWorktree, !worktree.isDeleted {
+                    WorktreeDetailView(
+                        worktree: worktree,
                         repositoryManager: repositoryManager,
-                        tabStateManager: tabStateManager
+                        tabStateManager: tabStateManager,
+                        gitChangesContext: $gitChangesContext,
+                        onWorktreeDeleted: { _ in
+                            selectCrossProjectWorktree(nil)
+                            prepareCrossProjectWorkspaceIfNeeded()
+                        },
+                        showZenModeButton: false
                     )
+                    .id(worktree.id)
+                } else if selectionStore.isCrossProjectSelected {
+                    Color.clear
+                        .task {
+                            prepareCrossProjectWorkspaceIfNeeded()
+                        }
+                } else if let worktree = selectionStore.selectedWorktree, !worktree.isDeleted {
+                    WorktreeDetailView(
+                        worktree: worktree,
+                        repositoryManager: repositoryManager,
+                        tabStateManager: tabStateManager,
+                        gitChangesContext: $gitChangesContext,
+                        onWorktreeDeleted: { nextWorktree in
+                            selectWorktree(nextWorktree)
+                        },
+                        showZenModeButton: true
+                    )
+                    .id(worktree.id)
                 } else {
                     placeholderView(
-                        titleKey: "contentView.selectRepository",
-                        systemImage: "folder.badge.gearshape",
-                        descriptionKey: "contentView.selectRepositoryDescription"
+                        titleKey: "contentView.selectWorktree",
+                        systemImage: "arrow.triangle.branch",
+                        descriptionKey: "contentView.selectWorktreeDescription"
                     )
                 }
             }
-            .navigationSplitViewColumnWidth(
-                min: zenModeEnabled ? 0 : 250,
-                ideal: zenModeEnabled ? 0 : 300,
-                max: zenModeEnabled ? 0 : 400
-            )
-            .opacity(zenModeEnabled ? 0 : 1)
-            .allowsHitTesting(!zenModeEnabled)
-            .animation(.easeInOut(duration: 0.25), value: zenModeEnabled)
-        } detail: {
-            // Right panel - worktree details
-            if selectionStore.isCrossProjectSelected, let worktree = selectionStore.crossProjectWorktree, !worktree.isDeleted {
-                WorktreeDetailView(
-                    worktree: worktree,
-                    repositoryManager: repositoryManager,
-                    tabStateManager: tabStateManager,
-                    gitChangesContext: $gitChangesContext,
-                    onWorktreeDeleted: { _ in
-                        selectCrossProjectWorktree(nil)
-                        prepareCrossProjectWorkspaceIfNeeded()
-                    },
-                    showZenModeButton: false
-                )
-                .id(worktree.id)
-            } else if selectionStore.isCrossProjectSelected {
-                Color.clear
-                    .task {
-                        prepareCrossProjectWorkspaceIfNeeded()
-                    }
-            } else if let worktree = selectionStore.selectedWorktree, !worktree.isDeleted {
-                WorktreeDetailView(
-                    worktree: worktree,
-                    repositoryManager: repositoryManager,
-                    tabStateManager: tabStateManager,
-                    gitChangesContext: $gitChangesContext,
-                    onWorktreeDeleted: { nextWorktree in
-                        selectWorktree(nextWorktree)
-                    },
-                    showZenModeButton: true
-                )
-                .id(worktree.id)
-            } else {
-                placeholderView(
-                    titleKey: "contentView.selectWorktree",
-                    systemImage: "arrow.triangle.branch",
-                    descriptionKey: "contentView.selectWorktreeDescription"
-                )
-            }
-        }
-        .sheet(isPresented: $showingAddRepository) {
-            if let workspace = selectionStore.selectedWorkspace ?? workspaces.first {
-                RepositoryAddSheet(
-                    workspace: workspace,
-                    repositoryManager: repositoryManager,
-                    onRepositoryAdded: { repository in
-                        selectRepository(repository)
-                    }
-                )
-            }
-        }
-        .sheet(isPresented: $showingOnboarding) {
-            OnboardingView()
-        }
-        .sheet(isPresented: $showingCrossProjectOnboarding) {
-            CrossProjectOnboardingView()
-        }
-        .onAppear {
-            if selectionStore.isCrossProjectSelected && selectionStore.crossProjectWorktree == nil {
-                setCrossProjectSelected(false)
-            }
-
-            // Restore selected workspace from persistent storage
-            if selectionStore.selectedWorkspace == nil {
-                if let workspaceId = selectedWorkspaceId,
-                   let uuid = UUID(uuidString: workspaceId),
-                   let workspace = workspaces.first(where: { $0.id == uuid }) {
-                    selectWorkspace(workspace)
-                } else {
-                    selectWorkspace(workspaces.first)
+            .sheet(isPresented: $showingAddRepository) {
+                if let workspace = selectionStore.selectedWorkspace ?? workspaces.first {
+                    RepositoryAddSheet(
+                        workspace: workspace,
+                        repositoryManager: repositoryManager,
+                        onRepositoryAdded: { repository in
+                            selectRepository(repository)
+                        }
+                    )
                 }
             }
-
-            if !hasShownOnboarding {
-                showingOnboarding = true
-                hasShownOnboarding = true
+            .sheet(isPresented: $showingOnboarding) {
+                OnboardingView()
             }
-        }
-        .task(id: zenModeEnabled) {
-            if selectionStore.isCrossProjectSelected && !zenModeEnabled {
-                zenModeEnabled = true
+            .sheet(isPresented: $showingCrossProjectOnboarding) {
+                CrossProjectOnboardingView()
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .commandPaletteShortcut)) { _ in
-            showCommandPalette()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .quickSwitchWorktree)) { _ in
-            quickSwitchToPreviousWorktree()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToWorktree)) { notification in
-            guard let info = notification.userInfo,
-                  let workspaceId = info["workspaceId"] as? UUID,
-                  let repoId = info["repoId"] as? UUID,
-                  let worktreeId = info["worktreeId"] as? UUID else {
-                return
-            }
-            navigateToWorktree(workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToChatSession)) { notification in
-            guard let chatSessionId = notification.userInfo?["chatSessionId"] as? UUID else {
-                return
-            }
-            navigator.navigateToChatSession(
-                chatSessionId: chatSessionId,
-                viewContext: viewContext,
-                navigateToWorktree: navigateToWorktree
-            )
-        }
+        )
     }
 
 }

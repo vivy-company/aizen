@@ -5,19 +5,22 @@
 //  Created by Codex on 2026-04-03.
 //
 
+import CoreData
+import Foundation
+
 extension ContentView {
-    fileprivate func isCrossProjectRepository(_ repository: Repository) -> Bool {
+    func isCrossProjectRepository(_ repository: Repository) -> Bool {
         repository.isCrossProject || repository.note == crossProjectRepositoryMarker
     }
 
-    fileprivate func visibleRepositories(in workspace: Workspace) -> [Repository] {
+    func visibleRepositories(in workspace: Workspace) -> [Repository] {
         let repositories = (workspace.repositories as? Set<Repository>) ?? []
         return repositories
             .filter { !$0.isDeleted && !isCrossProjectRepository($0) }
             .sorted { ($0.name ?? "") < ($1.name ?? "") }
     }
 
-    private func ensureCrossProjectWorktree(for workspace: Workspace) throws -> Worktree {
+    func ensureCrossProjectWorktree(for workspace: Workspace) throws -> Worktree {
         try CrossProjectWorkspaceCoordinator(
             viewContext: viewContext,
             repositoryMarker: crossProjectRepositoryMarker
@@ -28,7 +31,7 @@ extension ContentView {
         )
     }
 
-    fileprivate func prepareCrossProjectWorkspaceIfNeeded() {
+    func prepareCrossProjectWorkspaceIfNeeded() {
         guard selectionStore.isCrossProjectSelected, let workspace = selectionStore.selectedWorkspace else {
             selectCrossProjectWorktree(nil)
             return
@@ -41,7 +44,7 @@ extension ContentView {
         }
     }
 
-    fileprivate func presentCrossProjectOnboardingIfNeeded() {
+    func presentCrossProjectOnboardingIfNeeded() {
         guard !hasShownCrossProjectOnboarding else {
             return
         }
@@ -50,7 +53,7 @@ extension ContentView {
         showingCrossProjectOnboarding = true
     }
 
-    private func showCommandPalette() {
+    func showCommandPalette() {
         let activeWorktree = currentActiveWorktree()
         let currentRepositoryId = selectionStore.selectedRepository?.id?.uuidString
             ?? activeWorktree?.repository?.id?.uuidString
@@ -67,7 +70,7 @@ extension ContentView {
         )
     }
 
-    fileprivate func currentActiveWorktree() -> Worktree? {
+    func currentActiveWorktree() -> Worktree? {
         if selectionStore.isCrossProjectSelected {
             return selectionStore.crossProjectWorktree
         }
