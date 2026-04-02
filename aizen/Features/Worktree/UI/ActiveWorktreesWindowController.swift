@@ -9,8 +9,8 @@ import AppKit
 import CoreData
 import SwiftUI
 
-final class ActiveWorktreesWindowManager {
-    static let shared = ActiveWorktreesWindowManager()
+final class ActiveWorktreesWindowController {
+    static let shared = ActiveWorktreesWindowController()
 
     private var window: NSWindow?
 

@@ -169,7 +169,7 @@ struct aizenApp: App {
 
             CommandGroup(after: .newItem) {
                 Button("Activity Monitor...") {
-                    ActiveWorktreesWindowManager.shared.show(context: persistenceController.container.viewContext)
+                    ActiveWorktreesWindowController.shared.show(context: persistenceController.container.viewContext)
                 }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
 
