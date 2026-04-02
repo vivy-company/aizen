@@ -1,5 +1,5 @@
 //
-//  TabConfigurationManager.swift
+//  TabConfigurationStore.swift
 //  aizen
 //
 
@@ -12,13 +12,13 @@ extension Notification.Name {
     static let tabConfigurationDidChange = Notification.Name("tabConfigurationDidChange")
 }
 
-class TabConfigurationManager: ObservableObject {
-    static let shared = TabConfigurationManager()
+class TabConfigurationStore: ObservableObject {
+    static let shared = TabConfigurationStore()
 
     private let defaults: UserDefaults
     private let orderKey = "tabOrder"
     private let defaultTabKey = "defaultTab"
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "TabConfigurationManager")
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "TabConfigurationStore")
 
     @Published private(set) var tabOrder: [TabItem] = TabItem.defaultOrder
     @Published private(set) var defaultTab: String = "chat"

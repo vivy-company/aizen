@@ -36,7 +36,7 @@ struct WorktreeDetailView: View {
     private let worktreeRuntime: WorktreeRuntime
     @ObservedObject private var gitSummaryStore: GitSummaryStore
     @ObservedObject private var xcodeBuildManager: XcodeBuildManager
-    @StateObject private var tabConfig = TabConfigurationManager.shared
+    @StateObject private var tabConfig = TabConfigurationStore.shared
     @State private var fileSearchWindowController: FileSearchWindowController?
     @State private var fileToOpenFromSearch: String?
     @State private var cachedTerminalBackgroundColor: Color?

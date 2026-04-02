@@ -224,7 +224,7 @@ struct GeneralSettingsView: View {
     @AppStorage("showXcodeBuild") private var showXcodeBuild = true
 
     @ObservedObject private var appDetector = AppDetector.shared
-    @StateObject private var tabConfig = TabConfigurationManager.shared
+    @StateObject private var tabConfig = TabConfigurationStore.shared
 
     @State private var showingResetConfirmation = false
     @State private var cliStatus = CLISymlinkManager.status()
