@@ -8,7 +8,7 @@
 import Foundation
 
 extension Notification.Name {
-    static let agentMetadataDidChange = Notification.Name("agentMetadataDidChange")
+    nonisolated static let agentMetadataDidChange = Notification.Name("agentMetadataDidChange")
 }
 
 nonisolated final class AgentRegistry {
