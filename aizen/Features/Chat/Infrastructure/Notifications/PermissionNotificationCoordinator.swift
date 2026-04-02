@@ -1,5 +1,5 @@
 //
-//  PermissionNotificationManager.swift
+//  PermissionNotificationCoordinator.swift
 //  aizen
 //
 //  Handles macOS notifications for agent permission requests when app is not focused.
@@ -25,8 +25,8 @@ struct PermissionNotificationInfo {
 }
 
 @MainActor
-final class PermissionNotificationManager: NSObject, UNUserNotificationCenterDelegate {
-    static let shared = PermissionNotificationManager()
+final class PermissionNotificationCoordinator: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = PermissionNotificationCoordinator()
 
     private let center = UNUserNotificationCenter.current()
     private let logger = Logger.forCategory("PermissionNotification")

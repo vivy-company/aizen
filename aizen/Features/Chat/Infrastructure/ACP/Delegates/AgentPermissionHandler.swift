@@ -80,7 +80,7 @@ class AgentPermissionHandler: ObservableObject {
             options: request.options ?? []
         )
 
-        PermissionNotificationManager.shared.notify(info: info)
+        PermissionNotificationCoordinator.shared.notify(info: info)
     }
 
     /// Handle timeout - auto-deny the permission request
@@ -109,7 +109,7 @@ class AgentPermissionHandler: ObservableObject {
 
         // Clear any pending system notification
         if let sessionId = chatSessionId {
-            PermissionNotificationManager.shared.clearNotification(for: sessionId)
+            PermissionNotificationCoordinator.shared.clearNotification(for: sessionId)
         }
 
         showingPermissionAlert = false
