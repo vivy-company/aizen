@@ -96,7 +96,7 @@ class ChatAgentSession: ObservableObject {
     var pendingToolCallUpdatesById: [String: [ToolCallUpdateDetails]] = [:]
 
     // Delegates
-    private let terminalDelegate = AgentTerminalDelegate()
+    let terminalDelegate = AgentTerminalDelegate()
     let permissionHandler = AgentPermissionHandler()
     private var clientDelegateBridge: ChatAgentSessionClientDelegate!
     private var agentCapabilities: AgentCapabilities?
@@ -889,76 +889,6 @@ class ChatAgentSession: ObservableObject {
     func dismissSetupPrompt() {
         needsAgentSetup = false
         setupError = nil
-    }
-
-    // MARK: - ACP Delegate Forwarding
-
-    func handleTerminalCreate(
-        command: String, sessionId: String, args: [String]?, cwd: String?, env: [EnvVariable]?,
-        outputByteLimit: Int?
-    ) async throws -> CreateTerminalResponse {
-        // Fall back to session's working directory if cwd not specified
-        let effectiveCwd = cwd ?? (workingDirectory.isEmpty ? nil : workingDirectory)
-
-        return try await terminalDelegate.handleTerminalCreate(
-            command: command,
-            sessionId: sessionId,
-            args: args,
-            cwd: effectiveCwd,
-            env: env,
-            outputByteLimit: outputByteLimit
-        )
-    }
-
-    func handleTerminalOutput(terminalId: TerminalId, sessionId: String) async throws
-        -> TerminalOutputResponse
-    {
-        return try await terminalDelegate.handleTerminalOutput(
-            terminalId: terminalId, sessionId: sessionId)
-    }
-
-    func handleTerminalWaitForExit(terminalId: TerminalId, sessionId: String) async throws
-        -> WaitForExitResponse
-    {
-        return try await terminalDelegate.handleTerminalWaitForExit(
-            terminalId: terminalId, sessionId: sessionId)
-    }
-
-    func handleTerminalKill(terminalId: TerminalId, sessionId: String) async throws
-        -> KillTerminalResponse
-    {
-        return try await terminalDelegate.handleTerminalKill(
-            terminalId: terminalId, sessionId: sessionId)
-    }
-
-    func handleTerminalRelease(terminalId: TerminalId, sessionId: String) async throws
-        -> ReleaseTerminalResponse
-    {
-        return try await terminalDelegate.handleTerminalRelease(
-            terminalId: terminalId, sessionId: sessionId)
-    }
-
-    func handlePermissionRequest(request: RequestPermissionRequest) async throws
-        -> RequestPermissionResponse
-    {
-        return await permissionHandler.handlePermissionRequest(request: request)
-    }
-
-    /// Respond to a permission request - delegates to permission handler
-    func respondToPermission(optionId: String) {
-        permissionHandler.respondToPermission(optionId: optionId)
-    }
-
-    // MARK: - Terminal Output Access
-
-    /// Get terminal output for display in UI
-    func getTerminalOutput(terminalId: String) async -> String? {
-        return await terminalDelegate.getOutput(terminalId: TerminalId(terminalId))
-    }
-
-    /// Check if terminal is still running
-    func isTerminalRunning(terminalId: String) async -> Bool {
-        return await terminalDelegate.isRunning(terminalId: TerminalId(terminalId))
     }
 
     func isAuthRequiredError(_ error: Error) -> Bool {
