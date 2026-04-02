@@ -10,7 +10,7 @@ struct PostCreateActionsView: View {
     @ObservedObject var repository: Repository
     @Binding var showingAddAction: Bool
     @Environment(\.managedObjectContext) private var viewContext
-    @StateObject private var templateManager = PostCreateTemplateManager.shared
+    @StateObject private var templateManager = PostCreateTemplateStore.shared
 
     @State private var showingTemplates = false
     @State private var editingAction: PostCreateAction?
@@ -959,7 +959,7 @@ struct PostCreateTemplatesSheet: View {
     let onSelect: (PostCreateTemplate) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var templateManager = PostCreateTemplateManager.shared
+    @StateObject private var templateManager = PostCreateTemplateStore.shared
 
     var body: some View {
         VStack(spacing: 0) {

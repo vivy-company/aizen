@@ -1,5 +1,5 @@
 //
-//  PostCreateTemplateManager.swift
+//  PostCreateTemplateStore.swift
 //  aizen
 //
 
@@ -8,13 +8,13 @@ import Combine
 import os.log
 
 @MainActor
-class PostCreateTemplateManager: ObservableObject {
-    static let shared = PostCreateTemplateManager()
+class PostCreateTemplateStore: ObservableObject {
+    static let shared = PostCreateTemplateStore()
 
     @Published var customTemplates: [PostCreateTemplate] = []
 
     private let userDefaultsKey = "postCreateTemplates"
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "PostCreateTemplateManager")
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "PostCreateTemplateStore")
 
     init() {
         loadTemplates()
