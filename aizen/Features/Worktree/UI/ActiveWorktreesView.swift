@@ -817,7 +817,7 @@ struct ActiveWorktreesView: View {
 
             var paneIds = paneIDs(for: session)
             if paneIds.isEmpty {
-                paneIds = TerminalSessionManager.shared.paneIds(for: sessionId)
+                paneIds = TerminalRuntimeStore.shared.paneIds(for: sessionId)
             }
 
             let uniquePaneIds = Array(Set(paneIds))
@@ -827,7 +827,7 @@ struct ActiveWorktreesView: View {
             }
 
             expectedPanes += uniquePaneIds.count
-            let runtimeCounts = TerminalSessionManager.shared.runtimeCounts(for: sessionId, paneIds: uniquePaneIds)
+            let runtimeCounts = TerminalRuntimeStore.shared.runtimeCounts(for: sessionId, paneIds: uniquePaneIds)
             livePanes += runtimeCounts.livePanes
             runningPanes += runtimeCounts.runningPanes
         }
@@ -891,7 +891,7 @@ struct ActiveWorktreesView: View {
         let terminals = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
         for session in terminals where !session.isDeleted {
             if let id = session.id {
-                TerminalSessionManager.shared.removeAllTerminals(for: id)
+                TerminalRuntimeStore.shared.removeAllTerminals(for: id)
             }
 
             if sessionPersistence,

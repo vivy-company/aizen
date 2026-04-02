@@ -15,7 +15,7 @@ struct TerminalTabView: View {
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @Environment(\.colorScheme) private var colorScheme
 
-    private let sessionManager = TerminalSessionManager.shared
+    private let sessionManager = TerminalRuntimeStore.shared
     @StateObject private var presetManager = TerminalPresetStore.shared
     private let logger = Logger.terminal
     private let visiblePresetsLimit = 8

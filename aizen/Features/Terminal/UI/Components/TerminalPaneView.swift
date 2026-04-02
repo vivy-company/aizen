@@ -26,7 +26,7 @@ struct TerminalPaneView: View {
     let effectiveThemeName: String
     let isSplit: Bool
     let isFocused: Bool
-    let sessionManager: TerminalSessionManager
+    let sessionManager: TerminalRuntimeStore
     @Binding var voiceAction: VoiceAction?
     let focusRequestVersion: Int
     let onFocus: () -> Void

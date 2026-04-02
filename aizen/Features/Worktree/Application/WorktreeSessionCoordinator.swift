@@ -94,7 +94,7 @@ struct WorktreeSessionCoordinator {
 
         // Clean up terminal views
         if let id = sessionId {
-            TerminalSessionManager.shared.removeAllTerminals(for: id)
+            TerminalRuntimeStore.shared.removeAllTerminals(for: id)
             terminalTitleRegistry.clearLiveTitle(for: id)
         }
 

@@ -1,5 +1,5 @@
 //
-//  TerminalSessionManager.swift
+//  TerminalRuntimeStore.swift
 //  aizen
 //
 //  Created by Uladzislau Yakauleu on 17.10.25.
@@ -13,8 +13,8 @@ struct TerminalRuntimeCounts {
     let runningPanes: Int
 }
 
-class TerminalSessionManager {
-    static let shared = TerminalSessionManager()
+class TerminalRuntimeStore {
+    static let shared = TerminalRuntimeStore()
 
     private var terminals: [String: AizenTerminalSurfaceView] = [:]
     private var accessOrder: [String] = []

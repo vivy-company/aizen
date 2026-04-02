@@ -19,7 +19,7 @@ final class TerminalSplitController: ObservableObject {
 
     let worktree: Worktree
     let session: TerminalSession
-    let sessionManager: TerminalSessionManager
+    let sessionManager: TerminalRuntimeStore
     let splitActions = TerminalSplitActions()
     private let titleRegistry = TerminalTitleRegistry.shared
 
@@ -60,7 +60,7 @@ final class TerminalSplitController: ObservableObject {
     init(
         worktree: Worktree,
         session: TerminalSession,
-        sessionManager: TerminalSessionManager,
+        sessionManager: TerminalRuntimeStore,
         isSelected: Bool
     ) {
         self.worktree = worktree

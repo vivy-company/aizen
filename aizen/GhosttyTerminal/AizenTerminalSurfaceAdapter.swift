@@ -6,7 +6,7 @@ struct AizenTerminalSurfaceAdapter {
     let session: TerminalSession
     let worktree: Worktree
     let paneId: String
-    let sessionManager: TerminalSessionManager
+    let sessionManager: TerminalRuntimeStore
     let onProcessExit: () -> Void
     let onFocus: () -> Void
     let onReady: () -> Void

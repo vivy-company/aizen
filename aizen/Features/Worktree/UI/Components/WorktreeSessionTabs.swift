@@ -192,7 +192,7 @@ struct SessionTabsScrollView: View {
         }
 
         // Check if any pane has a running process
-        if TerminalSessionManager.shared.hasRunningProcess(for: sessionId, paneIds: paneIds) {
+        if TerminalRuntimeStore.shared.hasRunningProcess(for: sessionId, paneIds: paneIds) {
             sessionToClose = session
             showCloseConfirmation = true
         } else {

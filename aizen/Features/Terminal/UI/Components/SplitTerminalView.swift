@@ -10,7 +10,7 @@ import SwiftUI
 struct SplitTerminalView: View {
     @ObservedObject var worktree: Worktree
     @ObservedObject var session: TerminalSession
-    let sessionManager: TerminalSessionManager
+    let sessionManager: TerminalRuntimeStore
     let isSelected: Bool
 
     @Environment(\.colorScheme) private var colorScheme
@@ -27,7 +27,7 @@ struct SplitTerminalView: View {
     init(
         worktree: Worktree,
         session: TerminalSession,
-        sessionManager: TerminalSessionManager,
+        sessionManager: TerminalRuntimeStore,
         isSelected: Bool = false
     ) {
         self.worktree = worktree
@@ -91,7 +91,7 @@ private struct SplitTerminalSubtreeView: View {
     let node: SplitNode
     @ObservedObject var worktree: Worktree
     @ObservedObject var session: TerminalSession
-    let sessionManager: TerminalSessionManager
+    let sessionManager: TerminalRuntimeStore
     let effectiveThemeName: String
     let isSplit: Bool
     let focusedPaneId: String
