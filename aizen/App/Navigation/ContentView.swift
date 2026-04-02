@@ -64,72 +64,26 @@ struct ContentView: View {
                 )
                 .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
             } content: {
-                // Middle panel - worktree list or detail
-                Group {
-                    if selectionStore.isCrossProjectSelected {
-                        Color.clear
-                    } else if let repository = selectionStore.selectedRepository {
-                        WorktreeListView(
-                            repository: repository,
-                            selectedWorktree: selectedWorktreeBinding,
-                            repositoryManager: repositoryManager,
-                            tabStateManager: tabStateManager
-                        )
-                    } else {
-                        placeholderView(
-                            titleKey: "contentView.selectRepository",
-                            systemImage: "folder.badge.gearshape",
-                            descriptionKey: "contentView.selectRepositoryDescription"
-                        )
-                    }
-                }
-                .navigationSplitViewColumnWidth(
-                    min: zenModeEnabled ? 0 : 250,
-                    ideal: zenModeEnabled ? 0 : 300,
-                    max: zenModeEnabled ? 0 : 400
+                AppNavigationContentColumn(
+                    isCrossProjectSelected: selectionStore.isCrossProjectSelected,
+                    repository: selectionStore.selectedRepository,
+                    selectedWorktree: selectedWorktreeBinding,
+                    repositoryManager: repositoryManager,
+                    tabStateManager: tabStateManager,
+                    zenModeEnabled: zenModeEnabled
                 )
-                .opacity(zenModeEnabled ? 0 : 1)
-                .allowsHitTesting(!zenModeEnabled)
-                .animation(.easeInOut(duration: 0.25), value: zenModeEnabled)
             } detail: {
-                // Right panel - worktree details
-                if selectionStore.isCrossProjectSelected, let worktree = selectionStore.crossProjectWorktree, !worktree.isDeleted {
-                    WorktreeDetailView(
-                        worktree: worktree,
-                        repositoryManager: repositoryManager,
-                        tabStateManager: tabStateManager,
-                        gitChangesContext: $gitChangesContext,
-                        onWorktreeDeleted: { _ in
-                            selectCrossProjectWorktree(nil)
-                            prepareCrossProjectWorkspaceIfNeeded()
-                        },
-                        showZenModeButton: false
-                    )
-                    .id(worktree.id)
-                } else if selectionStore.isCrossProjectSelected {
-                    Color.clear
-                        .task {
-                            prepareCrossProjectWorkspaceIfNeeded()
-                        }
-                } else if let worktree = selectionStore.selectedWorktree, !worktree.isDeleted {
-                    WorktreeDetailView(
-                        worktree: worktree,
-                        repositoryManager: repositoryManager,
-                        tabStateManager: tabStateManager,
-                        gitChangesContext: $gitChangesContext,
-                        onWorktreeDeleted: { nextWorktree in
-                            selectWorktree(nextWorktree)
-                        },
-                        showZenModeButton: true
-                    )
-                    .id(worktree.id)
-                } else {
-                    placeholderView(
-                        titleKey: "contentView.selectWorktree",
-                        systemImage: "arrow.triangle.branch",
-                        descriptionKey: "contentView.selectWorktreeDescription"
-                    )
-                }
+                AppNavigationDetailColumn(
+                    isCrossProjectSelected: selectionStore.isCrossProjectSelected,
+                    crossProjectWorktree: selectionStore.crossProjectWorktree,
+                    selectedWorktree: selectionStore.selectedWorktree,
+                    repositoryManager: repositoryManager,
+                    tabStateManager: tabStateManager,
+                    gitChangesContext: $gitChangesContext,
+                    onSelectCrossProjectWorktree: selectCrossProjectWorktree,
+                    onPrepareCrossProjectWorkspaceIfNeeded: prepareCrossProjectWorkspaceIfNeeded,
+                    onSelectWorktree: selectWorktree
+                )
             }
             .sheet(isPresented: $showingAddRepository) {
                 if let workspace = selectionStore.selectedWorkspace ?? workspaces.first {
@@ -156,7 +110,7 @@ struct ContentView: View {
 
 
 @ViewBuilder
-private func placeholderView(
+func placeholderView(
     titleKey: LocalizedStringKey,
     systemImage: String,
     descriptionKey: LocalizedStringKey
