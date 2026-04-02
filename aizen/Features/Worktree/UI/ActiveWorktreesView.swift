@@ -900,7 +900,7 @@ struct ActiveWorktreesView: View {
                 let paneIds = layout.allPaneIds()
                 Task {
                     for paneId in paneIds {
-                        await TmuxSessionManager.shared.killSession(paneId: paneId)
+                        await TmuxSessionRuntime.shared.killSession(paneId: paneId)
                     }
                 }
             }

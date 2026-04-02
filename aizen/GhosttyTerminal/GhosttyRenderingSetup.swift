@@ -66,13 +66,13 @@ class GhosttyRenderingSetup {
 
         // Check if session persistence is enabled and tmux is available
         var isRestoringTmuxSession = false
-        if sessionPersistence, let paneId = paneId, TmuxSessionManager.shared.isTmuxAvailable() {
+        if sessionPersistence, let paneId = paneId, TmuxSessionRuntime.shared.isTmuxAvailable() {
             // Check if we're restoring an existing tmux session
-            isRestoringTmuxSession = TmuxSessionManager.shared.sessionExistsSync(paneId: paneId)
+            isRestoringTmuxSession = TmuxSessionRuntime.shared.sessionExistsSync(paneId: paneId)
 
             // Use tmux for session persistence - set as the command directly
             // This makes tmux the shell process, not something running inside a shell
-            let tmuxCommand = TmuxSessionManager.shared.attachOrCreateCommand(
+            let tmuxCommand = TmuxSessionRuntime.shared.attachOrCreateCommand(
                 paneId: paneId,
                 workingDirectory: worktreePath
             )

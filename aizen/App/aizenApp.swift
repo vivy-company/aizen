@@ -120,7 +120,7 @@ struct aizenApp: App {
                 }
                 .task(id: "\(terminalFontName)\(terminalFontSize)\(terminalThemeName)\(terminalThemeNameLight)\(terminalUsePerAppearanceTheme)") {
                     ghosttyApp.reloadConfig()
-                    await TmuxSessionManager.shared.updateConfig()
+                    await TmuxSessionRuntime.shared.updateConfig()
                 }
                 .task {
                     await cleanupOrphanedTmuxSessions()
@@ -283,6 +283,6 @@ struct aizenApp: App {
             }
         }
 
-        await TmuxSessionManager.shared.cleanupOrphanedSessions(validPaneIds: validPaneIds)
+        await TmuxSessionRuntime.shared.cleanupOrphanedSessions(validPaneIds: validPaneIds)
     }
 }

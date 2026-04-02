@@ -1,5 +1,5 @@
 //
-//  TmuxSessionManager.swift
+//  TmuxSessionRuntime.swift
 //  aizen
 //
 //  Manages tmux sessions for terminal persistence across app restarts
@@ -12,10 +12,10 @@ import OSLog
 ///
 /// When terminal session persistence is enabled, each terminal pane runs inside
 /// a hidden tmux session. This allows terminals to survive app restarts.
-actor TmuxSessionManager {
-    static let shared = TmuxSessionManager()
+actor TmuxSessionRuntime {
+    static let shared = TmuxSessionRuntime()
 
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "TmuxSessionManager")
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "TmuxSessionRuntime")
 
     private init() {
         Task { await ensureConfigExists() }

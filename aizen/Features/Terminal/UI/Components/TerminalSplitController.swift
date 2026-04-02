@@ -319,7 +319,7 @@ final class TerminalSplitController: ObservableObject {
 
             if Self.sessionPersistenceEnabled {
                 Task {
-                    await TmuxSessionManager.shared.killSession(paneId: paneIdToClose)
+                    await TmuxSessionRuntime.shared.killSession(paneId: paneIdToClose)
                 }
             }
         }
@@ -350,7 +350,7 @@ final class TerminalSplitController: ObservableObject {
         if Self.sessionPersistenceEnabled {
             Task {
                 for paneId in allPaneIds {
-                    await TmuxSessionManager.shared.killSession(paneId: paneId)
+                    await TmuxSessionRuntime.shared.killSession(paneId: paneId)
                 }
             }
         }

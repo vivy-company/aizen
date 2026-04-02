@@ -64,7 +64,7 @@ struct TerminalSettingsView: View {
                     Button {
                         clearingTmuxSessions = true
                         Task {
-                            await TmuxSessionManager.shared.killAllAizenSessions()
+                            await TmuxSessionRuntime.shared.killAllAizenSessions()
                             clearingTmuxSessions = false
                         }
                     } label: {
@@ -157,7 +157,7 @@ struct TerminalSettingsView: View {
         .formStyle(.grouped)
         .settingsSurface()
         .onAppear {
-            tmuxAvailable = TmuxSessionManager.shared.isTmuxAvailable()
+            tmuxAvailable = TmuxSessionRuntime.shared.isTmuxAvailable()
         }
         .sheet(isPresented: $showingAddPreset) {
             TerminalPresetFormView(

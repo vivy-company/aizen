@@ -9,8 +9,8 @@ import ACP
 import os.log
 import SwiftUI
 
-// NOTE: TmuxSessionManager lives outside Views; keep a lightweight reference here.
-private let tmuxManager = TmuxSessionManager.shared
+// NOTE: TmuxSessionRuntime lives outside Views; keep a lightweight reference here.
+private let tmuxManager = TmuxSessionRuntime.shared
 private let terminalTitleRegistry = TerminalTitleRegistry.shared
 
 @MainActor
