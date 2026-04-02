@@ -10,26 +10,26 @@ import Sparkle
 import Combine
 
 struct UpdateSettingsView: View {
-    @ObservedObject private var updaterViewModel: UpdaterViewModel
+    @ObservedObject private var updaterStore: UpdaterStore
 
     init(updater: SPUUpdater) {
-        updaterViewModel = UpdaterViewModel(updater: updater)
+        updaterStore = UpdaterStore(updater: updater)
     }
 
     var body: some View {
         Form {
             Section(header: Text("Updates")) {
-                Toggle("Automatically check for updates", isOn: $updaterViewModel.automaticallyChecksForUpdates)
+                Toggle("Automatically check for updates", isOn: $updaterStore.automaticallyChecksForUpdates)
                     .help("Check for updates automatically on app launch and in the background")
 
-                Toggle("Automatically download updates", isOn: $updaterViewModel.automaticallyDownloadsUpdates)
+                Toggle("Automatically download updates", isOn: $updaterStore.automaticallyDownloadsUpdates)
                     .help("Download updates automatically without asking")
-                    .disabled(!updaterViewModel.automaticallyChecksForUpdates)
+                    .disabled(!updaterStore.automaticallyChecksForUpdates)
 
                 HStack {
                     Text("Last checked:")
                     Spacer()
-                    if let lastCheckDate = updaterViewModel.lastUpdateCheckDate {
+                    if let lastCheckDate = updaterStore.lastUpdateCheckDate {
                         Text(lastCheckDate, style: .relative)
                             .foregroundColor(.secondary)
                     } else {
@@ -39,9 +39,9 @@ struct UpdateSettingsView: View {
                 }
 
                 Button("Check Now") {
-                    updaterViewModel.checkForUpdates()
+                    updaterStore.checkForUpdates()
                 }
-                .disabled(!updaterViewModel.canCheckForUpdates)
+                .disabled(!updaterStore.canCheckForUpdates)
             }
         }
         .formStyle(.grouped)
@@ -50,7 +50,7 @@ struct UpdateSettingsView: View {
     }
 }
 
-final class UpdaterViewModel: ObservableObject {
+final class UpdaterStore: ObservableObject {
     @Published var automaticallyChecksForUpdates: Bool {
         didSet {
             updater.automaticallyChecksForUpdates = automaticallyChecksForUpdates

@@ -10,21 +10,21 @@ import Sparkle
 import Combine
 
 struct CheckForUpdatesView: View {
-    @ObservedObject private var checkForUpdatesViewModel: CheckForUpdatesViewModel
+    @ObservedObject private var checkForUpdatesStore: CheckForUpdatesStore
 
     init(updater: SPUUpdater) {
-        checkForUpdatesViewModel = CheckForUpdatesViewModel(updater: updater)
+        checkForUpdatesStore = CheckForUpdatesStore(updater: updater)
     }
 
     var body: some View {
         Button("Check for Updates...") {
-            checkForUpdatesViewModel.checkForUpdates()
+            checkForUpdatesStore.checkForUpdates()
         }
-        .disabled(!checkForUpdatesViewModel.canCheckForUpdates)
+        .disabled(!checkForUpdatesStore.canCheckForUpdates)
     }
 }
 
-final class CheckForUpdatesViewModel: ObservableObject {
+final class CheckForUpdatesStore: ObservableObject {
     @Published var canCheckForUpdates = false
 
     private let updater: SPUUpdater
