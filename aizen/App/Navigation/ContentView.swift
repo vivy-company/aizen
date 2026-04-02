@@ -13,21 +13,21 @@ struct ContentView: View {
     @Environment(\.managedObjectContext) var viewContext
     @ObservedObject var repositoryManager: RepositoryManager
     @StateObject var selectionStore = AppNavigationSelectionStore()
-    @StateObject private var tabStateManager = WorktreeTabStateStore()
-    @StateObject private var navigator = AppWorktreeNavigator()
+    @StateObject var tabStateManager = WorktreeTabStateStore()
+    @StateObject var navigator = AppWorktreeNavigator()
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)],
         animation: .default)
     var workspaces: FetchedResults<Workspace>
 
-    @State private var searchText = ""
-    @State private var showingAddRepository = false
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @AppStorage("hasShownOnboarding") private var hasShownOnboarding = false
-    @AppStorage("hasShownCrossProjectOnboarding") private var hasShownCrossProjectOnboarding = false
-    @State private var showingOnboarding = false
-    @State private var showingCrossProjectOnboarding = false
+    @State var searchText = ""
+    @State var showingAddRepository = false
+    @State var columnVisibility: NavigationSplitViewVisibility = .all
+    @AppStorage("hasShownOnboarding") var hasShownOnboarding = false
+    @AppStorage("hasShownCrossProjectOnboarding") var hasShownCrossProjectOnboarding = false
+    @State var showingOnboarding = false
+    @State var showingCrossProjectOnboarding = false
     @AppStorage("zenModeEnabled") var zenModeEnabled = false
 
     @State var saveTask: Task<Void, Never>?
@@ -41,39 +41,11 @@ struct ContentView: View {
     @AppStorage("selectedWorktreeId") var selectedWorktreeId: String?
     @AppStorage("selectedWorktreeByRepository") var selectedWorktreeByRepositoryData: String = "{}"
     @AppStorage("worktreeMRUOrder") var worktreeMRUOrderData: String = "[]"
-    private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
+    let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
     init(context: NSManagedObjectContext, repositoryManager: RepositoryManager, gitChangesContext: Binding<GitChangesContext?>) {
         self.repositoryManager = repositoryManager
         _gitChangesContext = gitChangesContext
-    }
-
-    private var selectedWorkspaceBinding: Binding<Workspace?> {
-        Binding(
-            get: { selectionStore.selectedWorkspace },
-            set: { selectWorkspace($0) }
-        )
-    }
-
-    private var crossProjectSelectionBinding: Binding<Bool> {
-        Binding(
-            get: { selectionStore.isCrossProjectSelected },
-            set: { setCrossProjectSelected($0) }
-        )
-    }
-
-    private var selectedRepositoryBinding: Binding<Repository?> {
-        Binding(
-            get: { selectionStore.selectedRepository },
-            set: { selectRepository($0) }
-        )
-    }
-
-    private var selectedWorktreeBinding: Binding<Worktree?> {
-        Binding(
-            get: { selectionStore.selectedWorktree },
-            set: { selectWorktree($0) }
-        )
     }
 
     var body: some View {
