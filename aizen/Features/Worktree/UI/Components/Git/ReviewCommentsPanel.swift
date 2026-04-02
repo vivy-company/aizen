@@ -21,7 +21,7 @@ struct ReviewCommentsPanel: View {
         static let footerBottomPadding: CGFloat = 12
     }
 
-    @ObservedObject var reviewManager: ReviewSessionManager
+    @ObservedObject var reviewManager: ReviewSessionStore
     let onScrollToLine: ((String, Int) -> Void)?
     let onCopyAll: () -> Void
     let onSendToAgent: () -> Void

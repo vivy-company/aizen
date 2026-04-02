@@ -166,7 +166,7 @@ struct GitPanelWindowContent: View {
     @State private var showAgentPicker: Bool = false
     @State private var cachedChangedFiles: [String] = []
 
-    @StateObject private var reviewManager = ReviewSessionManager()
+    @StateObject private var reviewManager = ReviewSessionStore()
     @State private var selectedWorkflowForTrigger: Workflow?
     @State private var isInitializingGit = false
     @State private var gitInitializationError: String?

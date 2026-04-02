@@ -1,8 +1,8 @@
 //
-//  ReviewSessionManager.swift
+//  ReviewSessionStore.swift
 //  aizen
 //
-//  Manages review comments persistence and export
+//  Stores review comments persistence and export state.
 //
 
 import Foundation
@@ -10,7 +10,7 @@ import CryptoKit
 import Combine
 
 @MainActor
-class ReviewSessionManager: ObservableObject {
+final class ReviewSessionStore: ObservableObject {
     @Published var comments: [ReviewComment] = []
     @Published var isLoaded = false
 
