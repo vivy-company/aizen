@@ -254,12 +254,12 @@ class FileBrowserStore: ObservableObject {
         if let size = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize,
            size > maxOpenFileBytes {
             let mb = Double(size) / 1024.0 / 1024.0
-            ToastManager.shared.show(String(format: "File too large to open (%.1f MB). Open in external editor.", mb), type: .info)
+            ToastStore.shared.show(String(format: "File too large to open (%.1f MB). Open in external editor.", mb), type: .info)
             return
         }
 
         guard let content = try? await fileService.readFile(path: path) else {
-            ToastManager.shared.show("Unable to open file (not UTF-8 text).", type: .info)
+            ToastStore.shared.show("Unable to open file (not UTF-8 text).", type: .info)
             return
         }
 
@@ -329,7 +329,7 @@ class FileBrowserStore: ObservableObject {
 
         do {
             try await fileService.createFile(at: filePath)
-            ToastManager.shared.show("Created \(name)", type: .success)
+            ToastStore.shared.show("Created \(name)", type: .success)
 
             // Refresh the tree to show new file
             refreshTree()
@@ -337,7 +337,7 @@ class FileBrowserStore: ObservableObject {
             // Open the new file
             await openFile(path: filePath)
         } catch {
-            ToastManager.shared.show(error.localizedDescription, type: .error)
+            ToastStore.shared.show(error.localizedDescription, type: .error)
         }
     }
 
@@ -346,7 +346,7 @@ class FileBrowserStore: ObservableObject {
 
         do {
             try await fileService.createDirectory(at: folderPath)
-            ToastManager.shared.show("Created folder \(name)", type: .success)
+            ToastStore.shared.show("Created folder \(name)", type: .success)
 
             // Refresh the tree to show new folder
             refreshTree()
@@ -354,7 +354,7 @@ class FileBrowserStore: ObservableObject {
             // Auto-expand the newly created folder
             expandedPaths.insert(folderPath)
         } catch {
-            ToastManager.shared.show(error.localizedDescription, type: .error)
+            ToastStore.shared.show(error.localizedDescription, type: .error)
         }
     }
 
@@ -364,7 +364,7 @@ class FileBrowserStore: ObservableObject {
 
         do {
             try await fileService.renameItem(from: oldPath, to: newPath)
-            ToastManager.shared.show("Renamed to \(newName)", type: .success)
+            ToastStore.shared.show("Renamed to \(newName)", type: .success)
 
             // If file was open, update its info
             if let index = openFiles.firstIndex(where: { $0.path == oldPath }) {
@@ -389,7 +389,7 @@ class FileBrowserStore: ObservableObject {
 
             saveSession()
         } catch {
-            ToastManager.shared.show(error.localizedDescription, type: .error)
+            ToastStore.shared.show(error.localizedDescription, type: .error)
         }
     }
 
@@ -398,7 +398,7 @@ class FileBrowserStore: ObservableObject {
 
         do {
             try await fileService.deleteItem(at: path)
-            ToastManager.shared.show("Deleted \(fileName)", type: .success)
+            ToastStore.shared.show("Deleted \(fileName)", type: .success)
 
             // Close file if it was open
             if let openFile = openFiles.first(where: { $0.path == path }) {
@@ -411,13 +411,13 @@ class FileBrowserStore: ObservableObject {
             // Refresh the tree to show deletion
             refreshTree()
         } catch {
-            ToastManager.shared.show(error.localizedDescription, type: .error)
+            ToastStore.shared.show(error.localizedDescription, type: .error)
         }
     }
 
     func copyPathToClipboard(path: String) {
         Clipboard.copy(path)
-        ToastManager.shared.show("Path copied to clipboard", type: .success)
+        ToastStore.shared.show("Path copied to clipboard", type: .success)
     }
 
     func revealInFinder(path: String) {

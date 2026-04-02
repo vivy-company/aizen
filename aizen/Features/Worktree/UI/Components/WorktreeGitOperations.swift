@@ -17,14 +17,14 @@ struct WorktreeGitOperations {
 
     func stageFile(_ file: String) {
         gitOperationService.stageFile(file, onError: { [logger] error in
-            ToastManager.shared.show("Failed to stage file", type: .error)
+            ToastStore.shared.show("Failed to stage file", type: .error)
             logger.error("Failed to stage file: \(error)")
         })
     }
 
     func unstageFile(_ file: String) {
         gitOperationService.unstageFile(file, onError: { [logger] error in
-            ToastManager.shared.show("Failed to unstage file", type: .error)
+            ToastStore.shared.show("Failed to unstage file", type: .error)
             logger.error("Failed to unstage file: \(error)")
         })
     }
@@ -35,7 +35,7 @@ struct WorktreeGitOperations {
                 onComplete()
             },
             onError: { [logger] error in
-                ToastManager.shared.show("Failed to stage files", type: .error)
+                ToastStore.shared.show("Failed to stage files", type: .error)
                 logger.error("Failed to stage all files: \(error)")
             }
         )
@@ -45,7 +45,7 @@ struct WorktreeGitOperations {
         gitOperationService.unstageAll(
             onSuccess: nil,
             onError: { [logger] error in
-                ToastManager.shared.show("Failed to unstage files", type: .error)
+                ToastStore.shared.show("Failed to unstage files", type: .error)
                 logger.error("Failed to unstage all files: \(error)")
             }
         )
@@ -54,10 +54,10 @@ struct WorktreeGitOperations {
     func discardAll() {
         gitOperationService.discardAll(
             onSuccess: {
-                ToastManager.shared.show("All changes discarded", type: .success)
+                ToastStore.shared.show("All changes discarded", type: .success)
             },
             onError: { [logger] error in
-                ToastManager.shared.show("Failed to discard changes", type: .error)
+                ToastStore.shared.show("Failed to discard changes", type: .error)
                 logger.error("Failed to discard all changes: \(error)")
             }
         )
@@ -66,52 +66,52 @@ struct WorktreeGitOperations {
     func cleanUntracked() {
         gitOperationService.cleanUntracked(
             onSuccess: {
-                ToastManager.shared.show("Untracked files removed", type: .success)
+                ToastStore.shared.show("Untracked files removed", type: .success)
             },
             onError: { [logger] error in
-                ToastManager.shared.show("Failed to remove untracked files", type: .error)
+                ToastStore.shared.show("Failed to remove untracked files", type: .error)
                 logger.error("Failed to clean untracked files: \(error)")
             }
         )
     }
 
     func commit(_ message: String) {
-        ToastManager.shared.showLoading("Committing changes...")
+        ToastStore.shared.showLoading("Committing changes...")
         gitOperationService.commit(
             message: message,
             onSuccess: {
-                ToastManager.shared.show("Changes committed", type: .success)
+                ToastStore.shared.show("Changes committed", type: .success)
             },
             onError: { [logger] error in
-                ToastManager.shared.show("Commit failed: \(error.localizedDescription)", type: .error, duration: 5.0)
+                ToastStore.shared.show("Commit failed: \(error.localizedDescription)", type: .error, duration: 5.0)
                 logger.error("Failed to commit changes: \(error)")
             }
         )
     }
 
     func amendCommit(_ message: String) {
-        ToastManager.shared.showLoading("Amending commit...")
+        ToastStore.shared.showLoading("Amending commit...")
         gitOperationService.amendCommit(
             message: message,
             onSuccess: {
-                ToastManager.shared.show("Commit amended", type: .success)
+                ToastStore.shared.show("Commit amended", type: .success)
             },
             onError: { [logger] error in
-                ToastManager.shared.show("Amend failed: \(error.localizedDescription)", type: .error, duration: 5.0)
+                ToastStore.shared.show("Amend failed: \(error.localizedDescription)", type: .error, duration: 5.0)
                 logger.error("Failed to amend commit: \(error)")
             }
         )
     }
 
     func commitWithSignoff(_ message: String) {
-        ToastManager.shared.showLoading("Committing with sign-off...")
+        ToastStore.shared.showLoading("Committing with sign-off...")
         gitOperationService.commitWithSignoff(
             message: message,
             onSuccess: {
-                ToastManager.shared.show("Changes committed", type: .success)
+                ToastStore.shared.show("Changes committed", type: .success)
             },
             onError: { [logger] error in
-                ToastManager.shared.show("Commit failed: \(error.localizedDescription)", type: .error, duration: 5.0)
+                ToastStore.shared.show("Commit failed: \(error.localizedDescription)", type: .error, duration: 5.0)
                 logger.error("Failed to commit with signoff: \(error)")
             }
         )
@@ -119,7 +119,7 @@ struct WorktreeGitOperations {
 
     func switchBranch(_ branch: String) {
         gitOperationService.checkoutBranch(branch) { [logger] error in
-            ToastManager.shared.show("Failed to switch branch: \(error.localizedDescription)", type: .error, duration: 5.0)
+            ToastStore.shared.show("Failed to switch branch: \(error.localizedDescription)", type: .error, duration: 5.0)
             logger.error("Failed to switch branch: \(error)")
         }
 
@@ -131,7 +131,7 @@ struct WorktreeGitOperations {
 
     func createBranch(_ name: String) {
         gitOperationService.createBranch(name) { [logger] error in
-            ToastManager.shared.show("Failed to create branch: \(error.localizedDescription)", type: .error, duration: 5.0)
+            ToastStore.shared.show("Failed to create branch: \(error.localizedDescription)", type: .error, duration: 5.0)
             logger.error("Failed to create branch: \(error)")
         }
 

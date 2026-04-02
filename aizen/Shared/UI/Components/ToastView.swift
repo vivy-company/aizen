@@ -47,7 +47,7 @@ struct ToastContainerView<Content: View>: View {
 
 private struct ToastModifierView<Content: View>: View {
     let content: Content
-    @StateObject private var toastManager = ToastManager.shared
+    @StateObject private var toastManager = ToastStore.shared
 
     var body: some View {
         ZStack {

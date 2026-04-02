@@ -1,5 +1,5 @@
 //
-//  ToastManager.swift
+//  ToastStore.swift
 //  aizen
 //
 //  Created by Uladzislau Yakauleu on 03.11.25.
@@ -44,8 +44,8 @@ struct ToastMessage: Identifiable, Equatable {
     }
 }
 
-final class ToastManager: ObservableObject {
-    static let shared = ToastManager()
+final class ToastStore: ObservableObject {
+    static let shared = ToastStore()
 
     @Published var currentToast: ToastMessage?
 
