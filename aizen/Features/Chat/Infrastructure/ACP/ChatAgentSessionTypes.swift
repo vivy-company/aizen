@@ -1,6 +1,25 @@
 import ACP
 import Foundation
 
+/// Session lifecycle state for clear status tracking
+enum SessionState: Equatable {
+    case idle
+    case initializing
+    case ready
+    case closing
+    case failed(String)
+
+    var isReady: Bool {
+        if case .ready = self { return true }
+        return false
+    }
+
+    var isInitializing: Bool {
+        if case .initializing = self { return true }
+        return false
+    }
+}
+
 struct MessageItem: Identifiable, Equatable {
     let id: String
     let role: MessageRole

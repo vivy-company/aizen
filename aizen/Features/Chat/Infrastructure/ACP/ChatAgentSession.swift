@@ -11,25 +11,6 @@ import Foundation
 import CoreData
 import UniformTypeIdentifiers
 
-/// Session lifecycle state for clear status tracking
-enum SessionState: Equatable {
-    case idle
-    case initializing  // Process launching, protocol init, waiting for session
-    case ready  // Fully initialized, can send messages
-    case closing
-    case failed(String)
-
-    var isReady: Bool {
-        if case .ready = self { return true }
-        return false
-    }
-
-    var isInitializing: Bool {
-        if case .initializing = self { return true }
-        return false
-    }
-}
-
 /// ObservableObject that wraps Client for managing an agent session
 @MainActor
 class ChatAgentSession: ObservableObject {
