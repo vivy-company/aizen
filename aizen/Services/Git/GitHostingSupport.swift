@@ -14,7 +14,7 @@ enum GitHostingProvider: String, Sendable {
     case azureDevOps
     case unknown
 
-    var displayName: String {
+    nonisolated var displayName: String {
         switch self {
         case .github: return "GitHub"
         case .gitlab: return "GitLab"
@@ -24,7 +24,7 @@ enum GitHostingProvider: String, Sendable {
         }
     }
 
-    var cliName: String? {
+    nonisolated var cliName: String? {
         switch self {
         case .github: return "gh"
         case .gitlab: return "glab"
@@ -33,14 +33,14 @@ enum GitHostingProvider: String, Sendable {
         }
     }
 
-    var prTerminology: String {
+    nonisolated var prTerminology: String {
         switch self {
         case .gitlab: return "Merge Request"
         default: return "Pull Request"
         }
     }
 
-    var installInstructions: String {
+    nonisolated var installInstructions: String {
         switch self {
         case .github: return "brew install gh && gh auth login"
         case .gitlab: return "brew install glab && glab auth login"
@@ -91,7 +91,7 @@ enum GitHostingError: LocalizedError {
     case unsupportedProvider
     case noRemoteFound
 
-    var errorDescription: String? {
+    nonisolated var errorDescription: String? {
         switch self {
         case .cliNotInstalled(let provider):
             return "\(provider.cliName ?? "CLI") is not installed"
@@ -108,7 +108,7 @@ enum GitHostingError: LocalizedError {
 }
 
 enum GitHostingRemoteSupport {
-    static func detectProvider(from remoteURL: String) -> GitHostingProvider {
+    nonisolated static func detectProvider(from remoteURL: String) -> GitHostingProvider {
         let lowercased = remoteURL.lowercased()
 
         if lowercased.contains("github.com") {
@@ -124,7 +124,7 @@ enum GitHostingRemoteSupport {
         return .unknown
     }
 
-    static func parseOwnerRepo(from remoteURL: String) -> (owner: String, repo: String)? {
+    nonisolated static func parseOwnerRepo(from remoteURL: String) -> (owner: String, repo: String)? {
         if remoteURL.contains("@") && remoteURL.contains(":") {
             let parts = remoteURL.components(separatedBy: ":")
             guard parts.count >= 2 else { return nil }
@@ -135,11 +135,11 @@ enum GitHostingRemoteSupport {
         return parsePathComponents(url.path)
     }
 
-    static func parseISO8601Date(_ value: String) -> Date {
+    nonisolated static func parseISO8601Date(_ value: String) -> Date {
         ISO8601DateParser.shared.parse(value) ?? Date()
     }
 
-    static func extractBaseURL(from remoteURL: String, provider: GitHostingProvider) -> String {
+    nonisolated static func extractBaseURL(from remoteURL: String, provider: GitHostingProvider) -> String {
         switch provider {
         case .github:
             return "https://github.com"
@@ -160,7 +160,7 @@ enum GitHostingRemoteSupport {
         }
     }
 
-    private static func parsePathComponents(_ path: String) -> (owner: String, repo: String)? {
+    nonisolated private static func parsePathComponents(_ path: String) -> (owner: String, repo: String)? {
         var cleanPath = path
         if cleanPath.hasPrefix("/") {
             cleanPath = String(cleanPath.dropFirst())
@@ -177,7 +177,7 @@ enum GitHostingRemoteSupport {
 }
 
 enum GitHostingURLBuilder {
-    static func buildURL(info: GitHostingInfo, action: GitHostingAction) -> URL? {
+    nonisolated static func buildURL(info: GitHostingInfo, action: GitHostingAction) -> URL? {
         switch action {
         case .createPR(let sourceBranch, let targetBranch):
             return buildCreatePRURL(info: info, sourceBranch: sourceBranch, targetBranch: targetBranch)
@@ -188,7 +188,7 @@ enum GitHostingURLBuilder {
         }
     }
 
-    static func buildCreatePRURL(info: GitHostingInfo, sourceBranch: String, targetBranch: String?) -> URL? {
+    nonisolated static func buildCreatePRURL(info: GitHostingInfo, sourceBranch: String, targetBranch: String?) -> URL? {
         let target = targetBranch ?? "main"
         let encodedSource = sourceBranch.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? sourceBranch
         let encodedTarget = target.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? target
@@ -207,7 +207,7 @@ enum GitHostingURLBuilder {
         }
     }
 
-    static func buildViewPRURL(info: GitHostingInfo, number: Int) -> URL? {
+    nonisolated static func buildViewPRURL(info: GitHostingInfo, number: Int) -> URL? {
         switch info.provider {
         case .github:
             return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)/pull/\(number)")
@@ -222,7 +222,7 @@ enum GitHostingURLBuilder {
         }
     }
 
-    static func buildRepoURL(info: GitHostingInfo) -> URL? {
+    nonisolated static func buildRepoURL(info: GitHostingInfo) -> URL? {
         switch info.provider {
         case .github, .gitlab, .bitbucket:
             return URL(string: "\(info.baseURL)/\(info.owner)/\(info.repo)")
