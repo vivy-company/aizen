@@ -50,58 +50,43 @@ struct ContentView: View {
 
     var body: some View {
         withLifecycleHandlers(
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                // Left sidebar - workspaces and repositories
-                WorkspaceSidebarView(
-                    workspaces: Array(workspaces),
-                    selectedWorkspace: selectedWorkspaceBinding,
-                    isCrossProjectSelected: crossProjectSelectionBinding,
-                    selectedRepository: selectedRepositoryBinding,
-                    selectedWorktree: selectedWorktreeBinding,
-                    searchText: $searchText,
-                    showingAddRepository: $showingAddRepository,
-                    repositoryManager: repositoryManager
-                )
-                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
-            } content: {
-                AppNavigationContentColumn(
-                    isCrossProjectSelected: selectionStore.isCrossProjectSelected,
-                    repository: selectionStore.selectedRepository,
-                    selectedWorktree: selectedWorktreeBinding,
-                    repositoryManager: repositoryManager,
-                    tabStateManager: tabStateManager,
-                    zenModeEnabled: zenModeEnabled
-                )
-            } detail: {
-                AppNavigationDetailColumn(
-                    isCrossProjectSelected: selectionStore.isCrossProjectSelected,
-                    crossProjectWorktree: selectionStore.crossProjectWorktree,
-                    selectedWorktree: selectionStore.selectedWorktree,
-                    repositoryManager: repositoryManager,
-                    tabStateManager: tabStateManager,
-                    gitChangesContext: $gitChangesContext,
-                    onSelectCrossProjectWorktree: selectCrossProjectWorktree,
-                    onPrepareCrossProjectWorkspaceIfNeeded: prepareCrossProjectWorkspaceIfNeeded,
-                    onSelectWorktree: selectWorktree
-                )
-            }
-            .sheet(isPresented: $showingAddRepository) {
-                if let workspace = selectionStore.selectedWorkspace ?? workspaces.first {
-                    RepositoryAddSheet(
-                        workspace: workspace,
+            withPresentationSheets(
+                NavigationSplitView(columnVisibility: $columnVisibility) {
+                    // Left sidebar - workspaces and repositories
+                    WorkspaceSidebarView(
+                        workspaces: Array(workspaces),
+                        selectedWorkspace: selectedWorkspaceBinding,
+                        isCrossProjectSelected: crossProjectSelectionBinding,
+                        selectedRepository: selectedRepositoryBinding,
+                        selectedWorktree: selectedWorktreeBinding,
+                        searchText: $searchText,
+                        showingAddRepository: $showingAddRepository,
+                        repositoryManager: repositoryManager
+                    )
+                    .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
+                } content: {
+                    AppNavigationContentColumn(
+                        isCrossProjectSelected: selectionStore.isCrossProjectSelected,
+                        repository: selectionStore.selectedRepository,
+                        selectedWorktree: selectedWorktreeBinding,
                         repositoryManager: repositoryManager,
-                        onRepositoryAdded: { repository in
-                            selectRepository(repository)
-                        }
+                        tabStateManager: tabStateManager,
+                        zenModeEnabled: zenModeEnabled
+                    )
+                } detail: {
+                    AppNavigationDetailColumn(
+                        isCrossProjectSelected: selectionStore.isCrossProjectSelected,
+                        crossProjectWorktree: selectionStore.crossProjectWorktree,
+                        selectedWorktree: selectionStore.selectedWorktree,
+                        repositoryManager: repositoryManager,
+                        tabStateManager: tabStateManager,
+                        gitChangesContext: $gitChangesContext,
+                        onSelectCrossProjectWorktree: selectCrossProjectWorktree,
+                        onPrepareCrossProjectWorkspaceIfNeeded: prepareCrossProjectWorkspaceIfNeeded,
+                        onSelectWorktree: selectWorktree
                     )
                 }
-            }
-            .sheet(isPresented: $showingOnboarding) {
-                OnboardingView()
-            }
-            .sheet(isPresented: $showingCrossProjectOnboarding) {
-                CrossProjectOnboardingView()
-            }
+            )
         )
     }
 
