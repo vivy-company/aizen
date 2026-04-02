@@ -253,42 +253,4 @@ extension ContentView {
         }
     }
 
-    func selectCrossProjectWorktree(_ worktree: Worktree?) {
-        selectionStore.crossProjectWorktree = worktree
-        guard selectionStore.isCrossProjectSelected, let worktree, !worktree.isDeleted else {
-            return
-        }
-        recordWorktreeInMRU(worktree)
-    }
-
-    func setCrossProjectSelected(_ isSelected: Bool, preferredWorktree: Worktree? = nil) {
-        if !isSelected {
-            selectionStore.isCrossProjectSelected = false
-            if let previousZenMode = selectionStore.zenModeBeforeCrossProjectSelection {
-                zenModeEnabled = previousZenMode
-                selectionStore.zenModeBeforeCrossProjectSelection = nil
-            }
-            selectCrossProjectWorktree(nil)
-            return
-        }
-
-        if selectionStore.zenModeBeforeCrossProjectSelection == nil {
-            selectionStore.zenModeBeforeCrossProjectSelection = zenModeEnabled
-        }
-
-        selectionStore.isCrossProjectSelected = true
-        zenModeEnabled = true
-        selectionStore.selectedRepository = nil
-        selectedRepositoryId = nil
-        selectionStore.selectedWorktree = nil
-        selectedWorktreeId = nil
-
-        if let preferredWorktree, !preferredWorktree.isDeleted {
-            selectCrossProjectWorktree(preferredWorktree)
-        } else {
-            prepareCrossProjectWorkspaceIfNeeded()
-        }
-
-        presentCrossProjectOnboardingIfNeeded()
-    }
 }
