@@ -211,7 +211,7 @@ struct SendToAgentSheet: View {
 
     private func sendToExistingChat(sessionId: UUID) {
         // Set pending attachment and switch to chat
-        ChatSessionManager.shared.setPendingAttachments([attachment], for: sessionId)
+        ChatSessionRegistry.shared.setPendingAttachments([attachment], for: sessionId)
 
         // Post notification to switch to the chat
         NotificationCenter.default.post(

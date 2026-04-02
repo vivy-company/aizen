@@ -45,7 +45,7 @@ struct WorktreeSessionManager {
         guard !session.isDeleted else { return }
 
         if let id = session.id {
-            ChatSessionManager.shared.removeAgentSession(for: id)
+            ChatSessionRegistry.shared.removeAgentSession(for: id)
         }
 
         if viewModel.selectedChatSessionId == session.id {

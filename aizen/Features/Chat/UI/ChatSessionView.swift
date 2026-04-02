@@ -13,7 +13,7 @@ import VVChatTimeline
 struct ChatSessionView: View {
     let worktree: Worktree
     @ObservedObject var session: ChatSession
-    let sessionManager: ChatSessionManager
+    let sessionManager: ChatSessionRegistry
     let isSelected: Bool
     let isCompanionResizing: Bool
 
@@ -51,7 +51,7 @@ struct ChatSessionView: View {
     init(
         worktree: Worktree,
         session: ChatSession,
-        sessionManager: ChatSessionManager,
+        sessionManager: ChatSessionRegistry,
         viewContext: NSManagedObjectContext,
         isSelected: Bool,
         isCompanionResizing: Bool = false

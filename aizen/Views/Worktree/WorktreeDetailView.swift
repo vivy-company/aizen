@@ -562,7 +562,7 @@ struct WorktreeDetailView: View {
         }
 
         // Store attachment (user can add context before sending)
-        ChatSessionManager.shared.setPendingAttachments([attachment], for: sessionId)
+        ChatSessionRegistry.shared.setPendingAttachments([attachment], for: sessionId)
 
         if doesChatSessionBelongToCurrentWorktree(sessionId) {
             selectedTab = "chat"

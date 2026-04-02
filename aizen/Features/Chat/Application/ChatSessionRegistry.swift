@@ -1,5 +1,5 @@
 //
-//  ChatSessionManager.swift
+//  ChatSessionRegistry.swift
 //  aizen
 //
 //  Created by Uladzislau Yakauleu on 17.10.25.
@@ -10,8 +10,8 @@ import Foundation
 import Combine
 
 @MainActor
-class ChatSessionManager: ObservableObject {
-    static let shared = ChatSessionManager()
+class ChatSessionRegistry: ObservableObject {
+    static let shared = ChatSessionRegistry()
 
     private var agentSessions: [UUID: AgentSession] = [:]
 

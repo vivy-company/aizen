@@ -13,7 +13,7 @@ struct PermissionBannerView: View {
     let currentChatSessionId: UUID?
     let onNavigate: (UUID) -> Void
 
-    @ObservedObject private var chatSessionManager = ChatSessionManager.shared
+    @ObservedObject private var chatSessionManager = ChatSessionRegistry.shared
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.colorScheme) private var colorScheme
 
@@ -27,7 +27,7 @@ struct PermissionBannerView: View {
     }
 
     private func fetchSessionInfo(for chatSessionId: UUID) -> PendingPermissionInfo? {
-        guard let agentSession = ChatSessionManager.shared.getAgentSession(for: chatSessionId),
+        guard let agentSession = ChatSessionRegistry.shared.getAgentSession(for: chatSessionId),
               let request = agentSession.permissionHandler.permissionRequest else {
             return nil
         }

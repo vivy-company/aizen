@@ -672,7 +672,7 @@ class AgentSession: ObservableObject {
         
         let context = PersistenceController.shared.container.viewContext
         
-        try await SessionPersistenceService.shared.saveSessionId(
+        try await ChatSessionPersistence.shared.saveSessionId(
             sessionId.value,
             for: chatSessionId,
             in: context

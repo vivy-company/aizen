@@ -1,5 +1,5 @@
 //
-//  SessionPersistenceService.swift
+//  ChatSessionPersistence.swift
 //  aizen
 //
 //  Service for persisting ACP session IDs to Core Data
@@ -30,8 +30,8 @@ enum SessionPersistenceError: LocalizedError {
 }
 
 /// Service responsible for persisting ACP session state to Core Data
-final class SessionPersistenceService {
-    static let shared = SessionPersistenceService()
+final class ChatSessionPersistence {
+    static let shared = ChatSessionPersistence()
     
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "SessionPersistence")
     private static let legacyWorktreeMapKey = "chatSession.lastWorktreeBySessionId"

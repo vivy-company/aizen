@@ -35,9 +35,9 @@ final class PermissionNotificationManager: NSObject, UNUserNotificationCenterDel
     /// Pending permission info keyed by notification identifier
     private var pendingNotifications: [String: PermissionNotificationInfo] = [:]
 
-    /// Routes permission response to the correct handler via ChatSessionManager
+    /// Routes permission response to the correct handler via ChatSessionRegistry
     private func respondToPermission(chatSessionId: UUID, optionId: String) {
-        guard let agentSession = ChatSessionManager.shared.getAgentSession(for: chatSessionId) else {
+        guard let agentSession = ChatSessionRegistry.shared.getAgentSession(for: chatSessionId) else {
             return
         }
         agentSession.permissionHandler.respondToPermission(optionId: optionId)

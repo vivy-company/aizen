@@ -126,12 +126,12 @@ struct aizenApp: App {
                     await cleanupOrphanedTmuxSessions()
                 }
                 .task {
-                    await SessionPersistenceService.shared.backfillSessionMetadata(
+                    await ChatSessionPersistence.shared.backfillSessionMetadata(
                         in: persistenceController.container.viewContext
                     )
                 }
                 .task {
-                    await SessionPersistenceService.shared.recoverDetachedSessionsFromLegacyScope(
+                    await ChatSessionPersistence.shared.recoverDetachedSessionsFromLegacyScope(
                         in: persistenceController.container.viewContext
                     )
                 }

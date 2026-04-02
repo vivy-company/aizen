@@ -94,7 +94,7 @@ struct SessionTabsScrollView: View {
     @State private var sessionToClose: TerminalSession?
     @State private var showCloseConfirmation = false
 
-    @ObservedObject private var sessionManager = ChatSessionManager.shared
+    @ObservedObject private var sessionManager = ChatSessionRegistry.shared
     @ObservedObject private var terminalTitleRegistry = TerminalTitleRegistry.shared
 
     var body: some View {

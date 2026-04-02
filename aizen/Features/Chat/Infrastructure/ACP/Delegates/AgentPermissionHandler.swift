@@ -21,9 +21,9 @@ class AgentPermissionHandler: ObservableObject {
 
     // MARK: - Context Properties
 
-    /// The chat session ID this handler belongs to (set by ChatSessionManager)
+    /// The chat session ID this handler belongs to (set by ChatSessionRegistry)
     var chatSessionId: UUID?
-    /// The worktree name for notification display (set by ChatSessionManager)
+    /// The worktree name for notification display (set by ChatSessionRegistry)
     var worktreeName: String?
 
     // MARK: - Private Properties

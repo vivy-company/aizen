@@ -19,7 +19,7 @@ class ChatSessionStore: ObservableObject {
 
     let worktree: Worktree
     let session: ChatSession
-    let sessionManager: ChatSessionManager
+    let sessionManager: ChatSessionRegistry
     let viewContext: NSManagedObjectContext
     private let worktreePathSnapshot: String
 
@@ -154,7 +154,7 @@ class ChatSessionStore: ObservableObject {
     init(
         worktree: Worktree,
         session: ChatSession,
-        sessionManager: ChatSessionManager,
+        sessionManager: ChatSessionRegistry,
         viewContext: NSManagedObjectContext
     ) {
         self.worktree = worktree
@@ -600,7 +600,7 @@ class ChatSessionStore: ObservableObject {
             return
         }
 
-        if let acpSessionId = await SessionPersistenceService.shared.getSessionId(
+        if let acpSessionId = await ChatSessionPersistence.shared.getSessionId(
             for: sessionId,
             in: viewContext
         ),
@@ -658,7 +658,7 @@ class ChatSessionStore: ObservableObject {
                 }
                 if shouldClearSessionId {
                     do {
-                        try await SessionPersistenceService.shared.clearSessionId(for: sessionId, in: viewContext)
+                        try await ChatSessionPersistence.shared.clearSessionId(for: sessionId, in: viewContext)
                     } catch {
                         logger.error("Failed to clear persisted session ID: \(error.localizedDescription)")
                     }

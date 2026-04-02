@@ -20,7 +20,7 @@ struct ChatTabView: View {
 
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.colorScheme) private var colorScheme
-    private let sessionManager = ChatSessionManager.shared
+    private let sessionManager = ChatSessionRegistry.shared
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ChatTabView")
     @State private var enabledAgents: [AgentMetadata] = []
     @State private var cachedSessionIds: [UUID] = []

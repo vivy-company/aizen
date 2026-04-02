@@ -231,7 +231,7 @@ final class SessionsListStore: ObservableObject {
         
         Task { @MainActor in
             do {
-                try await SessionPersistenceService.shared.archiveSession(sessionId, in: context)
+                try await ChatSessionPersistence.shared.archiveSession(sessionId, in: context)
                 logger.info("Archived session \(sessionId.uuidString)")
             } catch {
                 logger.error("Failed to archive session: \(error.localizedDescription)")
@@ -249,7 +249,7 @@ final class SessionsListStore: ObservableObject {
         
         Task { @MainActor in
             do {
-                try await SessionPersistenceService.shared.unarchiveSession(sessionId, in: context)
+                try await ChatSessionPersistence.shared.unarchiveSession(sessionId, in: context)
                 logger.info("Unarchived session \(sessionId.uuidString)")
             } catch {
                 logger.error("Failed to unarchive session: \(error.localizedDescription)")

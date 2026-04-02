@@ -883,7 +883,7 @@ struct ActiveWorktreesView: View {
         let chats = (worktree.chatSessions as? Set<ChatSession>) ?? []
         for session in chats where !session.isDeleted {
             if let id = session.id {
-                ChatSessionManager.shared.removeAgentSession(for: id)
+                ChatSessionRegistry.shared.removeAgentSession(for: id)
             }
             viewContext.delete(session)
         }
