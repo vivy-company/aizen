@@ -416,7 +416,7 @@ struct NewTabButton: View {
     var onCreateChatWithAgent: ((String) -> Void)?
     var onCreateTerminalWithPreset: ((TerminalPreset) -> Void)?
 
-    @StateObject private var presetManager = TerminalPresetManager.shared
+    @StateObject private var presetManager = TerminalPresetStore.shared
     @State private var enabledAgents: [AgentMetadata] = []
     @State private var isHovering = false
     @State private var clickTrigger = 0

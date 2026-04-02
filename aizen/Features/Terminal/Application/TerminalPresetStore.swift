@@ -1,5 +1,5 @@
 //
-//  TerminalPresetManager.swift
+//  TerminalPresetStore.swift
 //  aizen
 //
 //  Created by Uladzislau Yakauleu on 10.12.25.
@@ -14,12 +14,12 @@ extension Notification.Name {
     static let terminalPresetsDidChange = Notification.Name("terminalPresetsDidChange")
 }
 
-class TerminalPresetManager: ObservableObject {
-    static let shared = TerminalPresetManager()
+class TerminalPresetStore: ObservableObject {
+    static let shared = TerminalPresetStore()
 
     private let defaults: UserDefaults
     private let presetsKey = "terminalPresets"
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "TerminalPresetManager")
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "TerminalPresetStore")
 
     @Published private(set) var presets: [TerminalPreset] = []
 

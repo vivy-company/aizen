@@ -16,7 +16,7 @@ struct TerminalTabView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private let sessionManager = TerminalSessionManager.shared
-    @StateObject private var presetManager = TerminalPresetManager.shared
+    @StateObject private var presetManager = TerminalPresetStore.shared
     private let logger = Logger.terminal
     private let visiblePresetsLimit = 8
     private let emptyStateMaxWidth: CGFloat = 540

@@ -23,7 +23,7 @@ struct TerminalSettingsView: View {
     @AppStorage("terminalCopyRemoveBoxDrawing") private var copyRemoveBoxDrawing = false
     @AppStorage("terminalCopyStripAnsiCodes") private var copyStripAnsiCodes = true
 
-    @StateObject private var presetManager = TerminalPresetManager.shared
+    @StateObject private var presetManager = TerminalPresetStore.shared
     @State private var tmuxAvailable = false
     @State private var clearingTmuxSessions = false
     @State private var showingAddPreset = false

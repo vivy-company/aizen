@@ -132,10 +132,10 @@ struct TerminalPresetFormView: View {
             updated.name = trimmedName
             updated.command = trimmedCommand
             updated.icon = selectedIcon
-            TerminalPresetManager.shared.updatePreset(updated)
+            TerminalPresetStore.shared.updatePreset(updated)
             onSave(updated)
         } else {
-            TerminalPresetManager.shared.addPreset(
+            TerminalPresetStore.shared.addPreset(
                 name: trimmedName,
                 command: trimmedCommand,
                 icon: selectedIcon
