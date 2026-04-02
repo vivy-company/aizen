@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct GitSettingsView: View {
-    @StateObject private var templateManager = BranchTemplateManager.shared
+    @StateObject private var templateManager = BranchTemplateStore.shared
 
     @State private var showingAddTemplate = false
     @State private var editingTemplate: BranchTemplate?

@@ -1,5 +1,5 @@
 //
-//  BranchTemplateManager.swift
+//  BranchTemplateStore.swift
 //  aizen
 //
 
@@ -12,13 +12,13 @@ extension Notification.Name {
     static let branchTemplatesDidChange = Notification.Name("branchTemplatesDidChange")
 }
 
-class BranchTemplateManager: ObservableObject {
-    static let shared = BranchTemplateManager()
+class BranchTemplateStore: ObservableObject {
+    static let shared = BranchTemplateStore()
 
     private let defaults: UserDefaults
     private let templatesKey = "branchTemplates"
     private let legacyKey = "branchNameTemplates"
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "BranchTemplateManager")
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "BranchTemplateStore")
 
     @Published private(set) var templates: [BranchTemplate] = []
 

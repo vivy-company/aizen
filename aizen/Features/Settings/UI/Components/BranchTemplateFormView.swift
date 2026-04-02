@@ -121,10 +121,10 @@ struct BranchTemplateFormView: View {
             var updated = existing
             updated.prefix = trimmedPrefix
             updated.icon = selectedIcon
-            BranchTemplateManager.shared.updateTemplate(updated)
+            BranchTemplateStore.shared.updateTemplate(updated)
             onSave(updated)
         } else {
-            BranchTemplateManager.shared.addTemplate(prefix: trimmedPrefix, icon: selectedIcon)
+            BranchTemplateStore.shared.addTemplate(prefix: trimmedPrefix, icon: selectedIcon)
             let newTemplate = BranchTemplate(prefix: trimmedPrefix, icon: selectedIcon)
             onSave(newTemplate)
         }
