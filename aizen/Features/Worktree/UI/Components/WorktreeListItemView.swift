@@ -17,7 +17,7 @@ struct WorktreeListItemView: View {
     @ObservedObject var tabStateManager: WorktreeTabStateStore
     @Environment(\.controlActiveState) private var controlActiveState
 
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "WorktreeListItemView")
+    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "WorktreeListItemView")
 
     @AppStorage("defaultTerminalBundleId") private var defaultTerminalBundleId: String?
     @AppStorage("defaultEditorBundleId") private var defaultEditorBundleId: String?
@@ -46,36 +46,36 @@ struct WorktreeListItemView: View {
     }
 
     @State private var showingDetails = false
-    @State private var showingDeleteConfirmation = false
-    @State private var hasUnsavedChanges = false
-    @State private var errorMessage: String?
-    @State private var worktreeStatuses: [WorktreeStatusInfo] = []
-    @State private var isLoadingStatuses = false
-    @State private var mergeErrorMessage: String?
-    @State private var mergeConflictFiles: [String] = []
-    @State private var showingMergeConflict = false
-    @State private var showingMergeSuccess = false
-    @State private var mergeSuccessMessage = ""
-    @State private var availableBranches: [BranchInfo] = []
-    @State private var isLoadingBranches = false
-    @State private var showingBranchSelector = false
-    @State private var branchSwitchError: String?
+    @State var showingDeleteConfirmation = false
+    @State var hasUnsavedChanges = false
+    @State var errorMessage: String?
+    @State var worktreeStatuses: [WorktreeStatusInfo] = []
+    @State var isLoadingStatuses = false
+    @State var mergeErrorMessage: String?
+    @State var mergeConflictFiles: [String] = []
+    @State var showingMergeConflict = false
+    @State var showingMergeSuccess = false
+    @State var mergeSuccessMessage = ""
+    @State var availableBranches: [BranchInfo] = []
+    @State var isLoadingBranches = false
+    @State var showingBranchSelector = false
+    @State var branchSwitchError: String?
     @State private var showingNoteEditor = false
 
     private var worktreeStatus: ItemStatus {
         ItemStatus(rawValue: worktree.status ?? "active") ?? .active
     }
 
-    private var isGitEnvironment: Bool {
+    var isGitEnvironment: Bool {
         guard let path = worktree.path else { return false }
         return GitUtils.isGitRepository(at: path)
     }
 
-    private var supportsBranchOperations: Bool {
+    var supportsBranchOperations: Bool {
         isGitEnvironment && !worktree.isIndependentEnvironment
     }
 
-    private var supportsMergeOperations: Bool {
+    var supportsMergeOperations: Bool {
         isGitEnvironment && (worktree.isLinkedEnvironment || worktree.isPrimary)
     }
 
@@ -122,7 +122,7 @@ struct WorktreeListItemView: View {
         return Color(nsColor: base).opacity(alpha)
     }
 
-    private var mergeSourceStatuses: [WorktreeStatusInfo] {
+    var mergeSourceStatuses: [WorktreeStatusInfo] {
         worktreeStatuses.filter { $0.worktree.id != worktree.id }
     }
 
@@ -520,238 +520,4 @@ struct WorktreeListItemView: View {
         }
     }
 
-    // MARK: - Private Methods
-
-    private func setWorktreeStatus(_ status: ItemStatus) {
-        do {
-            try repositoryManager.updateWorktreeStatus(worktree, status: status)
-        } catch {
-            logger.error("Failed to update worktree status: \(error.localizedDescription)")
-        }
-    }
-
-    private func checkUnsavedChanges() {
-        guard isGitEnvironment else {
-            hasUnsavedChanges = false
-            showingDeleteConfirmation = true
-            return
-        }
-
-        Task {
-            do {
-                let changes = try await repositoryManager.hasUnsavedChanges(worktree)
-                await MainActor.run {
-                    hasUnsavedChanges = changes
-                    showingDeleteConfirmation = true
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func deleteWorktree() {
-        Task {
-            do {
-                // Find closest worktree to select after deletion
-                if let currentIndex = allWorktrees.firstIndex(where: { $0.id == worktree.id }) {
-                    let nextWorktree: Worktree?
-
-                    // Try next worktree, then previous, then nil
-                    if currentIndex + 1 < allWorktrees.count {
-                        nextWorktree = allWorktrees[currentIndex + 1]
-                    } else if currentIndex > 0 {
-                        nextWorktree = allWorktrees[currentIndex - 1]
-                    } else {
-                        nextWorktree = nil
-                    }
-
-                    try await repositoryManager.deleteWorktree(worktree, force: hasUnsavedChanges)
-
-                    await MainActor.run {
-                        selectedWorktree = nextWorktree
-                    }
-                } else {
-                    try await repositoryManager.deleteWorktree(worktree, force: hasUnsavedChanges)
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func loadWorktreeStatuses() {
-        guard supportsMergeOperations else {
-            worktreeStatuses = []
-            return
-        }
-        guard !isLoadingStatuses else { return }
-
-        Task {
-            await MainActor.run {
-                isLoadingStatuses = true
-            }
-
-            var statuses: [WorktreeStatusInfo] = []
-
-            for wt in allWorktrees {
-                if wt.isIndependentEnvironment {
-                    continue
-                }
-                guard let path = wt.path, GitUtils.isGitRepository(at: path) else {
-                    continue
-                }
-                do {
-                    let hasChanges = try await repositoryManager.hasUnsavedChanges(wt)
-                    let branch = wt.branch ?? "unknown"
-                    statuses.append(WorktreeStatusInfo(
-                        worktree: wt,
-                        hasUncommittedChanges: hasChanges,
-                        branch: branch
-                    ))
-                } catch {
-                    // Skip worktrees with errors
-                    continue
-                }
-            }
-
-            await MainActor.run {
-                worktreeStatuses = statuses
-                isLoadingStatuses = false
-            }
-        }
-    }
-
-    private func performMerge(from source: Worktree, to target: Worktree) {
-        guard supportsMergeOperations else { return }
-        Task {
-            do {
-                let result = try await repositoryManager.mergeFromWorktree(target: target, source: source)
-
-                await MainActor.run {
-                    switch result {
-                    case .success:
-                        mergeSuccessMessage = "Successfully merged \(source.branch ?? "unknown") into \(target.branch ?? "unknown")"
-                        showingMergeSuccess = true
-
-                    case .conflict(let files):
-                        mergeConflictFiles = files
-                        showingMergeConflict = true
-
-                    case .alreadyUpToDate:
-                        mergeSuccessMessage = "Already up to date with \(source.branch ?? "unknown")"
-                        showingMergeSuccess = true
-                    }
-
-                    // Reload statuses after merge
-                    loadWorktreeStatuses()
-                }
-            } catch {
-                await MainActor.run {
-                    mergeErrorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func loadAvailableBranches() {
-        guard supportsBranchOperations else {
-            availableBranches = []
-            return
-        }
-        guard !isLoadingBranches else { return }
-
-        Task {
-            await MainActor.run {
-                isLoadingBranches = true
-            }
-
-            do {
-                guard let repo = worktree.repository else {
-                    logger.warning("Cannot load branches: worktree has no repository")
-                    await MainActor.run { isLoadingBranches = false }
-                    return
-                }
-                let branches = try await repositoryManager.getBranches(for: repo)
-
-                await MainActor.run {
-                    // Show top 5 local branches + top 3 remote branches
-                    let localBranches = branches
-                        .filter { !$0.isRemote && $0.name != worktree.branch }
-                        .prefix(5)
-
-                    let remoteBranches = branches
-                        .filter { $0.isRemote }
-                        .prefix(3)
-
-                    availableBranches = Array(localBranches) + Array(remoteBranches)
-                    isLoadingBranches = false
-                }
-            } catch {
-                logger.error("Failed to load available branches: \(error.localizedDescription)")
-                await MainActor.run { isLoadingBranches = false }
-            }
-        }
-    }
-
-    private func switchToBranch(_ branch: BranchInfo) {
-        guard supportsBranchOperations else { return }
-        Task {
-            do {
-                // Handle remote branches by creating local tracking branch
-                if branch.isRemote {
-                    // Extract local branch name (e.g., "origin/feature" -> "feature")
-                    let localName = branch.name.split(separator: "/").dropFirst().joined(separator: "/")
-
-                    // Create and checkout new local branch tracking the remote
-                    try await repositoryManager.createAndSwitchBranch(
-                        worktree,
-                        name: localName,
-                        from: branch.name
-                    )
-                } else {
-                    // Switch to existing local branch
-                    try await repositoryManager.switchBranch(worktree, to: branch.name)
-                }
-
-                await MainActor.run {
-                    loadAvailableBranches()
-                }
-            } catch {
-                await MainActor.run {
-                    branchSwitchError = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func createNewBranch(name: String) {
-        guard supportsBranchOperations else { return }
-        Task {
-            do {
-                // Create new branch from current branch
-                guard let currentBranch = worktree.branch else {
-                    throw Libgit2Error.branchNotFound("No current branch")
-                }
-
-                try await repositoryManager.createAndSwitchBranch(
-                    worktree,
-                    name: name,
-                    from: currentBranch
-                )
-
-                await MainActor.run {
-                    loadAvailableBranches()
-                }
-            } catch {
-                await MainActor.run {
-                    branchSwitchError = error.localizedDescription
-                }
-            }
-        }
-    }
 }
