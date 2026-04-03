@@ -23,20 +23,20 @@ struct WorktreeDetailView: View {
     @StateObject var viewModel: WorktreeDetailStore
     @ObservedObject var tabStateManager: WorktreeTabStateStore
 
-    @AppStorage("showChatTab") private var showChatTab = true
-    @AppStorage("showTerminalTab") private var showTerminalTab = true
-    @AppStorage("showFilesTab") private var showFilesTab = true
-    @AppStorage("showBrowserTab") private var showBrowserTab = true
+    @AppStorage("showChatTab") var showChatTab = true
+    @AppStorage("showTerminalTab") var showTerminalTab = true
+    @AppStorage("showFilesTab") var showFilesTab = true
+    @AppStorage("showBrowserTab") var showBrowserTab = true
     @AppStorage("showOpenInApp") private var showOpenInApp = true
     @AppStorage("showGitStatus") private var showGitStatus = true
     @AppStorage("showXcodeBuild") private var showXcodeBuild = true
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
     @State var selectedTab = "chat"
-    @State private var lastOpenedApp: DetectedApp?
+    @State var lastOpenedApp: DetectedApp?
     private let worktreeRuntime: WorktreeRuntime
     @ObservedObject private var gitSummaryStore: GitSummaryStore
     @ObservedObject private var xcodeBuildManager: XcodeBuildStore
-    @StateObject private var tabConfig = TabConfigurationStore.shared
+    @StateObject var tabConfig = TabConfigurationStore.shared
     @State private var fileSearchWindowController: FileSearchWindowController?
     @State var fileToOpenFromSearch: String?
     @State private var cachedTerminalBackgroundColor: Color?
@@ -553,50 +553,6 @@ struct WorktreeDetailView: View {
             }
     }
 
-    private func loadTabState() {
-        guard let worktreeId = worktree.id else { return }
-
-        if tabStateManager.hasStoredState(for: worktreeId) {
-            // Restore saved state
-            let state = tabStateManager.getState(for: worktreeId)
-            selectedTab = state.viewType
-            viewModel.selectedChatSessionId = state.chatSessionId
-            viewModel.selectedTerminalSessionId = state.terminalSessionId
-            viewModel.selectedBrowserSessionId = state.browserSessionId
-            viewModel.selectedFileSessionId = state.fileSessionId
-        } else {
-            // Fresh worktree - use configured default tab
-            selectedTab = tabConfig.effectiveDefaultTab(
-                showChat: showChatTab,
-                showTerminal: showTerminalTab,
-                showFiles: showFilesTab,
-                showBrowser: showBrowserTab
-            )
-        }
-    }
-
-    private func saveTabState() {
-        guard let worktreeId = worktree.id else { return }
-        tabStateManager.saveViewType(selectedTab, for: worktreeId)
-    }
-
-    // MARK: - App Actions
-
-    private func openInLastApp() {
-        guard let app = lastOpenedApp else {
-            if let finder = appDetector.getApps(for: .finder).first {
-                openInDetectedApp(finder)
-            }
-            return
-        }
-        openInDetectedApp(app)
-    }
-
-    private func openInDetectedApp(_ app: DetectedApp) {
-        guard let path = worktree.path else { return }
-        lastOpenedApp = app
-        appDetector.openPath(path, with: app)
-    }
 }
 
 #Preview {
