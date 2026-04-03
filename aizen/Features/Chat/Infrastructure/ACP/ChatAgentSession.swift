@@ -275,61 +275,14 @@ class ChatAgentSession: ObservableObject {
         }
 
         if let authMethods = initResponse.authMethods, !authMethods.isEmpty {
-            self.authMethods = authMethods
-
-            // Check if we should skip authentication (previously succeeded without explicit auth)
-            let shouldSkipAuth = AgentRegistry.shared.shouldSkipAuth(for: agentName)
-
-            if shouldSkipAuth {
-                // User has previously authenticated externally (e.g., claude /login)
-                // Try session directly with normal timeout
-                do {
-                    try await createSessionDirectly(workingDir: workingDir, client: client)
-                    return
-                } catch {
-                    // Auth may have expired, clear skip preference and show dialog
-                    AgentRegistry.shared.clearAuthPreference(for: agentName)
-                    // Fall through to show auth dialog
-                }
-            } else if let savedAuthMethod = AgentRegistry.shared.getAuthPreference(for: agentName) {
-                // Try saved auth method
-                do {
-                    try await performAuthentication(
-                        client: client, authMethodId: savedAuthMethod, workingDir: workingDir)
-                    return
-                } catch {
-                    addSystemMessage(
-                        "⚠️ Saved authentication method failed. Please re-authenticate.")
-                    AgentRegistry.shared.clearAuthPreference(for: agentName)
-                    // Fall through to show auth dialog
-                }
-            } else {
-                // No saved preference - try session without auth first (user may have logged in externally)
-                do {
-                    try await createSessionDirectly(workingDir: workingDir, client: client)
-                    // Success! Save skip preference for future sessions
-                    AgentRegistry.shared.saveSkipAuth(for: agentName)
-                    return
-                } catch {
-                    // Check if error indicates API key/custom endpoint issue
-                    let errorMessage = error.localizedDescription.lowercased()
-                    if isAuthRequiredError(error) {
-                        self.needsAuthentication = true
-                        if errorMessage.contains("api key") || errorMessage.contains("invalid") ||
-                            errorMessage.contains("unauthorized") || errorMessage.contains("401") {
-                            addSystemMessage("⚠️ \(error.localizedDescription)")
-                        } else {
-                            addSystemMessage("Authentication required. Use the login button or configure API keys in environment variables.")
-                        }
-                        return
-                    }
-                    // Fall through to show auth dialog for other errors
-                }
+            if try await handleAuthenticationHandshake(
+                authMethods: authMethods,
+                agentName: agentName,
+                workingDir: workingDir,
+                client: client
+            ) {
+                return
             }
-
-            // Show auth dialog
-            self.needsAuthentication = true
-            addSystemMessage("Authentication required. Use the login button or configure API keys in environment variables.")
             return
         }
 

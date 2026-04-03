@@ -12,6 +12,60 @@ import Foundation
 
 @MainActor
 extension ChatAgentSession {
+    func handleAuthenticationHandshake(
+        authMethods: [AuthMethod],
+        agentName: String,
+        workingDir: String,
+        client: Client
+    ) async throws -> Bool {
+        self.authMethods = authMethods
+
+        let shouldSkipAuth = AgentRegistry.shared.shouldSkipAuth(for: agentName)
+
+        if shouldSkipAuth {
+            do {
+                try await createSessionDirectly(workingDir: workingDir, client: client)
+                return true
+            } catch {
+                AgentRegistry.shared.clearAuthPreference(for: agentName)
+            }
+        } else if let savedAuthMethod = AgentRegistry.shared.getAuthPreference(for: agentName) {
+            do {
+                try await performAuthentication(
+                    client: client,
+                    authMethodId: savedAuthMethod,
+                    workingDir: workingDir
+                )
+                return true
+            } catch {
+                addSystemMessage("⚠️ Saved authentication method failed. Please re-authenticate.")
+                AgentRegistry.shared.clearAuthPreference(for: agentName)
+            }
+        } else {
+            do {
+                try await createSessionDirectly(workingDir: workingDir, client: client)
+                AgentRegistry.shared.saveSkipAuth(for: agentName)
+                return true
+            } catch {
+                let errorMessage = error.localizedDescription.lowercased()
+                if isAuthRequiredError(error) {
+                    needsAuthentication = true
+                    if errorMessage.contains("api key") || errorMessage.contains("invalid") ||
+                        errorMessage.contains("unauthorized") || errorMessage.contains("401") {
+                        addSystemMessage("⚠️ \(error.localizedDescription)")
+                    } else {
+                        addSystemMessage("Authentication required. Use the login button or configure API keys in environment variables.")
+                    }
+                    return true
+                }
+            }
+        }
+
+        needsAuthentication = true
+        addSystemMessage("Authentication required. Use the login button or configure API keys in environment variables.")
+        return false
+    }
+
     /// Helper to create session directly without authentication
     func createSessionDirectly(workingDir: String, client: Client, timeout: TimeInterval = 60.0) async throws {
         let mcpServers = await resolveMCPServers()
