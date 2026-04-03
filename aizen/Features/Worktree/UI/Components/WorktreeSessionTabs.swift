@@ -27,9 +27,6 @@ struct SessionTabsScrollView: View {
     @State private var sessionToClose: TerminalSession?
     @State private var showCloseConfirmation = false
 
-    @ObservedObject private var sessionManager = ChatSessionRegistry.shared
-    @ObservedObject private var terminalTitleRegistry = TerminalTitleRegistry.shared
-
     var body: some View {
         HStack(spacing: 4) {
             // Navigation arrows group
@@ -55,7 +52,12 @@ struct SessionTabsScrollView: View {
                         if selectedTab == "chat" && !chatSessions.isEmpty {
                             ForEach(chatSessions) { session in
                                 let index = chatSessions.firstIndex(where: { $0.id == session.id }) ?? 0
-                                chatTabView(session: session)
+                                ChatSessionTabItemView(
+                                    session: session,
+                                    isSelected: selectedChatSessionId == session.id,
+                                    onSelect: { selectedChatSessionId = session.id },
+                                    onClose: { onCloseChatSession(session) }
+                                )
                                     .id(session.id)
                                     .contextMenu {
                                         chatContextMenu(session: session, index: index)
@@ -64,7 +66,12 @@ struct SessionTabsScrollView: View {
                         } else if selectedTab == "terminal" && !terminalSessions.isEmpty {
                             ForEach(terminalSessions) { session in
                                 let index = terminalSessions.firstIndex(where: { $0.id == session.id }) ?? 0
-                                terminalTabView(session: session)
+                                TerminalSessionTabItemView(
+                                    session: session,
+                                    isSelected: selectedTerminalSessionId == session.id,
+                                    onSelect: { selectedTerminalSessionId = session.id },
+                                    onClose: { requestCloseTerminalSession(session) }
+                                )
                                     .id(session.id)
                                     .contextMenu {
                                         terminalContextMenu(session: session, index: index)
@@ -130,54 +137,6 @@ struct SessionTabsScrollView: View {
             showCloseConfirmation = true
         } else {
             onCloseTerminalSession(session)
-        }
-    }
-
-    // MARK: - Chat Tab View
-
-    @ViewBuilder
-    private func chatTabView(session: ChatSession) -> some View {
-        let hasPendingPermission = session.id.map { sessionManager.hasPendingPermission(for: $0) } ?? false
-
-        SessionTabButton(
-            isSelected: selectedChatSessionId == session.id,
-            action: { selectedChatSessionId = session.id }
-        ) {
-            HStack(spacing: 6) {
-                DetailCloseButton(action: { onCloseChatSession(session) }, size: 10)
-
-                AgentIconView(agent: session.agentName ?? AgentRegistry.defaultAgentID, size: 14)
-
-                Text(session.title ?? session.agentName?.capitalized ?? String(localized: "worktree.session.chat"))
-                    .font(.callout)
-
-                // Pending permission indicator
-                if hasPendingPermission {
-                    PendingPermissionIndicator()
-                }
-            }
-        }
-    }
-
-    // MARK: - Terminal Tab View
-
-    @ViewBuilder
-    private func terminalTabView(session: TerminalSession) -> some View {
-        SessionTabButton(
-            isSelected: selectedTerminalSessionId == session.id,
-            action: { selectedTerminalSessionId = session.id }
-        ) {
-            HStack(spacing: 6) {
-                DetailCloseButton(action: { requestCloseTerminalSession(session) }, size: 10)
-
-                Image(systemName: "terminal")
-                    .font(.system(size: 12))
-
-                Text(terminalTitleRegistry.title(for: session) ?? String(localized: "worktree.session.terminal"))
-                    .font(.callout)
-
-                TerminalPersistenceIndicator()
-            }
         }
     }
 
