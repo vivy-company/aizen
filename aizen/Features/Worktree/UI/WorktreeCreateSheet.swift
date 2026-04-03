@@ -27,14 +27,14 @@ struct WorktreeCreateSheet: View {
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
 
     @State var mode: EnvironmentCreationMode = .linked
-    @State private var environmentName = ""
+    @State var environmentName = ""
     @State var branchName = ""
     @State var selectedBranch: BranchInfo?
     @State private var isProcessing = false
     @State private var errorMessage: String?
-    @State private var validationWarning: String?
+    @State var validationWarning: String?
     @State var showingBranchSelector = false
-    @State private var selectedTemplateIndex: Int?
+    @State var selectedTemplateIndex: Int?
     @State var showingPostCreateActions = false
     @State var shouldRunPostCreateActions = true
     @State var independentMethod: WorkspaceRepositoryStore.IndependentEnvironmentMethod = .clone
@@ -45,9 +45,9 @@ struct WorktreeCreateSheet: View {
     @State var selectedSubmodulePaths: Set<String> = []
     @State var matchSubmoduleBranchToEnvironment = false
 
-    @AppStorage("branchNameTemplates") private var branchNameTemplatesData: Data = Data()
+    @AppStorage("branchNameTemplates") var branchNameTemplatesData: Data = Data()
 
-    private var branchNameTemplates: [String] {
+    var branchNameTemplates: [String] {
         (try? JSONDecoder().decode([String].self, from: branchNameTemplatesData)) ?? []
     }
 
@@ -102,7 +102,7 @@ struct WorktreeCreateSheet: View {
         return selectedSubmodulePaths.intersection(available).count
     }
 
-    private var branchNamePrompt: String {
+    var branchNamePrompt: String {
         let trimmedName = environmentName.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedName.isEmpty {
             return "feature-login-auth"
@@ -147,7 +147,7 @@ struct WorktreeCreateSheet: View {
         )
     }
 
-    private var branchNameBinding: Binding<String> {
+    var branchNameBinding: Binding<String> {
         Binding(
             get: { branchName },
             set: { newValue in
@@ -169,7 +169,7 @@ struct WorktreeCreateSheet: View {
         )
     }
 
-    private var environmentNameWarning: String? {
+    var environmentNameWarning: String? {
         let trimmedName = environmentName.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedName.isEmpty {
             return "Environment name is required."
@@ -280,78 +280,6 @@ struct WorktreeCreateSheet: View {
         }
     }
 
-    @ViewBuilder
-    private var namingSection: some View {
-        Section("Naming") {
-            LabeledContent("Environment Name") {
-                TextField("", text: $environmentName, prompt: Text("feature-landing-redesign"))
-                    .frame(maxWidth: 280)
-            }
-
-            if let warning = environmentNameWarning {
-                warningRow(warning)
-            }
-
-            if mode == .linked {
-                LabeledContent {
-                    HStack(spacing: 8) {
-                        TextField("", text: branchNameBinding, prompt: Text(branchNamePrompt))
-                            .frame(maxWidth: 260)
-                            .onSubmit {
-                                if !branchName.isEmpty && validationWarning == nil {
-                                    createEnvironment()
-                                }
-                            }
-                        Button {
-                            generateRandomName()
-                        } label: {
-                            Image(systemName: "shuffle")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(String(localized: "worktree.create.generateRandom"))
-                    }
-                } label: {
-                    Text(String(localized: "worktree.create.branchName", bundle: .main))
-                }
-
-                if !branchNameTemplates.isEmpty {
-                    ScrollView(.horizontal) {
-                        HStack(spacing: 6) {
-                            ForEach(Array(branchNameTemplates.enumerated()), id: \.offset) { index, template in
-                                Button {
-                                    if selectedTemplateIndex == index {
-                                        selectedTemplateIndex = nil
-                                    } else {
-                                        selectedTemplateIndex = index
-                                        branchName = template
-                                    }
-                                    validateBranchName()
-                                } label: {
-                                    Text(template)
-                                        .font(.caption)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(
-                                            selectedTemplateIndex == index
-                                                ? Color.accentColor.opacity(0.3)
-                                                : Color.secondary.opacity(0.2),
-                                            in: Capsule()
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
-                }
-
-                if let warning = validationWarning {
-                    warningRow(warning)
-                }
-            }
-        }
-    }
-
     private func suggestEnvironmentName() {
         generateRandomName()
     }
@@ -381,7 +309,7 @@ struct WorktreeCreateSheet: View {
         }
     }
 
-    private func generateRandomName() {
+    func generateRandomName() {
         let excludedNames = Set(existingWorktreeNames)
         let generated = WorkspaceNameGenerator.generateUniqueName(excluding: Array(excludedNames))
             .lowercased()
@@ -392,7 +320,7 @@ struct WorktreeCreateSheet: View {
         validateBranchName()
     }
 
-    private func validateBranchName() {
+    func validateBranchName() {
         guard mode == .linked else {
             validationWarning = nil
             return
@@ -410,7 +338,7 @@ struct WorktreeCreateSheet: View {
         }
     }
 
-    private func createEnvironment() {
+    func createEnvironment() {
         guard !isProcessing, isValid else { return }
         guard let destinationPath = targetPath else { return }
 
