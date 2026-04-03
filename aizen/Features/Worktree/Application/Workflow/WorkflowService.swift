@@ -40,9 +40,9 @@ class WorkflowService: ObservableObject {
     private var githubProvider: GitHubWorkflowProvider?
     private var gitlabProvider: GitLabWorkflowProvider?
 
-    private var refreshTask: Task<Void, Never>?
+    var refreshTask: Task<Void, Never>?
     var logPollingTask: Task<Void, Never>?
-    private var autoRefreshEnabled = false
+    var autoRefreshEnabled = false
     var isStateStale = true
 
     let runsLimit = 20
@@ -106,41 +106,6 @@ class WorkflowService: ObservableObject {
         isStateStale = true
         guard autoRefreshEnabled else { return }
         await loadRuns()
-    }
-
-    // MARK: - Auto Refresh
-
-    private func startAutoRefresh() {
-        stopAutoRefresh()
-
-        refreshTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
-                guard !Task.isCancelled else { break }
-                await self?.refresh()
-            }
-        }
-    }
-
-    func stopAutoRefresh() {
-        refreshTask?.cancel()
-        refreshTask = nil
-    }
-
-    func setAutoRefreshEnabled(_ enabled: Bool) {
-        guard isConfigured else { return }
-        autoRefreshEnabled = enabled
-        if enabled {
-            if isStateStale || workflows.isEmpty || runs.isEmpty {
-                Task { [weak self] in
-                    await self?.refresh()
-                }
-            }
-            startAutoRefresh()
-        } else {
-            stopAutoRefresh()
-            stopLogPolling()
-        }
     }
 
     // MARK: - Helpers
