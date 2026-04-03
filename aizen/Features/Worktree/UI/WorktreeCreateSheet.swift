@@ -37,7 +37,7 @@ struct WorktreeCreateSheet: View {
     @State private var selectedTemplateIndex: Int?
     @State var showingPostCreateActions = false
     @State var shouldRunPostCreateActions = true
-    @State private var independentMethod: WorkspaceRepositoryStore.IndependentEnvironmentMethod = .clone
+    @State var independentMethod: WorkspaceRepositoryStore.IndependentEnvironmentMethod = .clone
     @State private var detectedSubmodules: [GitSubmoduleInfo] = []
     @State private var loadingSubmodules = false
     @State private var initializeSubmodules = true
@@ -51,12 +51,12 @@ struct WorktreeCreateSheet: View {
         (try? JSONDecoder().decode([String].self, from: branchNameTemplatesData)) ?? []
     }
 
-    private var isGitProject: Bool {
+    var isGitProject: Bool {
         guard let repoPath = repository.path else { return false }
         return GitUtils.isGitRepository(at: repoPath)
     }
 
-    private var sourcePath: String? {
+    var sourcePath: String? {
         let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
         if let primary = worktrees.first(where: { $0.isPrimary }),
            let path = primary.path {
@@ -110,7 +110,7 @@ struct WorktreeCreateSheet: View {
         return "feature/\(trimmedName)"
     }
 
-    private var independentMethodDescription: String {
+    var independentMethodDescription: String {
         switch independentMethod {
         case .clone:
             return "Clone creates a separate Git repository using git clone --local. It keeps .git, history, branches, and remotes."
@@ -435,41 +435,6 @@ struct WorktreeCreateSheet: View {
                 }
             } else {
                 Text("No submodules detected in this repository.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var independentModeSections: some View {
-        Section("Source") {
-            Text(sourcePath ?? "No source path available")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
-
-            if !isGitProject {
-                Text("Files will be copied into a separate environment.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-
-        if isGitProject {
-            Section("Method") {
-                Picker("Method", selection: $independentMethod) {
-                    Text("Clone")
-                        .tag(WorkspaceRepositoryStore.IndependentEnvironmentMethod.clone)
-                    Text("Copy")
-                        .tag(WorkspaceRepositoryStore.IndependentEnvironmentMethod.copy)
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-
-                Text(independentMethodDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
