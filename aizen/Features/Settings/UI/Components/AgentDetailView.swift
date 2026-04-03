@@ -14,21 +14,21 @@ struct AgentDetailView: View {
     let isDefault: Bool
     let onSetDefault: () -> Void
 
-    @State private var isInstalling = false
-    @State private var isUpdating = false
-    @State private var isTesting = false
-    @State private var canUpdate = false
-    @State private var isAgentValid = false
-    @State private var testResult: String?
+    @State var isInstalling = false
+    @State var isUpdating = false
+    @State var isTesting = false
+    @State var canUpdate = false
+    @State var isAgentValid = false
+    @State var testResult: String?
     @State private var showingFilePicker = false
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirmation = false
-    @State private var errorMessage: String?
-    @State private var testTask: Task<Void, Never>?
-    @State private var resultDismissTask: Task<Void, Never>?
+    @State var errorMessage: String?
+    @State var testTask: Task<Void, Never>?
+    @State var resultDismissTask: Task<Void, Never>?
     @State private var authMethodName: String?
     @State private var showingAuthClearedMessage = false
-    @State private var installedVersion: String?
+    @State var installedVersion: String?
     @State private var showingRulesEditor = false
     @State private var showingConfigEditor = false
     @State private var selectedConfigFile: AgentConfigFile?
@@ -656,143 +656,6 @@ struct AgentDetailView: View {
 
     // MARK: - Private Methods
 
-    private func validateAgent() async {
-        let isValid = AgentRegistry.shared.validateAgent(named: metadata.id)
-        await MainActor.run {
-            isAgentValid = isValid
-            errorMessage = nil
-        }
-    }
-
-    private func updateAgent() async {
-        await MainActor.run {
-            isUpdating = true
-            testResult = nil
-        }
-
-        do {
-            try await AgentInstaller.shared.updateAgent(metadata)
-            let refreshedMetadata = AgentRegistry.shared.getMetadata(for: metadata.id)
-            await MainActor.run {
-                if let refreshedMetadata {
-                    metadata = refreshedMetadata
-                }
-                showResult("Updated to latest version")
-            }
-
-            await validateAgent()
-            let canUpdateState = await AgentInstaller.shared.canUpdate(metadata)
-            await MainActor.run {
-                canUpdate = canUpdateState
-            }
-
-            await AgentVersionChecker.shared.clearCache(for: metadata.id)
-            await loadVersion()
-        } catch {
-            await MainActor.run {
-                showResult("Update failed: \(error.localizedDescription)", autoDismiss: false)
-            }
-        }
-
-        await MainActor.run {
-            isUpdating = false
-        }
-    }
-
-    private func installAgent() async {
-        await MainActor.run {
-            isInstalling = true
-            testResult = nil
-        }
-
-        do {
-            try await AgentInstaller.shared.installAgent(metadata)
-            let refreshedMetadata = AgentRegistry.shared.getMetadata(for: metadata.id)
-            await MainActor.run {
-                if let refreshedMetadata {
-                    metadata = refreshedMetadata
-                }
-            }
-
-            await validateAgent()
-            let canUpdateState = await AgentInstaller.shared.canUpdate(metadata)
-            await MainActor.run {
-                canUpdate = canUpdateState
-            }
-
-            await loadVersion()
-        } catch {
-            await MainActor.run {
-                showResult("Install failed: \(error.localizedDescription)", autoDismiss: false)
-            }
-        }
-
-        await MainActor.run {
-            isInstalling = false
-        }
-    }
-
-    private func testConnection() async {
-        testTask?.cancel()
-
-        isTesting = true
-        testResult = nil
-
-        guard let path = AgentRegistry.shared.getAgentPath(for: metadata.id) else {
-            showResult("No executable path set", autoDismiss: false)
-            isTesting = false
-            return
-        }
-
-        testTask = Task {
-            do {
-                let tempClient = Client()
-
-                let arguments = AgentRegistry.shared.getAgentLaunchArgs(for: metadata.id)
-                let environment = await AgentRegistry.shared.resolvedAgentLaunchEnvironment(for: metadata.id)
-
-                try await tempClient.launch(
-                    agentPath: path,
-                    arguments: arguments,
-                    environment: environment.isEmpty ? nil : environment
-                )
-
-                let capabilities = ClientCapabilities(
-                    fs: FileSystemCapabilities(
-                        readTextFile: true,
-                        writeTextFile: true
-                    ),
-                    terminal: true,
-                    meta: [
-                        "terminal_output": AnyCodable(true),
-                        "terminal-auth": AnyCodable(true)
-                    ]
-                )
-
-                _ = try await tempClient.initialize(
-                    protocolVersion: 1,
-                    capabilities: capabilities
-                )
-
-                await MainActor.run {
-                    showResult("Success: Valid ACP executable")
-                }
-
-                await tempClient.terminate()
-            } catch {
-                await MainActor.run {
-                    showResult("Failed: \(error.localizedDescription)", autoDismiss: false)
-                }
-            }
-
-            await MainActor.run {
-                isTesting = false
-            }
-        }
-
-        await testTask?.value
-    }
-
     private func loadAuthStatus() {
         authMethodName = AgentRegistry.shared.getAuthMethodName(for: metadata.id)
         showingAuthClearedMessage = false
@@ -821,35 +684,6 @@ struct AgentDetailView: View {
 
         Task {
             await AgentRegistry.shared.updateAgent(updatedMetadata)
-        }
-    }
-
-    private func loadVersion() async {
-        guard isAgentValid else {
-            await MainActor.run {
-                installedVersion = nil
-            }
-            return
-        }
-
-        let versionInfo = await AgentVersionChecker.shared.checkVersion(for: metadata.id)
-        await MainActor.run {
-            installedVersion = versionInfo.current
-        }
-    }
-
-    private func showResult(_ message: String, autoDismiss: Bool = true) {
-        resultDismissTask?.cancel()
-        testResult = message
-
-        if autoDismiss {
-            resultDismissTask = Task {
-                try? await Task.sleep(for: .seconds(3))
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    testResult = nil
-                }
-            }
         }
     }
 
