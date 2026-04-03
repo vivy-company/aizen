@@ -12,28 +12,28 @@ import SwiftUI
 struct MCPMarketplaceView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject private var mcpManager = MCPManagementStore.shared
+    @ObservedObject var mcpManager = MCPManagementStore.shared
 
     let agentId: String
     let agentPath: String?
     let agentName: String
 
-    @State private var searchQuery = ""
-    @State private var servers: [MCPServer] = []
-    @State private var isLoading = true
-    @State private var hasMore = false
-    @State private var nextCursor: String?
-    @State private var errorMessage: String?
-    @State private var selectedFilter: ServerFilter = .all
+    @State var searchQuery = ""
+    @State var servers: [MCPServer] = []
+    @State var isLoading = true
+    @State var hasMore = false
+    @State var nextCursor: String?
+    @State var errorMessage: String?
+    @State var selectedFilter: ServerFilter = .all
 
-    @State private var selectedServer: MCPServer?
-    @State private var showingInstallSheet = false
-    @State private var serverToRemove: MCPServer?
-    @State private var showingRemoveConfirmation = false
+    @State var selectedServer: MCPServer?
+    @State var showingInstallSheet = false
+    @State var serverToRemove: MCPServer?
+    @State var showingRemoveConfirmation = false
 
-    @State private var supportedTransports: Set<String> = ["stdio"]
+    @State var supportedTransports: Set<String> = ["stdio"]
 
-    private enum ServerFilter: String, CaseIterable {
+    enum ServerFilter: String, CaseIterable {
         case all = "All"
         case installed = "Added"
         case remote = "Remote"
@@ -192,233 +192,9 @@ struct MCPMarketplaceView: View {
 
     // MARK: - Content
 
-    private var filteredServers: [MCPServer] {
-        let compatibleServers = servers.filter { isCompatible(server: $0) }
-        switch selectedFilter {
-        case .all:
-            return compatibleServers
-        case .installed:
-            return [] // Handled separately by installedServerListView
-        case .remote:
-            return compatibleServers.filter { $0.isRemoteOnly }
-        case .package:
-            return compatibleServers.filter { !$0.isRemoteOnly }
-        }
-    }
-
-    private var contentView: some View {
-        Group {
-            if selectedFilter == .installed {
-                installedServerListView
-            } else if isLoading && servers.isEmpty {
-                loadingView
-            } else if let error = errorMessage {
-                errorView(error)
-            } else if filteredServers.isEmpty {
-                emptyView
-            } else {
-                serverListView
-            }
-        }
-    }
-
-    private var loadingView: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            ProgressView()
-                .controlSize(.large)
-            Text("Loading MCP servers...")
-                .font(.callout)
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func errorView(_ error: String) -> some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 32))
-                .foregroundColor(.orange)
-            Text(error)
-                .font(.callout)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-            Button("Retry") {
-                Task { await loadServers() }
-            }
-            .buttonStyle(.bordered)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-    }
-
-    private var emptyView: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: selectedFilter == .installed ? "checkmark.circle" : "magnifyingglass")
-                .font(.system(size: 32))
-                .foregroundColor(.secondary)
-            Text(emptyMessage)
-                .font(.callout)
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var emptyMessage: String {
-        if selectedFilter != .installed, !servers.isEmpty, filteredServers.isEmpty {
-            return "No compatible servers for \(agentName)"
-        }
-        switch selectedFilter {
-        case .installed:
-            return "No MCP servers added"
-        case .remote:
-            return "No remote servers found"
-        case .package:
-            return "No package servers found"
-        case .all:
-            return searchQuery.isEmpty ? "No servers available" : "No servers found"
-        }
-    }
-
-    private var installedServers: [MCPInstalledServer] {
-        mcpManager.servers(for: agentId)
-    }
-
-    private var installedServerListView: some View {
-        VStack(spacing: 0) {
-            // Count label
-            HStack {
-                Text("\(installedServers.count) added")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                if mcpManager.isSyncingServers(for: agentId) {
-                    ProgressView()
-                        .controlSize(.small)
-                        .padding(.leading, 4)
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color(NSColor.controlBackgroundColor))
-
-            Divider()
-
-            if installedServers.isEmpty {
-                VStack(spacing: 12) {
-                    Spacer()
-                    Image(systemName: "checkmark.circle")
-                        .font(.system(size: 32))
-                        .foregroundColor(.secondary)
-                    Text("No MCP servers added")
-                        .font(.callout)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-            } else {
-                List {
-                    ForEach(installedServers) { server in
-                        MCPInstalledServerRow(server: server) {
-                            Task {
-                                do {
-                                    try await mcpManager.remove(
-                                        serverName: server.serverName,
-                                        agentId: agentId
-                                    )
-                                } catch {
-                                    errorMessage = error.localizedDescription
-                                }
-                            }
-                        }
-                        .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
-                    }
-                }
-                .listStyle(.plain)
-            }
-        }
-    }
-
-    private var serverListView: some View {
-        VStack(spacing: 0) {
-            // Count label
-            HStack {
-                Text("\(filteredServers.count) servers")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                if isLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                        .padding(.leading, 4)
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color(NSColor.controlBackgroundColor))
-
-            Divider()
-
-            // Server list
-            List {
-                ForEach(filteredServers) { server in
-                    MCPServerRowView(
-                        server: server,
-                        isInstalled: mcpManager.isInstalled(
-                            serverName: server.name,
-                            agentId: agentId
-                        ),
-                        onInstall: {
-                            selectedServer = server
-                            showingInstallSheet = true
-                        },
-                        onRemove: {
-                            serverToRemove = server
-                            showingRemoveConfirmation = true
-                        }
-                    )
-                    .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
-                }
-
-                // Load more button
-                if hasMore && selectedFilter != .installed {
-                    Button {
-                        Task { await loadMore() }
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if isLoading {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Text("Load more servers")
-                                    .font(.caption)
-                                    .foregroundColor(.accentColor)
-                            }
-                            Spacer()
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                    .disabled(isLoading)
-                }
-            }
-            .listStyle(.plain)
-        }
-    }
-
     // MARK: - Data Loading
 
-    private func loadServers() async {
+    func loadServers() async {
         isLoading = true
         errorMessage = nil
 
@@ -500,7 +276,7 @@ struct MCPMarketplaceView: View {
         await tempClient.terminate()
     }
 
-    private func isCompatible(server: MCPServer) -> Bool {
+    func isCompatible(server: MCPServer) -> Bool {
         let packageSupported = server.packages?.contains { package in
             supportsTransport(package.transportType)
         } ?? false
@@ -570,7 +346,7 @@ struct MCPMarketplaceView: View {
         isLoading = false
     }
 
-    private func loadMore() async {
+    func loadMore() async {
         guard let cursor = nextCursor, !isLoading else { return }
 
         isLoading = true
