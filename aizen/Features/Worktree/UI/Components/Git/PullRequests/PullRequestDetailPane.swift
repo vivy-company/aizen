@@ -11,14 +11,14 @@ struct PullRequestDetailPane: View {
     @ObservedObject var viewModel: PullRequestsViewModel
     let pr: PullRequest
 
-    @State private var selectedTab: DetailTab = .overview
+    @State var selectedTab: DetailTab = .overview
     @State var commentText: String = ""
     @State var conversationAction: PullRequestsViewModel.ConversationAction = .comment
     @State var showRequestChangesSheet = false
     @State var requestChangesText: String = ""
 
-    @AppStorage("editorFontFamily") private var editorFontFamily: String = "Menlo"
-    @AppStorage("diffFontSize") private var diffFontSize: Double = 11.0
+    @AppStorage("editorFontFamily") var editorFontFamily: String = "Menlo"
+    @AppStorage("diffFontSize") var diffFontSize: Double = 11.0
 
     enum DetailTab: String, CaseIterable {
         case overview = "Overview"
@@ -174,136 +174,6 @@ struct PullRequestDetailPane: View {
         case .overview: return nil
         case .diff: return pr.changedFiles > 0 ? pr.changedFiles : nil
         case .comments: return viewModel.comments.isEmpty ? nil : viewModel.comments.count
-        }
-    }
-
-    // MARK: - Tab Content
-
-    @ViewBuilder
-    private var tabContent: some View {
-        switch selectedTab {
-        case .overview:
-            overviewTab
-        case .diff:
-            diffTab
-        case .comments:
-            commentsTab
-        }
-    }
-
-    private var overviewTab: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if !pr.body.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Description")
-                            .font(.headline)
-
-                        MessageContentView(content: pr.body)
-                    }
-                } else {
-                    Text("No description provided")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.tertiary)
-                        .italic()
-                }
-
-                Spacer()
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    @ViewBuilder
-    private var diffTab: some View {
-        Group {
-            if viewModel.isLoadingDiff {
-                VStack {
-                    Spacer()
-                    ProgressView()
-                    Text("Loading diff...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-            } else if viewModel.diffOutput.isEmpty {
-                VStack(spacing: 12) {
-                    Spacer()
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 32))
-                        .foregroundStyle(.tertiary)
-                    Text("No changes")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-            } else {
-                DiffView(
-                    diffOutput: viewModel.diffOutput,
-                    fontSize: diffFontSize,
-                    fontFamily: editorFontFamily,
-                    repoPath: "",
-                    scrollToFile: nil,
-                    onFileVisible: { _ in },
-                    onOpenFile: { _ in },
-                    commentedLines: Set(),
-                    onAddComment: { _, _ in }
-                )
-            }
-        }
-        .task(id: pr.id) {
-            await viewModel.loadDiffIfNeeded()
-        }
-    }
-
-    @ViewBuilder
-    private var commentsTab: some View {
-        VStack(spacing: 0) {
-            if viewModel.isLoadingComments {
-                VStack {
-                    Spacer()
-                    ProgressView()
-                    Text("Loading comments...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-            } else if viewModel.comments.isEmpty {
-                VStack(spacing: 12) {
-                    Spacer()
-                    Image(systemName: "bubble.left.and.bubble.right")
-                        .font(.system(size: 32))
-                        .foregroundStyle(.tertiary)
-                    Text("No comments yet")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(viewModel.comments) { comment in
-                            PRCommentView(comment: comment)
-                        }
-                    }
-                    .padding(16)
-                }
-            }
-
-            GitWindowDivider()
-
-            // Comment input
-            if pr.state == .open {
-                commentInput
-            }
-        }
-        .task(id: pr.id) {
-            await viewModel.loadCommentsIfNeeded()
         }
     }
 
