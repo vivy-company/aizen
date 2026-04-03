@@ -29,9 +29,9 @@ struct AgentDetailView: View {
     @State var authMethodName: String?
     @State var showingAuthClearedMessage = false
     @State var installedVersion: String?
-    @State private var showingRulesEditor = false
-    @State private var showingConfigEditor = false
-    @State private var selectedConfigFile: AgentConfigFile?
+    @State var showingRulesEditor = false
+    @State var showingConfigEditor = false
+    @State var selectedConfigFile: AgentConfigFile?
     @State var rulesPreview: String?
     @State var commands: [AgentCommand] = []
     @State private var showingCommandEditor = false
@@ -39,17 +39,17 @@ struct AgentDetailView: View {
     @State private var showingMCPMarketplace = false
     @State private var mcpServerToRemove: MCPInstalledServer?
     @State private var showingMCPRemoveConfirmation = false
-    @State private var showingUsageDetails = false
+    @State var showingUsageDetails = false
     @State var environmentSaveTask: Task<Void, Never>?
     @State var environmentVariablesDraft: [AgentEnvironmentVariable] = []
     @ObservedObject private var mcpManager = MCPManagementStore.shared
-    @ObservedObject private var usageMetricsStore = AgentUsageMetricsStore.shared
+    @ObservedObject var usageMetricsStore = AgentUsageMetricsStore.shared
 
     var configSpec: AgentConfigSpec {
         AgentConfigRegistry.spec(for: metadata.id)
     }
 
-    private var supportsUsageMetrics: Bool {
+    var supportsUsageMetrics: Bool {
         switch UsageProvider.fromAgentId(metadata.id) {
         case .codex, .claude, .gemini:
             return true
@@ -265,83 +265,9 @@ struct AgentDetailView: View {
             )
 
             if metadata.isEnabled {
-                // MARK: - Usage
+                usageSection
 
-                if supportsUsageMetrics {
-                    Section("Usage") {
-                        AgentUsageSummaryView(
-                            report: usageMetricsStore.report(for: metadata.id),
-                            refreshState: usageMetricsStore.refreshState(for: metadata.id),
-                            onRefresh: { usageMetricsStore.refresh(agentId: metadata.id, force: true) },
-                            onOpenDetails: { showingUsageDetails = true }
-                        )
-                    }
-                }
-
-                // MARK: - Configuration
-
-                if !configSpec.configFiles.isEmpty {
-                    Section("Configuration") {
-                        // Rules file
-                        if let rulesFile = configSpec.rulesFile {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(rulesFile.name)
-                                            .font(.headline)
-                                        if let desc = rulesFile.description {
-                                            Text(desc)
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-
-                                    Spacer()
-
-                                    Button(rulesFile.exists ? "Edit" : "Create") {
-                                        showingRulesEditor = true
-                                    }
-                                    .buttonStyle(.bordered)
-                                }
-
-                                if let preview = rulesPreview, !preview.isEmpty {
-                                    Text(preview)
-                                        .font(.system(.caption, design: .monospaced))
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(3)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(8)
-                                        .background(Color.secondary.opacity(0.1))
-                                        .cornerRadius(6)
-                                }
-                            }
-                        }
-
-                        // Settings files
-                        ForEach(configSpec.settingsFiles) { configFile in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(configFile.name)
-                                        .font(.headline)
-                                    if let desc = configFile.description {
-                                        Text(desc)
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-
-                                Spacer()
-
-                                Button(configFile.exists ? "Edit" : "Create") {
-                                    selectedConfigFile = configFile
-                                    showingConfigEditor = true
-                                }
-                                .buttonStyle(.bordered)
-                            }
-                        }
-
-                    }
-                }
+                configurationSection
 
                 // MARK: - Custom Commands
 
