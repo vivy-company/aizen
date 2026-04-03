@@ -17,13 +17,13 @@ struct PullRequestListPane: View {
 
     @Environment(\.controlActiveState) private var controlActiveState
     @ObservedObject var viewModel: PullRequestsViewModel
-    @State private var hoveredPullRequestID: Int?
+    @State var hoveredPullRequestID: Int?
 
-    private var selectedForegroundColor: Color {
+    var selectedForegroundColor: Color {
         controlActiveState == .key ? .accentColor : .accentColor.opacity(0.78)
     }
 
-    private var selectionFillColor: Color {
+    var selectionFillColor: Color {
         let base = NSColor.unemphasizedSelectedContentBackgroundColor
         let alpha: Double = controlActiveState == .key ? 0.26 : 0.18
         return Color(nsColor: base).opacity(alpha)
@@ -34,122 +34,6 @@ struct PullRequestListPane: View {
             header
             GitWindowDivider()
             listContent
-        }
-    }
-
-    @ViewBuilder
-    private var listContent: some View {
-        if viewModel.isLoadingList && viewModel.pullRequests.isEmpty {
-            loadingView
-        } else if let error = viewModel.listError {
-            errorView(error)
-        } else if viewModel.pullRequests.isEmpty {
-            emptyListView
-        } else {
-            prList
-        }
-    }
-
-    private var loadingView: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            ProgressView()
-            Text("Loading \(viewModel.prTerminology.lowercased())s...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func errorView(_ error: String) -> some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 32))
-                .foregroundStyle(.orange)
-
-            Text("Failed to load")
-                .font(.headline)
-
-            Text(error)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-
-            Button("Retry") {
-                Task { await viewModel.loadPullRequests() }
-            }
-            .buttonStyle(.bordered)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var emptyListView: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: "tray")
-                .font(.system(size: 32))
-                .foregroundStyle(.tertiary)
-
-            Text("No \(viewModel.prTerminology.lowercased())s")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            Text("No \(viewModel.filter.displayName.lowercased()) \(viewModel.prTerminology.lowercased())s found")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var prList: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(viewModel.pullRequests) { pr in
-                    PRRowView(
-                        pr: pr,
-                        isSelected: viewModel.selectedPR?.id == pr.id,
-                        isHovered: hoveredPullRequestID == pr.id,
-                        selectedForegroundColor: selectedForegroundColor,
-                        selectionFillColor: selectionFillColor
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        viewModel.selectPR(pr)
-                    }
-                    .onHover { hovering in
-                        hoveredPullRequestID = hovering ? pr.id :
-                            (hoveredPullRequestID == pr.id ? nil : hoveredPullRequestID)
-                    }
-                    GitWindowDivider()
-                }
-
-                // Pagination trigger
-                if viewModel.hasMore {
-                    Color.clear
-                        .frame(height: 1)
-                        .onAppear {
-                            Task { await viewModel.loadMore() }
-                        }
-
-                    if viewModel.isLoadingList {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                                .scaleEffect(0.7)
-                            Spacer()
-                        }
-                        .padding(.vertical, 12)
-                    }
-                }
-            }
-            .padding(.bottom, Layout.listBottomPadding)
         }
     }
 
