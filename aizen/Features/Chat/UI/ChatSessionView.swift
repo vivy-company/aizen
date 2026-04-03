@@ -26,7 +26,7 @@ struct ChatSessionView: View {
     @State var showingPermissionError = false
     @State var permissionErrorMessage = ""
     @State private var showingUsageSheet = false
-    @State private var autocompleteWindow: AutocompleteWindowController?
+    @State var autocompleteWindow: AutocompleteWindowController?
     @State private var keyMonitor: Any?
     @State private var chatActions = ChatActions()
     @State private var isWindowResizing = false
@@ -35,7 +35,7 @@ struct ChatSessionView: View {
 
     // Input state (local to avoid re-rendering entire view on keystroke)
     @State var inputText = ""
-    @State private var pendingCursorPosition: Int?
+    @State var pendingCursorPosition: Int?
     @State private var isInlinePlanCollapsed = true
     @State private var inputBarWidth: CGFloat = 0
 
@@ -597,44 +597,5 @@ struct ChatSessionView: View {
         viewModel.sendMessage(text)
     }
 
-    private func handleAutocompleteSelection() {
-        guard let (replacement, range) = viewModel.autocompleteHandler.selectCurrent() else { return }
-        let nsString = inputText as NSString
-        inputText = nsString.replacingCharacters(in: range, with: replacement)
-        pendingCursorPosition = range.location + replacement.count
-    }
-
     // MARK: - Autocomplete Window
-
-    private func setupAutocompleteWindow() {
-        let window = AutocompleteWindowController()
-        window.configureActions(
-            onTap: { item in
-                // Defer to avoid "Publishing changes from within view updates" warning
-                Task { @MainActor in
-                    viewModel.autocompleteHandler.selectItem(item)
-                    handleAutocompleteSelection()
-                }
-            },
-            onSelect: {
-                handleAutocompleteSelection()
-            }
-        )
-        autocompleteWindow = window
-    }
-
-    private func updateAutocompleteWindow(state: AutocompleteState) {
-        guard let window = autocompleteWindow else { return }
-
-        // Find parent window - try keyWindow, mainWindow, or any window
-        let parentWindow = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible })
-
-        // Show window when active (even if items empty - shows "no matches")
-        if state.isActive, let parentWindow = parentWindow {
-            window.update(state: state)
-            window.show(at: state.cursorRect, attachedTo: parentWindow)
-        } else {
-            window.dismiss()
-        }
-    }
 }
