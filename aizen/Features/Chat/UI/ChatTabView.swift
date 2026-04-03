@@ -18,11 +18,11 @@ struct ChatTabView: View {
     @Binding var selectedTerminalSessionId: UUID?
     @Binding var selectedBrowserSessionId: UUID?
 
-    @Environment(\.managedObjectContext) private var viewContext
-    private let sessionManager = ChatSessionRegistry.shared
+    @Environment(\.managedObjectContext) var viewContext
+    let sessionManager = ChatSessionRegistry.shared
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ChatTabView")
     @State private var enabledAgents: [AgentMetadata] = []
-    @State private var cachedSessionIds: [UUID] = []
+    @State var cachedSessionIds: [UUID] = []
     // Keep only the active chat session mounted to avoid hidden view layout churn.
     private let maxCachedSessions = 1
     private let recentSessionsLimit = 3
@@ -30,28 +30,28 @@ struct ChatTabView: View {
     // Companion panel state (persisted) - Left
     @AppStorage("companionLeftPanelType") private var leftPanelType: String = ""
     @AppStorage("companionLeftPanelWidth") private var leftPanelWidthStored: Double = 400
-    @State private var leftPanelWidth: Double = 400
+    @State var leftPanelWidth: Double = 400
 
     // Companion panel state (persisted) - Right
     @AppStorage("companionRightPanelType") private var rightPanelType: String = ""
     @AppStorage("companionRightPanelWidth") private var rightPanelWidthStored: Double = 400
-    @State private var rightPanelWidth: Double = 400
+    @State var rightPanelWidth: Double = 400
 
     @State private var didLoadWidths = false
-    @State private var isResizingCompanion = false
+    @State var isResizingCompanion = false
 
-    private let minPanelWidth: CGFloat = 250
-    private let minCenterWidth: CGFloat = 360
-    private let dividerWidth: CGFloat = 1
-    private let maxPanelWidthRatio: CGFloat = 0.75
+    let minPanelWidth: CGFloat = 250
+    let minCenterWidth: CGFloat = 360
+    let dividerWidth: CGFloat = 1
+    let maxPanelWidthRatio: CGFloat = 0.75
     private let companionCoordinateSpace = "companionSplit"
 
-    private var leftPanel: CompanionPanel? {
+    var leftPanel: CompanionPanel? {
         get { CompanionPanel(rawValue: leftPanelType) }
         nonmutating set { leftPanelType = newValue?.rawValue ?? "" }
     }
 
-    private var rightPanel: CompanionPanel? {
+    var rightPanel: CompanionPanel? {
         get { CompanionPanel(rawValue: rightPanelType) }
         nonmutating set { rightPanelType = newValue?.rawValue ?? "" }
     }
@@ -69,7 +69,7 @@ struct ChatTabView: View {
         sessions.compactMap(\.id)
     }
 
-    @FetchRequest private var sessions: FetchedResults<ChatSession>
+    @FetchRequest var sessions: FetchedResults<ChatSession>
     @FetchRequest private var recentSessions: FetchedResults<ChatSession>
 
     init(
@@ -281,58 +281,6 @@ struct ChatTabView: View {
         }
     }
 
-    private func resolvedToolbarInset(from geometry: GeometryProxy) -> CGFloat {
-        let safeInset = geometry.safeAreaInsets.top
-        if safeInset > 0 {
-            return safeInset
-        }
-
-        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
-            let estimatedInset = max(window.frame.height - window.contentLayoutRect.height, 0)
-            if estimatedInset > 0 {
-                return estimatedInset
-            }
-        }
-
-        return 0
-    }
-
-    private var chatSessionsStack: some View {
-        ZStack {
-            ForEach(cachedSessions) { session in
-                let isSelected = selectedSessionId == session.id
-                ChatSessionView(
-                    worktree: worktree,
-                    session: session,
-                    sessionManager: sessionManager,
-                    viewContext: viewContext,
-                    isSelected: isSelected,
-                    isCompanionResizing: isResizingCompanion
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .opacity(isSelected ? 1 : 0)
-                .allowsHitTesting(isSelected)
-                .zIndex(isSelected ? 1 : 0)
-            }
-        }
-    }
-
-    private var cachedSessions: [ChatSession] {
-        if cachedSessionIds.isEmpty {
-            let fallbackId = selectedSessionId ?? sessions.last?.id
-            if let fallbackId,
-               let fallback = sessions.first(where: { $0.id == fallbackId }) {
-                return [fallback]
-            }
-            if let last = sessions.last {
-                return [last]
-            }
-        }
-        return cachedSessionIds.compactMap { id in
-            sessions.first(where: { $0.id == id })
-        }
-    }
-
     private func syncSelectionAndCache() {
         if selectedSessionId == nil {
             selectedSessionId = sessions.last?.id
@@ -357,49 +305,6 @@ struct ChatTabView: View {
     private func pruneCache() {
         let validIds = Set(sessions.compactMap { $0.id })
         cachedSessionIds.removeAll { !validIds.contains($0) }
-    }
-
-    private func maxLeftWidth(containerWidth: CGFloat, rightWidth: CGFloat) -> CGFloat {
-        let rightTotal = rightPanel == nil ? 0 : rightWidth + dividerWidth
-        let available = containerWidth - minCenterWidth - rightTotal - dividerWidth
-        let ratioMax = containerWidth * maxPanelWidthRatio
-        return max(minPanelWidth, min(available, ratioMax))
-    }
-
-    private func maxRightWidth(containerWidth: CGFloat, leftWidth: CGFloat) -> CGFloat {
-        let leftTotal = leftPanel == nil ? 0 : leftWidth + dividerWidth
-        let available = containerWidth - minCenterWidth - leftTotal - dividerWidth
-        let ratioMax = containerWidth * maxPanelWidthRatio
-        return max(minPanelWidth, min(available, ratioMax))
-    }
-
-    private func clampPanelWidths(containerWidth: CGFloat) {
-        guard containerWidth > 0 else { return }
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            if leftPanel != nil {
-                let maxWidth = maxLeftWidth(containerWidth: containerWidth, rightWidth: CGFloat(rightPanelWidth))
-                let clamped = min(max(CGFloat(leftPanelWidth), minPanelWidth), maxWidth)
-                if abs(clamped - CGFloat(leftPanelWidth)) > 0.5 {
-                    leftPanelWidth = Double(clamped)
-                }
-            }
-            if rightPanel != nil {
-                let maxWidth = maxRightWidth(containerWidth: containerWidth, leftWidth: CGFloat(leftPanelWidth))
-                let clamped = min(max(CGFloat(rightPanelWidth), minPanelWidth), maxWidth)
-                if abs(clamped - CGFloat(rightPanelWidth)) > 0.5 {
-                    rightPanelWidth = Double(clamped)
-                }
-            }
-            if leftPanel != nil {
-                let maxWidth = maxLeftWidth(containerWidth: containerWidth, rightWidth: CGFloat(rightPanelWidth))
-                let clamped = min(max(CGFloat(leftPanelWidth), minPanelWidth), maxWidth)
-                if abs(clamped - CGFloat(leftPanelWidth)) > 0.5 {
-                    leftPanelWidth = Double(clamped)
-                }
-            }
-        }
     }
 
     private func loadEnabledAgents() {
