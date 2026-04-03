@@ -36,10 +36,10 @@ struct ChatMessageList: View {
     @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var terminalUsePerAppearanceTheme = false
     @Environment(\.colorScheme) private var colorScheme
 
-    @State private var controller = VVChatTimelineController(style: .init(), renderWidth: 0)
-    @State private var appliedEntries: [VVChatTimelineEntry] = []
+    @State var controller = VVChatTimelineController(style: .init(), renderWidth: 0)
+    @State var appliedEntries: [VVChatTimelineEntry] = []
     @State private var lastBuildMetadata = TimelineBuildMetadata()
-    @State private var lastReportedTimelineState: VVChatTimelineState?
+    @State var lastReportedTimelineState: VVChatTimelineState?
     @State private var copiedUserMessageID: String?
     @State private var copiedUserMessageState: CopyFooterState = .idle
     @State private var hoveredCopyUserMessageID: String?
@@ -296,156 +296,9 @@ struct ChatMessageList: View {
         apply(entries: build.entries, scrollToBottom: scrollToBottom)
     }
 
-    private func apply(entries newEntries: [VVChatTimelineEntry], scrollToBottom: Bool) {
-        defer { appliedEntries = newEntries }
+    
 
-        if appliedEntries.isEmpty {
-            controller.setEntries(
-                newEntries,
-                scrollToBottom: scrollToBottom,
-                customEntryMessageMapper: customEntryMessageMapper
-            )
-            return
-        }
-
-        if canApplyIncrementally(from: appliedEntries, to: newEntries) {
-            let oldCount = appliedEntries.count
-            let newCount = newEntries.count
-            let replacements = makeEntryReplacements(from: appliedEntries, to: newEntries)
-
-            if !replacements.isEmpty {
-                applyEntryReplacements(replacements, scrollToBottom: scrollToBottom)
-            }
-
-            if newCount > oldCount {
-                for entry in newEntries[oldCount...] {
-                    append(entry)
-                }
-            }
-            return
-        }
-
-        // Structural change — use range replacement instead of full setEntries rebuild.
-        // This matches the VVDevKit playground pattern: replaceEntries preserves layout
-        // continuity and render caches, while setEntries invalidates everything.
-        if let anchorID = stableAnchorID(from: appliedEntries, to: newEntries) {
-            controller.prepareLayoutTransition(anchorItemID: anchorID)
-        }
-        controller.replaceEntries(
-            in: 0..<controller.entries.count,
-            with: newEntries,
-            scrollToBottom: scrollToBottom,
-            markUnread: false
-        )
-    }
-
-    private func stableAnchorID(from oldEntries: [VVChatTimelineEntry], to newEntries: [VVChatTimelineEntry]) -> String? {
-        let newIDs = Set(newEntries.map(\.id))
-        // Find the first old entry that still exists in the new set — best scroll anchor
-        for entry in oldEntries {
-            if newIDs.contains(entry.id) {
-                return entry.id
-            }
-        }
-        return newEntries.first?.id
-    }
-
-    private func canApplyIncrementally(from oldEntries: [VVChatTimelineEntry], to newEntries: [VVChatTimelineEntry]) -> Bool {
-        guard !oldEntries.isEmpty else { return false }
-        guard newEntries.count >= oldEntries.count else { return false }
-
-        let prefixCount = min(oldEntries.count, newEntries.count)
-        for index in 0..<prefixCount {
-            if oldEntries[index].id != newEntries[index].id {
-                return false
-            }
-        }
-        return true
-    }
-
-    private func append(_ entry: VVChatTimelineEntry) {
-        prepareAppendTransition()
-        switch entry {
-        case .message(let message):
-            controller.appendMessage(message)
-        case .custom(let custom):
-            controller.appendCustomEntry(custom)
-        }
-    }
-
-    private struct EntryReplacement {
-        let id: String
-        let oldEntry: VVChatTimelineEntry
-        let newEntry: VVChatTimelineEntry
-    }
-
-    private func prepareAppendTransition() {
-        let anchorID = controller.entries.last?.id ?? appliedEntries.last?.id
-        if let anchorID {
-            controller.prepareLayoutTransition(anchorItemID: anchorID)
-        }
-    }
-
-    private func makeEntryReplacements(
-        from oldEntries: [VVChatTimelineEntry],
-        to newEntries: [VVChatTimelineEntry]
-    ) -> [EntryReplacement] {
-        let prefixCount = min(oldEntries.count, newEntries.count)
-        var replacements: [EntryReplacement] = []
-        replacements.reserveCapacity(prefixCount)
-
-        for index in 0..<prefixCount {
-            if entryRevision(oldEntries[index]) != entryRevision(newEntries[index]) {
-                replacements.append(
-                    EntryReplacement(
-                        id: oldEntries[index].id,
-                        oldEntry: oldEntries[index],
-                        newEntry: newEntries[index]
-                    )
-                )
-            }
-        }
-
-        return replacements
-    }
-
-    private func applyEntryReplacements(_ replacements: [EntryReplacement], scrollToBottom: Bool) {
-        for replacement in replacements {
-            if applyDraftMessageUpdateIfPossible(replacement) {
-                continue
-            }
-            controller.prepareLayoutTransition(anchorItemID: replacement.id)
-            controller.replaceEntry(
-                id: replacement.id,
-                with: replacement.newEntry,
-                scrollToBottom: scrollToBottom
-            )
-        }
-    }
-
-    private func applyDraftMessageUpdateIfPossible(_ replacement: EntryReplacement) -> Bool {
-        guard case .message(let oldMessage) = replacement.oldEntry,
-              case .message(let newMessage) = replacement.newEntry else {
-            return false
-        }
-        guard oldMessage.id == newMessage.id else { return false }
-        guard oldMessage.role == .assistant, newMessage.role == .assistant else { return false }
-        guard oldMessage.state == .draft, newMessage.state == .draft else { return false }
-        guard oldMessage.presentation == newMessage.presentation else { return false }
-        guard oldMessage.customContent == newMessage.customContent else { return false }
-        guard oldMessage.timestamp == newMessage.timestamp else { return false }
-
-        controller.updateDraftMessage(id: newMessage.id, content: newMessage.content, throttle: true)
-        return true
-    }
-
-    private func reportTimelineStateIfNeeded(_ state: VVChatTimelineState) {
-        guard lastReportedTimelineState != state else { return }
-        lastReportedTimelineState = state
-        onTimelineStateChange(state)
-    }
-
-    private func entryRevision(_ entry: VVChatTimelineEntry) -> Int {
+    func entryRevision(_ entry: VVChatTimelineEntry) -> Int {
         switch entry {
         case .message(let message):
             return message.revision
@@ -579,7 +432,7 @@ struct ChatMessageList: View {
         return lowerBound..<upperBound
     }
 
-    private var customEntryMessageMapper: VVChatTimelineController.CustomEntryMessageMapper {
+    var customEntryMessageMapper: VVChatTimelineController.CustomEntryMessageMapper {
         { custom in
             let decoded = decodeCustomPayload(from: custom.payload)
             let content = decoded?.body ?? String(data: custom.payload, encoding: .utf8) ?? "[\(custom.kind)]"
