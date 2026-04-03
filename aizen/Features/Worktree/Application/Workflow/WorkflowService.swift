@@ -35,7 +35,7 @@ class WorkflowService: ObservableObject {
 
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "WorkflowService")
     var repoPath: String = ""
-    private var currentBranch: String = ""
+    var currentBranch: String = ""
 
     private var githubProvider: GitHubWorkflowProvider?
     private var gitlabProvider: GitLabWorkflowProvider?
@@ -43,9 +43,9 @@ class WorkflowService: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     var logPollingTask: Task<Void, Never>?
     private var autoRefreshEnabled = false
-    private var isStateStale = true
+    var isStateStale = true
 
-    private let runsLimit = 20
+    let runsLimit = 20
 
     // MARK: - Initialization
 
@@ -106,64 +106,6 @@ class WorkflowService: ObservableObject {
         isStateStale = true
         guard autoRefreshEnabled else { return }
         await loadRuns()
-    }
-
-    // MARK: - Data Loading
-
-    func loadWorkflows() async {
-        guard provider != .none else { return }
-
-        isLoading = true
-        error = nil
-
-        do {
-            workflows = try await currentProvider?.listWorkflows(repoPath: repoPath) ?? []
-        } catch let workflowError as WorkflowError {
-            error = workflowError
-            logger.error("Failed to load workflows: \(workflowError.localizedDescription)")
-        } catch {
-            self.error = .executionFailed(error.localizedDescription)
-            logger.error("Failed to load workflows: \(error.localizedDescription)")
-        }
-
-        isLoading = false
-        isStateStale = false
-    }
-
-    func loadRuns() async {
-        guard provider != .none else { return }
-
-        isLoading = true
-        error = nil
-
-        do {
-            runs = try await currentProvider?.listRuns(
-                repoPath: repoPath,
-                workflow: nil,
-                branch: currentBranch,
-                limit: runsLimit
-            ) ?? []
-        } catch let workflowError as WorkflowError {
-            error = workflowError
-            logger.error("Failed to load runs: \(workflowError.localizedDescription)")
-        } catch {
-            self.error = .executionFailed(error.localizedDescription)
-            logger.error("Failed to load runs: \(error.localizedDescription)")
-        }
-
-        isLoading = false
-        isStateStale = false
-    }
-
-    func refresh() async {
-        guard provider != .none else { return }
-        await loadWorkflows()
-        await loadRuns()
-
-        // Refresh selected run if any
-        if let selected = selectedRun {
-            await selectRun(selected)
-        }
     }
 
     // MARK: - Auto Refresh
