@@ -112,35 +112,6 @@ struct PlanApprovalDialog: View {
         )
         .shadow(color: .black.opacity(0.25), radius: 30, y: 15)
     }
-
-    private func buttonIcon(for option: PermissionOption) -> String {
-        if option.kind == "allow_always" {
-            return "checkmark.circle.fill"
-        } else if option.kind.contains("allow") {
-            return "checkmark"
-        } else if option.kind.contains("reject") {
-            return "xmark"
-        }
-        return "circle"
-    }
-
-    private func buttonForeground(for option: PermissionOption) -> Color {
-        if option.kind.contains("allow") || option.kind.contains("reject") {
-            return .white
-        }
-        return .primary
-    }
-
-    private func buttonBackground(for option: PermissionOption) -> Color {
-        if option.kind == "allow_always" {
-            return .green
-        } else if option.kind.contains("allow") {
-            return .blue
-        } else if option.kind.contains("reject") {
-            return .red.opacity(0.85)
-        }
-        return .secondary.opacity(0.2)
-    }
 }
 
 struct PlanApprovalPickerView: View {
