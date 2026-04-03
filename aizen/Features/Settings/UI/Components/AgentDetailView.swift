@@ -22,7 +22,7 @@ struct AgentDetailView: View {
     @State var testResult: String?
     @State var showingFilePicker = false
     @State var showingEditSheet = false
-    @State private var showingDeleteConfirmation = false
+    @State var showingDeleteConfirmation = false
     @State var errorMessage: String?
     @State var testTask: Task<Void, Never>?
     @State var resultDismissTask: Task<Void, Never>?
@@ -158,21 +158,11 @@ struct AgentDetailView: View {
                 errorMessage = "Failed to select file: \(error.localizedDescription)"
             }
         }
-        .sheet(isPresented: $showingEditSheet) {
-            CustomAgentFormView(
-                existingMetadata: metadata,
-                onSave: { updated in
-                    metadata = updated
-                },
-                onCancel: {}
-            )
-        }
+        .sheet(isPresented: $showingEditSheet) { editSheet }
         .alert("Delete Agent", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                Task {
-                    await AgentRegistry.shared.deleteAgent(id: metadata.id)
-                }
+                deleteAgent()
             }
         } message: {
             Text("Are you sure you want to delete \"\(metadata.name)\"? This cannot be undone.")
@@ -198,55 +188,17 @@ struct AgentDetailView: View {
                 usageMetricsStore.refreshIfNeeded(agentId: metadata.id)
             }
         }
-        .sheet(isPresented: $showingRulesEditor) {
-            if let rulesFile = configSpec.rulesFile {
-                AgentRulesEditorSheet(
-                    configFile: rulesFile,
-                    agentName: metadata.name,
-                    onDismiss: { loadRulesPreview() }
-                )
-            }
-        }
-        .sheet(isPresented: $showingConfigEditor) {
-            if let configFile = selectedConfigFile {
-                AgentConfigEditorSheet(
-                    configFile: configFile,
-                    agentName: metadata.name
-                )
-            }
-        }
-        .sheet(isPresented: $showingCommandEditor) {
-            AgentCommandEditorSheet(
-                command: selectedCommand,
-                commandsDirectory: configSpec.expandedCommandsDirectory ?? "",
-                agentName: metadata.name,
-                onDismiss: { loadCommands() }
-            )
-        }
-        .sheet(isPresented: $showingUsageDetails) {
-            AgentUsageSheet(agentId: metadata.id, agentName: metadata.name)
-        }
-        .sheet(isPresented: $showingMCPMarketplace) {
-            MCPMarketplaceView(
-                agentId: metadata.id,
-                agentPath: AgentRegistry.shared.getAgentPath(for: metadata.id),
-                agentName: metadata.name
-            )
-        }
+        .sheet(isPresented: $showingRulesEditor) { rulesEditorSheet }
+        .sheet(isPresented: $showingConfigEditor) { configEditorSheet }
+        .sheet(isPresented: $showingCommandEditor) { commandEditorSheet }
+        .sheet(isPresented: $showingUsageDetails) { usageDetailsSheet }
+        .sheet(isPresented: $showingMCPMarketplace) { mcpMarketplaceSheet }
         .alert("Remove MCP Server", isPresented: $showingMCPRemoveConfirmation) {
             Button("Cancel", role: .cancel) {
                 mcpServerToRemove = nil
             }
             Button("Remove", role: .destructive) {
-                if let server = mcpServerToRemove {
-                    Task {
-                        try? await mcpManager.remove(
-                            serverName: server.serverName,
-                            agentId: metadata.id
-                        )
-                        mcpServerToRemove = nil
-                    }
-                }
+                removeSelectedMCPServer()
             }
         } message: {
             if let server = mcpServerToRemove {
