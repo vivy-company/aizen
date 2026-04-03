@@ -37,7 +37,7 @@ final class XcodeBuildStore: ObservableObject {
     var launchedOutputPipe: Pipe?
     var launchedErrorPipe: Pipe?
 
-    private var appMonitorTask: Task<Void, Never>?
+    var appMonitorTask: Task<Void, Never>?
 
     // MARK: - Persistence
 
@@ -63,8 +63,8 @@ final class XcodeBuildStore: ObservableObject {
 
     // MARK: - Services
 
-    private let projectDetector = XcodeProjectDetector()
-    private let deviceService = XcodeDeviceService()
+    let projectDetector = XcodeProjectDetector()
+    let deviceService = XcodeDeviceService()
     private let buildService = XcodeBuildService()
 
     private var buildTask: Task<Void, Never>?
@@ -316,248 +316,11 @@ final class XcodeBuildStore: ObservableObject {
         }
     }
 
-    private func launchInSimulator(project: XcodeProject, scheme: String, destination: XcodeDestination) async {
-        await MainActor.run {
-            currentPhase = .launching
-        }
-
-        // Open Simulator app
-        await deviceService.openSimulatorApp()
-
-        do {
-            // Get bundle identifier
-            let bundleId = try await projectDetector.getBundleIdentifier(project: project, scheme: scheme)
-
-            guard let bundleId = bundleId else {
-                logger.warning("Could not determine bundle identifier for launch")
-                await MainActor.run {
-                    currentPhase = .succeeded
-                }
-                return
-            }
-
-            // Terminate previous instance before launching new one
-            await deviceService.terminateInSimulator(deviceId: destination.id, bundleId: bundleId)
-
-            // Launch the app
-            try await deviceService.launchInSimulator(deviceId: destination.id, bundleId: bundleId)
-
-            // Store launch info for future termination and log streaming
-            await MainActor.run {
-                self.launchedBundleId = bundleId
-                self.launchedDestination = destination
-                self.launchedAppPath = nil
-                currentPhase = .succeeded
-            }
-        } catch {
-            logger.error("Failed to launch in simulator: \(error.localizedDescription)")
-            await MainActor.run {
-                currentPhase = .failed(error: "Launch failed: \(error.localizedDescription)", log: "")
-            }
-        }
-    }
-
-    private func launchOnMac(project: XcodeProject, scheme: String) async {
-        await MainActor.run {
-            currentPhase = .launching
-        }
-
-        do {
-            // Find the built app in DerivedData
-            let appPath = try await findBuiltApp(project: project, scheme: scheme)
-
-            guard let appPath = appPath else {
-                logger.warning("Could not find built app")
-                await MainActor.run {
-                    currentPhase = .succeeded
-                }
-                return
-            }
-
-            // Get bundle identifier for the app
-            let bundleId = try await projectDetector.getBundleIdentifier(project: project, scheme: scheme)
-
-            // Terminate previous instance we launched (by PID if available)
-            await terminatePreviousLaunch()
-
-            // Launch the app directly (not via 'open') to capture stdout/stderr
-            let executablePath = (appPath as NSString).appendingPathComponent("Contents/MacOS/\((appPath as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: ""))")
-
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: executablePath)
-            process.arguments = []
-
-            // Set up pipes to capture stdout/stderr
-            let outputPipe = Pipe()
-            let errorPipe = Pipe()
-            process.standardOutput = outputPipe
-            process.standardError = errorPipe
-
-            // Set environment for proper app behavior
-            var env = ProcessInfo.processInfo.environment
-            env["NSUnbufferedIO"] = "YES"  // Disable output buffering
-            process.environment = env
-
-            try process.run()
-
-            let pid = process.processIdentifier
-
-            // Store launch info for future termination and log streaming
-            await MainActor.run {
-                self.launchedBundleId = bundleId
-                self.launchedDestination = selectedDestination
-                self.launchedAppPath = appPath
-                self.launchedPID = pid
-                self.launchedProcess = process
-                self.launchedOutputPipe = outputPipe
-                self.launchedErrorPipe = errorPipe
-                currentPhase = .succeeded
-            }
-
-            // Start monitoring if the app is still running
-            startAppMonitoring()
-
-        } catch {
-            logger.error("Failed to launch on Mac: \(error.localizedDescription)")
-            await MainActor.run {
-                currentPhase = .failed(error: "Launch failed: \(error.localizedDescription)", log: "")
-            }
-        }
-    }
-
-    private func launchOnDevice(project: XcodeProject, scheme: String, destination: XcodeDestination) async {
-        await MainActor.run {
-            currentPhase = .launching
-        }
-
-        do {
-            // Get bundle identifier
-            let bundleId = try await projectDetector.getBundleIdentifier(project: project, scheme: scheme)
-
-            guard let bundleId = bundleId else {
-                logger.warning("Could not determine bundle identifier for device launch")
-                await MainActor.run {
-                    currentPhase = .succeeded
-                }
-                return
-            }
-
-            // Find the built app and install it on device
-            let appPath = try await findBuiltAppForDevice(project: project, scheme: scheme, destination: destination)
-            if let appPath = appPath {
-                try await deviceService.installOnDevice(deviceId: destination.id, appPath: appPath)
-            }
-
-            // Launch app on device with console capture using devicectl
-            let process = try await deviceService.launchOnDeviceWithConsole(deviceId: destination.id, bundleId: bundleId)
-
-            // Get the pipes from the process
-            let outputPipe = process.standardOutput as? Pipe
-            let errorPipe = process.standardError as? Pipe
-
-            // Store launch info for future termination and log streaming
-            await MainActor.run {
-                self.launchedBundleId = bundleId
-                self.launchedDestination = destination
-                self.launchedAppPath = nil
-                self.launchedPID = process.processIdentifier
-                self.launchedProcess = process
-                self.launchedOutputPipe = outputPipe
-                self.launchedErrorPipe = errorPipe
-                currentPhase = .succeeded
-            }
-
-            // Start monitoring if the devicectl process is still running
-            startAppMonitoring()
-
-        } catch {
-            logger.error("Failed to launch on device: \(error.localizedDescription)")
-            await MainActor.run {
-                currentPhase = .failed(error: "Launch failed: \(error.localizedDescription)", log: "")
-            }
-        }
-    }
-
-    private func terminatePreviousLaunch() async {
-        // If we have a process reference, terminate it directly
-        if let process = await MainActor.run(body: { self.launchedProcess }) {
-            if process.isRunning {
-                process.terminate()
-                try? await Task.sleep(nanoseconds: 300_000_000)
-            }
-            await MainActor.run {
-                self.closeLaunchPipes()
-            }
-            return
-        }
-
-        // Fallback: terminate by PID if we don't have process reference
-        if let pid = await MainActor.run(body: { self.launchedPID }) {
-            _ = try? await ProcessExecutor.shared.execute(
-                executable: "/bin/kill",
-                arguments: [String(pid)]
-            )
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            await MainActor.run {
-                self.closeLaunchPipes()
-            }
-        }
-    }
-
-    private func startAppMonitoring() {
-        // Cancel any existing monitor
-        appMonitorTask?.cancel()
-
-        appMonitorTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2_000_000_000) // Check every 2 seconds
-
-                guard let self = self else { break }
-
-                let pid = await MainActor.run { self.launchedPID }
-                guard let pid = pid else { break }
-
-                // Check if process is still running
-                let isRunning = kill(pid, 0) == 0
-
-                if !isRunning {
-                    await MainActor.run {
-                        self.clearLaunchState()
-                    }
-                    break
-                }
-            }
-        }
-    }
-
-    private func clearLaunchState() {
-        stopLogStream()
-        launchedBundleId = nil
-        launchedDestination = nil
-        launchedAppPath = nil
-        launchedPID = nil
-        launchedProcess = nil
-        closeLaunchPipes()
-        appMonitorTask?.cancel()
-        appMonitorTask = nil
-    }
-
-    private func closeLaunchPipes() {
-        if let outputPipe = launchedOutputPipe {
-            try? outputPipe.fileHandleForReading.close()
-        }
-        if let errorPipe = launchedErrorPipe {
-            try? errorPipe.fileHandleForReading.close()
-        }
-        launchedOutputPipe = nil
-        launchedErrorPipe = nil
-    }
-
-    private func findBuiltApp(project: XcodeProject, scheme: String) async throws -> String? {
+    func findBuiltApp(project: XcodeProject, scheme: String) async throws -> String? {
         return try await findBuiltAppWithDestination(project: project, scheme: scheme, destination: nil)
     }
 
-    private func findBuiltAppForDevice(project: XcodeProject, scheme: String, destination: XcodeDestination) async throws -> String? {
+    func findBuiltAppForDevice(project: XcodeProject, scheme: String, destination: XcodeDestination) async throws -> String? {
         return try await findBuiltAppWithDestination(project: project, scheme: scheme, destination: destination)
     }
 
