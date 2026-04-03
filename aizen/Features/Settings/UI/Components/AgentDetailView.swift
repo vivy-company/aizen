@@ -21,7 +21,7 @@ struct AgentDetailView: View {
     @State var isAgentValid = false
     @State var testResult: String?
     @State var showingFilePicker = false
-    @State private var showingEditSheet = false
+    @State var showingEditSheet = false
     @State private var showingDeleteConfirmation = false
     @State var errorMessage: String?
     @State var testTask: Task<Void, Never>?
@@ -139,70 +139,7 @@ struct AgentDetailView: View {
                 .background(.ultraThinMaterial)
             }
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                // Install button
-                if metadata.requiresInstall,
-                   !isAgentValid,
-                   !isUpdating {
-                    if isInstalling {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else {
-                        Button {
-                            Task { await installAgent() }
-                        } label: {
-                            Label("Install", systemImage: "square.and.arrow.down")
-                                .labelStyle(.titleAndIcon)
-                        }
-                        .help("Install agent")
-                    }
-                }
-
-                // Update button
-                if canUpdate && (isAgentValid || isUpdating) {
-                    if isUpdating {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else {
-                        Button {
-                            Task { await updateAgent() }
-                        } label: {
-                            Label("Update", systemImage: "arrow.triangle.2.circlepath")
-                                .labelStyle(.titleAndIcon)
-                        }
-                        .help("Update to latest version")
-                    }
-                }
-
-                // Test Connection button
-                if isAgentValid {
-                    if isTesting {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else {
-                        Button {
-                            Task { await testConnection() }
-                        } label: {
-                            Label("Test", systemImage: "antenna.radiowaves.left.and.right")
-                                .labelStyle(.titleAndIcon)
-                        }
-                        .help("Test connection")
-                    }
-                }
-
-                // Edit button for custom agents only
-                if metadata.isCustom {
-                    Button {
-                        showingEditSheet = true
-                    } label: {
-                        Label("Edit", systemImage: "square.and.pencil")
-                            .labelStyle(.titleAndIcon)
-                    }
-                    .help("Edit agent")
-                }
-            }
-        }
+        .toolbar { toolbarContent }
         .fileImporter(
             isPresented: $showingFilePicker,
             allowedContentTypes: [.executable, .unixExecutable],
