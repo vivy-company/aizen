@@ -25,7 +25,7 @@ class ChatSessionStore: ObservableObject {
 
     // MARK: - Handlers
 
-    private let agentSwitcher: AgentSwitcher
+    let agentSwitcher: AgentSwitcher
     let autocompleteHandler = UnifiedAutocompleteHandler()
 
     // MARK: - Services
@@ -234,104 +234,5 @@ class ChatSessionStore: ObservableObject {
         showingPermissionAlert = session.permissionHandler.showingPermissionAlert
         currentPermissionRequest = session.permissionHandler.permissionRequest
     }
-
-    // MARK: - Agent Management
-
-    func cycleModeForward() {
-        guard let session = currentAgentSession else { return }
-        let modes = session.availableModes
-        guard !modes.isEmpty else { return }
-
-        if let currentIndex = modes.firstIndex(where: { $0.id == session.currentModeId }) {
-            let nextIndex = (currentIndex + 1) % modes.count
-            Task {
-                try? await session.setModeById(modes[nextIndex].id)
-            }
-        }
-    }
-
-    func requestAgentSwitch(to newAgent: String) {
-        guard newAgent != selectedAgent else { return }
-        pendingAgentSwitch = newAgent
-        showingAgentSwitchWarning = true
-    }
-
-    func performAgentSwitch(to newAgent: String) {
-        agentSwitcher.performAgentSwitch(to: newAgent, worktree: worktree) {
-            self.objectWillChange.send()
-        }
-
-        if let sessionId = session.id {
-            sessionManager.removeAgentSession(for: sessionId)
-        }
-        currentAgentSession = nil
-        // Clear tracked IDs and bump timeline revision (messages/toolCalls are computed from session)
-        previousMessageIds = []
-        previousToolCallIds = []
-        timelineRenderEpoch &+= 1
-
-        setupAgentSession()
-        pendingAgentSwitch = nil
-    }
-
-    func restartSession() {
-        guard let agentSession = currentAgentSession else { return }
-        
-        let context = viewContext
-        let newChatSession = ChatSession(context: context)
-        newChatSession.id = UUID()
-        newChatSession.agentName = selectedAgent
-        newChatSession.createdAt = Date()
-        newChatSession.worktree = worktree
-        
-        Task {
-            let displayName = AgentRegistry.shared.getMetadata(for: selectedAgent)?.name ?? selectedAgent.capitalized
-            newChatSession.title = displayName
-            
-            do {
-                try context.save()
-                
-                await agentSession.close()
-                
-                if let oldSessionId = session.id {
-                    sessionManager.removeAgentSession(for: oldSessionId)
-                }
-                
-                NotificationCenter.default.post(
-                    name: .switchToChatSession,
-                    object: nil,
-                    userInfo: ["chatSessionId": newChatSession.id!]
-                )
-                
-                let worktreePath = worktree.path ?? ""
-                let freshAgentSession = ChatAgentSession(agentName: selectedAgent, workingDirectory: worktreePath)
-                sessionManager.setAgentSession(freshAgentSession, for: newChatSession.id!, worktreeName: worktree.branch)
-                currentAgentSession = freshAgentSession
-                autocompleteHandler.agentSession = freshAgentSession
-                
-                previousMessageIds = []
-                previousToolCallIds = []
-                timelineRenderEpoch &+= 1
-                
-                setupSessionObservers(session: freshAgentSession)
-                
-                try await freshAgentSession.start(
-                    agentName: selectedAgent,
-                    workingDir: worktreePath,
-                    chatSessionId: self.session.id
-                )
-            } catch {
-                context.delete(newChatSession)
-                do {
-                    try context.save()
-                } catch {
-                    logger.error("Failed to rollback new session creation: \(error.localizedDescription)")
-                }
-                logger.error("Failed to create/start new session: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    // MARK: - Markdown Rendering
 
 }
