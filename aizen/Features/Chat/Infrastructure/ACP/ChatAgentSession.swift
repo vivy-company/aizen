@@ -367,39 +367,8 @@ class ChatAgentSession: ObservableObject {
         guard !isActive && sessionState != .initializing else {
             throw AgentSessionError.sessionAlreadyActive
         }
-        
-        sessionState = .initializing
-        isActive = true
-        isResumingSession = true
-        suppressResumedAgentMessages = true
-        prepareResumeReplayState()
-        self.chatSessionId = chatSessionId
-        
-        guard !acpSessionId.isEmpty,
-              acpSessionId.count < 256,
-              acpSessionId.allSatisfy({ $0.isASCII && !$0.isNewline }) else {
-            sessionState = .failed("Invalid ACP session ID format")
-            isActive = false
-            isResumingSession = false
-            clearResumeReplayState()
-            throw AgentSessionError.custom("Invalid ACP session ID format")
-        }
-        
-        guard FileManager.default.fileExists(atPath: workingDir) else {
-            sessionState = .failed("Working directory no longer exists: \(workingDir)")
-            isActive = false
-            isResumingSession = false
-            clearResumeReplayState()
-            throw AgentSessionError.custom("Working directory no longer exists: \(workingDir)")
-        }
-        
-        guard FileManager.default.isReadableFile(atPath: workingDir) else {
-            sessionState = .failed("Working directory not accessible: \(workingDir)")
-            isActive = false
-            isResumingSession = false
-            clearResumeReplayState()
-            throw AgentSessionError.custom("Working directory not accessible: \(workingDir)")
-        }
+        prepareForResume(chatSessionId: chatSessionId)
+        try validateResumeRequest(acpSessionId: acpSessionId, workingDir: workingDir)
         
         let startTime = CFAbsoluteTimeGetCurrent()
         
@@ -420,18 +389,13 @@ class ChatAgentSession: ObservableObject {
                 previousWorkingDir: previousWorkingDir
             )
         } catch {
-            isActive = false
-            isResumingSession = false
-            clearResumeReplayState()
+            resetResumeState()
             throw error
         }
 
         let canLoadSession = initResponse.agentCapabilities.loadSession ?? false
         guard canLoadSession else {
-            isActive = false
-            isResumingSession = false
-            clearResumeReplayState()
-            sessionState = .failed("Agent does not support session resume")
+            failResume("Agent does not support session resume")
             throw AgentSessionError.sessionResumeUnsupported
         }
         
@@ -444,22 +408,14 @@ class ChatAgentSession: ObservableObject {
                 mcpServers: mcpServers
             )
         } catch {
-            isActive = false
-            isResumingSession = false
-            clearResumeReplayState()
-            sessionState = .failed("loadSession failed: \(error.localizedDescription)")
+            failResume("loadSession failed: \(error.localizedDescription)")
             self.acpClient = nil
             throw error
         }
         
         applySessionState(from: sessionResponse)
         announceSessionResume(agentName: agentName, workingDir: workingDir)
-        
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1))
-            self.isResumingSession = false
-            self.clearResumeReplayState()
-        }
+        scheduleResumeReplayCleanup()
     }
 
 }
