@@ -195,7 +195,7 @@ struct GeneralSettingsView: View {
         sortDescriptors: [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)],
         animation: .default
     )
-    private var workspaces: FetchedResults<Workspace>
+    var workspaces: FetchedResults<Workspace>
 
     // Appearance
     @AppStorage("appearanceMode") var appearanceMode: String = AppearanceMode.system.rawValue
@@ -209,8 +209,8 @@ struct GeneralSettingsView: View {
     @AppStorage("defaultTerminalBundleId") var defaultTerminalBundleId: String?
     @AppStorage("defaultEditorBundleId") var defaultEditorBundleId: String?
     @AppStorage("useCliEditor") var useCliEditor = false
-    @AppStorage("defaultCloneLocation") private var defaultCloneLocation = "~/.aizen/repos"
-    @AppStorage("defaultWorkspaceId") private var defaultWorkspaceId = ""
+    @AppStorage("defaultCloneLocation") var defaultCloneLocation = "~/.aizen/repos"
+    @AppStorage("defaultWorkspaceId") var defaultWorkspaceId = ""
 
     // Layout
     @AppStorage("showChatTab") var showChatTab = true
@@ -239,28 +239,7 @@ struct GeneralSettingsView: View {
 
             defaultAppsSection
 
-            // MARK: - Repositories
-
-            Section("Projects") {
-                HStack(spacing: 12) {
-                    TextField("Default Clone Location", text: $defaultCloneLocation)
-                        .textFieldStyle(.roundedBorder)
-                    Button("Choose") {
-                        selectDefaultCloneLocation()
-                    }
-                }
-                .help("Used by the CLI when cloning projects without --destination")
-
-                Picker("Default Workspace", selection: $defaultWorkspaceId) {
-                    Text("None")
-                        .tag("")
-                    ForEach(workspaces) { workspace in
-                        Text(workspace.name ?? "")
-                            .tag(workspace.id?.uuidString ?? "")
-                    }
-                }
-                .help("Used by the CLI when adding projects without --workspace")
-            }
+            projectsSection
 
             layoutSection
 
@@ -296,18 +275,6 @@ struct GeneralSettingsView: View {
             }
         } message: {
             Text("Please restart the app to apply the language change.")
-        }
-    }
-
-    private func selectDefaultCloneLocation() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.message = "Select default clone location"
-
-        if panel.runModal() == .OK, let url = panel.url {
-            defaultCloneLocation = url.path
         }
     }
 
