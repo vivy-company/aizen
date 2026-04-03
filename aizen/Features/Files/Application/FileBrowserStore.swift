@@ -75,10 +75,10 @@ class FileBrowserStore: ObservableObject {
     @Published private(set) var gitFileStatus: [String: FileGitStatus] = [:]
     @Published private(set) var gitIgnoredPaths: Set<String> = []
 
-    private let worktree: Worktree
-    private let viewContext: NSManagedObjectContext
-    private var session: FileBrowserSession?
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "FileBrowser")
+    let worktree: Worktree
+    let viewContext: NSManagedObjectContext
+    var session: FileBrowserSession?
+    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "FileBrowser")
     private let fileService = FileService()
     private let gitRuntime = FileBrowserGitRuntime()
 
@@ -93,71 +93,6 @@ class FileBrowserStore: ObservableObject {
         // Load git status
         Task {
             await loadGitStatus()
-        }
-    }
-
-    private func loadSession() {
-        // Try to get existing session from worktree
-        if let existingSession = worktree.fileBrowserSession {
-            self.session = existingSession
-
-            // Restore state from session
-            if let currentPath = existingSession.currentPath {
-                self.currentPath = currentPath
-            }
-
-            if let expandedPathsArray = existingSession.value(forKey: "expandedPaths") as? [String] {
-                self.expandedPaths = Set(expandedPathsArray)
-            }
-
-            if let selectedPath = existingSession.selectedFilePath {
-                // Restore selected file if it was open
-                if let openPathsArray = existingSession.value(forKey: "openFilesPaths") as? [String],
-                   openPathsArray.contains(selectedPath) {
-                    // Will be restored when files are reopened
-                }
-            }
-
-            // Restore open files
-            if let openPathsArray = existingSession.value(forKey: "openFilesPaths") as? [String] {
-                Task {
-                    for path in openPathsArray {
-                        await openFile(path: path)
-                    }
-
-                    // Restore selection after files are opened
-                    if let selectedPath = existingSession.selectedFilePath,
-                       let selectedFile = openFiles.first(where: { $0.path == selectedPath }) {
-                        selectedFileId = selectedFile.id
-                    }
-                }
-            }
-        } else {
-            // Create new session
-            let newSession = FileBrowserSession(context: viewContext)
-            newSession.id = UUID()
-            newSession.currentPath = currentPath
-            newSession.setValue([], forKey: "expandedPaths")
-            newSession.setValue([], forKey: "openFilesPaths")
-            newSession.worktree = worktree
-            self.session = newSession
-
-            saveSession()
-        }
-    }
-
-    private func saveSession() {
-        guard let session = session else { return }
-
-        session.currentPath = currentPath
-        session.setValue(Array(expandedPaths), forKey: "expandedPaths")
-        session.setValue(openFiles.map { $0.path }, forKey: "openFilesPaths")
-        session.selectedFilePath = openFiles.first(where: { $0.id == selectedFileId })?.path
-
-        do {
-            try viewContext.save()
-        } catch {
-            logger.error("Error saving FileBrowserSession: \(error)")
         }
     }
 
