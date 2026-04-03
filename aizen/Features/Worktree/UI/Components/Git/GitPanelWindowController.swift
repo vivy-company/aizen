@@ -97,23 +97,23 @@ struct GitPanelWindowContentWithToolbar: View {
     @State private var currentOperation: GitToolbarOperation?
 
     // PR/MR state
-    @State private var prStatus: PRStatus = .unknown
-    @State private var hostingInfo: GitHostingInfo?
-    @State private var showCLIInstallAlert: Bool = false
-    @State private var prOperationInProgress: Bool = false
-    @State private var hostingInfoTask: Task<Void, Never>?
+    @State var prStatus: PRStatus = .unknown
+    @State var hostingInfo: GitHostingInfo?
+    @State var showCLIInstallAlert: Bool = false
+    @State var prOperationInProgress: Bool = false
+    @State var hostingInfoTask: Task<Void, Never>?
     @AppStorage(AppearanceSettings.gitDiffRenderStyleKey)
     private var diffRenderStyleRawValue: String = AppearanceSettings.defaultGitDiffRenderStyleRawValue
 
-    private let runtime: WorktreeRuntime
+    let runtime: WorktreeRuntime
     @ObservedObject private var gitSummaryStore: GitSummaryStore
     @ObservedObject private var gitOperationService: GitOperationService
 
-    private let gitHostingService = GitHostingService.shared
+    let gitHostingService = GitHostingService.shared
 
-    private var worktree: Worktree { context.worktree }
-    private var gitStatus: GitStatus { gitSummaryStore.status }
-    private var isOperationPending: Bool { gitOperationService.isOperationPending }
+    var worktree: Worktree { context.worktree }
+    var gitStatus: GitStatus { gitSummaryStore.status }
+    var isOperationPending: Bool { gitOperationService.isOperationPending }
     private var gitFeaturesAvailable: Bool { gitSummaryStore.repositoryState == .ready }
 
     private var diffRenderStyleBinding: Binding<VVDiffRenderStyle> {
@@ -136,7 +136,7 @@ struct GitPanelWindowContentWithToolbar: View {
         self._gitOperationService = ObservedObject(wrappedValue: context.runtime.operationService)
     }
 
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitPanelToolbar")
+    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitPanelToolbar")
 
     private var gitOperations: WorktreeGitOperations {
         WorktreeGitOperations(
@@ -378,177 +378,4 @@ struct GitPanelWindowContentWithToolbar: View {
         action()
     }
 
-    // MARK: - PR Actions
-
-    private var isOnMainBranch: Bool {
-        let branch = gitStatus.currentBranch.lowercased()
-        return branch == "main" || branch == "master"
-    }
-
-    @ViewBuilder
-    private var prActionButton: some View {
-        if let info = hostingInfo, info.provider != .unknown, !isOnMainBranch {
-            if prOperationInProgress {
-                HStack(spacing: 6) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(info.provider == .gitlab ? "MR..." : "PR...")
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-            } else {
-                switch prStatus {
-                case .unknown, .noPR:
-                    Button {
-                        createPR()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.triangle.pull")
-                            Text(info.provider == .gitlab ? "Create MR" : "Create PR")
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isOperationPending || gitStatus.currentBranch.isEmpty)
-
-                case .open(let number, let url, let mergeable, let title):
-                    HStack(spacing: 4) {
-                        Button {
-                            if let prURL = URL(string: url) {
-                                NSWorkspace.shared.open(prURL)
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "number")
-                                Text("\(number)")
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .help(title)
-
-                        Button {
-                            mergePR(number: number)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.triangle.merge")
-                                Text("Merge")
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!mergeable || isOperationPending)
-                        .help(mergeable ? "Merge this PR" : "PR cannot be merged (conflicts or checks failing)")
-                    }
-
-                case .merged, .closed:
-                    Button {
-                        createPR()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.triangle.pull")
-                            Text(info.provider == .gitlab ? "Create MR" : "Create PR")
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isOperationPending || gitStatus.currentBranch.isEmpty)
-                }
-            }
-        }
-    }
-
-    private func loadHostingInfo() async {
-        guard let path = worktree.path else { return }
-        hostingInfo = await gitHostingService.getHostingInfo(for: path)
-        await refreshPRStatus()
-    }
-
-    private func loadHostingInfoIfNeeded() {
-        guard hostingInfo == nil, hostingInfoTask == nil else { return }
-        hostingInfoTask = Task {
-            await loadHostingInfo()
-            await MainActor.run {
-                hostingInfoTask = nil
-            }
-        }
-    }
-
-    private func refreshPRStatus() async {
-        guard let path = worktree.path,
-              let info = hostingInfo,
-              info.cliInstalled && info.cliAuthenticated else {
-            prStatus = .unknown
-            return
-        }
-
-        let branch = gitStatus.currentBranch
-        guard !branch.isEmpty else {
-            prStatus = .unknown
-            return
-        }
-
-        prStatus = await gitHostingService.getPRStatus(repoPath: path, branch: branch)
-    }
-
-    private func createPR() {
-        guard let info = hostingInfo else { return }
-        let branch = gitStatus.currentBranch
-        guard !branch.isEmpty else { return }
-
-        // Check if CLI is available
-        if !info.cliInstalled || !info.cliAuthenticated {
-            // For providers without CLI support, open browser directly
-            if info.provider == .bitbucket || info.provider.cliName == nil {
-                Task {
-                    await gitHostingService.openInBrowser(
-                        info: info,
-                        action: .createPR(sourceBranch: branch, targetBranch: nil)
-                    )
-                }
-            } else {
-                showCLIInstallAlert = true
-            }
-            return
-        }
-
-        prOperationInProgress = true
-        Task {
-            do {
-                guard let path = worktree.path else { return }
-                try await gitHostingService.createPR(repoPath: path, sourceBranch: branch)
-                await refreshPRStatus()
-            } catch {
-                logger.error("Failed to create PR: \(error.localizedDescription)")
-                // Fallback to browser
-                await gitHostingService.openInBrowser(
-                    info: info,
-                    action: .createPR(sourceBranch: branch, targetBranch: nil)
-                )
-            }
-            prOperationInProgress = false
-        }
-    }
-
-    private func mergePR(number: Int) {
-        guard let info = hostingInfo else { return }
-
-        if !info.cliInstalled || !info.cliAuthenticated {
-            // Open PR in browser for manual merge
-            if let url = gitHostingService.buildURL(info: info, action: .viewPR(number: number)) {
-                NSWorkspace.shared.open(url)
-            }
-            return
-        }
-
-        prOperationInProgress = true
-        Task {
-            do {
-                guard let path = worktree.path else { return }
-                try await gitHostingService.mergePR(repoPath: path, prNumber: number)
-                await refreshPRStatus()
-                // Refresh git status after merge
-                runtime.refreshSummary(lightweight: false)
-            } catch {
-                logger.error("Failed to merge PR: \(error.localizedDescription)")
-            }
-            prOperationInProgress = false
-        }
-    }
 }
