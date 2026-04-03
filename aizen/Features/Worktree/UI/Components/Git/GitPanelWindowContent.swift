@@ -156,18 +156,18 @@ struct GitPanelWindowContent: View {
     private let runtime: WorktreeRuntime
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitPanelWindow")
-    @State private var selectedHistoryCommit: GitCommit?
+    @State var selectedHistoryCommit: GitCommit?
     @State private var historyDiffOutput: String = ""
     @State private var leftPanelWidth: CGFloat = 350
-    @State private var visibleFile: String?
-    @State private var scrollToFile: String?
+    @State var visibleFile: String?
+    @State var scrollToFile: String?
     @State private var commentPopoverLine: DiffLine?
     @State private var commentPopoverFilePath: String?
-    @State private var showAgentPicker: Bool = false
+    @State var showAgentPicker: Bool = false
     @State private var cachedChangedFiles: [String] = []
 
-    @StateObject private var reviewManager = ReviewSessionStore()
-    @State private var selectedWorkflowForTrigger: Workflow?
+    @StateObject var reviewManager = ReviewSessionStore()
+    @State var selectedWorkflowForTrigger: Workflow?
     @State var isInitializingGit = false
     @State var gitInitializationError: String?
 
@@ -179,7 +179,7 @@ struct GitPanelWindowContent: View {
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var gitSummaryStore: GitSummaryStore
     @ObservedObject private var gitDiffStore: GitDiffRuntimeStore
-    @ObservedObject private var gitOperationService: GitOperationService
+    @ObservedObject var gitOperationService: GitOperationService
     @ObservedObject var workflowService: WorkflowService
 
     private let minLeftPanelWidth: CGFloat = 280
@@ -207,7 +207,7 @@ struct GitPanelWindowContent: View {
         self._workflowService = ObservedObject(wrappedValue: context.runtime.workflowService)
     }
 
-    private var gitOperations: WorktreeGitOperations {
+    var gitOperations: WorktreeGitOperations {
         WorktreeGitOperations(
             gitOperationService: gitOperationService,
             repositoryManager: repositoryManager,
@@ -216,7 +216,7 @@ struct GitPanelWindowContent: View {
         )
     }
 
-    private var gitStatus: GitStatus { gitSummaryStore.status }
+    var gitStatus: GitStatus { gitSummaryStore.status }
 
     private var repositoryState: GitRepositoryState {
         gitSummaryStore.repositoryState
@@ -350,100 +350,6 @@ struct GitPanelWindowContent: View {
                 }
             )
         }
-    }
-
-    // MARK: - Left Panel (Tab Content)
-
-    @ViewBuilder
-    private var leftPanel: some View {
-        switch selectedTab {
-        case .git:
-            gitTabContent
-        case .history:
-            GitHistoryView(
-                worktreePath: worktreePath,
-                selectedCommit: selectedHistoryCommit,
-                onSelectCommit: { commit in
-                    selectedHistoryCommit = commit
-                }
-            )
-        case .comments:
-            ReviewCommentsPanel(
-                reviewManager: reviewManager,
-                onScrollToLine: { filePath, _ in
-                    scrollToFile = filePath
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        scrollToFile = nil
-                    }
-                },
-                onCopyAll: {
-                    let markdown = reviewManager.exportToMarkdown()
-                    Clipboard.copy(markdown)
-                },
-                onSendToAgent: {
-                    showAgentPicker = true
-                }
-            )
-        case .workflows:
-            WorkflowSidebarView(
-                service: workflowService,
-                onSelect: { workflow in
-                    workflowService.selectedWorkflow = workflow
-                    workflowService.selectedRun = nil
-                },
-                onTrigger: { workflow in
-                    selectedWorkflowForTrigger = workflow
-                }
-            )
-        case .prs:
-            EmptyView()
-        }
-    }
-
-    private var gitTabContent: some View {
-        GitSidebarView(
-            worktreePath: worktreePath,
-            onClose: onClose,
-            gitStatus: gitStatus,
-            isOperationPending: gitOperationService.isOperationPending,
-            selectedDiffFile: visibleFile,
-            onStageFile: { file in
-                gitOperations.stageFile(file)
-            },
-            onUnstageFile: { file in
-                gitOperations.unstageFile(file)
-            },
-            onStageAll: { completion in
-                gitOperations.stageAll {
-                    completion()
-                }
-            },
-            onUnstageAll: {
-                gitOperations.unstageAll()
-            },
-            onDiscardAll: {
-                gitOperations.discardAll()
-            },
-            onCleanUntracked: {
-                gitOperations.cleanUntracked()
-            },
-            onCommit: { message in
-                gitOperations.commit(message)
-            },
-            onAmendCommit: { message in
-                gitOperations.amendCommit(message)
-            },
-            onCommitWithSignoff: { message in
-                gitOperations.commitWithSignoff(message)
-            },
-            onFileClick: { file in
-                visibleFile = file
-                scrollToFile = file
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    scrollToFile = nil
-                }
-            }
-        )
     }
 
     // MARK: - Diff Panel
