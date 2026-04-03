@@ -34,9 +34,9 @@ struct TerminalPaneView: View {
     let onTitleChange: (String) -> Void
     let onVoiceRecordingChanged: (Bool) -> Void
 
-    @EnvironmentObject private var ghosttyApp: Ghostty.App
+    @EnvironmentObject var ghosttyApp: Ghostty.App
 
-    @State private var surfaceView: AizenTerminalSurfaceView?
+    @State var surfaceView: AizenTerminalSurfaceView?
     @StateObject var audioService = AudioService()
     @State var showingVoiceRecording = false
     @State var showingPermissionError = false
@@ -137,53 +137,6 @@ struct TerminalPaneView: View {
         } message: {
             Text(permissionErrorMessage)
         }
-    }
-
-    private func resolveSurfaceIfNeeded() {
-        if let existing = surfaceView {
-            surfaceAdapter.applyCallbacks(to: existing)
-            existing.setGhosttyFocused(isFocused)
-            return
-        }
-
-        if let sessionId = session.id,
-           let existing = sessionManager.getTerminal(for: sessionId, paneId: paneId) {
-            surfaceAdapter.applyCallbacks(to: existing)
-            existing.setGhosttyFocused(isFocused)
-            surfaceView = existing
-            return
-        }
-
-        guard let app = ghosttyApp.app,
-              let worktreePath = surfaceAdapter.worktreePath else {
-            return
-        }
-
-        let created = AizenTerminalSurfaceView(
-            frame: .zero,
-            worktreePath: worktreePath,
-            ghosttyApp: app,
-            appWrapper: ghosttyApp,
-            paneId: paneId,
-            command: surfaceAdapter.initialCommand
-        )
-        surfaceAdapter.applyCallbacks(to: created)
-        surfaceAdapter.store(surface: created)
-        created.setGhosttyFocused(isFocused)
-        surfaceView = created
-    }
-
-    private func requestSurfaceFocus() {
-        resolveSurfaceIfNeeded()
-        guard let surface = surfaceView else {
-            return
-        }
-
-        // Already the first responder — skip the async dispatch to avoid
-        // queueing a stale moveFocus that could race with a later click.
-        guard surface.window?.firstResponder !== surface else { return }
-
-        Ghostty.moveFocus(to: surface)
     }
 
 }
