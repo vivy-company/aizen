@@ -47,15 +47,15 @@ final class TerminalSplitController: ObservableObject {
 
     private(set) var isSelected: Bool
     private var paneTitles: [String: String] = [:]
-    private var layoutSaveTask: Task<Void, Never>?
-    private var focusSaveTask: Task<Void, Never>?
-    private var contextSaveTask: Task<Void, Never>?
+    var layoutSaveTask: Task<Void, Never>?
+    var focusSaveTask: Task<Void, Never>?
+    var contextSaveTask: Task<Void, Never>?
     private var pendingCloseAction: CloseAction = .pane
     private var keyMonitor: Any?
     private var focusedPaneVoiceRecording = false
     private var paneVoiceRecordingStates: [String: Bool] = [:]
     private var closingPaneIds: Set<String> = []
-    private var isClosingSession = false
+    var isClosingSession = false
 
     init(
         worktree: Worktree,
@@ -381,93 +381,6 @@ final class TerminalSplitController: ObservableObject {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleVoiceShortcut(event) ?? event
         }
-    }
-
-    private func saveContext() {
-        scheduleDebouncedSave()
-    }
-
-    private func scheduleDebouncedSave() {
-        contextSaveTask?.cancel()
-        contextSaveTask = Task { @MainActor [weak session] in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled,
-                  let session,
-                  !session.isDeleted,
-                  let context = session.managedObjectContext else { return }
-            do {
-                try context.save()
-            } catch {
-                Logger.terminal.error("Failed to save split layout: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func seedSessionLayoutIfNeeded() {
-        guard !session.isDeleted else { return }
-        guard let context = session.managedObjectContext else { return }
-
-        let resolvedPaneId = TerminalLayoutDefaults.paneId(
-            sessionId: session.id,
-            focusedPaneId: focusedPaneId
-        )
-
-        var didChange = false
-        if session.focusedPaneId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
-            session.focusedPaneId = resolvedPaneId
-            didChange = true
-        }
-
-        if session.splitLayout?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true,
-           let json = SplitLayoutHelper.encode(TerminalLayoutDefaults.defaultLayout(paneId: resolvedPaneId)) {
-            session.splitLayout = json
-            didChange = true
-        }
-
-        guard didChange else { return }
-        do {
-            try context.save()
-        } catch {
-            Logger.terminal.error("Failed to seed terminal session layout: \(error.localizedDescription)")
-        }
-    }
-
-    private func scheduleLayoutSave() {
-        layoutSaveTask?.cancel()
-        let currentLayout = layout
-        layoutSaveTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
-            self?.persistLayout(currentLayout)
-        }
-    }
-
-    private func scheduleFocusSave() {
-        focusSaveTask?.cancel()
-        let currentFocusedPaneId = focusedPaneId
-        focusSaveTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(100))
-            guard !Task.isCancelled else { return }
-            self?.persistFocus(currentFocusedPaneId)
-        }
-    }
-
-    private func persistLayout(_ layoutToSave: SplitNode? = nil) {
-        guard !isClosingSession, !session.isDeleted else { return }
-        let node = layoutToSave ?? layout
-        if let json = SplitLayoutHelper.encode(node), session.splitLayout != json {
-            session.splitLayout = json
-            saveContext()
-        }
-    }
-
-    private func persistFocus(_ paneId: String? = nil) {
-        guard !isClosingSession, !session.isDeleted else { return }
-        let id = paneId ?? focusedPaneId
-        guard !id.isEmpty else { return }
-        guard session.focusedPaneId != id else { return }
-        session.focusedPaneId = id
-        saveContext()
     }
 
     private func applyTitleForFocusedPane() {
