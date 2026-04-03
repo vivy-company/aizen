@@ -28,22 +28,22 @@ struct WorktreeCreateSheet: View {
 
     @State var mode: EnvironmentCreationMode = .linked
     @State private var environmentName = ""
-    @State private var branchName = ""
-    @State private var selectedBranch: BranchInfo?
+    @State var branchName = ""
+    @State var selectedBranch: BranchInfo?
     @State private var isProcessing = false
     @State private var errorMessage: String?
     @State private var validationWarning: String?
-    @State private var showingBranchSelector = false
+    @State var showingBranchSelector = false
     @State private var selectedTemplateIndex: Int?
     @State var showingPostCreateActions = false
     @State var shouldRunPostCreateActions = true
     @State var independentMethod: WorkspaceRepositoryStore.IndependentEnvironmentMethod = .clone
-    @State private var detectedSubmodules: [GitSubmoduleInfo] = []
-    @State private var loadingSubmodules = false
-    @State private var initializeSubmodules = true
-    @State private var includeNestedSubmodules = true
-    @State private var selectedSubmodulePaths: Set<String> = []
-    @State private var matchSubmoduleBranchToEnvironment = false
+    @State var detectedSubmodules: [GitSubmoduleInfo] = []
+    @State var loadingSubmodules = false
+    @State var initializeSubmodules = true
+    @State var includeNestedSubmodules = true
+    @State var selectedSubmodulePaths: Set<String> = []
+    @State var matchSubmoduleBranchToEnvironment = false
 
     @AppStorage("branchNameTemplates") private var branchNameTemplatesData: Data = Data()
 
@@ -85,7 +85,7 @@ struct WorktreeCreateSheet: View {
         return worktrees.compactMap { $0.branch }
     }
 
-    private var defaultBaseBranch: String {
+    var defaultBaseBranch: String {
         let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
         if let mainWorktree = worktrees.first(where: { $0.isPrimary }) {
             return mainWorktree.branch ?? "main"
@@ -93,11 +93,11 @@ struct WorktreeCreateSheet: View {
         return "main"
     }
 
-    private var hasSubmodules: Bool {
+    var hasSubmodules: Bool {
         !detectedSubmodules.isEmpty
     }
 
-    private var selectedSubmoduleCount: Int {
+    var selectedSubmoduleCount: Int {
         let available = Set(detectedSubmodules.map(\.path))
         return selectedSubmodulePaths.intersection(available).count
     }
@@ -119,7 +119,7 @@ struct WorktreeCreateSheet: View {
         }
     }
 
-    private func submoduleSelectionBinding(for path: String) -> Binding<Bool> {
+    func submoduleSelectionBinding(for path: String) -> Binding<Bool> {
         Binding(
             get: { selectedSubmodulePaths.contains(path) },
             set: { selected in
@@ -157,7 +157,7 @@ struct WorktreeCreateSheet: View {
         )
     }
 
-    private var initializeSubmodulesBinding: Binding<Bool> {
+    var initializeSubmodulesBinding: Binding<Bool> {
         Binding(
             get: { initializeSubmodules },
             set: { newValue in
@@ -348,75 +348,6 @@ struct WorktreeCreateSheet: View {
                 if let warning = validationWarning {
                     warningRow(warning)
                 }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var linkedModeSections: some View {
-        Section(String(localized: "worktree.create.baseBranch", bundle: .main)) {
-            BranchSelectorButton(
-                selectedBranch: selectedBranch,
-                defaultBranch: defaultBaseBranch,
-                isPresented: $showingBranchSelector
-            )
-
-            Text("worktree.create.baseBranchHelp", bundle: .main)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-
-        Section("Submodules") {
-            if loadingSubmodules {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Detecting submodules...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } else if hasSubmodules {
-                Toggle("Initialize submodules after environment creation", isOn: initializeSubmodulesBinding)
-                Toggle("Include nested submodules recursively", isOn: $includeNestedSubmodules)
-                    .disabled(!initializeSubmodules)
-
-                Text("\(selectedSubmoduleCount) of \(detectedSubmodules.count) submodule\(detectedSubmodules.count == 1 ? "" : "s") selected")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                if initializeSubmodules {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(Array(detectedSubmodules.prefix(8)), id: \.path) { submodule in
-                            Toggle(isOn: submoduleSelectionBinding(for: submodule.path)) {
-                                Text(submodule.path)
-                                    .font(.caption)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
-                            .toggleStyle(.checkbox)
-                            .controlSize(.small)
-                        }
-
-                        if detectedSubmodules.count > 8 {
-                            Text("+\(detectedSubmodules.count - 8) more")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-
-                    Toggle(
-                        "Checkout/create branch '\(branchName.isEmpty ? "new-environment" : branchName)' in selected submodules",
-                        isOn: $matchSubmoduleBranchToEnvironment
-                    )
-                    .disabled(selectedSubmoduleCount == 0 || branchName.isEmpty)
-                }
-            } else {
-                Text("No submodules detected in this repository.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }
