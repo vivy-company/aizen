@@ -30,7 +30,7 @@ struct ChatSessionView: View {
     @State var keyMonitor: Any?
     @State var chatActions = ChatActions()
     @State private var isWindowResizing = false
-    @State private var wasNearBottomBeforeResize = true
+    @State var wasNearBottomBeforeResize = true
     @State var chatTimelineState = VVChatTimelineState()
 
     // Input state (local to avoid re-rendering entire view on keystroke)
@@ -250,29 +250,6 @@ struct ChatSessionView: View {
     }
 
     // MARK: - Helpers
-
-    private func updateInputBarWidth(_ width: CGFloat) {
-        let normalized = max((width * 2).rounded() / 2, 0)
-        guard abs(normalized - inputBarWidth) > 0.5 else { return }
-
-        // Geometry changes can arrive during layout; defer state mutation to next run loop.
-        DispatchQueue.main.async {
-            guard abs(normalized - inputBarWidth) > 0.5 else { return }
-            inputBarWidth = normalized
-        }
-    }
-
-    private func handleLayoutResizingChange(_ resizing: Bool) {
-        if resizing {
-            wasNearBottomBeforeResize = viewModel.isNearBottom
-            viewModel.cancelPendingAutoScroll()
-            viewModel.suppressNextAutoScroll = true
-            viewModel.scrollRequest = nil
-            viewModel.isNearBottom = false
-        } else {
-            viewModel.isNearBottom = wasNearBottomBeforeResize
-        }
-    }
 
     var currentPermissionRequest: RequestPermissionRequest? {
         guard viewModel.showingPermissionAlert,
