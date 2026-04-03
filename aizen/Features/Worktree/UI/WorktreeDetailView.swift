@@ -20,7 +20,7 @@ struct WorktreeDetailView: View {
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "WorktreeDetailView")
 
-    @StateObject private var viewModel: WorktreeDetailStore
+    @StateObject var viewModel: WorktreeDetailStore
     @ObservedObject var tabStateManager: WorktreeTabStateStore
 
     @AppStorage("showChatTab") private var showChatTab = true
@@ -31,16 +31,16 @@ struct WorktreeDetailView: View {
     @AppStorage("showGitStatus") private var showGitStatus = true
     @AppStorage("showXcodeBuild") private var showXcodeBuild = true
     @AppStorage("zenModeEnabled") private var zenModeEnabled = false
-    @State private var selectedTab = "chat"
+    @State var selectedTab = "chat"
     @State private var lastOpenedApp: DetectedApp?
     private let worktreeRuntime: WorktreeRuntime
     @ObservedObject private var gitSummaryStore: GitSummaryStore
     @ObservedObject private var xcodeBuildManager: XcodeBuildStore
     @StateObject private var tabConfig = TabConfigurationStore.shared
     @State private var fileSearchWindowController: FileSearchWindowController?
-    @State private var fileToOpenFromSearch: String?
+    @State var fileToOpenFromSearch: String?
     @State private var cachedTerminalBackgroundColor: Color?
-    @State private var hasLoadedTabState = false
+    @State var hasLoadedTabState = false
     @Environment(\.colorScheme) private var colorScheme
 
     init(
@@ -162,7 +162,7 @@ struct WorktreeDetailView: View {
         }
     }
 
-    private var visibleTabIds: [String] {
+    var visibleTabIds: [String] {
         tabConfig.tabOrder
             .map(\.id)
             .filter { isTabVisible($0) }
@@ -458,152 +458,6 @@ struct WorktreeDetailView: View {
             }
             navigateToChatSession(chatSessionId)
         }
-    }
-
-    private func navigateToChatSession(_ sessionId: UUID) {
-        guard let worktreeId = worktree.id else { return }
-        // Fetch session directly to check if it belongs to this worktree
-        // (avoids stale relationship cache after reattachment)
-        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktreeId as CVarArg)
-        request.fetchLimit = 1
-
-        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
-            selectedTab = "chat"
-            viewModel.selectedChatSessionId = sessionId
-        } else {
-            NotificationCenter.default.post(
-                name: .navigateToChatSession,
-                object: nil,
-                userInfo: ["chatSessionId": sessionId]
-            )
-        }
-    }
-
-    private func handleSwitchToChatSession(_ notification: Notification) {
-        guard let sessionId = notification.userInfo?["chatSessionId"] as? UUID else {
-            return
-        }
-        guard let worktreeId = worktree.id else { return }
-        // Fetch session directly to verify it belongs to this worktree
-        // (avoids stale relationship cache after reattachment)
-        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktreeId as CVarArg)
-        request.fetchLimit = 1
-
-        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
-            selectedTab = "chat"
-            viewModel.selectedChatSessionId = sessionId
-        }
-    }
-
-    private func handleSwitchToWorktreeTab(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let targetWorktreeId = userInfo["worktreeId"] as? UUID,
-              let tabId = userInfo["tabId"] as? String,
-              targetWorktreeId == worktree.id else {
-            return
-        }
-
-        guard visibleTabIds.contains(tabId) else { return }
-        selectedTab = tabId
-    }
-
-    private func handleSwitchToTerminalSession(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let targetWorktreeId = userInfo["worktreeId"] as? UUID,
-              let sessionId = userInfo["sessionId"] as? UUID,
-              targetWorktreeId == worktree.id else {
-            return
-        }
-
-        let request: NSFetchRequest<TerminalSession> = TerminalSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, targetWorktreeId as CVarArg)
-        request.fetchLimit = 1
-
-        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
-            selectedTab = "terminal"
-            viewModel.selectedTerminalSessionId = sessionId
-        }
-    }
-
-    private func handleSwitchToBrowserSession(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let targetWorktreeId = userInfo["worktreeId"] as? UUID,
-              let sessionId = userInfo["sessionId"] as? UUID,
-              targetWorktreeId == worktree.id else {
-            return
-        }
-
-        let request: NSFetchRequest<BrowserSession> = BrowserSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, targetWorktreeId as CVarArg)
-        request.fetchLimit = 1
-
-        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
-            selectedTab = "browser"
-            viewModel.selectedBrowserSessionId = sessionId
-        }
-    }
-
-    private func handleSendMessageToChat(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let sessionId = userInfo["sessionId"] as? UUID else {
-            return
-        }
-
-        // Get attachment from notification (new way) or create from message (legacy way)
-        let attachment: ChatAttachment
-        if let existingAttachment = userInfo["attachment"] as? ChatAttachment {
-            attachment = existingAttachment
-        } else if let message = userInfo["message"] as? String {
-            attachment = .reviewComments(message)
-        } else {
-            return
-        }
-
-        // Store attachment (user can add context before sending)
-        ChatSessionRegistry.shared.setPendingAttachments([attachment], for: sessionId)
-
-        if doesChatSessionBelongToCurrentWorktree(sessionId) {
-            selectedTab = "chat"
-            viewModel.selectedChatSessionId = sessionId
-        } else {
-            NotificationCenter.default.post(
-                name: .navigateToChatSession,
-                object: nil,
-                userInfo: ["chatSessionId": sessionId]
-            )
-        }
-    }
-
-    private func handleSwitchToChat(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let sessionId = userInfo["sessionId"] as? UUID else {
-            return
-        }
-
-        if doesChatSessionBelongToCurrentWorktree(sessionId) {
-            selectedTab = "chat"
-            viewModel.selectedChatSessionId = sessionId
-        } else {
-            NotificationCenter.default.post(
-                name: .navigateToChatSession,
-                object: nil,
-                userInfo: ["chatSessionId": sessionId]
-            )
-        }
-    }
-
-    private func doesChatSessionBelongToCurrentWorktree(_ sessionId: UUID) -> Bool {
-        guard let worktreeId = worktree.id else { return false }
-        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(
-            format: "id == %@ AND worktree.id == %@",
-            sessionId as CVarArg,
-            worktreeId as CVarArg
-        )
-        request.fetchLimit = 1
-        return ((try? worktree.managedObjectContext?.fetch(request).first) != nil)
     }
 
     var body: some View {
