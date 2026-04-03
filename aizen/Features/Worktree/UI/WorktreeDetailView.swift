@@ -37,7 +37,7 @@ struct WorktreeDetailView: View {
     @ObservedObject private var gitSummaryStore: GitSummaryStore
     @ObservedObject private var xcodeBuildManager: XcodeBuildStore
     @StateObject var tabConfig = TabConfigurationStore.shared
-    @State private var fileSearchWindowController: FileSearchWindowController?
+    @State var fileSearchWindowController: FileSearchWindowController?
     @State var fileToOpenFromSearch: String?
     @State private var cachedTerminalBackgroundColor: Color?
     @State var hasLoadedTabState = false
@@ -349,35 +349,6 @@ struct WorktreeDetailView: View {
         if !visibleTabs.contains(where: { $0.id == selectedTab }) {
             selectedTab = visibleTabs.first?.id ?? "files"
         }
-    }
-
-    private func openFile(_ filePath: String) {
-        // Remember the file path so the files tab can open it
-        fileToOpenFromSearch = filePath
-
-        // Switch to files tab
-        selectedTab = "files"
-    }
-
-    private func showFileSearch() {
-        // Toggle behavior: close if already visible
-        if let existing = fileSearchWindowController, existing.window?.isVisible == true {
-            existing.closeWindow()
-            fileSearchWindowController = nil
-            return
-        }
-
-        guard let worktreePath = worktree.path else { return }
-
-        let windowController = FileSearchWindowController(
-            worktreePath: worktreePath,
-            onFileSelected: { filePath in
-                self.openFile(filePath)
-            }
-        )
-
-        fileSearchWindowController = windowController
-        windowController.showWindow(nil)
     }
 
     @ViewBuilder
