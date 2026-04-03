@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-private enum EnvironmentCreationMode: String, CaseIterable {
+enum EnvironmentCreationMode: String, CaseIterable {
     case linked
     case independent
 
@@ -26,7 +26,7 @@ struct WorktreeCreateSheet: View {
     @ObservedObject var repository: Repository
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
 
-    @State private var mode: EnvironmentCreationMode = .linked
+    @State var mode: EnvironmentCreationMode = .linked
     @State private var environmentName = ""
     @State private var branchName = ""
     @State private var selectedBranch: BranchInfo?
@@ -135,7 +135,7 @@ struct WorktreeCreateSheet: View {
         )
     }
 
-    private var modeBinding: Binding<EnvironmentCreationMode> {
+    var modeBinding: Binding<EnvironmentCreationMode> {
         Binding(
             get: { mode },
             set: { newMode in
@@ -281,26 +281,6 @@ struct WorktreeCreateSheet: View {
     }
 
     @ViewBuilder
-    private var environmentTypeSection: some View {
-        Section("Environment Type") {
-            Picker("Type", selection: modeBinding) {
-                Text(EnvironmentCreationMode.linked.title)
-                    .tag(EnvironmentCreationMode.linked)
-                    .disabled(!isGitProject)
-                Text(EnvironmentCreationMode.independent.title)
-                    .tag(EnvironmentCreationMode.independent)
-            }
-            .pickerStyle(.radioGroup)
-            .labelsHidden()
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if !isGitProject && mode == .linked {
-                warningRow("Linked environments require a git project. Use Independent mode instead.")
-            }
-        }
-    }
-
-    @ViewBuilder
     private var namingSection: some View {
         Section("Naming") {
             LabeledContent("Environment Name") {
@@ -439,17 +419,6 @@ struct WorktreeCreateSheet: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-
-    @ViewBuilder
-    private func warningRow(_ warning: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.caption)
-            Text(warning)
-                .font(.caption)
-        }
-        .foregroundStyle(.orange)
     }
 
     private func suggestEnvironmentName() {
