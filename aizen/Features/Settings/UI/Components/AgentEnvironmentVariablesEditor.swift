@@ -13,12 +13,12 @@ struct AgentEnvironmentVariablesEditor: View {
 
     var helperText: String = "Merged on top of your shell environment each time Aizen launches the agent."
 
-    @State private var revealedSecretIDs: Set<UUID> = []
+    @State var revealedSecretIDs: Set<UUID> = []
     @State private var showingFileImporter = false
     @State private var showingTextEditor = false
     @State var importError: String?
 
-    private var duplicateNames: [String] {
+    var duplicateNames: [String] {
         variables.duplicateNames
     }
 
@@ -47,97 +47,14 @@ struct AgentEnvironmentVariablesEditor: View {
 
     // MARK: - Empty State
 
-    private var emptyState: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "tray")
-                .foregroundStyle(.tertiary)
-            Text("No environment variables configured")
-                .foregroundStyle(.secondary)
-        }
-        .font(.callout)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 4)
-    }
-
-    // MARK: - Variables List
-
-    private let actionButtonsWidth: CGFloat = 54 // lock (24) + spacing (6) + remove (24)
-
-    private var variablesList: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Header
-            HStack(spacing: 6) {
-                Text("Name")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text("Value")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.trailing, actionButtonsWidth + 6)
-
-            // Rows
-            ForEach(variables.map(\.id), id: \.self) { id in
-                variableRow(for: id)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func variableRow(for id: UUID) -> some View {
-        if let variable = variable(for: id) {
-            let isRevealed = revealedSecretIDs.contains(id)
-            let isDuplicate = !variable.trimmedName.isEmpty && duplicateNames.contains(variable.trimmedName)
-
-            HStack(spacing: 6) {
-                // Name field
-                PlainTextField(text: nameBinding(for: id), isDuplicate: isDuplicate)
-
-                // Value field
-                HStack(spacing: 4) {
-                    if variable.isSecret && !isRevealed {
-                        PlainSecureField(text: valueBinding(for: id))
-                    } else {
-                        PlainTextField(text: valueBinding(for: id))
-                    }
-
-                    if variable.isSecret {
-                        Button {
-                            toggleReveal(for: id)
-                        } label: {
-                            Image(systemName: isRevealed ? "eye.slash" : "eye")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .fixedSize()
-                        .help(isRevealed ? "Hide value" : "Reveal value")
-                    }
-                }
-
-                // Fixed-width action buttons
-                secureToggle(for: id, variable: variable)
-
-                Button(role: .destructive) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        removeVariable(id: id)
-                    }
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .foregroundStyle(.red)
-                }
-                .buttonStyle(.plain)
-                .help("Remove variable")
-            }
-        }
-    }
+    let actionButtonsWidth: CGFloat = 54 // lock (24) + spacing (6) + remove (24)
 
     // MARK: - Field Components
 
     /// Plain-style TextField with full-width hit area.
     /// Each instance owns its own @FocusState so an invisible overlay can
     /// forward clicks that land outside the tiny underlying NSTextField.
-    private struct PlainTextField: View {
+    struct PlainTextField: View {
         @Binding var text: String
         var isDuplicate: Bool = false
         @FocusState private var isFocused: Bool
@@ -166,7 +83,7 @@ struct AgentEnvironmentVariablesEditor: View {
         }
     }
 
-    private struct PlainSecureField: View {
+    struct PlainSecureField: View {
         @Binding var text: String
         @FocusState private var isFocused: Bool
 
@@ -192,24 +109,6 @@ struct AgentEnvironmentVariablesEditor: View {
                     }
                 }
         }
-    }
-
-    private func secureToggle(for id: UUID, variable: AgentEnvironmentVariable) -> some View {
-        Button {
-            guard let index = variables.firstIndex(where: { $0.id == id }) else { return }
-            variables[index].isSecret.toggle()
-            if !variables[index].isSecret {
-                revealedSecretIDs.remove(id)
-            }
-        } label: {
-            Image(systemName: variable.isSecret ? "lock.fill" : "lock.open")
-                .font(.caption)
-                .foregroundStyle(variable.isSecret ? Color.blue : Color.secondary.opacity(0.4))
-                .frame(width: 24, height: 24)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(variable.isSecret ? "Secured — value is stored in macOS Keychain. Click to store as plain text instead." : "Unsecured — value is stored as plain text. Click to protect with macOS Keychain.")
     }
 
     // MARK: - Actions
@@ -335,45 +234,6 @@ struct AgentEnvironmentVariablesEditor: View {
             }
             .foregroundStyle(.secondary)
         }
-    }
-
-    // MARK: - Helpers
-
-    private func variable(for id: UUID) -> AgentEnvironmentVariable? {
-        variables.first(where: { $0.id == id })
-    }
-
-    private func nameBinding(for id: UUID) -> Binding<String> {
-        Binding(
-            get: { variable(for: id)?.name ?? "" },
-            set: { newValue in
-                guard let index = variables.firstIndex(where: { $0.id == id }) else { return }
-                variables[index].name = newValue
-            }
-        )
-    }
-
-    private func valueBinding(for id: UUID) -> Binding<String> {
-        Binding(
-            get: { variable(for: id)?.value ?? "" },
-            set: { newValue in
-                guard let index = variables.firstIndex(where: { $0.id == id }) else { return }
-                variables[index].value = newValue
-            }
-        )
-    }
-
-    private func toggleReveal(for id: UUID) {
-        if revealedSecretIDs.contains(id) {
-            revealedSecretIDs.remove(id)
-        } else {
-            revealedSecretIDs.insert(id)
-        }
-    }
-
-    private func removeVariable(id: UUID) {
-        variables.removeAll { $0.id == id }
-        revealedSecretIDs.remove(id)
     }
 
 }
