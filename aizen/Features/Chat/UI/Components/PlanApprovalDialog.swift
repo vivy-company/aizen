@@ -127,7 +127,7 @@ struct PlanApprovalPickerView: View {
     let onDismissWithoutResponse: () -> Void
 
     @State var selectedIndex = 0
-    @State private var keyMonitor: Any?
+    @State var keyMonitor: Any?
 
     var options: [PermissionOption] {
         request.options ?? []
@@ -244,7 +244,7 @@ struct PlanApprovalPickerView: View {
         !options.isEmpty && selectedIndex >= 0 && selectedIndex < options.count
     }
 
-    private func submitSelectedOption() {
+    func submitSelectedOption() {
         guard canSubmit else { return }
         let option = options[selectedIndex]
         session.respondToPermission(optionId: option.optionId)
@@ -256,7 +256,7 @@ struct PlanApprovalPickerView: View {
         session.respondToPermission(optionId: options[index].optionId)
     }
 
-    private func dismissRequest() {
+    func dismissRequest() {
         if let option = preferredDismissOption {
             session.respondToPermission(optionId: option.optionId)
         } else {
@@ -266,11 +266,11 @@ struct PlanApprovalPickerView: View {
         }
     }
 
-    private var preferredDismissOption: PermissionOption? {
+    var preferredDismissOption: PermissionOption? {
         options.first(where: { isDismissOption($0.kind) }) ?? options.last
     }
 
-    private func isDismissOption(_ kind: String) -> Bool {
+    func isDismissOption(_ kind: String) -> Bool {
         let normalized = kind.lowercased()
         return normalized.contains("reject")
             || normalized.contains("deny")
@@ -278,7 +278,7 @@ struct PlanApprovalPickerView: View {
             || normalized.contains("decline")
     }
 
-    private func moveSelection(_ delta: Int) {
+    func moveSelection(_ delta: Int) {
         guard options.count > 1 else { return }
         let next = max(0, min(selectedIndex + delta, options.count - 1))
         selectedIndex = next
@@ -289,52 +289,6 @@ struct PlanApprovalPickerView: View {
         return KeyEquivalent(Character("\(number)"))
     }
 
-    private func installKeyboardMonitorIfNeeded() {
-        guard keyMonitor == nil else { return }
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            if handleKeyDown(event) {
-                return nil
-            }
-            return event
-        }
-    }
-
-    private func removeKeyboardMonitor() {
-        if let keyMonitor {
-            NSEvent.removeMonitor(keyMonitor)
-            self.keyMonitor = nil
-        }
-    }
-
-    private func handleKeyDown(_ event: NSEvent) -> Bool {
-        switch event.keyCode {
-        case 126: // Up arrow
-            moveSelection(-1)
-            return true
-        case 125: // Down arrow
-            moveSelection(1)
-            return true
-        case 36, 76: // Return / Enter
-            submitSelectedOption()
-            return true
-        case 53: // Escape
-            dismissRequest()
-            return true
-        default:
-            if let index = numberKeyCodeToIndex[event.keyCode], index < options.count {
-                submitOption(at: index)
-                return true
-            }
-            break
-        }
-
-        return false
-    }
-
-    private var numberKeyCodeToIndex: [UInt16: Int] {
-        // Top-row number key codes on macOS keyboard layout: 1...9
-        [18: 0, 19: 1, 20: 2, 21: 3, 23: 4, 22: 5, 26: 6, 28: 7, 25: 8]
-    }
 }
 
 struct PermissionRequestPrompt {
