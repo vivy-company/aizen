@@ -31,7 +31,7 @@ struct ChatSessionView: View {
     @State private var chatActions = ChatActions()
     @State private var isWindowResizing = false
     @State private var wasNearBottomBeforeResize = true
-    @State private var chatTimelineState = VVChatTimelineState()
+    @State var chatTimelineState = VVChatTimelineState()
 
     // Input state (local to avoid re-rendering entire view on keystroke)
     @State var inputText = ""
@@ -428,41 +428,6 @@ struct ChatSessionView: View {
             return nil
         }
         return request
-    }
-
-    private var shouldShowScrollToBottom: Bool {
-        (!chatTimelineState.isLiveTail || chatTimelineState.hasUnreadNewContent)
-            && (!viewModel.messages.isEmpty || !viewModel.toolCalls.isEmpty)
-    }
-
-    private func scrollToBottom() {
-        viewModel.scrollToBottom()
-    }
-
-    @ViewBuilder
-    private var scrollToBottomButton: some View {
-        Button(action: scrollToBottom) {
-            if #available(macOS 26.0, *) {
-                Image(systemName: "arrow.down")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .padding(10)
-                    .glassEffect(.regular, in: Circle())
-                    .contentShape(Circle())
-            } else {
-                Image(systemName: "arrow.down")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .padding(10)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(
-                        Circle()
-                            .strokeBorder(.separator.opacity(0.3), lineWidth: 0.5)
-                    )
-                    .contentShape(Circle())
-            }
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Input Handling
