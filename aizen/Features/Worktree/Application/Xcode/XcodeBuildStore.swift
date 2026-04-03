@@ -24,7 +24,7 @@ final class XcodeBuildStore: ObservableObject {
     @Published var lastBuildLog: String?
     @Published var lastBuildDuration: TimeInterval?
     @Published var isLoadingDestinations = false
-    @Published private(set) var isReady = false
+    @Published var isReady = false
 
     // Track launched app for termination before next launch
     @Published var launchedBundleId: String?
@@ -41,7 +41,7 @@ final class XcodeBuildStore: ObservableObject {
 
     // MARK: - Persistence
 
-    nonisolated private static func persistenceKey(prefix: String, scopedTo path: String) -> String {
+    nonisolated static func persistenceKey(prefix: String, scopedTo path: String) -> String {
         let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
         return "\(prefix)_\(normalizedPath)"
     }
@@ -68,94 +68,11 @@ final class XcodeBuildStore: ObservableObject {
     private let buildService = XcodeBuildService()
 
     private var buildTask: Task<Void, Never>?
-    private var currentWorktreePath: String?
+    var currentWorktreePath: String?
     var lastDestinationsRefreshAt: Date?
     let destinationsRefreshTTL: TimeInterval = 300
 
     init() {}
-
-    // MARK: - Detection
-
-    func detectProject(at path: String) {
-        if path == currentWorktreePath, detectedProject != nil {
-            return
-        }
-        guard path != currentWorktreePath else { return }
-        currentWorktreePath = path
-        let projectDetector = self.projectDetector
-        let destinationsCacheKey = self.destinationsCacheKey
-        let lastDestinationIdKey = self.lastDestinationIdKey
-
-        Task { [weak self] in
-            guard let self = self else { return }
-
-            // Reset state on main actor
-            await MainActor.run {
-                self.detectedProject = nil
-                self.selectedScheme = nil
-                self.currentPhase = .idle
-                self.lastBuildLog = nil
-                self.isReady = false
-            }
-
-            // Detect project off main actor
-            let project = await projectDetector.detectProject(at: path)
-
-            guard let project = project else {
-                return  // isReady stays false
-            }
-
-            // Load cached destinations off main actor (JSON decoding)
-            let cachedDestinations = Self.loadCachedDestinationsOffMainActor(from: destinationsCacheKey)
-            let lastDestId = Self.loadLastDestinationId(from: lastDestinationIdKey)
-            let savedScheme = self.loadSavedScheme(for: project.path)
-
-            // Update UI state on main actor
-            await MainActor.run {
-                if let cached = cachedDestinations {
-                    self.availableDestinations = cached
-                }
-
-                self.detectedProject = project
-
-                // Restore or auto-select scheme
-                if let saved = savedScheme, project.schemes.contains(saved) {
-                    self.selectedScheme = saved
-                } else {
-                    self.selectedScheme = project.schemes.first
-                }
-
-                // Restore selected destination from cache
-                if !lastDestId.isEmpty, let dest = self.findDestination(byId: lastDestId) {
-                    self.selectedDestination = dest
-                } else if self.selectedDestination == nil {
-                    self.selectedDestination = self.availableDestinations[.simulator]?.first { $0.platform == "iOS" }
-                        ?? self.availableDestinations[.mac]?.first
-                }
-
-                // Mark ready if we have cached destinations
-                if !self.availableDestinations.isEmpty {
-                    self.isReady = true
-                }
-            }
-
-            // Refresh destinations in background (or load if no cache)
-            let shouldRefresh = await MainActor.run { self.shouldRefreshDestinations(force: false) }
-            if cachedDestinations != nil, shouldRefresh {
-                await self.loadDestinations(force: false)
-            } else {
-                await self.loadDestinations(force: true)
-                await MainActor.run {
-                    self.isReady = true
-                }
-            }
-        }
-    }
-
-    nonisolated private func loadSavedScheme(for projectPath: String) -> String? {
-        let key = Self.persistenceKey(prefix: "xcodeScheme", scopedTo: projectPath)
-        return UserDefaults.standard.string(forKey: key)
-    }
 
     // MARK: - Scheme Selection
 
