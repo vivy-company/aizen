@@ -1,0 +1,449 @@
+import ACP
+import AppKit
+import Foundation
+import SwiftUI
+import VVChatTimeline
+import VVCode
+import VVMetalPrimitives
+
+extension ChatMessageList {
+    func summaryPayloadCard(_ summary: TurnSummary) -> PayloadSummaryCard {
+        let rows = summary.fileChanges.map { change in
+            let filePath = resolveSummaryFilePath(change.path)
+            return PayloadSummaryRow(
+                id: change.id,
+                title: compactDisplayPath(change.path),
+                subtitle: nil,
+                iconURL: summaryFileIconURL(path: change.path),
+                actionURL: fileOpenURLString(path: filePath),
+                additionsText: "+\(change.linesAdded)",
+                deletionsText: "-\(change.linesRemoved)"
+            )
+        }
+
+        let subtitle: String
+        if rows.isEmpty {
+            subtitle = "\(summary.toolCallCount) tool call\(summary.toolCallCount == 1 ? "" : "s") • \(summary.formattedDuration) • no files modified"
+        } else {
+            subtitle = "\(summary.toolCallCount) tool call\(summary.toolCallCount == 1 ? "" : "s") • \(summary.formattedDuration)"
+        }
+
+        return PayloadSummaryCard(
+            title: "Turn Summary",
+            subtitle: subtitle,
+            rows: rows
+        )
+    }
+
+    func makeSummaryCard(from payload: PayloadSummaryCard) -> VVChatSummaryCard {
+        let rows = payload.rows.map { row in
+            VVChatSummaryCardRow(
+                id: row.id,
+                title: row.title,
+                subtitle: row.subtitle,
+                iconURL: row.iconURL,
+                actionURL: row.actionURL,
+                titleColor: summaryRowTitleColor,
+                subtitleColor: summaryRowSubtitleColor,
+                additionsText: row.additionsText,
+                additionsColor: summaryAdditionsColor,
+                deletionsText: row.deletionsText,
+                deletionsColor: summaryDeletionsColor,
+                hoverFillColor: summaryRowHoverColor
+            )
+        }
+
+        return VVChatSummaryCard(
+            title: payload.title,
+            iconURL: symbolIconURL(
+                "checklist",
+                fallbackID: "turn-summary",
+                tintColor: headerIconTintColor,
+                pointSize: 12
+            ),
+            subtitle: payload.subtitle,
+            rows: rows,
+            titleColor: summaryTitleColor,
+            subtitleColor: summarySubtitleColor,
+            dividerColor: summaryDividerColor,
+            rowDividerColor: summaryRowDividerColor
+        )
+    }
+
+    var summaryTitleColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.textColor)
+        }
+        return colorScheme == .dark ? .rgba(0.96, 0.97, 0.99, 1) : .rgba(0.12, 0.14, 0.18, 1)
+    }
+
+    var summarySubtitleColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.textColor).withOpacity(0.74)
+        }
+        return colorScheme == .dark ? .rgba(0.83, 0.85, 0.90, 0.92) : .rgba(0.34, 0.38, 0.46, 0.92)
+    }
+
+    var summaryDividerColor: SIMD4<Float> {
+        simdColor(from: GhosttyThemeParser.loadDividerColor(named: effectiveTerminalThemeName))
+            .withOpacity(colorScheme == .dark ? 0.9 : 0.7)
+    }
+
+    var summaryRowDividerColor: SIMD4<Float> {
+        summaryDividerColor.withOpacity(colorScheme == .dark ? 0.45 : 0.35)
+    }
+
+    var summaryRowTitleColor: SIMD4<Float> {
+        summaryTitleColor.withOpacity(0.96)
+    }
+
+    var summaryRowSubtitleColor: SIMD4<Float> {
+        summarySubtitleColor.withOpacity(0.9)
+    }
+
+    var summaryAdditionsColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.gitAddedColor)
+        }
+        return colorScheme == .dark ? .rgba(0.50, 0.86, 0.62, 1) : .rgba(0.11, 0.60, 0.25, 1)
+    }
+
+    var summaryDeletionsColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.gitDeletedColor)
+        }
+        return colorScheme == .dark ? .rgba(0.94, 0.69, 0.48, 1) : .rgba(0.78, 0.36, 0.08, 1)
+    }
+
+    var summaryRowHoverColor: SIMD4<Float> {
+        if let theme = activeTerminalVVTheme {
+            return simdColor(from: theme.currentLineColor).withOpacity(colorScheme == .dark ? 0.18 : 0.10)
+        }
+        return colorScheme == .dark ? .rgba(0.86, 0.90, 0.98, 0.035) : .rgba(0.14, 0.20, 0.30, 0.03)
+    }
+
+    func summaryFileIconURL(path: String) -> String? {
+        let iconPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        let iconName = FileIconMapper.iconName(for: iconPath) ?? "file_default"
+        guard let image = NSImage(named: iconName),
+              let data = image.tiffRepresentation else {
+            return nil
+        }
+        let cacheKey = "turn-summary-file-\(iconName)-\(revisionKey(iconPath))"
+        return ChatTimelineHeaderIconStore.urlString(
+            for: .customImage(data),
+            fallbackAgentId: cacheKey,
+            tintColor: nil,
+            targetPointSize: 16,
+            backingScale: timelineBackingScale
+        )
+    }
+
+    func planRequestMarkdown(_ request: RequestPermissionRequest) -> String {
+        var sections: [String] = ["**Plan approval requested**"]
+
+        if let message = request.message,
+           !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append(message)
+        }
+
+        if let toolCall = request.toolCall,
+           let rawInput = toolCall.rawInput?.value as? [String: Any],
+           let plan = rawInput["plan"] as? String,
+           !plan.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append(plan)
+        }
+
+        if let options = request.options, !options.isEmpty {
+            let optionLines = options.map { "- \($0.name)" }
+            sections.append(optionLines.joined(separator: "\n"))
+        }
+
+        return sections.joined(separator: "\n\n")
+    }
+
+    func resolveSummaryFilePath(_ rawPath: String) -> String {
+        let expanded = (rawPath as NSString).expandingTildeInPath
+        if expanded.hasPrefix("/") {
+            return URL(fileURLWithPath: expanded).standardizedFileURL.path
+        }
+
+        if let worktreePath, !worktreePath.isEmpty {
+            return URL(fileURLWithPath: worktreePath)
+                .appendingPathComponent(expanded)
+                .standardizedFileURL
+                .path
+        }
+
+        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(expanded)
+            .standardizedFileURL
+            .path
+    }
+
+    func fileOpenURLString(path: String) -> String {
+        var components = URLComponents()
+        components.scheme = "aizen-file"
+        components.queryItems = [URLQueryItem(name: "path", value: path)]
+        return components.url?.absoluteString ?? path
+    }
+
+    func unifiedDiffDocument(for diff: ToolCallDiff) -> String {
+        diffDocument(for: diff, contextLines: 3, maxOutputLines: 8_000)
+    }
+
+    func diffDocument(for diff: ToolCallDiff, contextLines: Int, maxOutputLines: Int) -> String {
+        let normalizedPath = normalizedDiffPath(diff.path)
+        let oldText = diff.oldText ?? ""
+        let oldLines = oldText.isEmpty ? [String]() : oldText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let newLines = diff.newText.isEmpty ? [String]() : diff.newText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+
+        let linePairs = unifiedDiffLines(
+            oldLines: oldLines,
+            newLines: newLines,
+            contextLines: contextLines,
+            maxOutputLines: maxOutputLines
+        )
+
+        var output: [String] = [
+            "diff --git a/\(normalizedPath) b/\(normalizedPath)",
+            "--- a/\(normalizedPath)",
+            "+++ b/\(normalizedPath)"
+        ]
+
+        output.append("@@ -1,1 +1,1 @@")
+
+        if linePairs.isEmpty {
+            output.append(" ")
+            return output.joined(separator: "\n")
+        }
+
+        for line in linePairs {
+            switch line.type {
+            case .context:
+                output.append(" \(line.content)")
+            case .added:
+                output.append("+\(line.content)")
+            case .deleted:
+                output.append("-\(line.content)")
+            case .separator:
+                output.append("@@ -1,1 +1,1 @@")
+            }
+        }
+
+        return output.joined(separator: "\n")
+    }
+
+    func normalizedDiffPath(_ rawPath: String) -> String {
+        let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "file" }
+
+        let expanded = (trimmed as NSString).expandingTildeInPath
+        if !expanded.hasPrefix("/") {
+            return expanded
+        }
+
+        let cwd = FileManager.default.currentDirectoryPath
+        if expanded.hasPrefix(cwd + "/") {
+            return String(expanded.dropFirst(cwd.count + 1))
+        }
+
+        let pathURL = URL(fileURLWithPath: expanded)
+        let components = pathURL.pathComponents.filter { $0 != "/" }
+        if components.count >= 3 {
+            return components.suffix(3).joined(separator: "/")
+        }
+        return pathURL.lastPathComponent.isEmpty ? expanded : pathURL.lastPathComponent
+    }
+
+    func unifiedDiffLines(
+        oldLines: [String],
+        newLines: [String],
+        contextLines: Int,
+        maxOutputLines: Int
+    ) -> [ToolDiffPreviewLine] {
+        if oldLines == newLines {
+            return []
+        }
+
+        let complexityLimit = 350_000
+        let complexity = oldLines.count * newLines.count
+        if complexity > complexityLimit {
+            return fastUnifiedDiffLines(oldLines: oldLines, newLines: newLines, maxOutputLines: maxOutputLines)
+        }
+
+        let lcs = longestCommonSubsequence(oldLines, newLines)
+        var edits: [(type: ToolDiffPreviewLineType, content: String)] = []
+        edits.reserveCapacity(oldLines.count + newLines.count)
+
+        var oldIdx = 0
+        var newIdx = 0
+        var lcsIdx = 0
+
+        while oldIdx < oldLines.count || newIdx < newLines.count {
+            if lcsIdx < lcs.count && oldIdx < oldLines.count && newIdx < newLines.count &&
+                oldLines[oldIdx] == lcs[lcsIdx] && newLines[newIdx] == lcs[lcsIdx] {
+                edits.append((.context, oldLines[oldIdx]))
+                oldIdx += 1
+                newIdx += 1
+                lcsIdx += 1
+            } else if oldIdx < oldLines.count && (lcsIdx >= lcs.count || oldLines[oldIdx] != lcs[lcsIdx]) {
+                edits.append((.deleted, oldLines[oldIdx]))
+                oldIdx += 1
+            } else if newIdx < newLines.count {
+                edits.append((.added, newLines[newIdx]))
+                newIdx += 1
+            }
+        }
+
+        return hunkedDiffLines(edits: edits, contextLines: contextLines, maxOutputLines: maxOutputLines)
+    }
+
+    func fastUnifiedDiffLines(
+        oldLines: [String],
+        newLines: [String],
+        maxOutputLines: Int
+    ) -> [ToolDiffPreviewLine] {
+        var result: [ToolDiffPreviewLine] = []
+        result.reserveCapacity(min(maxOutputLines + 1, oldLines.count + newLines.count))
+
+        let oldLimit = min(oldLines.count, maxOutputLines / 2)
+        let newLimit = min(newLines.count, maxOutputLines - oldLimit)
+
+        for line in oldLines.prefix(oldLimit) {
+            result.append(ToolDiffPreviewLine(type: .deleted, content: line))
+        }
+        for line in newLines.prefix(newLimit) {
+            result.append(ToolDiffPreviewLine(type: .added, content: line))
+        }
+
+        if oldLines.count > oldLimit || newLines.count > newLimit {
+            result.append(ToolDiffPreviewLine(type: .separator, content: "… truncated …"))
+        }
+
+        return result
+    }
+
+    func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
+        guard !a.isEmpty, !b.isEmpty else { return [] }
+        let maxMatrixSize = 900
+        if a.count > maxMatrixSize || b.count > maxMatrixSize {
+            return simpleLCS(a, b)
+        }
+
+        let rows = a.count + 1
+        let cols = b.count + 1
+        var dp = Array(repeating: Array(repeating: 0, count: cols), count: rows)
+
+        for i in 1..<rows {
+            for j in 1..<cols {
+                if a[i - 1] == b[j - 1] {
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                } else {
+                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+                }
+            }
+        }
+
+        var result: [String] = []
+        var i = a.count
+        var j = b.count
+        while i > 0 && j > 0 {
+            if a[i - 1] == b[j - 1] {
+                result.append(a[i - 1])
+                i -= 1
+                j -= 1
+            } else if dp[i - 1][j] > dp[i][j - 1] {
+                i -= 1
+            } else {
+                j -= 1
+            }
+        }
+        return result.reversed()
+    }
+
+    func simpleLCS(_ a: [String], _ b: [String]) -> [String] {
+        let bSet = Set(b)
+        return a.filter { bSet.contains($0) }
+    }
+
+    func hunkedDiffLines(
+        edits: [(type: ToolDiffPreviewLineType, content: String)],
+        contextLines: Int,
+        maxOutputLines: Int
+    ) -> [ToolDiffPreviewLine] {
+        var changeIndices: [Int] = []
+        for (index, edit) in edits.enumerated() where edit.type != .context {
+            changeIndices.append(index)
+        }
+        guard !changeIndices.isEmpty else { return [] }
+
+        var hunks: [[Int]] = []
+        var current: [Int] = []
+        for index in changeIndices {
+            if current.isEmpty {
+                current = [index]
+            } else if index - (current.last ?? index) <= (contextLines * 2 + 1) {
+                current.append(index)
+            } else {
+                hunks.append(current)
+                current = [index]
+            }
+        }
+        if !current.isEmpty {
+            hunks.append(current)
+        }
+
+        var result: [ToolDiffPreviewLine] = []
+        result.reserveCapacity(min(maxOutputLines + hunks.count, edits.count))
+
+        for (hunkIndex, hunk) in hunks.enumerated() {
+            let start = max(0, (hunk.first ?? 0) - contextLines)
+            let end = min(edits.count - 1, (hunk.last ?? 0) + contextLines)
+
+            if hunkIndex > 0 {
+                result.append(ToolDiffPreviewLine(type: .separator, content: "···"))
+            }
+
+            for index in start...end {
+                result.append(ToolDiffPreviewLine(type: edits[index].type, content: edits[index].content))
+                if result.count >= maxOutputLines {
+                    result.append(ToolDiffPreviewLine(type: .separator, content: "… truncated …"))
+                    return result
+                }
+            }
+        }
+
+        return result
+    }
+
+    func decodeCustomPayload(from data: Data) -> TimelineCustomPayload? {
+        try? JSONDecoder().decode(TimelineCustomPayload.self, from: data)
+    }
+
+    func toolGroupStatusColor(statusRawValue: String?) -> SIMD4<Float> {
+        switch statusRawValue {
+        case "failed":
+            return colorScheme == .dark ? .rgba(0.92, 0.42, 0.44, 1) : .rgba(0.82, 0.24, 0.28, 1)
+        case "in_progress":
+            return colorScheme == .dark ? .rgba(0.98, 0.78, 0.36, 1) : .rgba(0.88, 0.62, 0.06, 1)
+        default:
+            return colorScheme == .dark ? .rgba(0.42, 0.82, 0.52, 1) : .rgba(0.14, 0.64, 0.24, 1)
+        }
+    }
+
+    func toolGroupStatusNSColor(statusRawValue: String?) -> NSColor {
+        switch statusRawValue {
+        case "failed":
+            return colorScheme == .dark
+                ? NSColor(red: 0.92, green: 0.42, blue: 0.44, alpha: 1)
+                : NSColor(red: 0.82, green: 0.24, blue: 0.28, alpha: 1)
+        case "in_progress":
+            return colorScheme == .dark
+                ? NSColor(red: 0.98, green: 0.78, blue: 0.36, alpha: 1)
+                : NSColor(red: 0.88, green: 0.62, blue: 0.06, alpha: 1)
+        default:
+            return headerIconTintColor
+        }
+    }
+}
