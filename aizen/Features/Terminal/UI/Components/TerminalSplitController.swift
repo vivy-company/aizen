@@ -21,7 +21,7 @@ final class TerminalSplitController: ObservableObject {
     let session: TerminalSession
     let sessionManager: TerminalRuntimeStore
     let splitActions = TerminalSplitActions()
-    private let titleRegistry = TerminalTitleRegistry.shared
+    let titleRegistry = TerminalTitleRegistry.shared
 
     @Published var layout: SplitNode {
         didSet {
@@ -45,13 +45,13 @@ final class TerminalSplitController: ObservableObject {
     @Published var voiceAction: (paneId: String, action: VoiceAction)?
     @Published var focusRequestVersion = 0
 
-    private(set) var isSelected: Bool
-    private var paneTitles: [String: String] = [:]
+    var isSelected: Bool
+    var paneTitles: [String: String] = [:]
     var layoutSaveTask: Task<Void, Never>?
     var focusSaveTask: Task<Void, Never>?
     var contextSaveTask: Task<Void, Never>?
     var pendingCloseAction: CloseAction = .pane
-    private var keyMonitor: Any?
+    var keyMonitor: Any?
     var focusedPaneVoiceRecording = false
     var paneVoiceRecordingStates: [String: Bool] = [:]
     var closingPaneIds: Set<String> = []
@@ -90,67 +90,11 @@ final class TerminalSplitController: ObservableObject {
         )
     }
 
-    func handleAppear() {
-        seedSessionLayoutIfNeeded()
-        ensureKeyMonitor()
-
-        guard isSelected else { return }
-        activateSplitActions()
-        syncGhosttySurfaceFocus()
-        persistLayout()
-        persistFocus()
-        applyTitleForFocusedPane()
-        focusRequestVersion += 1
-    }
-
-    func handleDisappear() {
-        layoutSaveTask?.cancel()
-        focusSaveTask?.cancel()
-        contextSaveTask?.cancel()
-        deactivateSplitActions()
-        clearGhosttySurfaceFocus()
-
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-            keyMonitor = nil
-        }
-    }
-
-    func handleSelectionChange(_ selected: Bool) {
-        isSelected = selected
-
-        if selected {
-            activateSplitActions()
-            syncGhosttySurfaceFocus()
-            persistLayout()
-            persistFocus()
-            applyTitleForFocusedPane()
-            focusRequestVersion += 1
-        } else {
-            deactivateSplitActions()
-            clearGhosttySurfaceFocus()
-        }
-    }
-
-    func handlePaneFocus(_ paneId: String) {
-        guard !isClosingSession else { return }
-        guard layout.allPaneIds().contains(paneId) else { return }
-        activateSplitActions()
-        focusedPaneId = paneId
-    }
-
     func handleTitleChange(for paneId: String, title: String) {
         paneTitles[paneId] = title
         if paneId == focusedPaneId,
            let sessionId = session.id {
             titleRegistry.setLiveTitle(title, for: sessionId)
-        }
-    }
-
-    func handleVoiceRecordingChanged(for paneId: String, isRecording: Bool) {
-        paneVoiceRecordingStates[paneId] = isRecording
-        if focusedPaneId == paneId {
-            focusedPaneVoiceRecording = isRecording
         }
     }
 
@@ -231,115 +175,6 @@ final class TerminalSplitController: ObservableObject {
         activateSplitActions()
     }
 
-    func activateSplitActions() {
-        TerminalSplitActionRouter.shared.activate(splitActions)
-    }
-
-    func deactivateSplitActions() {
-        TerminalSplitActionRouter.shared.clear(splitActions)
-    }
-
-    private func ensureKeyMonitor() {
-        guard keyMonitor == nil else { return }
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleVoiceShortcut(event) ?? event
-        }
-    }
-
-    private func applyTitleForFocusedPane() {
-        guard !isClosingSession, !session.isDeleted else { return }
-        guard let sessionId = session.id else { return }
-
-        if let title = paneTitles[focusedPaneId] {
-            titleRegistry.setLiveTitle(title, for: sessionId)
-        } else {
-            titleRegistry.clearLiveTitle(for: sessionId)
-        }
-    }
-
-    private func handleVoiceShortcut(_ event: NSEvent) -> NSEvent? {
-        guard isSelected else { return event }
-        let targetPaneId = activePaneId()
-
-        if focusedPaneVoiceRecording {
-            if event.keyCode == 53 {
-                voiceAction = (targetPaneId, .cancel)
-                return nil
-            }
-            if event.keyCode == 36 {
-                voiceAction = (targetPaneId, .accept)
-                return nil
-            }
-        }
-
-        guard event.modifierFlags.contains(.command),
-              event.modifierFlags.contains(.shift),
-              event.charactersIgnoringModifiers?.lowercased() == "m" else {
-            return event
-        }
-
-        voiceAction = (targetPaneId, .toggle)
-        return nil
-    }
-
-    func activePaneId() -> String {
-        let paneIds = layout.allPaneIds()
-        if let sessionId = session.id,
-           let responderPaneId = sessionManager.focusedPaneId(for: sessionId),
-           paneIds.contains(responderPaneId) {
-            if focusedPaneId != responderPaneId {
-                focusedPaneId = responderPaneId
-            }
-            return responderPaneId
-        }
-
-        if paneIds.contains(focusedPaneId) {
-            return focusedPaneId
-        }
-
-        if let fallbackPaneId = paneIds.first {
-            focusedPaneId = fallbackPaneId
-            return fallbackPaneId
-        }
-
-        return focusedPaneId
-    }
-
-    private func syncGhosttySurfaceFocus() {
-        guard isSelected, let sessionId = session.id else { return }
-
-        let paneIds = Set(layout.allPaneIds())
-        for paneId in paneIds {
-            guard let surface = sessionManager.getTerminal(for: sessionId, paneId: paneId) else { continue }
-            surface.setGhosttyFocused(paneId == focusedPaneId)
-        }
-    }
-
-    private func clearGhosttySurfaceFocus() {
-        guard let sessionId = session.id else { return }
-
-        let paneIds = Set(layout.allPaneIds())
-        for paneId in paneIds {
-            guard let surface = sessionManager.getTerminal(for: sessionId, paneId: paneId) else { continue }
-            surface.setGhosttyFocused(false)
-        }
-    }
-
-    func transferFocus(from sourcePaneId: String, to targetPaneId: String?) {
-        guard let targetPaneId else { return }
-
-        if focusedPaneId != targetPaneId {
-            focusedPaneId = targetPaneId
-        }
-
-        if let sessionId = session.id,
-           let targetSurface = sessionManager.getTerminal(for: sessionId, paneId: targetPaneId) {
-            let sourceSurface = sessionManager.getTerminal(for: sessionId, paneId: sourcePaneId)
-            Ghostty.moveFocus(to: targetSurface, from: sourceSurface)
-        }
-
-        focusRequestVersion += 1
-    }
 
     static var sessionPersistenceEnabled: Bool {
         UserDefaults.standard.bool(forKey: "terminalSessionPersistence")
