@@ -161,8 +161,8 @@ struct GitPanelWindowContent: View {
     @State private var leftPanelWidth: CGFloat = 350
     @State var visibleFile: String?
     @State var scrollToFile: String?
-    @State private var commentPopoverLine: DiffLine?
-    @State private var commentPopoverFilePath: String?
+    @State var commentPopoverLine: DiffLine?
+    @State var commentPopoverFilePath: String?
     @State var showAgentPicker: Bool = false
     @State private var cachedChangedFiles: [String] = []
 
@@ -171,8 +171,8 @@ struct GitPanelWindowContent: View {
     @State var isInitializingGit = false
     @State var gitInitializationError: String?
 
-    @AppStorage(AppearanceSettings.codeFontFamilyKey) private var editorFontFamily: String = AppearanceSettings.defaultCodeFontFamily
-    @AppStorage(AppearanceSettings.diffFontSizeKey) private var diffFontSize: Double = AppearanceSettings.defaultDiffFontSize
+    @AppStorage(AppearanceSettings.codeFontFamilyKey) var editorFontFamily: String = AppearanceSettings.defaultCodeFontFamily
+    @AppStorage(AppearanceSettings.diffFontSizeKey) var diffFontSize: Double = AppearanceSettings.defaultDiffFontSize
     @AppStorage(AppearanceSettings.themeNameKey) private var terminalThemeName = AppearanceSettings.defaultDarkTheme
     @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
     @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var usePerAppearanceTheme = false
@@ -226,7 +226,7 @@ struct GitPanelWindowContent: View {
         repositoryState == .notRepository
     }
 
-    private var allChangedFiles: [String] {
+    var allChangedFiles: [String] {
         cachedChangedFiles
     }
 
@@ -354,119 +354,6 @@ struct GitPanelWindowContent: View {
 
     // MARK: - Diff Panel
 
-    private var diffRenderStylePicker: some View {
-        Picker("Diff Layout", selection: $diffRenderStyle) {
-            Text("Inline").tag(VVDiffRenderStyle.inline)
-            Text("Split").tag(VVDiffRenderStyle.sideBySide)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .controlSize(.small)
-        .frame(width: 128)
-        .help("Switch between inline and side-by-side diff layouts")
-    }
-
-    private func changesDiffHeader() -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: GitPanelTab.git.icon)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-            Text(GitPanelTab.git.displayName)
-                .font(.system(size: 13, weight: .medium))
-
-            Spacer()
-
-            diffRenderStylePicker
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 44)
-    }
-
-    private func diffPanelHeader(for commit: GitCommit) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "arrow.triangle.branch")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-            Text(commit.shortHash)
-                .font(.system(size: 13, weight: .medium, design: .monospaced))
-
-            Text(commit.message)
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-
-            Spacer()
-
-            diffRenderStylePicker
-
-            Button(String(localized: "git.panel.backToChanges")) {
-                selectedHistoryCommit = nil
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 44)
-    }
-
-    var diffPanel: some View {
-        VStack(spacing: 0) {
-            if let commit = selectedHistoryCommit {
-                diffPanelHeader(for: commit)
-            } else {
-                changesDiffHeader()
-            }
-
-            if selectedHistoryCommit == nil && allChangedFiles.isEmpty {
-                AllFilesDiffEmptyView()
-            } else if effectiveDiffOutput.isEmpty {
-                VStack {
-                    Spacer()
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text(String(localized: "git.diff.loading"))
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 8)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                DiffView(
-                    diffOutput: effectiveDiffOutput,
-                    fontSize: diffFontSize,
-                    fontFamily: editorFontFamily,
-                    repoPath: worktreePath,
-                    renderStyle: diffRenderStyle,
-                    scrollToFile: scrollToFile,
-                    onFileVisible: { file in
-                        visibleFile = file
-                    },
-                    onOpenFile: { file in
-                        let fullPath = (worktreePath as NSString).appendingPathComponent(file)
-                        NotificationCenter.default.post(
-                            name: .openFileInEditor,
-                            object: nil,
-                            userInfo: ["path": fullPath]
-                        )
-                        onClose()
-                    },
-                    commentedLines: selectedHistoryCommit == nil ? reviewManager.commentedLineKeys : Set(),
-                    onAddComment: selectedHistoryCommit == nil ? { line, filePath in
-                        commentPopoverFilePath = filePath
-                        commentPopoverLine = line
-                    } : { _, _ in }
-                )
-            }
-        }
-        .task(id: effectiveDiffOutput) {
-            validateCommentsAgainstDiff()
-        }
-    }
-
     // MARK: - Right Panel
 
     // MARK: - Divider
@@ -523,7 +410,7 @@ struct GitPanelWindowContent: View {
         return false
     }
 
-    private func validateCommentsAgainstDiff() {
+    func validateCommentsAgainstDiff() {
         guard selectedHistoryCommit == nil else { return }
 
         let filesInDiff = Set(allChangedFiles)
@@ -561,7 +448,7 @@ struct GitPanelWindowContent: View {
         }
     }
 
-    private var effectiveDiffOutput: String {
+    var effectiveDiffOutput: String {
         selectedHistoryCommit == nil ? gitDiffStore.diffOutput : historyDiffOutput
     }
 
