@@ -93,8 +93,8 @@ struct GitPanelWindowContentWithToolbar: View {
     let onClose: () -> Void
 
     @State private var selectedTab: GitPanelTab = .git
-    @State private var showingBranchPicker: Bool = false
-    @State private var currentOperation: GitToolbarOperation?
+    @State var showingBranchPicker: Bool = false
+    @State var currentOperation: GitToolbarOperation?
 
     // PR/MR state
     @State var prStatus: PRStatus = .unknown
@@ -107,7 +107,7 @@ struct GitPanelWindowContentWithToolbar: View {
 
     let runtime: WorktreeRuntime
     @ObservedObject private var gitSummaryStore: GitSummaryStore
-    @ObservedObject private var gitOperationService: GitOperationService
+    @ObservedObject var gitOperationService: GitOperationService
 
     let gitHostingService = GitHostingService.shared
 
@@ -138,7 +138,7 @@ struct GitPanelWindowContentWithToolbar: View {
 
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitPanelToolbar")
 
-    private var gitOperations: WorktreeGitOperations {
+    var gitOperations: WorktreeGitOperations {
         WorktreeGitOperations(
             gitOperationService: gitOperationService,
             repositoryManager: repositoryManager,
@@ -147,7 +147,7 @@ struct GitPanelWindowContentWithToolbar: View {
         )
     }
 
-    private enum GitToolbarOperation: String {
+    enum GitToolbarOperation: String {
         case fetch = "Fetching..."
         case pull = "Pulling..."
         case push = "Pushing..."
@@ -262,120 +262,6 @@ struct GitPanelWindowContentWithToolbar: View {
                 }
             )
         }
-    }
-
-    private var branchSelector: some View {
-        Button {
-            showingBranchPicker = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.triangle.branch")
-                Text(gitStatus.currentBranch.isEmpty ? "HEAD" : gitStatus.currentBranch)
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .buttonStyle(.bordered)
-    }
-
-    private var gitActionsToolbar: some View {
-        HStack(spacing: 4) {
-            if let operation = currentOperation {
-                // Show loading state
-                HStack(spacing: 6) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(operation.rawValue)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-            } else if gitStatus.aheadCount > 0 && gitStatus.behindCount > 0 {
-                Button {
-                    performOperation(.pull) { gitOperations.pull() }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.down")
-                        Text("Pull (\(gitStatus.behindCount))")
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(isOperationPending)
-
-                Button {
-                    performOperation(.push) { gitOperations.push() }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.up")
-                        Text("Push (\(gitStatus.aheadCount))")
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(isOperationPending)
-            } else if gitStatus.aheadCount > 0 {
-                Button {
-                    performOperation(.push) { gitOperations.push() }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.up")
-                        Text("Push (\(gitStatus.aheadCount))")
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(isOperationPending)
-            } else {
-                Button {
-                    performOperation(.fetch) { gitOperations.fetch() }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                        Text("Fetch")
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(isOperationPending)
-            }
-
-            if currentOperation == nil {
-                Menu {
-                    Button {
-                        performOperation(.fetch) { gitOperations.fetch() }
-                    } label: {
-                        Label("Fetch", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                    .disabled(isOperationPending)
-
-                    Button {
-                        performOperation(.pull) { gitOperations.pull() }
-                    } label: {
-                        Label("Pull", systemImage: "arrow.down")
-                    }
-                    .disabled(isOperationPending)
-
-                    Button {
-                        performOperation(.push) { gitOperations.push() }
-                    } label: {
-                        Label("Push", systemImage: "arrow.up")
-                    }
-                    .disabled(isOperationPending)
-                } label: {
-                    Image(systemName: "chevron.down")
-                }
-                .menuIndicator(.hidden)
-                .buttonStyle(.bordered)
-                .disabled(isOperationPending)
-            }
-        }
-        .task(id: gitOperationService.isOperationPending) {
-            guard !gitOperationService.isOperationPending else { return }
-            currentOperation = nil
-        }
-    }
-
-    private func performOperation(_ operation: GitToolbarOperation, action: () -> Void) {
-        currentOperation = operation
-        action()
     }
 
 }
