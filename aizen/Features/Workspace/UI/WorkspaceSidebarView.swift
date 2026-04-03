@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 import os.log
 
 struct WorkspaceSidebarView: View {
-    private let logger = Logger.workspace
+    let logger = Logger.workspace
     let workspaces: [Workspace]
     @Binding var selectedWorkspace: Workspace?
     @Binding var isCrossProjectSelected: Bool
@@ -29,8 +29,8 @@ struct WorkspaceSidebarView: View {
     @State var showingRepositorySearch = false
     @State var showingRepositoryFilters = false
     @State private var workspaceToEdit: Workspace?
-    @State private var refreshTask: Task<Void, Never>?
-    @State private var missingRepository: WorkspaceRepositoryStore.MissingRepository?
+    @State var refreshTask: Task<Void, Never>?
+    @State var missingRepository: WorkspaceRepositoryStore.MissingRepository?
     @AppStorage("repositoryStatusFilters") var storedStatusFilters: String = ""
 
     var selectedStatusFilters: Set<ItemStatus> {
@@ -46,7 +46,7 @@ struct WorkspaceSidebarView: View {
         }
     }
 
-    private let refreshInterval: TimeInterval = 30.0
+    let refreshInterval: TimeInterval = 30.0
     private let crossProjectRepositoryMarker = "__aizen.cross_project.workspace_repo__"
 
     private func isCrossProjectRepository(_ repository: Repository) -> Bool {
@@ -199,75 +199,6 @@ struct WorkspaceSidebarView: View {
             .padding(.top, 6)
             .padding(.bottom, 2)
         }
-    }
-
-    private func startPeriodicRefresh() {
-        // Cancel any existing refresh task
-        refreshTask?.cancel()
-
-        // Use Task-based periodic refresh instead of Timer (runs off main thread)
-        refreshTask = Task {
-            while !Task.isCancelled {
-                // Wait for refresh interval
-                try? await Task.sleep(for: .seconds(refreshInterval))
-
-                guard !Task.isCancelled else { break }
-
-                // Perform refresh
-                await refreshAllRepositories()
-            }
-        }
-    }
-
-    private func stopPeriodicRefresh() {
-        refreshTask?.cancel()
-        refreshTask = nil
-    }
-
-    private func refreshAllRepositories() async {
-        // Prioritize selected repository for immediate refresh
-        if let selected = selectedRepository {
-            do {
-                try await repositoryManager.refreshRepository(selected)
-            } catch let error as Libgit2Error {
-                if case .repositoryPathMissing(let path) = error {
-                    handleMissingRepository(selected, path: path)
-                } else {
-                    logger.error("Failed to refresh selected repository \(selected.name ?? "unknown"): \(error.localizedDescription)")
-                }
-            } catch {
-                logger.error("Failed to refresh selected repository \(selected.name ?? "unknown"): \(error.localizedDescription)")
-            }
-        }
-
-        // Background refresh other repos with stagger to reduce I/O contention
-        for repository in filteredRepositories where repository.id != selectedRepository?.id {
-            guard !Task.isCancelled else { break }
-            do {
-                try await repositoryManager.refreshRepository(repository)
-                try await Task.sleep(for: .milliseconds(100))
-            } catch let error as Libgit2Error {
-                if case .repositoryPathMissing(let path) = error {
-                    handleMissingRepository(repository, path: path)
-                } else {
-                    logger.error("Failed to refresh repository \(repository.name ?? "unknown"): \(error.localizedDescription)")
-                }
-            } catch {
-                logger.error("Failed to refresh repository \(repository.name ?? "unknown"): \(error.localizedDescription)")
-            }
-        }
-    }
-
-    @MainActor
-    private func handleMissingRepository(_ repository: Repository, path: String) {
-        guard let id = repository.id else { return }
-        // Only show if not already showing one
-        guard missingRepository == nil else { return }
-        missingRepository = WorkspaceRepositoryStore.MissingRepository(
-            id: id,
-            repository: repository,
-            lastKnownPath: path
-        )
     }
 
     var body: some View {
