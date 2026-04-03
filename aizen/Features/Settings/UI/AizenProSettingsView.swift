@@ -60,17 +60,17 @@ struct AizenProSettingsView: View {
 
 }
 
-private struct AizenProPlansSheet: View {
+struct AizenProPlansSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedPlan: PlanType = .pro
-    @State private var selectedBilling: BillingCycle = .monthly
+    @State var selectedPlan: PlanType = .pro
+    @State var selectedBilling: BillingCycle = .monthly
 
-    private enum PlanType {
+    enum PlanType {
         case pro
         case lifetime
     }
 
-    private enum BillingCycle {
+    enum BillingCycle {
         case monthly
         case yearly
     }
@@ -128,148 +128,6 @@ private struct AizenProPlansSheet: View {
         }
     }
 
-    private var proCard: some View {
-        planCard(
-            title: "Pro",
-            subtitle: "",
-            price: proPriceLabel,
-            features: ["Support continued development", "Priority support", "Future exclusive features"],
-            isSelected: selectedPlan == .pro
-        ) { // topContent
-            GlassSegmentedTabs(
-                options: [
-                    GlassSegmentedTabs.Option(title: "Monthly", value: .monthly),
-                    GlassSegmentedTabs.Option(title: "Yearly", value: .yearly, badge: "20% off")
-                ],
-                selection: $selectedBilling
-            )
-        } bottomContent: {
-            GlassPrimaryButton(title: "Subscribe") {
-                NSWorkspace.shared.open(proURL)
-            }
-        }
-        .onTapGesture {
-            selectedPlan = .pro
-        }
-    }
-
-    private var lifetimeCard: some View {
-        planCard(
-            title: "Lifetime",
-            subtitle: "One-time purchase",
-            price: "$179",
-            features: ["Support continued development", "Priority support forever", "Future exclusive features"],
-            isSelected: selectedPlan == .lifetime
-        ) {
-            EmptyView()
-        } bottomContent: {
-            GlassPrimaryButton(title: "Purchase") {
-                NSWorkspace.shared.open(lifetimeURL)
-            }
-        }
-        .onTapGesture {
-            selectedPlan = .lifetime
-        }
-    }
-
-    private func planCard(
-        title: String,
-        subtitle: String,
-        price: String,
-        features: [String],
-        isSelected: Bool
-    ) -> some View {
-        planCard(
-            title: title,
-            subtitle: subtitle,
-            price: price,
-            features: features,
-            isSelected: isSelected,
-            topContent: { EmptyView() },
-            bottomContent: { EmptyView() }
-        )
-    }
-
-    @ViewBuilder
-    private func planCard<Top: View, Bottom: View>(
-        title: String,
-        subtitle: String,
-        price: String,
-        features: [String],
-        isSelected: Bool,
-        @ViewBuilder topContent: () -> Top,
-        @ViewBuilder bottomContent: () -> Bottom
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                Spacer()
-                Text(price)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.primary)
-            }
-
-            topContent()
-
-            if !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(features, id: \.self) { feature in
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text(feature)
-                            .font(.callout)
-                    }
-                }
-            }
-
-            Spacer()
-
-            bottomContent()
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 220)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(isSelected ? 0.06 : 0.04))
-                .modifier(GlassBackground(cornerRadius: 18))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(isSelected ? 0.16 : 0.08), lineWidth: 1)
-        )
-    }
-
-    private var proURL: URL {
-        switch selectedBilling {
-        case .monthly:
-            return URL(string: "https://buy.stripe.com/dRmdR1dOI9eHfyW0LA3Ru00")!
-        case .yearly:
-            return URL(string: "https://buy.stripe.com/eVqfZ9bGAduXaeC9i63Ru02")!
-        }
-    }
-
-    private var lifetimeURL: URL {
-        URL(string: "https://buy.stripe.com/8x23cn7qk2QjgD0gKy3Ru01")!
-    }
-
-    private var proPriceLabel: String {
-        switch selectedBilling {
-        case .monthly:
-            return "$5.99 / mo"
-        case .yearly:
-            return "$59 / yr"
-        }
-    }
-
     private var footerNotice: some View {
         Text("By subscribing you agree to our privacy policy and refund policy.")
             .font(.caption)
@@ -279,7 +137,7 @@ private struct AizenProPlansSheet: View {
     }
 }
 
-private struct GlassPrimaryButton: View {
+struct GlassPrimaryButton: View {
     let title: String
     let action: () -> Void
 
@@ -305,7 +163,7 @@ private struct GlassPrimaryButton: View {
     }
 }
 
-private struct GlassSegmentedTabs<Value: Hashable>: View {
+struct GlassSegmentedTabs<Value: Hashable>: View {
     struct Option: Identifiable {
         let id = UUID()
         let title: String
@@ -375,7 +233,7 @@ private struct GlassSegmentedTabs<Value: Hashable>: View {
     }
 }
 
-private struct GlassBackground: ViewModifier {
+struct GlassBackground: ViewModifier {
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
