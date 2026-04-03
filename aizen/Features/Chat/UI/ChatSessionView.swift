@@ -19,12 +19,12 @@ struct ChatSessionView: View {
 
     @Environment(\.managedObjectContext) private var viewContext
 
-    @StateObject private var viewModel: ChatSessionStore
+    @StateObject var viewModel: ChatSessionStore
 
     // UI-only state
-    @State private var showingVoiceRecording = false
-    @State private var showingPermissionError = false
-    @State private var permissionErrorMessage = ""
+    @State var showingVoiceRecording = false
+    @State var showingPermissionError = false
+    @State var permissionErrorMessage = ""
     @State private var showingUsageSheet = false
     @State private var autocompleteWindow: AutocompleteWindowController?
     @State private var keyMonitor: Any?
@@ -34,7 +34,7 @@ struct ChatSessionView: View {
     @State private var chatTimelineState = VVChatTimelineState()
 
     // Input state (local to avoid re-rendering entire view on keystroke)
-    @State private var inputText = ""
+    @State var inputText = ""
     @State private var pendingCursorPosition: Int?
     @State private var isInlinePlanCollapsed = true
     @State private var inputBarWidth: CGFloat = 0
@@ -581,53 +581,6 @@ struct ChatSessionView: View {
             || normalized.contains("deny")
             || normalized.contains("cancel")
             || normalized.contains("decline")
-    }
-
-    private func toggleChatVoiceRecording() {
-        if showingVoiceRecording {
-            acceptChatVoiceRecording()
-        } else {
-            startChatVoiceRecording()
-        }
-    }
-
-    private func startChatVoiceRecording() {
-        Task {
-            do {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    showingVoiceRecording = true
-                }
-                try await viewModel.audioService.startRecording()
-            } catch {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    showingVoiceRecording = false
-                }
-                if let recordingError = error as? AudioService.RecordingError {
-                    permissionErrorMessage = recordingError.localizedDescription + "\n\nPlease enable Microphone and Speech Recognition permissions in System Settings."
-                } else {
-                    permissionErrorMessage = error.localizedDescription
-                }
-                showingPermissionError = true
-            }
-        }
-    }
-
-    private func acceptChatVoiceRecording() {
-        Task {
-            let text = await viewModel.audioService.stopRecording()
-            let finalText = text.isEmpty ? viewModel.audioService.partialTranscription : text
-            await MainActor.run {
-                if !finalText.isEmpty {
-                    inputText = finalText
-                }
-                showingVoiceRecording = false
-            }
-        }
-    }
-
-    private func cancelChatVoiceRecording() {
-        viewModel.audioService.cancelRecording()
-        showingVoiceRecording = false
     }
 
     // MARK: - Input Handling
