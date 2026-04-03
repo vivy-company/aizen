@@ -168,8 +168,8 @@ struct GitPanelWindowContent: View {
 
     @StateObject private var reviewManager = ReviewSessionStore()
     @State private var selectedWorkflowForTrigger: Workflow?
-    @State private var isInitializingGit = false
-    @State private var gitInitializationError: String?
+    @State var isInitializingGit = false
+    @State var gitInitializationError: String?
 
     @AppStorage(AppearanceSettings.codeFontFamilyKey) private var editorFontFamily: String = AppearanceSettings.defaultCodeFontFamily
     @AppStorage(AppearanceSettings.diffFontSizeKey) private var diffFontSize: Double = AppearanceSettings.defaultDiffFontSize
@@ -186,7 +186,7 @@ struct GitPanelWindowContent: View {
     private let maxLeftPanelWidth: CGFloat = 500
 
     private var worktree: Worktree { context.worktree }
-    private var worktreePath: String { worktree.path ?? "" }
+    var worktreePath: String { worktree.path ?? "" }
 
     init(
         context: GitChangesContext,
@@ -350,54 +350,6 @@ struct GitPanelWindowContent: View {
                 }
             )
         }
-    }
-
-    private var initializeGitView: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "externaldrive.badge.plus")
-                .font(.system(size: 36))
-                .foregroundStyle(.secondary)
-
-            Text("This folder is not a Git project.")
-                .font(.headline)
-
-            Text("Initialize Git to enable commits, branches, history, and pull requests.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 420)
-
-            if let error = gitInitializationError {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 420)
-            }
-
-            HStack(spacing: 10) {
-                Button("Close") {
-                    onClose()
-                }
-                .buttonStyle(.bordered)
-
-                Button {
-                    initializeGit()
-                } label: {
-                    if isInitializingGit {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 80)
-                    } else {
-                        Text("Initialize Git")
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isInitializingGit || worktreePath.isEmpty)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(24)
     }
 
     // MARK: - Left Panel (Tab Content)
@@ -666,7 +618,7 @@ struct GitPanelWindowContent: View {
 
     // MARK: - Helper Methods
 
-    private func initializeGit() {
+    func initializeGit() {
         guard !isInitializingGit else { return }
         guard !worktreePath.isEmpty else { return }
 
