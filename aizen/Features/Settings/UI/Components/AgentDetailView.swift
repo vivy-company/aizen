@@ -145,18 +145,7 @@ struct AgentDetailView: View {
             allowedContentTypes: [.executable, .unixExecutable],
             allowsMultipleSelection: false
         ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first {
-                    metadata.executablePath = url.path
-                    Task {
-                        await AgentRegistry.shared.updateAgent(metadata)
-                        await validateAgent()
-                    }
-                }
-            case .failure(let error):
-                errorMessage = "Failed to select file: \(error.localizedDescription)"
-            }
+            handleFileImport(result)
         }
         .sheet(isPresented: $showingEditSheet) { editSheet }
         .alert("Delete Agent", isPresented: $showingDeleteConfirmation) {
@@ -175,18 +164,10 @@ struct AgentDetailView: View {
             }
         }
         .task(id: AgentRegistry.shared.getAgentPath(for: metadata.id) ?? metadata.id) {
-            await validateAgent()
-            canUpdate = await AgentInstaller.shared.canUpdate(metadata)
-            loadAuthStatus()
-            await loadVersion()
-            loadRulesPreview()
-            loadCommands()
-            await mcpManager.syncInstalled(agentId: metadata.id)
+            await performAgentLoad()
         }
         .task(id: metadata.id) {
-            if supportsUsageMetrics {
-                usageMetricsStore.refreshIfNeeded(agentId: metadata.id)
-            }
+            refreshUsageIfNeeded()
         }
         .sheet(isPresented: $showingRulesEditor) { rulesEditorSheet }
         .sheet(isPresented: $showingConfigEditor) { configEditorSheet }
@@ -208,10 +189,7 @@ struct AgentDetailView: View {
         .task(id: metadata.id) {
             loadEnvironmentDraft()
         }
-        .onDisappear {
-            testTask?.cancel()
-            flushEnvironmentSaveIfNeeded()
-        }
+        .onDisappear { handleDisappear() }
     }
 
     // MARK: - Private Methods
