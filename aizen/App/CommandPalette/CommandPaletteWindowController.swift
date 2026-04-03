@@ -232,31 +232,12 @@ struct CommandPaletteContent: View {
         sortDescriptors: [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)],
         animation: .default
     )
-    private var allWorkspaces: FetchedResults<Workspace>
+    var allWorkspaces: FetchedResults<Workspace>
 
-    @FocusState private var isSearchFocused: Bool
+    @FocusState var isSearchFocused: Bool
     @EnvironmentObject var interaction: PaletteInteractionState
     @State var hoveredIndex: Int?
-    @AppStorage("selectedWorktreeId") private var currentWorktreeId: String?
-
-    private struct SnapshotSyncKey: Hashable {
-        let worktreeCount: Int
-        let workspaceCount: Int
-        let currentWorktreeId: String?
-    }
-
-    private var snapshotSyncKey: SnapshotSyncKey {
-        SnapshotSyncKey(
-            worktreeCount: allWorktrees.count,
-            workspaceCount: allWorkspaces.count,
-            currentWorktreeId: currentWorktreeId
-        )
-    }
-
-    private func syncSnapshots() {
-        viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
-        viewModel.updateWorkspaceSnapshot(Array(allWorkspaces))
-    }
+    @AppStorage("selectedWorktreeId") var currentWorktreeId: String?
 
     var body: some View {
         LiquidGlassCard(
@@ -303,73 +284,8 @@ struct CommandPaletteContent: View {
             }
         }
         .frame(width: 760, height: 520)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                isSearchFocused = true
-            }
-        }
-        .task(id: snapshotSyncKey) {
-            syncSnapshots()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: .NSManagedObjectContextObjectsDidChange,
-                object: viewContext
-            )
-        ) { _ in
-            syncSnapshots()
-        }
-        .background {
-            Group {
-                Button("") {
-                    interaction.didUseKeyboard()
-                    viewModel.moveSelectionDown()
-                }
-                .keyboardShortcut(.downArrow, modifiers: [])
-
-                Button("") {
-                    interaction.didUseKeyboard()
-                    viewModel.moveSelectionUp()
-                }
-                .keyboardShortcut(.upArrow, modifiers: [])
-
-                Button("") {
-                    interaction.didUseKeyboard()
-                    if let action = viewModel.selectedNavigationAction() {
-                        handleSelection(action)
-                    }
-                }
-                .keyboardShortcut(.return, modifiers: [])
-
-                Button("") { onClose() }
-                    .keyboardShortcut(.escape, modifiers: [])
-
-                Button("") {
-                    interaction.didUseKeyboard()
-                    viewModel.setScope(.all)
-                }
-                .keyboardShortcut("1", modifiers: .command)
-
-                Button("") {
-                    interaction.didUseKeyboard()
-                    viewModel.setScope(.currentProject)
-                }
-                .keyboardShortcut("2", modifiers: .command)
-
-                Button("") {
-                    interaction.didUseKeyboard()
-                    viewModel.setScope(.workspace)
-                }
-                .keyboardShortcut("3", modifiers: .command)
-
-                Button("") {
-                    interaction.didUseKeyboard()
-                    viewModel.setScope(.tabs)
-                }
-                .keyboardShortcut("4", modifiers: .command)
-            }
-            .hidden()
-        }
+        .modifier(CommandPaletteLifecycleModifier(content: self))
+        .modifier(CommandPaletteKeyboardShortcutModifier(content: self))
     }
 
 }
