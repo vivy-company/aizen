@@ -153,18 +153,18 @@ struct GitPanelWindowContent: View {
     @Binding var selectedTab: GitPanelTab
     @Binding var diffRenderStyle: VVDiffRenderStyle
     let onClose: () -> Void
-    private let runtime: WorktreeRuntime
+    let runtime: WorktreeRuntime
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitPanelWindow")
     @State var selectedHistoryCommit: GitCommit?
-    @State private var historyDiffOutput: String = ""
+    @State var historyDiffOutput: String = ""
     @State private var leftPanelWidth: CGFloat = 350
     @State var visibleFile: String?
     @State var scrollToFile: String?
     @State var commentPopoverLine: DiffLine?
     @State var commentPopoverFilePath: String?
     @State var showAgentPicker: Bool = false
-    @State private var cachedChangedFiles: [String] = []
+    @State var cachedChangedFiles: [String] = []
 
     @StateObject var reviewManager = ReviewSessionStore()
     @State var selectedWorkflowForTrigger: Workflow?
@@ -178,7 +178,7 @@ struct GitPanelWindowContent: View {
     @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var usePerAppearanceTheme = false
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var gitSummaryStore: GitSummaryStore
-    @ObservedObject private var gitDiffStore: GitDiffRuntimeStore
+    @ObservedObject var gitDiffStore: GitDiffRuntimeStore
     @ObservedObject var gitOperationService: GitOperationService
     @ObservedObject var workflowService: WorkflowService
 
@@ -395,79 +395,8 @@ struct GitPanelWindowContent: View {
         }
     }
 
-    private func updateChangedFilesCache() -> Bool {
-        var files = Set<String>()
-        files.formUnion(gitStatus.stagedFiles)
-        files.formUnion(gitStatus.modifiedFiles)
-        files.formUnion(gitStatus.untrackedFiles)
-        files.formUnion(gitStatus.conflictedFiles)
-
-        let sortedFiles = files.sorted()
-        if sortedFiles != cachedChangedFiles {
-            cachedChangedFiles = sortedFiles
-            return true
-        }
-        return false
-    }
-
-    func validateCommentsAgainstDiff() {
-        guard selectedHistoryCommit == nil else { return }
-
-        let filesInDiff = Set(allChangedFiles)
-        let commentsToRemove = reviewManager.comments.filter { !filesInDiff.contains($0.filePath) }
-
-        for comment in commentsToRemove {
-            reviewManager.deleteComment(id: comment.id)
-        }
-    }
-
-    @MainActor
-    private func synchronizeDiffOutput(for commit: GitCommit?) async {
-        let path = worktreePath
-        guard !path.isEmpty else {
-            applyDiffOutput("")
-            return
-        }
-
-        let commitID = commit?.id
-        guard let commitID else {
-            applyDiffOutput(gitDiffStore.diffOutput)
-            return
-        }
-
-        let output = await Self.loadCommitDiff(path: path, commitID: commitID)
-        guard !Task.isCancelled else { return }
-        guard worktreePath == path else { return }
-        guard selectedHistoryCommit?.id == commitID else { return }
-        applyDiffOutput(output)
-    }
-
-    private func applyDiffOutput(_ output: String) {
-        if historyDiffOutput != output {
-            historyDiffOutput = output
-        }
-    }
-
     var effectiveDiffOutput: String {
         selectedHistoryCommit == nil ? gitDiffStore.diffOutput : historyDiffOutput
-    }
-
-    private func syncRuntimeVisibility() {
-        let shouldUseWorkingDiff = selectedHistoryCommit == nil && selectedTab != .workflows && selectedTab != .prs
-        runtime.setGitPanelVisible(true, showsWorkingDiff: shouldUseWorkingDiff, showsWorkflow: selectedTab == .workflows)
-    }
-
-    nonisolated private static func loadCommitDiff(path: String, commitID: String) async -> String {
-        do {
-            let result = try await ProcessExecutor.shared.executeWithOutput(
-                executable: "/usr/bin/git",
-                arguments: ["show", "--format=", commitID],
-                workingDirectory: path
-            )
-            return result.stdout
-        } catch {
-            return ""
-        }
     }
 
 }
