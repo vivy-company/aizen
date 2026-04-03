@@ -657,85 +657,17 @@ struct WorkflowLogTableView: NSViewRepresentable {
             Clipboard.copy(lines: lines)
         }
 
-        private var frameObserver: NSObjectProtocol?
-        private var columnObserver: NSObjectProtocol?
-        private var lastTableWidth: CGFloat = 0
-
-        func observeFrameChanges(_ tableView: NSTableView) {
-            lastTableWidth = tableView.bounds.width
-            tableView.postsFrameChangedNotifications = true
-
-            // Observe the enclosing scroll view's clip view for more reliable width change detection
-            if let clipView = tableView.enclosingScrollView?.contentView {
-                clipView.postsBoundsChangedNotifications = true
-                frameObserver = NotificationCenter.default.addObserver(
-                    forName: NSView.boundsDidChangeNotification,
-                    object: clipView,
-                    queue: .main
-                ) { [weak self, weak tableView] _ in
-                    self?.handleWidthChange(tableView)
-                }
-            } else {
-                frameObserver = NotificationCenter.default.addObserver(
-                    forName: NSView.frameDidChangeNotification,
-                    object: tableView,
-                    queue: .main
-                ) { [weak self, weak tableView] _ in
-                    self?.handleWidthChange(tableView)
-                }
-            }
-
-            // Also observe column resize
-            columnObserver = NotificationCenter.default.addObserver(
-                forName: NSTableView.columnDidResizeNotification,
-                object: tableView,
-                queue: .main
-            ) { [weak self, weak tableView] _ in
-                self?.handleWidthChange(tableView)
-            }
-        }
-
-        private func handleWidthChange(_ tableView: NSTableView?) {
-            guard let tableView = tableView else { return }
-            let newWidth = tableView.tableColumns.first?.width ?? tableView.bounds.width
-            // Only recalculate if width changed significantly
-            if abs(newWidth - lastTableWidth) > 5 {
-                lastTableWidth = newWidth
-                let rowCount = displayRows.count
-                if rowCount > 0 {
-                    tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<rowCount))
-                }
-            }
-        }
+        var workflowLogFrameObserver: NSObjectProtocol?
+        var workflowLogColumnObserver: NSObjectProtocol?
+        var workflowLogLastTableWidth: CGFloat = 0
 
         deinit {
-            if let observer = frameObserver {
+            if let observer = workflowLogFrameObserver {
                 NotificationCenter.default.removeObserver(observer)
             }
-            if let observer = columnObserver {
+            if let observer = workflowLogColumnObserver {
                 NotificationCenter.default.removeObserver(observer)
             }
-        }
-
-        func getSelectedContent() -> String {
-            guard let tableView = tableView else { return "" }
-            var lines: [String] = []
-            for rowIndex in tableView.selectedRowIndexes {
-                guard rowIndex < displayRows.count else { continue }
-                switch displayRows[rowIndex] {
-                case .logLine(_, let content, _):
-                    lines.append(content)
-                case .groupHeader(_, _, let title, _, _):
-                    lines.append("[\(title)]")
-                case .stepHeader(_, let name, _, _):
-                    lines.append("== \(name) ==")
-                }
-            }
-            return lines.joined(separator: "\n")
-        }
-
-        func selectedCopyText() -> String {
-            getSelectedContent()
         }
 
         // MARK: - NSTableViewDataSource
