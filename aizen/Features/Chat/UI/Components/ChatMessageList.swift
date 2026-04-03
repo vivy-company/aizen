@@ -38,14 +38,14 @@ struct ChatMessageList: View {
 
     @State var controller = VVChatTimelineController(style: .init(), renderWidth: 0)
     @State var appliedEntries: [VVChatTimelineEntry] = []
-    @State private var lastBuildMetadata = TimelineBuildMetadata()
+    @State var lastBuildMetadata = TimelineBuildMetadata()
     @State var lastReportedTimelineState: VVChatTimelineState?
-    @State private var copiedUserMessageID: String?
-    @State private var copiedUserMessageState: CopyFooterState = .idle
-    @State private var hoveredCopyUserMessageID: String?
-    @State private var copyIndicatorResetTask: Task<Void, Never>?
-    @State private var expandedToolGroupIDs: Set<String> = []
-    @State private var suppressNextTimelineSignatureSync = false
+    @State var copiedUserMessageID: String?
+    @State var copiedUserMessageState: CopyFooterState = .idle
+    @State var hoveredCopyUserMessageID: String?
+    @State var copyIndicatorResetTask: Task<Void, Never>?
+    @State var expandedToolGroupIDs: Set<String> = []
+    @State var suppressNextTimelineSignatureSync = false
 
     private var shouldShowLoading: Bool {
         isSessionInitializing && messages.isEmpty && toolCalls.isEmpty
@@ -128,7 +128,7 @@ struct ChatMessageList: View {
         }
     }
 
-    private func syncTimeline(scrollToBottom: Bool) {
+    func syncTimeline(scrollToBottom: Bool) {
         let build = buildTimeline()
         lastBuildMetadata = build.metadata
         apply(entries: build.entries, scrollToBottom: scrollToBottom)
@@ -143,131 +143,6 @@ struct ChatMessageList: View {
         case .custom(let custom):
             return custom.revision
         }
-    }
-
-    private func handleUserMessageCopyAction(_ messageID: String) {
-        if let message = timelineMessage(withID: messageID) {
-            let copyText: String
-            let trimmed = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                copyText = messageMarkdown(message)
-            } else {
-                copyText = message.content
-            }
-            guard !copyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-
-            Clipboard.copy(copyText)
-            copiedUserMessageID = messageID
-            copiedUserMessageState = .transition
-            syncTimeline(scrollToBottom: false)
-
-            copyIndicatorResetTask?.cancel()
-            copyIndicatorResetTask = Task { @MainActor in
-                do {
-                    try await Task.sleep(for: .milliseconds(90))
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled, copiedUserMessageID == messageID else { return }
-                copiedUserMessageState = .confirmed
-                syncTimeline(scrollToBottom: false)
-
-                do {
-                    try await Task.sleep(for: .milliseconds(1110))
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled, copiedUserMessageID == messageID else { return }
-                copiedUserMessageID = nil
-                copiedUserMessageState = .idle
-                syncTimeline(scrollToBottom: false)
-            }
-            return
-        }
-
-    }
-
-    private func handleEntryActivate(_ entryID: String) {
-        if isToolGroupEntryID(entryID) {
-            toggleToolGroupEntry(entryID)
-            return
-        }
-
-    }
-
-    private func toggleToolGroupEntry(_ entryID: String) {
-        suppressNextTimelineSignatureSync = true
-        controller.prepareLayoutTransition(anchorItemID: entryID)
-        if expandedToolGroupIDs.contains(entryID) {
-            expandedToolGroupIDs.remove(entryID)
-        } else {
-            expandedToolGroupIDs.insert(entryID)
-        }
-
-        guard let group = toolCallGroup(forEntryID: entryID),
-              let replacementRange = toolCallGroupEntryRange(for: entryID, in: appliedEntries) else {
-            syncTimeline(scrollToBottom: false)
-            return
-        }
-
-        let replacementEntries = makeEntries(from: .toolCallGroup(group), startsAssistantLane: false)
-        controller.replaceEntries(
-            in: replacementRange,
-            with: replacementEntries,
-            scrollToBottom: false,
-            markUnread: false
-        )
-        appliedEntries.replaceSubrange(replacementRange, with: replacementEntries)
-    }
-
-    private func handleTimelineLinkActivate(_ rawLink: String) {
-        guard let url = URL(string: rawLink) else { return }
-
-        switch url.scheme?.lowercased() {
-        case "aizen-file":
-            guard let path = destinationPath(from: url) else { return }
-            NotificationCenter.default.post(
-                name: .openFileInEditor,
-                object: nil,
-                userInfo: ["path": path]
-            )
-        case "aizen":
-            DeepLinkHandler.shared.handle(url)
-        default:
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func handleUserMessageCopyHoverChange(_ messageID: String?) {
-        guard hoveredCopyUserMessageID != messageID else { return }
-        hoveredCopyUserMessageID = messageID
-    }
-
-    private func timelineMessage(withID messageID: String) -> MessageItem? {
-        lastBuildMetadata.messagesByID[messageID]
-    }
-
-    private func toolCallGroup(forEntryID entryID: String) -> ToolCallGroup? {
-        for item in assembleTimelineSourceItems() {
-            guard case .toolCallGroup(let group) = item, group.entryID == entryID else { continue }
-            return group
-        }
-        return nil
-    }
-
-    private func toolCallGroupEntryRange(
-        for groupEntryID: String,
-        in entries: [VVChatTimelineEntry]
-    ) -> Range<Int>? {
-        guard let lowerBound = entries.firstIndex(where: { $0.id == groupEntryID }) else {
-            return nil
-        }
-        let detailPrefix = "\(groupEntryID)::"
-        var upperBound = lowerBound + 1
-        while upperBound < entries.count, entries[upperBound].id.hasPrefix(detailPrefix) {
-            upperBound += 1
-        }
-        return lowerBound..<upperBound
     }
 
     var customEntryMessageMapper: VVChatTimelineController.CustomEntryMessageMapper {
@@ -496,20 +371,20 @@ struct ChatMessageList: View {
         let metadata: TimelineBuildMetadata
     }
 
-    private struct TimelineBuildMetadata {
+    struct TimelineBuildMetadata {
         var messagesByID: [String: MessageItem] = [:]
         var toolCallsByEntryID: [String: ToolCall] = [:]
         var groupEntryIDs: Set<String> = []
     }
 
-    private enum TimelineSourceItem {
+    enum TimelineSourceItem {
         case message(MessageItem)
         case toolCall(ToolCall)
         case toolCallGroup(ToolCallGroup)
         case turnSummary(TurnSummary)
     }
 
-    private struct FileChangeSummary: Identifiable {
+    struct FileChangeSummary: Identifiable {
         let path: String
         let isNew: Bool
         var linesAdded: Int
@@ -518,7 +393,7 @@ struct ChatMessageList: View {
         var id: String { path }
     }
 
-    private struct TurnSummary: Identifiable {
+    struct TurnSummary: Identifiable {
         let id: String
         let timestamp: Date
         let duration: TimeInterval
@@ -540,7 +415,7 @@ struct ChatMessageList: View {
         }
     }
 
-    private struct ToolCallGroup: Identifiable {
+    struct ToolCallGroup: Identifiable {
         let id: String
         let toolCalls: [ToolCall]
         let timestamp: Date
@@ -594,7 +469,7 @@ struct ChatMessageList: View {
         let sequence: Int
     }
 
-    private func assembleTimelineSourceItems() -> [TimelineSourceItem] {
+    func assembleTimelineSourceItems() -> [TimelineSourceItem] {
         let orderedSources = orderedTimelineSources()
 
         var items: [TimelineSourceItem] = []
@@ -969,7 +844,7 @@ struct ChatMessageList: View {
         return TimelineBuildResult(entries: entries, metadata: metadata)
     }
 
-    private func makeEntries(from item: TimelineSourceItem, startsAssistantLane: Bool) -> [VVChatTimelineEntry] {
+    func makeEntries(from item: TimelineSourceItem, startsAssistantLane: Bool) -> [VVChatTimelineEntry] {
         switch item {
         case .message(let message):
             let content = messageMarkdown(message)
@@ -1580,7 +1455,7 @@ struct ChatMessageList: View {
         }
     }
 
-    private func isToolGroupEntryID(_ entryID: String) -> Bool {
+    func isToolGroupEntryID(_ entryID: String) -> Bool {
         lastBuildMetadata.groupEntryIDs.contains(entryID)
     }
 
@@ -1610,7 +1485,7 @@ struct ChatMessageList: View {
         return components.url?.absoluteString ?? path
     }
 
-    private func destinationPath(from url: URL) -> String? {
+    func destinationPath(from url: URL) -> String? {
         if url.scheme?.lowercased() == "aizen-file" {
             guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
                   let rawPath = components.queryItems?.first(where: { $0.name == "path" })?.value,
@@ -1948,7 +1823,7 @@ struct ChatMessageList: View {
         return NSColor(calibratedRed: 0.14, green: 0.64, blue: 0.28, alpha: 1)
     }
 
-    private func messageMarkdown(_ message: MessageItem) -> String {
+    func messageMarkdown(_ message: MessageItem) -> String {
         let normalizedContent = normalizedMessageMarkdown(
             message.content,
             role: message.role
@@ -2793,7 +2668,7 @@ struct ChatMessageList: View {
     }
 }
 
-private enum CopyFooterState {
+enum CopyFooterState {
     case idle
     case transition
     case confirmed
