@@ -17,7 +17,7 @@ struct ChatSessionView: View {
     let isSelected: Bool
     let isCompanionResizing: Bool
 
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.managedObjectContext) var viewContext
 
     @StateObject var viewModel: ChatSessionStore
 
@@ -28,7 +28,7 @@ struct ChatSessionView: View {
     @State private var showingUsageSheet = false
     @State var autocompleteWindow: AutocompleteWindowController?
     @State var keyMonitor: Any?
-    @State private var chatActions = ChatActions()
+    @State var chatActions = ChatActions()
     @State private var isWindowResizing = false
     @State private var wasNearBottomBeforeResize = true
     @State var chatTimelineState = VVChatTimelineState()
@@ -74,6 +74,7 @@ struct ChatSessionView: View {
 
     var body: some View {
         let isLayoutResizing = isWindowResizing || isCompanionResizing
+        applyLifecycleModifiers(to:
         ZStack {
             Color.clear
                 .ignoresSafeArea()
@@ -244,51 +245,7 @@ struct ChatSessionView: View {
                 handleLayoutResizingChange(isLayoutResizing)
             }
         }
-        .onAppear {
-            // Load draft input text if available
-            if let draft = viewModel.loadDraftInputText() {
-                inputText = draft
-            }
-        }
-        .onDisappear {
-            viewModel.persistDraftState(inputText: inputText)
-            viewModel.cancelPendingAutoScroll()
-            viewModel.scrollRequest = nil
-            autocompleteWindow?.dismiss()
-            NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
-            stopKeyMonitorIfNeeded()
-            chatActions.clear()
-            if showingVoiceRecording {
-                viewModel.audioService.cancelRecording()
-                showingVoiceRecording = false
-            }
-        }
-        .task(id: isSelected) {
-            if isSelected {
-                chatActions.configure(cycleModeForward: viewModel.cycleModeForward)
-                viewModel.setupAgentSession()
-                setupAutocompleteWindow()
-                NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
-                startKeyMonitorIfNeeded()
-            } else {
-                viewModel.cancelPendingAutoScroll()
-                viewModel.scrollRequest = nil
-                autocompleteWindow?.dismiss()
-                NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
-                stopKeyMonitorIfNeeded()
-                chatActions.clear()
-                if showingVoiceRecording {
-                    viewModel.audioService.cancelRecording()
-                    showingVoiceRecording = false
-                }
-            }
-        }
-        .task(id: inputText) {
-            viewModel.debouncedPersistDraft(inputText: inputText)
-        }
-        .onReceive(viewModel.autocompleteHandler.$state) { state in
-            updateAutocompleteWindow(state: state)
-        }
+        )
         .sheet(isPresented: viewModel.needsAuthBinding) {
             if let agentSession = viewModel.currentAgentSession {
                 AuthenticationSheet(session: agentSession)
