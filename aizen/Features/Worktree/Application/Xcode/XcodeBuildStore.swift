@@ -39,28 +39,6 @@ final class XcodeBuildStore: ObservableObject {
 
     var appMonitorTask: Task<Void, Never>?
 
-    // MARK: - Persistence
-
-    nonisolated static func persistenceKey(prefix: String, scopedTo path: String) -> String {
-        let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
-        return "\(prefix)_\(normalizedPath)"
-    }
-
-    var lastDestinationIdKey: String {
-        guard let path = currentWorktreePath else { return "" }
-        return Self.persistenceKey(prefix: "xcodeLastDestinationId", scopedTo: path)
-    }
-
-    private var projectSchemeKey: String {
-        guard let project = detectedProject else { return "" }
-        return Self.persistenceKey(prefix: "xcodeScheme", scopedTo: project.path)
-    }
-
-    var destinationsCacheKey: String {
-        guard let path = currentWorktreePath else { return "" }
-        return Self.persistenceKey(prefix: "xcodeDestinationsCache", scopedTo: path)
-    }
-
     // MARK: - Services
 
     let projectDetector = XcodeProjectDetector()
@@ -73,22 +51,6 @@ final class XcodeBuildStore: ObservableObject {
     let destinationsRefreshTTL: TimeInterval = 300
 
     init() {}
-
-    // MARK: - Scheme Selection
-
-    func selectScheme(_ scheme: String) {
-        selectedScheme = scheme
-        guard !projectSchemeKey.isEmpty else { return }
-        UserDefaults.standard.set(scheme, forKey: projectSchemeKey)
-    }
-
-    // MARK: - Destination Selection
-
-    func selectDestination(_ destination: XcodeDestination) {
-        selectedDestination = destination
-        guard !lastDestinationIdKey.isEmpty else { return }
-        UserDefaults.standard.set(destination.id, forKey: lastDestinationIdKey)
-    }
 
     // MARK: - Build & Run
 
