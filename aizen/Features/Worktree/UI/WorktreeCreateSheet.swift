@@ -80,7 +80,7 @@ struct WorktreeCreateSheet: View {
         return root.appendingPathComponent(trimmedName).path
     }
 
-    private var existingWorktreeNames: [String] {
+    var existingWorktreeNames: [String] {
         let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
         return worktrees.compactMap { $0.branch }
     }
@@ -280,10 +280,6 @@ struct WorktreeCreateSheet: View {
         }
     }
 
-    private func suggestEnvironmentName() {
-        generateRandomName()
-    }
-
     private func loadSubmodules() {
         guard isGitProject else {
             detectedSubmodules = []
@@ -306,35 +302,6 @@ struct WorktreeCreateSheet: View {
                 }
                 loadingSubmodules = false
             }
-        }
-    }
-
-    func generateRandomName() {
-        let excludedNames = Set(existingWorktreeNames)
-        let generated = WorkspaceNameGenerator.generateUniqueName(excluding: Array(excludedNames))
-            .lowercased()
-            .replacingOccurrences(of: " ", with: "-")
-            .replacingOccurrences(of: "'", with: "")
-        environmentName = generated
-        branchName = generated
-        validateBranchName()
-    }
-
-    func validateBranchName() {
-        guard mode == .linked else {
-            validationWarning = nil
-            return
-        }
-
-        guard !branchName.isEmpty else {
-            validationWarning = nil
-            return
-        }
-
-        if existingWorktreeNames.contains(branchName) {
-            validationWarning = String(localized: "worktree.create.branchExists \(branchName)")
-        } else {
-            validationWarning = nil
         }
     }
 
