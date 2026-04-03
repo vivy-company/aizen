@@ -26,26 +26,26 @@ struct AgentDetailView: View {
     @State var errorMessage: String?
     @State var testTask: Task<Void, Never>?
     @State var resultDismissTask: Task<Void, Never>?
-    @State private var authMethodName: String?
-    @State private var showingAuthClearedMessage = false
+    @State var authMethodName: String?
+    @State var showingAuthClearedMessage = false
     @State var installedVersion: String?
     @State private var showingRulesEditor = false
     @State private var showingConfigEditor = false
     @State private var selectedConfigFile: AgentConfigFile?
-    @State private var rulesPreview: String?
-    @State private var commands: [AgentCommand] = []
+    @State var rulesPreview: String?
+    @State var commands: [AgentCommand] = []
     @State private var showingCommandEditor = false
     @State private var selectedCommand: AgentCommand?
     @State private var showingMCPMarketplace = false
     @State private var mcpServerToRemove: MCPInstalledServer?
     @State private var showingMCPRemoveConfirmation = false
     @State private var showingUsageDetails = false
-    @State private var environmentSaveTask: Task<Void, Never>?
-    @State private var environmentVariablesDraft: [AgentEnvironmentVariable] = []
+    @State var environmentSaveTask: Task<Void, Never>?
+    @State var environmentVariablesDraft: [AgentEnvironmentVariable] = []
     @ObservedObject private var mcpManager = MCPManagementStore.shared
     @ObservedObject private var usageMetricsStore = AgentUsageMetricsStore.shared
 
-    private var configSpec: AgentConfigSpec {
+    var configSpec: AgentConfigSpec {
         AgentConfigRegistry.spec(for: metadata.id)
     }
 
@@ -656,80 +656,4 @@ struct AgentDetailView: View {
 
     // MARK: - Private Methods
 
-    private func loadAuthStatus() {
-        authMethodName = AgentRegistry.shared.getAuthMethodName(for: metadata.id)
-        showingAuthClearedMessage = false
-    }
-
-    private func scheduleEnvironmentSave() {
-        environmentSaveTask?.cancel()
-        var updatedMetadata = metadata
-        updatedMetadata.environmentVariables = environmentVariablesDraft
-        environmentSaveTask = Task {
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
-            await AgentRegistry.shared.updateAgent(updatedMetadata)
-        }
-    }
-
-    private func loadEnvironmentDraft() {
-        environmentVariablesDraft = metadata.environmentVariables
-    }
-
-    private func flushEnvironmentSaveIfNeeded() {
-        environmentSaveTask?.cancel()
-
-        var updatedMetadata = metadata
-        updatedMetadata.environmentVariables = environmentVariablesDraft
-
-        Task {
-            await AgentRegistry.shared.updateAgent(updatedMetadata)
-        }
-    }
-
-    private func loadRulesPreview() {
-        guard let rulesFile = configSpec.rulesFile else {
-            rulesPreview = nil
-            return
-        }
-
-        let path = rulesFile.expandedPath
-        guard FileManager.default.fileExists(atPath: path),
-              let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            rulesPreview = nil
-            return
-        }
-
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            rulesPreview = nil
-        } else {
-            let lines = trimmed.components(separatedBy: .newlines)
-            let previewLines = lines.prefix(5).joined(separator: "\n")
-            rulesPreview = previewLines
-        }
-    }
-
-    private func loadCommands() {
-        guard let commandsDir = configSpec.expandedCommandsDirectory else {
-            commands = []
-            return
-        }
-
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: commandsDir),
-              let files = try? fm.contentsOfDirectory(atPath: commandsDir) else {
-            commands = []
-            return
-        }
-
-        commands = files
-            .filter { $0.hasSuffix(".md") }
-            .map { filename in
-                let name = String(filename.dropLast(3)) // Remove .md
-                let path = (commandsDir as NSString).appendingPathComponent(filename)
-                return AgentCommand(name: name, path: path)
-            }
-            .sorted { $0.name < $1.name }
-    }
 }
