@@ -27,7 +27,7 @@ struct ChatSessionView: View {
     @State var permissionErrorMessage = ""
     @State private var showingUsageSheet = false
     @State var autocompleteWindow: AutocompleteWindowController?
-    @State private var keyMonitor: Any?
+    @State var keyMonitor: Any?
     @State private var chatActions = ChatActions()
     @State private var isWindowResizing = false
     @State private var wasNearBottomBeforeResize = true
@@ -422,7 +422,7 @@ struct ChatSessionView: View {
         return inputBarWidth * 0.95
     }
 
-    private var currentPermissionRequest: RequestPermissionRequest? {
+    var currentPermissionRequest: RequestPermissionRequest? {
         guard viewModel.showingPermissionAlert,
               let request = viewModel.currentPermissionRequest else {
             return nil
@@ -463,124 +463,6 @@ struct ChatSessionView: View {
             }
         }
         .buttonStyle(.plain)
-    }
-
-    private func startKeyMonitorIfNeeded() {
-        guard keyMonitor == nil else { return }
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            handleVoiceShortcut(event)
-        }
-    }
-
-    private func stopKeyMonitorIfNeeded() {
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-            keyMonitor = nil
-        }
-    }
-
-    private func handleVoiceShortcut(_ event: NSEvent) -> NSEvent? {
-        guard isSelected else { return event }
-
-        let keyCodeEscape: UInt16 = 53
-        let keyCodeReturn: UInt16 = 36
-        let keyCodeC: UInt16 = 8
-
-        if event.keyCode == keyCodeEscape,
-           shouldLetPresentedSheetHandleEscape(event) {
-            return event
-        }
-
-        if event.keyCode == keyCodeEscape, let permissionRequest = currentPermissionRequest {
-            handlePermissionPickerEscape(request: permissionRequest)
-            return nil
-        }
-
-        if showingVoiceRecording {
-            if event.keyCode == keyCodeEscape {
-                cancelChatVoiceRecording()
-                return nil
-            }
-            if event.keyCode == keyCodeReturn {
-                acceptChatVoiceRecording()
-                return nil
-            }
-        }
-
-        // Ctrl+C clears input text (terminal-like behavior)
-        if event.modifierFlags.contains(.control),
-           event.keyCode == keyCodeC {
-            if !inputText.isEmpty {
-                inputText = ""
-                return nil
-            }
-        }
-
-        // Escape interrupts agent when processing, otherwise clears input
-        if event.keyCode == keyCodeEscape && !showingVoiceRecording {
-            if viewModel.isProcessing {
-                viewModel.cancelCurrentPrompt()
-                return nil
-            } else if !inputText.isEmpty {
-                inputText = ""
-                return nil
-            }
-        }
-
-        if event.modifierFlags.contains(.command),
-           event.modifierFlags.contains(.shift),
-           event.charactersIgnoringModifiers?.lowercased() == "m" {
-            toggleChatVoiceRecording()
-            return nil
-        }
-
-        return event
-    }
-
-    private func shouldLetPresentedSheetHandleEscape(_ event: NSEvent) -> Bool {
-        guard let eventWindow = event.window else { return false }
-
-        // When a sheet is frontmost, Escape should dismiss that sheet instead of
-        // leaking through to the chat-level "stop turn" shortcut.
-        if eventWindow.sheetParent != nil {
-            return true
-        }
-
-        return eventWindow.attachedSheet != nil
-    }
-
-    private func handlePermissionPickerEscape(request: RequestPermissionRequest) {
-        if viewModel.isProcessing {
-            viewModel.cancelCurrentPrompt()
-        }
-
-        if let optionId = preferredPermissionDismissOptionId(for: request),
-           let agentSession = viewModel.currentAgentSession {
-            agentSession.respondToPermission(optionId: optionId)
-        } else if let agentSession = viewModel.currentAgentSession {
-            // Ensure ESC always resolves a pending permission request.
-            agentSession.permissionHandler.cancelPendingRequest()
-        } else {
-            viewModel.showingPermissionAlert = false
-        }
-    }
-
-    private func preferredPermissionDismissOptionId(for request: RequestPermissionRequest) -> String? {
-        guard let options = request.options, !options.isEmpty else {
-            return nil
-        }
-        if let dismissOption = options.first(where: { isPermissionDismissOptionKind($0.kind) }) {
-            return dismissOption.optionId
-        }
-        return options.last?.optionId
-    }
-
-    private func isPermissionDismissOptionKind(_ kind: String) -> Bool {
-        let normalized = kind.lowercased()
-        return normalized.contains("reject")
-            || normalized.contains("deny")
-            || normalized.contains("cancel")
-            || normalized.contains("decline")
     }
 
     // MARK: - Input Handling
