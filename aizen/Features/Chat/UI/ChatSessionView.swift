@@ -249,29 +249,4 @@ struct ChatSessionView: View {
         ))
     }
 
-    // MARK: - Helpers
-
-    var currentPermissionRequest: RequestPermissionRequest? {
-        guard viewModel.showingPermissionAlert,
-              let request = viewModel.currentPermissionRequest else {
-            return nil
-        }
-        return request
-    }
-
-    // MARK: - Input Handling
-
-    private func sendMessage() {
-        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        if ClientCommandHandler.shared.handle(text, context: viewContext) {
-            inputText = ""
-            return
-        }
-        
-        inputText = ""
-        viewModel.sendMessage(text)
-    }
-
-    // MARK: - Autocomplete Window
 }
