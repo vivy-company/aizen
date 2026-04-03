@@ -79,7 +79,7 @@ class FileBrowserStore: ObservableObject {
     let viewContext: NSManagedObjectContext
     var session: FileBrowserSession?
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "FileBrowser")
-    private let fileService = FileService()
+    let fileService = FileService()
     private let gitRuntime = FileBrowserGitRuntime()
 
     init(worktree: Worktree, context: NSManagedObjectContext) {
@@ -181,101 +181,8 @@ class FileBrowserStore: ObservableObject {
         expandedPaths.contains(path)
     }
 
-    private func refreshTree() {
+    func refreshTree() {
         treeRefreshTrigger = UUID()
-    }
-
-    // MARK: - File Operations
-
-    func createNewFile(parentPath: String, name: String) async {
-        let filePath = (parentPath as NSString).appendingPathComponent(name)
-
-        do {
-            try await fileService.createFile(at: filePath)
-            ToastStore.shared.show("Created \(name)", type: .success)
-
-            // Refresh the tree to show new file
-            refreshTree()
-
-            // Open the new file
-            await openFile(path: filePath)
-        } catch {
-            ToastStore.shared.show(error.localizedDescription, type: .error)
-        }
-    }
-
-    func createNewFolder(parentPath: String, name: String) async {
-        let folderPath = (parentPath as NSString).appendingPathComponent(name)
-
-        do {
-            try await fileService.createDirectory(at: folderPath)
-            ToastStore.shared.show("Created folder \(name)", type: .success)
-
-            // Refresh the tree to show new folder
-            refreshTree()
-
-            // Auto-expand the newly created folder
-            expandedPaths.insert(folderPath)
-        } catch {
-            ToastStore.shared.show(error.localizedDescription, type: .error)
-        }
-    }
-
-    func renameItem(oldPath: String, newName: String) async {
-        let parentPath = (oldPath as NSString).deletingLastPathComponent
-        let newPath = (parentPath as NSString).appendingPathComponent(newName)
-
-        do {
-            try await fileService.renameItem(from: oldPath, to: newPath)
-            ToastStore.shared.show("Renamed to \(newName)", type: .success)
-
-            // If file was open, update its info
-            if let index = openFiles.firstIndex(where: { $0.path == oldPath }) {
-                let fileInfo = openFiles[index]
-                openFiles[index] = OpenFileInfo(
-                    id: fileInfo.id,
-                    name: newName,
-                    path: newPath,
-                    content: fileInfo.content,
-                    hasUnsavedChanges: fileInfo.hasUnsavedChanges
-                )
-            }
-
-            // If it was a directory that was expanded, update its path in expandedPaths
-            if expandedPaths.contains(oldPath) {
-                expandedPaths.remove(oldPath)
-                expandedPaths.insert(newPath)
-            }
-
-            // Refresh the tree to show rename
-            refreshTree()
-
-            saveSession()
-        } catch {
-            ToastStore.shared.show(error.localizedDescription, type: .error)
-        }
-    }
-
-    func deleteItem(path: String) async {
-        let fileName = (path as NSString).lastPathComponent
-
-        do {
-            try await fileService.deleteItem(at: path)
-            ToastStore.shared.show("Deleted \(fileName)", type: .success)
-
-            // Close file if it was open
-            if let openFile = openFiles.first(where: { $0.path == path }) {
-                closeFile(id: openFile.id)
-            }
-
-            // Remove from expanded paths if it was a directory
-            expandedPaths.remove(path)
-
-            // Refresh the tree to show deletion
-            refreshTree()
-        } catch {
-            ToastStore.shared.show(error.localizedDescription, type: .error)
-        }
     }
 
     func copyPathToClipboard(path: String) {
