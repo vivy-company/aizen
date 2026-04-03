@@ -34,7 +34,7 @@ enum AppearanceMode: String, CaseIterable {
 
 /// View modifier that applies the app-wide appearance setting
 struct AppearanceModifier: ViewModifier {
-    @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
+    @AppStorage("appearanceMode") var appearanceMode: String = AppearanceMode.system.rawValue
 
     private var colorScheme: ColorScheme? {
         switch AppearanceMode(rawValue: appearanceMode) ?? .system {
@@ -198,12 +198,12 @@ struct GeneralSettingsView: View {
     private var workspaces: FetchedResults<Workspace>
 
     // Appearance
-    @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
+    @AppStorage("appearanceMode") var appearanceMode: String = AppearanceMode.system.rawValue
 
     // Language
-    @State private var selectedLanguage: AppLanguage = .system
-    @State private var showingRestartAlert = false
-    @State private var hasLoadedLanguage = false
+    @State var selectedLanguage: AppLanguage = .system
+    @State var showingRestartAlert = false
+    @State var hasLoadedLanguage = false
 
     // Default Apps
     @AppStorage("defaultTerminalBundleId") private var defaultTerminalBundleId: String?
@@ -233,22 +233,9 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
-            // MARK: - Appearance
+            appearanceSection
 
-            Section("Appearance") {
-                AppearancePickerView(selection: $appearanceMode)
-                    .frame(maxWidth: .infinity)
-            }
-
-            // MARK: - Language
-
-            Section("Language") {
-                Picker("Language", selection: languageSelectionBinding) {
-                    ForEach(AppLanguage.allCases) { language in
-                        Text(language.displayName).tag(language)
-                    }
-                }
-            }
+            languageSection
 
             // MARK: - Default Apps
 
@@ -503,65 +490,6 @@ struct GeneralSettingsView: View {
         case "files": return showFilesTab
         case "browser": return showBrowserTab
         default: return false
-        }
-    }
-
-    private var languageSelectionBinding: Binding<AppLanguage> {
-        Binding(
-            get: { selectedLanguage },
-            set: { newValue in
-                selectedLanguage = newValue
-                guard hasLoadedLanguage else { return }
-                applyLanguage(newValue)
-            }
-        )
-    }
-
-    // MARK: - Language
-
-    private func loadCurrentLanguage() {
-        if let languages = UserDefaults.standard.array(forKey: "AppleLanguages") as? [String],
-           let first = languages.first {
-            if first.hasPrefix("zh") {
-                selectedLanguage = .chinese
-            } else if first.hasPrefix("en") {
-                selectedLanguage = .english
-            } else {
-                selectedLanguage = .system
-            }
-        } else {
-            selectedLanguage = .system
-        }
-        DispatchQueue.main.async {
-            hasLoadedLanguage = true
-        }
-    }
-
-    private func applyLanguage(_ language: AppLanguage) {
-        switch language {
-        case .system:
-            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
-        case .english:
-            UserDefaults.standard.set(["en"], forKey: "AppleLanguages")
-        case .chinese:
-            UserDefaults.standard.set(["zh-Hans"], forKey: "AppleLanguages")
-        }
-        UserDefaults.standard.synchronize()
-        showingRestartAlert = true
-    }
-
-    private func restartApp() {
-        let bundleURL = Bundle.main.bundleURL
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            let task = Process()
-            task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            task.arguments = ["-n", bundleURL.path]
-            try? task.run()
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                NSApplication.shared.terminate(nil)
-            }
         }
     }
 
