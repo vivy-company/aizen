@@ -72,15 +72,15 @@ class FileBrowserStore: ObservableObject {
     @AppStorage("showHiddenFiles") var showHiddenFiles: Bool = true
 
     // Git status tracking
-    @Published private(set) var gitFileStatus: [String: FileGitStatus] = [:]
-    @Published private(set) var gitIgnoredPaths: Set<String> = []
+    @Published var gitFileStatus: [String: FileGitStatus] = [:]
+    @Published var gitIgnoredPaths: Set<String> = []
 
     let worktree: Worktree
     let viewContext: NSManagedObjectContext
     var session: FileBrowserSession?
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "FileBrowser")
     let fileService = FileService()
-    private let gitRuntime = FileBrowserGitRuntime()
+    let gitRuntime = FileBrowserGitRuntime()
 
     init(worktree: Worktree, context: NSManagedObjectContext) {
         self.worktree = worktree
@@ -194,24 +194,4 @@ class FileBrowserStore: ObservableObject {
         NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: "")
     }
 
-    // MARK: - Git Status
-
-    func loadGitStatus() async {
-        guard let worktreePath = worktree.path else { return }
-        let expandedPathsSnapshot = expandedPaths
-        let snapshot = await gitRuntime.loadGitSnapshot(
-            basePath: worktreePath,
-            expandedPaths: expandedPathsSnapshot
-        )
-
-        gitFileStatus = snapshot.fileStatus
-        gitIgnoredPaths = snapshot.ignoredPaths
-        refreshTree()
-    }
-
-    func refreshGitStatus() {
-        Task {
-            await loadGitStatus()
-        }
-    }
 }
