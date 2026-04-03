@@ -350,28 +350,8 @@ class ChatAgentSession: ObservableObject {
             throw error
         }
 
-        self.sessionId = sessionResponse.sessionId
-        // Mark as ready only after everything is set up
-        self.sessionState = .ready
-
-        if let modesInfo = sessionResponse.modes {
-            self.availableModes = modesInfo.availableModes
-            self.currentModeId = modesInfo.currentModeId
-        }
-
-        if let modelsInfo = sessionResponse.models {
-            self.availableModels = modelsInfo.availableModels
-            self.currentModelId = modelsInfo.currentModelId
-        }
-
-        if let configOptions = sessionResponse.configOptions {
-            self.availableConfigOptions = configOptions
-        }
-
-        let metadata = AgentRegistry.shared.getMetadata(for: agentName)
-        let displayName = metadata?.name ?? agentName
-        AgentUsageStore.shared.recordSessionStart(agentId: agentName)
-        addSystemMessage("Session started with \(displayName) in \(workingDir)")
+        applySessionState(from: sessionResponse)
+        announceSessionStart(agentName: agentName, workingDir: workingDir)
         
         if let chatSessionId = chatSessionId {
             do {
@@ -472,27 +452,8 @@ class ChatAgentSession: ObservableObject {
             throw error
         }
         
-        self.sessionId = sessionResponse.sessionId
-        self.sessionState = .ready
-
-        if let modesInfo = sessionResponse.modes {
-            self.availableModes = modesInfo.availableModes
-            self.currentModeId = modesInfo.currentModeId
-        }
-
-        if let modelsInfo = sessionResponse.models {
-            self.availableModels = modelsInfo.availableModels
-            self.currentModelId = modelsInfo.currentModelId
-        }
-
-        if let configOptions = sessionResponse.configOptions {
-            self.availableConfigOptions = configOptions
-        }
-        
-        let metadata = AgentRegistry.shared.getMetadata(for: agentName)
-        let displayName = metadata?.name ?? agentName
-        AgentUsageStore.shared.recordSessionStart(agentId: agentName)
-        addSystemMessage("Session resumed with \(displayName) in \(workingDir)")
+        applySessionState(from: sessionResponse)
+        announceSessionResume(agentName: agentName, workingDir: workingDir)
         
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
