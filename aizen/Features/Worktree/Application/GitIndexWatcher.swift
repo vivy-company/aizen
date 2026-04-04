@@ -15,9 +15,9 @@ nonisolated final class GitIndexWatcher: @unchecked Sendable {
     private let worktreePath: String
     private let gitIndexPath: String
     private let pollInterval: TimeInterval = 1.0  // Poll every 1 second
-    private let debounceInterval: TimeInterval = 1.0  // Debounce rapid changes
+    let debounceInterval: TimeInterval = 1.0  // Debounce rapid changes
     private var pollingTask: Task<Void, Never>?
-    private var debounceTask: Task<Void, Never>?
+    var debounceTask: Task<Void, Never>?
     private var indexSource: DispatchSourceFileSystemObject?
     private var headSource: DispatchSourceFileSystemObject?
     private var indexFD: CInt = -1
@@ -52,7 +52,7 @@ nonisolated final class GitIndexWatcher: @unchecked Sendable {
     }
     private let onChangeLock = NSLock()
     private var _onChange: (@Sendable () -> Void)?
-    private var onChange: (@Sendable () -> Void)? {
+    var onChange: (@Sendable () -> Void)? {
         get {
             onChangeLock.lock()
             defer { onChangeLock.unlock() }
@@ -66,7 +66,7 @@ nonisolated final class GitIndexWatcher: @unchecked Sendable {
     }
     private let pendingCallbackLock = NSLock()
     private var _hasPendingCallback = false
-    private var hasPendingCallback: Bool {
+    var hasPendingCallback: Bool {
         get {
             pendingCallbackLock.lock()
             defer { pendingCallbackLock.unlock() }
@@ -266,32 +266,6 @@ nonisolated final class GitIndexWatcher: @unchecked Sendable {
         }
 
         return createdSource
-    }
-
-    private func scheduleDebounceCallback() {
-        // If already pending, the existing debounce will fire
-        guard !hasPendingCallback else { return }
-        hasPendingCallback = true
-
-        // Cancel any existing debounce task
-        debounceTask?.cancel()
-
-        debounceTask = Task.detached { [weak self] in
-            guard let self = self else { return }
-
-            // Wait for debounce interval
-            do {
-                try await Task.sleep(for: .seconds(self.debounceInterval))
-            } catch {
-                return  // Cancelled
-            }
-
-            guard !Task.isCancelled else { return }
-
-            // Clear pending flag and fire callback
-            self.hasPendingCallback = false
-            self.onChange?()
-        }
     }
 
 }
