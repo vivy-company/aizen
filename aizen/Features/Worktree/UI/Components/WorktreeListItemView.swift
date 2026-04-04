@@ -36,7 +36,7 @@ struct WorktreeListItemView: View {
         AppDetector.shared.getApps(for: .finder).first
     }
 
-    @State private var showingDetails = false
+    @State var showingDetails = false
     @State var showingDeleteConfirmation = false
     @State var hasUnsavedChanges = false
     @State var errorMessage: String?
@@ -51,7 +51,7 @@ struct WorktreeListItemView: View {
     @State var isLoadingBranches = false
     @State var showingBranchSelector = false
     @State var branchSwitchError: String?
-    @State private var showingNoteEditor = false
+    @State var showingNoteEditor = false
 
     var worktreeStatus: ItemStatus {
         ItemStatus(rawValue: worktree.status ?? "active") ?? .active
@@ -315,95 +315,7 @@ struct WorktreeListItemView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingDetails) {
-            WorktreeDetailsSheet(worktree: worktree, repositoryManager: repositoryManager)
-        }
-        .sheet(isPresented: $showingBranchSelector) {
-            if let repo = worktree.repository {
-                BranchSelectorView(
-                    repository: repo,
-                    repositoryManager: repositoryManager,
-                    selectedBranch: .constant(nil),
-                    onSelectBranch: switchToBranch,
-                    allowCreation: true,
-                    onCreateBranch: { branchName in
-                        createNewBranch(name: branchName)
-                    }
-                )
-            }
-        }
-        .sheet(isPresented: $showingNoteEditor) {
-            NoteEditorView(
-                note: Binding(
-                    get: { worktree.note ?? "" },
-                    set: { worktree.note = $0 }
-                ),
-                title: String(localized: "worktree.note.title \(worktree.branch ?? "")"),
-                onSave: {
-                    try? repositoryManager.updateWorktreeNote(worktree, note: worktree.note)
-                }
-            )
-        }
-        .alert(hasUnsavedChanges ? String(localized: "worktree.detail.unsavedChangesTitle") : String(localized: "worktree.detail.deleteConfirmTitle"), isPresented: $showingDeleteConfirmation) {
-            Button(String(localized: "worktree.create.cancel"), role: .cancel) {}
-            Button(String(localized: "worktree.detail.delete"), role: .destructive) {
-                deleteWorktree()
-            }
-        } message: {
-            if hasUnsavedChanges {
-                Text(String(localized: "worktree.detail.unsavedChangesMessage \(worktree.branch ?? String(localized: "worktree.list.unknown"))"))
-            } else {
-                Text(String(localized: "worktree.detail.deleteConfirmMessageWithName \(worktree.branch ?? String(localized: "worktree.list.unknown"))"))
-            }
-        }
-        .alert(String(localized: "worktree.list.error"), isPresented: .constant(errorMessage != nil)) {
-            Button(String(localized: "worktree.list.ok")) {
-                errorMessage = nil
-            }
-        } message: {
-            if let error = errorMessage {
-                Text(error)
-            }
-        }
-        .alert(String(localized: "worktree.merge.conflict"), isPresented: $showingMergeConflict) {
-            Button(String(localized: "worktree.list.ok")) {
-                mergeConflictFiles = []
-            }
-        } message: {
-            VStack(alignment: .leading) {
-                Text(String(localized: "worktree.merge.conflictMessage"))
-                ForEach(mergeConflictFiles, id: \.self) { file in
-                    Text("• \(file)")
-                }
-                Text(String(localized: "worktree.merge.resolveHint"))
-            }
-        }
-        .alert(String(localized: "worktree.merge.successful"), isPresented: $showingMergeSuccess) {
-            Button(String(localized: "worktree.list.ok")) {}
-        } message: {
-            Text(mergeSuccessMessage)
-        }
-        .alert(String(localized: "worktree.merge.error"), isPresented: .constant(mergeErrorMessage != nil)) {
-            Button(String(localized: "worktree.list.ok")) {
-                mergeErrorMessage = nil
-            }
-        } message: {
-            if let error = mergeErrorMessage {
-                Text(error)
-            }
-        }
-        .alert(String(localized: "worktree.branch.switchError"), isPresented: .constant(branchSwitchError != nil)) {
-            Button(String(localized: "worktree.list.ok")) {
-                branchSwitchError = nil
-            }
-        } message: {
-            if let error = branchSwitchError {
-                Text(error)
-            }
-        }
-        .onAppear {
-            loadWorktreeStatuses()
-        }
+        .worktreeListItemPresentation(view: self)
     }
 
 }
