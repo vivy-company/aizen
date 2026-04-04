@@ -148,8 +148,8 @@ struct CustomTextEditor: NSViewRepresentable {
         var lastCursorPosition: Int = -1
         var lastKnownFocus: Bool = false
         var lastCursorText: String = ""
-        private var didApplyMentionHighlight = false
-        private static let mentionRegex = try? NSRegularExpression(pattern: "@[^\\s]+", options: [])
+        var didApplyMentionHighlight = false
+        static let mentionRegex = try? NSRegularExpression(pattern: "@[^\\s]+", options: [])
 
         init(
             text: Binding<String>,
@@ -231,64 +231,6 @@ struct CustomTextEditor: NSViewRepresentable {
             Task { @MainActor in
                 isFocused = false
             }
-        }
-
-        func applyHighlighting(to textView: NSTextView) {
-            highlightMentions(in: textView)
-        }
-
-        private func highlightMentions(in textView: NSTextView) {
-            let text = textView.string
-            let fullRange = NSRange(location: 0, length: text.utf16.count)
-            let selectedRange = textView.selectedRange()
-
-            if !text.contains("@") {
-                guard didApplyMentionHighlight else { return }
-                let attributedString = NSAttributedString(
-                    string: text,
-                    attributes: [
-                        .font: NSFont.systemFont(ofSize: 14),
-                        .foregroundColor: NSColor.labelColor
-                    ]
-                )
-                textView.textStorage?.setAttributedString(attributedString)
-                if selectedRange.location <= text.count {
-                    textView.setSelectedRange(selectedRange)
-                }
-                didApplyMentionHighlight = false
-                return
-            }
-
-            // Create attributed string with default styling
-            let attributedString = NSMutableAttributedString(string: text)
-            attributedString.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: fullRange)
-            attributedString.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
-
-            // Find and highlight @mentions (pattern: @followed by non-whitespace until space)
-            let mentionColor = mentionHighlightColor(for: textView)
-            let matches = Self.mentionRegex?.matches(in: text, options: [], range: fullRange) ?? []
-            for match in matches {
-                attributedString.addAttribute(.foregroundColor, value: mentionColor, range: match.range)
-            }
-
-            // Only update if there are actual mentions to highlight
-            if !attributedString.isEqual(to: textView.attributedString()) {
-                textView.textStorage?.setAttributedString(attributedString)
-                // Restore selection
-                if selectedRange.location <= text.count {
-                    textView.setSelectedRange(selectedRange)
-                }
-            }
-            didApplyMentionHighlight = !matches.isEmpty
-        }
-
-        private func mentionHighlightColor(for textView: NSTextView) -> NSColor {
-            let isDarkAppearance = textView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            let effectiveThemeName = AppearanceSettings.effectiveThemeName(isDarkAppearance: isDarkAppearance)
-            if let theme = GhosttyThemeParser.loadVVTheme(named: effectiveThemeName) {
-                return theme.cursorColor
-            }
-            return NSColor.controlAccentColor
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
