@@ -11,12 +11,12 @@ struct CustomAgentFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State var name: String
-    @State private var description: String
+    @State var description: String
     @State var executablePath: String
     @State var launchArgsText: String
     @State var environmentVariables: [AgentEnvironmentVariable]
-    @State private var selectedSFSymbol: String
-    @State private var showingSFSymbolPicker = false
+    @State var selectedSFSymbol: String
+    @State var showingSFSymbolPicker = false
     @State private var errorMessage: String?
     @State var isValidatingPath = false
     @State var pathValidationResult: PathValidation?
@@ -82,14 +82,7 @@ struct CustomAgentFormView: View {
 
             // Form
             Form {
-                Section("Basic Information") {
-                    TextField("Name", text: $name)
-                        .help("Display name for the agent")
-
-                    TextField("Description (optional)", text: $description, axis: .vertical)
-                        .lineLimit(2...4)
-                        .help("Brief description of the agent")
-                }
+                basicInformationSection
 
                 executableSection
 
@@ -98,25 +91,7 @@ struct CustomAgentFormView: View {
                     helperText: "Merged on top of your shell environment during validation and when the agent launches."
                 )
 
-                Section("Icon") {
-                    HStack(spacing: 12) {
-                        Image(systemName: selectedSFSymbol)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 32, height: 32)
-
-                        Text(selectedSFSymbol)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Spacer()
-
-                        Button("Choose Symbol...") {
-                            showingSFSymbolPicker = true
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
+                iconSection
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
