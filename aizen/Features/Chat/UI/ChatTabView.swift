@@ -28,23 +28,23 @@ struct ChatTabView: View {
     private let recentSessionsLimit = 3
 
     // Companion panel state (persisted) - Left
-    @AppStorage("companionLeftPanelType") private var leftPanelType: String = ""
-    @AppStorage("companionLeftPanelWidth") private var leftPanelWidthStored: Double = 400
+    @AppStorage("companionLeftPanelType") var leftPanelType: String = ""
+    @AppStorage("companionLeftPanelWidth") var leftPanelWidthStored: Double = 400
     @State var leftPanelWidth: Double = 400
 
     // Companion panel state (persisted) - Right
-    @AppStorage("companionRightPanelType") private var rightPanelType: String = ""
-    @AppStorage("companionRightPanelWidth") private var rightPanelWidthStored: Double = 400
+    @AppStorage("companionRightPanelType") var rightPanelType: String = ""
+    @AppStorage("companionRightPanelWidth") var rightPanelWidthStored: Double = 400
     @State var rightPanelWidth: Double = 400
 
-    @State private var didLoadWidths = false
+    @State var didLoadWidths = false
     @State var isResizingCompanion = false
 
     let minPanelWidth: CGFloat = 250
     let minCenterWidth: CGFloat = 360
     let dividerWidth: CGFloat = 1
     let maxPanelWidthRatio: CGFloat = 0.75
-    private let companionCoordinateSpace = "companionSplit"
+    let companionCoordinateSpace = "companionSplit"
 
     var leftPanel: CompanionPanel? {
         get { CompanionPanel(rawValue: leftPanelType) }
@@ -57,11 +57,11 @@ struct ChatTabView: View {
     }
 
     // Panels available for each side (excluding what's on the other side)
-    private var availableForLeft: [CompanionPanel] {
+    var availableForLeft: [CompanionPanel] {
         CompanionPanel.allCases.filter { $0.rawValue != rightPanelType }
     }
 
-    private var availableForRight: [CompanionPanel] {
+    var availableForRight: [CompanionPanel] {
         CompanionPanel.allCases.filter { $0.rawValue != leftPanelType }
     }
 
@@ -144,139 +144,6 @@ struct ChatTabView: View {
                     .task(id: sessionIdentitySnapshot) {
                         syncSelectionAndCache()
                     }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var chatContentWithCompanion: some View {
-        GeometryReader { geometry in
-            let toolbarInset = resolvedToolbarInset(from: geometry)
-            HStack(spacing: 0) {
-                // LEFT PANEL
-                if let panel = leftPanel {
-                    CompanionPanelView(
-                        panel: panel,
-                        worktree: worktree,
-                        repositoryManager: repositoryManager,
-                        side: .left,
-                        onClose: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                leftPanelType = ""
-                            }
-                        },
-                        isResizing: isResizingCompanion,
-                        terminalSessionId: $selectedTerminalSessionId,
-                        browserSessionId: $selectedBrowserSessionId
-                    )
-                    .padding(.top, toolbarInset)
-                    .frame(width: CGFloat(leftPanelWidth))
-                    .animation(nil, value: leftPanelWidth)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-
-                    CompanionDivider(
-                        panelWidth: $leftPanelWidth,
-                        minWidth: minPanelWidth,
-                        maxWidth: maxLeftWidth(containerWidth: geometry.size.width, rightWidth: CGFloat(rightPanelWidth)),
-                        containerWidth: geometry.size.width,
-                        coordinateSpace: companionCoordinateSpace,
-                        side: .left,
-                        isDragging: $isResizingCompanion,
-                        onDragEnd: { leftPanelWidthStored = leftPanelWidth }
-                    )
-                }
-
-                // CHAT (center)
-                chatSessionsStack
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .overlay(alignment: .leading) {
-                        if leftPanel == nil {
-                            CompanionRailView(
-                                side: .left,
-                                availablePanels: availableForLeft,
-                                onSelect: { leftPanelType = $0.rawValue }
-                            )
-                        }
-                    }
-                    .overlay(alignment: .trailing) {
-                        if rightPanel == nil {
-                            CompanionRailView(
-                                side: .right,
-                                availablePanels: availableForRight,
-                                onSelect: { rightPanelType = $0.rawValue }
-                            )
-                        }
-                    }
-                    .padding(.top, toolbarInset)
-
-                // RIGHT PANEL
-                if let panel = rightPanel {
-                    CompanionDivider(
-                        panelWidth: $rightPanelWidth,
-                        minWidth: minPanelWidth,
-                        maxWidth: maxRightWidth(containerWidth: geometry.size.width, leftWidth: CGFloat(leftPanelWidth)),
-                        containerWidth: geometry.size.width,
-                        coordinateSpace: companionCoordinateSpace,
-                        side: .right,
-                        isDragging: $isResizingCompanion,
-                        onDragEnd: { rightPanelWidthStored = rightPanelWidth }
-                    )
-
-                    CompanionPanelView(
-                        panel: panel,
-                        worktree: worktree,
-                        repositoryManager: repositoryManager,
-                        side: .right,
-                        onClose: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                rightPanelType = ""
-                            }
-                        },
-                        isResizing: isResizingCompanion,
-                        terminalSessionId: $selectedTerminalSessionId,
-                        browserSessionId: $selectedBrowserSessionId
-                    )
-                    .padding(.top, toolbarInset)
-                    .frame(width: CGFloat(rightPanelWidth))
-                    .animation(nil, value: rightPanelWidth)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
-            }
-            .animation(.easeInOut(duration: 0.2), value: leftPanelType)
-            .animation(.easeInOut(duration: 0.2), value: rightPanelType)
-            .animation(nil, value: leftPanelWidth)
-            .animation(nil, value: rightPanelWidth)
-            .transaction { transaction in
-                if isResizingCompanion {
-                    transaction.disablesAnimations = true
-                }
-            }
-            .ignoresSafeArea(.container, edges: .top)
-            .coordinateSpace(name: companionCoordinateSpace)
-            .onAppear {
-                if !didLoadWidths {
-                    leftPanelWidth = leftPanelWidthStored
-                    rightPanelWidth = rightPanelWidthStored
-                    clampPanelWidths(containerWidth: geometry.size.width)
-                    didLoadWidths = true
-                }
-            }
-            .task(id: geometry.size.width) {
-                // Defer to next run loop to break synchronous layout feedback cycle.
-                // Writing @State during layout can re-trigger the same layout pass.
-                DispatchQueue.main.async {
-                    clampPanelWidths(containerWidth: geometry.size.width)
-                }
-            }
-            .task(id: leftPanelType) {
-                DispatchQueue.main.async {
-                    clampPanelWidths(containerWidth: geometry.size.width)
-                }
-            }
-            .task(id: rightPanelType) {
-                DispatchQueue.main.async {
-                    clampPanelWidths(containerWidth: geometry.size.width)
-                }
             }
         }
     }
