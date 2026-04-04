@@ -48,11 +48,11 @@ class PullRequestsViewModel: ObservableObject {
 
     // MARK: - Private
 
-    private let hostingService = GitHostingService.shared
-    private var repoPath: String = ""
-    private var currentPage = 0
-    private let pageSize = 30
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "PullRequestsViewModel")
+    let hostingService = GitHostingService.shared
+    var repoPath: String = ""
+    var currentPage = 0
+    let pageSize = 30
+    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "PullRequestsViewModel")
 
     // MARK: - Initialization
 
@@ -60,85 +60,6 @@ class PullRequestsViewModel: ObservableObject {
         self.repoPath = repoPath
         Task {
             hostingInfo = await hostingService.getHostingInfo(for: repoPath)
-        }
-    }
-
-    // MARK: - List Operations
-
-    func loadPullRequests() async {
-        guard !isLoadingList else { return }
-
-        isLoadingList = true
-        listError = nil
-        currentPage = 1
-
-        do {
-            let prs = try await hostingService.listPullRequests(
-                repoPath: repoPath,
-                filter: filter,
-                page: currentPage,
-                limit: pageSize
-            )
-            pullRequests = prs
-            hasMore = prs.count >= pageSize
-
-            // Auto-select first PR if none selected
-            if selectedPR == nil, let first = prs.first {
-                selectedPR = first
-                await loadDetail(for: first)
-            }
-        } catch {
-            logger.error("Failed to load PRs: \(error.localizedDescription)")
-            listError = error.localizedDescription
-            pullRequests = []
-        }
-
-        isLoadingList = false
-    }
-
-    func loadMore() async {
-        guard !isLoadingList, hasMore else { return }
-
-        isLoadingList = true
-        currentPage += 1
-
-        do {
-            let prs = try await hostingService.listPullRequests(
-                repoPath: repoPath,
-                filter: filter,
-                page: currentPage,
-                limit: pageSize
-            )
-
-            // Filter out duplicates
-            let existingIds = Set(pullRequests.map(\.id))
-            let newPRs = prs.filter { !existingIds.contains($0.id) }
-
-            pullRequests.append(contentsOf: newPRs)
-            hasMore = prs.count >= pageSize
-        } catch {
-            logger.error("Failed to load more PRs: \(error.localizedDescription)")
-            currentPage -= 1
-        }
-
-        isLoadingList = false
-    }
-
-    func refresh() async {
-        currentPage = 1
-        await loadPullRequests()
-
-        // Refresh selected PR detail if any
-        if let pr = selectedPR {
-            await loadDetail(for: pr)
-        }
-    }
-
-    func changeFilter(to newFilter: PRFilter) {
-        guard filter != newFilter else { return }
-        filter = newFilter
-        Task {
-            await loadPullRequests()
         }
     }
 
