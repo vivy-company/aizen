@@ -6,6 +6,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import os.log
 
 extension ChatInputBar {
     func handleAutocompleteNavigation(_ action: AutocompleteNavigationAction) -> Bool {
@@ -44,6 +45,27 @@ extension ChatInputBar {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     attachments.append(contentsOf: panel.urls.map { .file($0) })
                 }
+            }
+        }
+    }
+
+    func startVoiceRecording() {
+        Task {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                showingVoiceRecording = true
+            }
+            do {
+                try await audioService.startRecording()
+            } catch {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingVoiceRecording = false
+                }
+                if let recordingError = error as? AudioService.RecordingError {
+                    permissionErrorMessage = recordingError.localizedDescription
+                        + "\n\nPlease enable Microphone and Speech Recognition permissions in System Settings."
+                    showingPermissionError = true
+                }
+                logger.error("Failed to start recording: \(error.localizedDescription)")
             }
         }
     }

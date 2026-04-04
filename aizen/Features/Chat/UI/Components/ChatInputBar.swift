@@ -27,7 +27,7 @@ struct ChatInputBar: View {
         static let textMaxHeight: CGFloat = 140
     }
 
-    private let logger = Logger.chat
+    let logger = Logger.chat
     @Binding var inputText: String
     @Binding var pendingCursorPosition: Int?
     @Binding var attachments: [ChatAttachment]
