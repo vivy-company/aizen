@@ -191,91 +191,21 @@ struct CustomTextEditor: NSViewRepresentable {
                     if let textView = self.textView,
                        textView.window?.firstResponder === textView {
                         // Try to handle image paste first
-                        if self.handleImagePaste() {
+                        if CustomTextEditorPasteSupport.handleImagePaste(
+                            onImagePaste: self.onImagePaste,
+                            onFilePaste: self.onFilePaste
+                        ) {
                             return nil // Consume the event
                         }
                         // Try to handle large text paste
-                        if self.handleLargeTextPaste() {
+                        if CustomTextEditorPasteSupport.handleLargeTextPaste(
+                            onLargeTextPaste: self.onLargeTextPaste
+                        ) {
                             return nil // Consume the event
                         }
                     }
                 }
                 return event
-            }
-        }
-
-        private func handleLargeTextPaste() -> Bool {
-            guard let onLargeTextPaste = onLargeTextPaste else { return false }
-            guard let pastedText = Clipboard.readString() else { return false }
-
-            let lineCount = pastedText.components(separatedBy: .newlines).count
-            let charCount = pastedText.count
-
-            // Check if text exceeds thresholds
-            if charCount >= CustomTextEditor.largeTextCharacterThreshold ||
-               lineCount >= CustomTextEditor.largeTextLineThreshold {
-                onLargeTextPaste(pastedText)
-                return true
-            }
-
-            return false
-        }
-
-        private func handleImagePaste() -> Bool {
-            let pasteboard = NSPasteboard.general
-
-            // Check for PNG data first (most common for screenshots)
-            if let data = pasteboard.data(forType: .png) {
-                guard let onImagePaste = onImagePaste else { return false }
-                onImagePaste(data, "image/png")
-                return true
-            }
-
-            // Check for TIFF data (common for copied images)
-            if let data = pasteboard.data(forType: .tiff) {
-                guard let onImagePaste = onImagePaste else { return false }
-                // Convert TIFF to PNG for better compatibility
-                if let image = NSImage(data: data),
-                   let tiffData = image.tiffRepresentation,
-                   let bitmap = NSBitmapImageRep(data: tiffData),
-                   let pngData = bitmap.representation(using: .png, properties: [:]) {
-                    onImagePaste(pngData, "image/png")
-                    return true
-                }
-            }
-
-            // Check for file URL that might be an image
-            if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
-               let url = urls.first {
-                let ext = url.pathExtension.lowercased()
-                let imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "tiff", "bmp"]
-                if imageExtensions.contains(ext) {
-                    if let onFilePaste = onFilePaste {
-                        onFilePaste(url)
-                        return true
-                    }
-                    guard let onImagePaste = onImagePaste else { return false }
-                    if let data = try? Data(contentsOf: url) {
-                        let mimeType = mimeTypeForExtension(ext)
-                        onImagePaste(data, mimeType)
-                        return true
-                    }
-                }
-            }
-
-            return false
-        }
-
-        private func mimeTypeForExtension(_ ext: String) -> String {
-            switch ext.lowercased() {
-            case "png": return "image/png"
-            case "jpg", "jpeg": return "image/jpeg"
-            case "gif": return "image/gif"
-            case "webp": return "image/webp"
-            case "heic", "heif": return "image/heic"
-            case "tiff", "tif": return "image/tiff"
-            case "bmp": return "image/bmp"
-            default: return "image/png"
             }
         }
 
