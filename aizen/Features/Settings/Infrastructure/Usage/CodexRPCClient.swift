@@ -31,38 +31,16 @@ enum RPCWireError: Error, CustomStringConvertible, LocalizedError {
 // SAFETY: Process and pipes are only accessed during setup before async operations begin.
 // stderrLines is protected by stderrLock. nextID is only accessed sequentially.
 final class CodexRPCClient: @unchecked Sendable {
-    private let process = Process()
-    private let stdinPipe = Pipe()
-    private let stdoutPipe = Pipe()
-    private let stderrPipe = Pipe()
-    private let stdoutLineStream: AsyncStream<Data>
-    private let stdoutLineContinuation: AsyncStream<Data>.Continuation
-    private var nextID = 1
-    private let stderrLock = NSLock()
-    private var stderrLines: [String] = []
-    private let stderrLimit = 6
-
-    // SAFETY: Thread-safe via NSLock protecting buffer mutations.
-    private final class LineBuffer: @unchecked Sendable {
-        private let lock = NSLock()
-        private var buffer = Data()
-
-        func appendAndDrainLines(_ data: Data) -> [Data] {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-
-            self.buffer.append(data)
-            var out: [Data] = []
-            while let newline = self.buffer.firstIndex(of: 0x0A) {
-                let lineData = Data(self.buffer[..<newline])
-                self.buffer.removeSubrange(...newline)
-                if !lineData.isEmpty {
-                    out.append(lineData)
-                }
-            }
-            return out
-        }
-    }
+    let process = Process()
+    let stdinPipe = Pipe()
+    let stdoutPipe = Pipe()
+    let stderrPipe = Pipe()
+    let stdoutLineStream: AsyncStream<Data>
+    let stdoutLineContinuation: AsyncStream<Data>.Continuation
+    var nextID = 1
+    let stderrLock = NSLock()
+    var stderrLines: [String] = []
+    let stderrLimit = 6
 
     init(
         executable: String = "codex",
@@ -174,94 +152,6 @@ final class CodexRPCClient: @unchecked Sendable {
         if self.process.isRunning {
             self.process.terminate()
         }
-    }
-
-    private func request(method: String, params: [String: Any]? = nil) async throws -> [String: Any] {
-        let id = self.nextID
-        self.nextID += 1
-        try self.sendRequest(id: id, method: method, params: params)
-
-        while true {
-            let message = try await self.readNextMessage()
-
-            if message["id"] == nil, message["method"] != nil {
-                continue
-            }
-
-            guard let messageID = self.jsonID(message["id"]), messageID == id else { continue }
-
-            if let error = message["error"] as? [String: Any], let messageText = error["message"] as? String {
-                throw RPCWireError.requestFailed(messageText)
-            }
-
-            return message
-        }
-    }
-
-    private func sendNotification(method: String, params: [String: Any]? = nil) throws {
-        try self.sendMessage([
-            "method": method,
-            "params": params ?? [:],
-        ])
-    }
-
-    private func sendRequest(id: Int, method: String, params: [String: Any]? = nil) throws {
-        try self.sendMessage([
-            "id": id,
-            "method": method,
-            "params": params ?? [:],
-        ])
-    }
-
-    private func sendMessage(_ message: [String: Any]) throws {
-        let data = try JSONSerialization.data(withJSONObject: message)
-        var buffer = data
-        buffer.append(0x0A)
-        try self.stdinPipe.fileHandleForWriting.write(contentsOf: buffer)
-    }
-
-    private func readNextMessage() async throws -> [String: Any] {
-        for await line in stdoutLineStream {
-            if let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any] {
-                return obj
-            }
-        }
-        if let summary = stderrSummary() {
-            throw RPCWireError.malformed("codex app-server closed stdout. \(summary)")
-        }
-        throw RPCWireError.malformed("codex app-server closed stdout")
-    }
-
-    private func jsonID(_ raw: Any?) -> Int? {
-        if let number = raw as? NSNumber { return number.intValue }
-        if let string = raw as? String, let number = Int(string) { return number }
-        return nil
-    }
-
-    private func decodeResult<T: Decodable>(from message: [String: Any], as type: T.Type) throws -> T {
-        guard let result = message["result"] else {
-            throw RPCWireError.malformed("Missing result")
-        }
-        let data = try JSONSerialization.data(withJSONObject: result)
-        return try JSONDecoder().decode(T.self, from: data)
-    }
-
-    private func recordStderr(_ line: String) {
-        stderrLock.lock()
-        defer { stderrLock.unlock() }
-        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        stderrLines.append(trimmed)
-        if stderrLines.count > stderrLimit {
-            stderrLines.removeFirst(stderrLines.count - stderrLimit)
-        }
-    }
-
-    private func stderrSummary() -> String? {
-        stderrLock.lock()
-        defer { stderrLock.unlock() }
-        guard !stderrLines.isEmpty else { return nil }
-        return "stderr: " + stderrLines.joined(separator: " | ")
     }
 }
 
