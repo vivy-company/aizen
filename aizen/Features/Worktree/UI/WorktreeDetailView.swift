@@ -27,15 +27,15 @@ struct WorktreeDetailView: View {
     @AppStorage("showTerminalTab") var showTerminalTab = true
     @AppStorage("showFilesTab") var showFilesTab = true
     @AppStorage("showBrowserTab") var showBrowserTab = true
-    @AppStorage("showOpenInApp") private var showOpenInApp = true
-    @AppStorage("showGitStatus") private var showGitStatus = true
-    @AppStorage("showXcodeBuild") private var showXcodeBuild = true
-    @AppStorage("zenModeEnabled") private var zenModeEnabled = false
+    @AppStorage("showOpenInApp") var showOpenInApp = true
+    @AppStorage("showGitStatus") var showGitStatus = true
+    @AppStorage("showXcodeBuild") var showXcodeBuild = true
+    @AppStorage("zenModeEnabled") var zenModeEnabled = false
     @State var selectedTab = "chat"
     @State var lastOpenedApp: DetectedApp?
     let worktreeRuntime: WorktreeRuntime
     @ObservedObject var gitSummaryStore: GitSummaryStore
-    @ObservedObject private var xcodeBuildManager: XcodeBuildStore
+    @ObservedObject var xcodeBuildManager: XcodeBuildStore
     @StateObject var tabConfig = TabConfigurationStore.shared
     @State var fileSearchWindowController: FileSearchWindowController?
     @State var fileToOpenFromSearch: String?
@@ -64,7 +64,7 @@ struct WorktreeDetailView: View {
         _xcodeBuildManager = ObservedObject(wrappedValue: runtime.xcodeBuildManager)
     }
 
-    private var sessionManager: WorktreeSessionCoordinator {
+    var sessionManager: WorktreeSessionCoordinator {
         WorktreeSessionCoordinator(
             worktree: worktree,
             viewModel: viewModel,
@@ -131,130 +131,12 @@ struct WorktreeDetailView: View {
         }
     }
 
-    @ToolbarContentBuilder
-    var tabPickerToolbarItem: some ToolbarContent {
-        ToolbarItem(placement: .automatic) {
-            Picker(String(localized: "worktree.session.tab"), selection: $selectedTab) {
-                ForEach(tabConfig.tabOrder) { tab in
-                    if isTabVisible(tab.id) {
-                        Label(LocalizedStringKey(tab.localizedKey), systemImage: tab.icon)
-                            .tag(tab.id)
-                    }
-                }
-            }
-            .pickerStyle(.segmented)
-        }
-    }
-
     var visibleTabIds: [String] {
         tabConfig.tabOrder
             .map(\.id)
             .filter { isTabVisible($0) }
     }
 
-    @ToolbarContentBuilder
-    var sessionToolbarItems: some ToolbarContent {
-        ToolbarItem(placement: .automatic) {
-            if shouldShowSessionToolbar {
-                SessionTabsScrollView(
-                    selectedTab: selectedTab,
-                    chatSessions: sessionManager.chatSessions,
-                    terminalSessions: sessionManager.terminalSessions,
-                    selectedChatSessionId: $viewModel.selectedChatSessionId,
-                    selectedTerminalSessionId: $viewModel.selectedTerminalSessionId,
-                    onCloseChatSession: sessionManager.closeChatSession,
-                    onCloseTerminalSession: sessionManager.closeTerminalSession,
-                    onCreateChatSession: sessionManager.createNewChatSession,
-                    onCreateTerminalSession: sessionManager.createNewTerminalSession,
-                    onCreateChatWithAgent: { agentId in
-                        sessionManager.createNewChatSession(withAgent: agentId)
-                    },
-                    onCreateTerminalWithPreset: { preset in
-                        sessionManager.createNewTerminalSession(withPreset: preset)
-                    }
-                )
-            }
-        }
-    }
-
-    @ToolbarContentBuilder
-    var leadingToolbarItems: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            if showZenModeButton {
-                HStack(spacing: 12) {
-                    zenModeButton
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var zenModeButton: some View {
-        let button = Button(action: {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                zenModeEnabled.toggle()
-            }
-        }) {
-            Label("Zen Mode", systemImage: zenModeEnabled ? "pip.enter" : "pip.exit")
-        }
-        .labelStyle(.iconOnly)
-        .help(zenModeEnabled ? "Show Environment List" : "Hide Environment List (Zen Mode)")
-
-        if #available(macOS 14.0, *) {
-            button.symbolEffect(.bounce, value: zenModeEnabled)
-        } else {
-            button
-        }
-    }
-
-    
-    @ToolbarContentBuilder
-    var trailingToolbarItems: some ToolbarContent {
-        // Xcode build button (only if fully loaded and ready)
-        ToolbarItem {
-            if showXcodeBuild, xcodeBuildManager.isReady {
-                XcodeBuildButton(buildManager: xcodeBuildManager, worktree: worktree)
-            }
-        }
-
-        if #available(macOS 26.0, *) {
-            ToolbarSpacer(.fixed)
-        } else {
-            ToolbarItem(placement: .automatic) {
-                Spacer().frame(width: 12).fixedSize()
-            }
-        }
-
-        ToolbarItem {
-            if showOpenInApp {
-                OpenInAppButton(
-                    lastOpenedApp: lastOpenedApp,
-                    appDetector: appDetector,
-                    onOpenInLastApp: openInLastApp,
-                    onOpenInDetectedApp: openInDetectedApp
-                )
-            }
-        }
-
-        if #available(macOS 26.0, *) {
-            ToolbarSpacer(.fixed)
-        } else {
-            ToolbarItem(placement: .automatic) {
-                Spacer().frame(width: 12).fixedSize()
-            }
-        }
-
-        ToolbarItem(placement: .automatic) {
-            if showGitStatus && hasGitChanges {
-                gitStatusView
-            }
-        }
-
-        ToolbarItem(placement: .automatic) {
-            gitSidebarButton
-        }
-    }
-    
     private func validateSelectedTab() {
         let visibleTabs = tabConfig.tabOrder.filter { isTabVisible($0.id) }
         if !visibleTabs.contains(where: { $0.id == selectedTab }) {
