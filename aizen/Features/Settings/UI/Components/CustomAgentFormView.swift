@@ -273,57 +273,14 @@ struct CustomAgentFormView: View {
 
         isValidatingPath = true
 
-        // Parse launch args
-        let launchArgs = launchArgsText
-            .trimmingCharacters(in: .whitespaces)
-            .split(separator: " ")
-            .map { String($0) }
-            .filter { !$0.isEmpty }
-
-        // Test ACP protocol
-        do {
-            let tempClient = Client()
-            let environment = environmentVariables.launchEnvironment
-
-            try await tempClient.launch(
-                agentPath: trimmedPath,
-                arguments: launchArgs,
-                environment: environment.isEmpty ? nil : environment
-            )
-
-            let capabilities = ClientCapabilities(
-                fs: FileSystemCapabilities(
-                    readTextFile: true,
-                    writeTextFile: true
-                ),
-                terminal: true,
-                meta: [
-                    "terminal_output": AnyCodable(true),
-                    "terminal-auth": AnyCodable(true)
-                ]
-            )
-
-            let initResponse = try await tempClient.initialize(
-                protocolVersion: 1,
-                capabilities: capabilities
-            )
-
-            // If agent requires authentication, that's still valid - we just can't test session creation
-            if let authMethods = initResponse.authMethods, !authMethods.isEmpty {
-                pathValidationResult = .valid
-                await tempClient.terminate()
-            } else {
-                // Try to create a session to fully validate
-                _ = try await tempClient.newSession(
-                    workingDirectory: FileManager.default.currentDirectoryPath,
-                    mcpServers: []
-                )
-                pathValidationResult = .valid
-                await tempClient.terminate()
-            }
-        } catch {
-            pathValidationResult = .invalid("Not a valid ACP executable: \(error.localizedDescription)")
-        }
+        let launchArgs = parsedLaunchArgs
+        let environment = environmentVariables.launchEnvironment
+        let validationMessage = await CustomAgentExecutableValidator.validate(
+            executablePath: trimmedPath,
+            launchArgs: launchArgs,
+            environment: environment
+        )
+        pathValidationResult = validationMessage.map(PathValidation.invalid) ?? .valid
 
         await MainActor.run {
             isValidatingPath = false
@@ -382,17 +339,20 @@ struct CustomAgentFormView: View {
         return false
     }
 
+    private var parsedLaunchArgs: [String] {
+        launchArgsText
+            .trimmingCharacters(in: .whitespaces)
+            .split(separator: " ")
+            .map { String($0) }
+            .filter { !$0.isEmpty }
+    }
+
     private func saveAgent() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedDescription = description.trimmingCharacters(in: .whitespaces)
         let trimmedPath = executablePath.trimmingCharacters(in: .whitespaces)
 
-        // Parse launch args
-        let launchArgs = launchArgsText
-            .trimmingCharacters(in: .whitespaces)
-            .split(separator: " ")
-            .map { String($0) }
-            .filter { !$0.isEmpty }
+        let launchArgs = parsedLaunchArgs
 
         // Use SF Symbol for icon
         let iconType = AgentIconType.sfSymbol(selectedSFSymbol)
