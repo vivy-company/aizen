@@ -8,12 +8,12 @@ import SwiftUI
 
 struct RegistryAgentPickerView: View {
     @State private var searchText = ""
-    @State private var agents: [RegistryAgent] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-    @State private var addingAgentIDs: Set<String> = []
+    @State var agents: [RegistryAgent] = []
+    @State var isLoading = false
+    @State var errorMessage: String?
+    @State var addingAgentIDs: Set<String> = []
 
-    private var surfaceColor: Color {
+    var surfaceColor: Color {
         AppSurfaceTheme.backgroundColor()
     }
 
@@ -65,88 +65,7 @@ struct RegistryAgentPickerView: View {
         .background(surfaceColor)
     }
 
-    @ViewBuilder
-    private var content: some View {
-        if isLoading && agents.isEmpty {
-            VStack(spacing: 12) {
-                ProgressView()
-                Text("Loading registry agents...")
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(surfaceColor)
-        } else if let errorMessage, agents.isEmpty {
-            VStack(spacing: 12) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.yellow)
-                Text("Failed to load the registry")
-                    .font(.headline)
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 320)
-                Button("Try Again") {
-                    Task { await loadAgents(forceRefresh: true) }
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(surfaceColor)
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    if let errorMessage {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.yellow)
-                            Text(errorMessage)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Divider()
-                    }
-
-                    if filteredAgents.isEmpty {
-                        VStack(spacing: 10) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 24))
-                                .foregroundStyle(.secondary)
-                            Text("No Matching Agents")
-                                .font(.headline)
-                            Text("Try a different search term.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 320)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 16)
-                    } else {
-                        ForEach(filteredAgents) { agent in
-                            RegistryAgentRow(
-                                agent: agent,
-                                isAdded: AgentRegistry.shared.getMetadata(for: agent.id) != nil,
-                                isAdding: addingAgentIDs.contains(agent.id),
-                                onAdd: { add(agent) }
-                            )
-
-                            Divider()
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .background(surfaceColor)
-        }
-    }
-
-    private var filteredAgents: [RegistryAgent] {
+    var filteredAgents: [RegistryAgent] {
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let visibleAgents = agents.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
@@ -162,7 +81,7 @@ struct RegistryAgentPickerView: View {
         }
     }
 
-    private func add(_ agent: RegistryAgent) {
+    func add(_ agent: RegistryAgent) {
         guard !addingAgentIDs.contains(agent.id) else { return }
 
         addingAgentIDs.insert(agent.id)
@@ -182,7 +101,7 @@ struct RegistryAgentPickerView: View {
         }
     }
 
-    private func loadAgents(forceRefresh: Bool) async {
+    func loadAgents(forceRefresh: Bool) async {
         await MainActor.run {
             isLoading = true
             errorMessage = nil
