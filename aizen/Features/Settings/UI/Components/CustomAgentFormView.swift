@@ -5,23 +5,21 @@
 //  Form for adding/editing custom agents
 //
 
-import ACP
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct CustomAgentFormView: View {
     @Environment(\.dismiss) private var dismiss
 
-    @State private var name: String
+    @State var name: String
     @State private var description: String
-    @State private var executablePath: String
-    @State private var launchArgsText: String
-    @State private var environmentVariables: [AgentEnvironmentVariable]
+    @State var executablePath: String
+    @State var launchArgsText: String
+    @State var environmentVariables: [AgentEnvironmentVariable]
     @State private var selectedSFSymbol: String
     @State private var showingSFSymbolPicker = false
     @State private var errorMessage: String?
-    @State private var isValidatingPath = false
-    @State private var pathValidationResult: PathValidation?
+    @State var isValidatingPath = false
+    @State var pathValidationResult: PathValidation?
 
     let existingMetadata: AgentMetadata?
     let onSave: (AgentMetadata) -> Void
@@ -93,66 +91,7 @@ struct CustomAgentFormView: View {
                         .help("Brief description of the agent")
                 }
 
-                Section("ACP Executable") {
-                    HStack(spacing: 8) {
-                        TextField("Path", text: executablePathBinding)
-                            .textFieldStyle(.roundedBorder)
-                            .help("Enter or paste executable path, or use Browse button")
-                            .onSubmit {
-                                Task {
-                                    await validateExecutablePath()
-                                }
-                            }
-
-                        Button("Browse...") {
-                            selectExecutableFile()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-
-                    TextField("Launch arguments (optional)", text: launchArgsTextBinding)
-                        .textFieldStyle(.roundedBorder)
-                        .help("Space-separated arguments (e.g., agent stdio, --experimental-acp)")
-                        .onSubmit {
-                            Task {
-                                await validateExecutablePath()
-                            }
-                        }
-
-                    // Validation status row (automatically validates on blur/submit)
-                    if !executablePath.isEmpty {
-                        HStack(spacing: 8) {
-                            if isValidatingPath {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                    .controlSize(.small)
-                                Text("Validating ACP executable...")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else if let validation = pathValidationResult {
-                                switch validation {
-                                case .valid:
-                                    ValidationStatusIcon(isValid: true)
-                                    Text("Valid ACP executable")
-                                        .font(.caption)
-                                        .foregroundStyle(.green)
-                                case .invalid(let message):
-                                    ValidationStatusIcon(isValid: false)
-                                    Text(message)
-                                        .font(.caption)
-                                        .foregroundStyle(.red)
-                                }
-                            } else {
-                                Image(systemName: "info.circle")
-                                    .foregroundStyle(.secondary)
-                                Text("Press Enter to validate")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                        }
-                    }
-                }
+                executableSection
 
                 AgentEnvironmentVariablesEditor(
                     variables: environmentVariablesBinding,
@@ -215,136 +154,6 @@ struct CustomAgentFormView: View {
         .sheet(isPresented: $showingSFSymbolPicker) {
             SFSymbolPickerView(selectedSymbol: $selectedSFSymbol, isPresented: $showingSFSymbolPicker)
         }
-    }
-
-    private func selectExecutableFile() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.showsHiddenFiles = true
-        panel.message = "Select ACP executable"
-        panel.prompt = "Select"
-
-        // Use beginSheetModal to attach to the current window
-        if let window = NSApp.keyWindow {
-            panel.beginSheetModal(for: window) { response in
-                if response == .OK, let url = panel.url {
-                    updateExecutablePath(url.path)
-                    // Auto-validate after selection
-                    Task {
-                        await validateExecutablePath()
-                    }
-                }
-            }
-        } else {
-            // Fallback to modal panel
-            let response = panel.runModal()
-            if response == .OK, let url = panel.url {
-                updateExecutablePath(url.path)
-                // Auto-validate after selection
-                Task {
-                    await validateExecutablePath()
-                }
-            }
-        }
-    }
-
-
-    private func validateExecutablePath() async {
-        let trimmedPath = executablePath.trimmingCharacters(in: .whitespaces)
-
-        guard !trimmedPath.isEmpty else {
-            pathValidationResult = .invalid("Path is empty")
-            return
-        }
-
-        // Check file exists
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: trimmedPath) else {
-            pathValidationResult = .invalid("File does not exist")
-            return
-        }
-
-        guard fileManager.isExecutableFile(atPath: trimmedPath) else {
-            pathValidationResult = .invalid("File is not executable")
-            return
-        }
-
-        isValidatingPath = true
-
-        let launchArgs = parsedLaunchArgs
-        let environment = environmentVariables.launchEnvironment
-        let validationMessage = await CustomAgentExecutableValidator.validate(
-            executablePath: trimmedPath,
-            launchArgs: launchArgs,
-            environment: environment
-        )
-        pathValidationResult = validationMessage.map(PathValidation.invalid) ?? .valid
-
-        await MainActor.run {
-            isValidatingPath = false
-        }
-    }
-
-    private var executablePathBinding: Binding<String> {
-        Binding(
-            get: { executablePath },
-            set: { updateExecutablePath($0) }
-        )
-    }
-
-    private var launchArgsTextBinding: Binding<String> {
-        Binding(
-            get: { launchArgsText },
-            set: { updateLaunchArgsText($0) }
-        )
-    }
-
-    private var environmentVariablesBinding: Binding<[AgentEnvironmentVariable]> {
-        Binding(
-            get: { environmentVariables },
-            set: { updateEnvironmentVariables($0) }
-        )
-    }
-
-    private func updateExecutablePath(_ newValue: String) {
-        executablePath = newValue
-        pathValidationResult = nil
-    }
-
-    private func updateLaunchArgsText(_ newValue: String) {
-        launchArgsText = newValue
-        pathValidationResult = nil
-    }
-
-    private func updateEnvironmentVariables(_ newValue: [AgentEnvironmentVariable]) {
-        environmentVariables = newValue
-        pathValidationResult = nil
-    }
-
-    private var isValid: Bool {
-        let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        let trimmedPath = executablePath.trimmingCharacters(in: .whitespaces)
-
-        guard !trimmedName.isEmpty && !trimmedPath.isEmpty else {
-            return false
-        }
-
-        // Require successful validation
-        if case .valid = pathValidationResult {
-            return true
-        }
-
-        return false
-    }
-
-    private var parsedLaunchArgs: [String] {
-        launchArgsText
-            .trimmingCharacters(in: .whitespaces)
-            .split(separator: " ")
-            .map { String($0) }
-            .filter { !$0.isEmpty }
     }
 
     private func saveAgent() {
