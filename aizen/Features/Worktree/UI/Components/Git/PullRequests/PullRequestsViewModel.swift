@@ -63,69 +63,6 @@ class PullRequestsViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Detail Operations
-
-    func selectPR(_ pr: PullRequest) {
-        guard selectedPR?.id != pr.id else { return }
-        selectedPR = pr
-        Task {
-            await loadDetail(for: pr)
-        }
-    }
-
-    func loadDetail(for pr: PullRequest) async {
-        detailError = nil
-
-        // Clear previous data
-        comments = []
-        diffOutput = ""
-
-        // Refresh PR details to get latest state (but don't update list to avoid jumps)
-        do {
-            let updatedPR = try await hostingService.getPullRequestDetail(repoPath: repoPath, number: pr.number)
-            // Only update selectedPR, not the list (list updates on refresh only)
-            if selectedPR?.id == pr.id {
-                selectedPR = updatedPR
-            }
-        } catch {
-            logger.error("Failed to refresh PR detail: \(error.localizedDescription)")
-        }
-    }
-
-    /// Load comments on-demand (called when Comments tab is selected)
-    func loadCommentsIfNeeded() async {
-        guard let pr = selectedPR, comments.isEmpty, !isLoadingComments else { return }
-        await loadComments(for: pr)
-    }
-
-    /// Load diff on-demand (called when Diff tab is selected)
-    func loadDiffIfNeeded() async {
-        guard let pr = selectedPR, diffOutput.isEmpty, !isLoadingDiff else { return }
-        await loadDiff(for: pr)
-    }
-
-    private func loadComments(for pr: PullRequest) async {
-        isLoadingComments = true
-        do {
-            comments = try await hostingService.getPullRequestComments(repoPath: repoPath, number: pr.number)
-        } catch {
-            logger.error("Failed to load comments: \(error.localizedDescription)")
-            comments = []
-        }
-        isLoadingComments = false
-    }
-
-    private func loadDiff(for pr: PullRequest) async {
-        isLoadingDiff = true
-        do {
-            diffOutput = try await hostingService.getPullRequestDiff(repoPath: repoPath, number: pr.number)
-        } catch {
-            logger.error("Failed to load diff: \(error.localizedDescription)")
-            diffOutput = ""
-        }
-        isLoadingDiff = false
-    }
-
     // MARK: - Actions
 
     func merge(method: PRMergeMethod) async {
