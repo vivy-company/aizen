@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 import os.log
 
 struct ChatInputBar: View {
-    private enum Layout {
+    enum Layout {
         static let containerPadding: CGFloat = 10
         static let rowSpacing: CGFloat = 8
         static let controlSize: CGFloat = 34
@@ -52,11 +52,11 @@ struct ChatInputBar: View {
     let onFilePaste: (URL) -> Void
     let onAgentSelect: (String) -> Void
 
-    @State private var measuredTextHeight: CGFloat = 0
-    @State private var isTextEditorFocused = false
+    @State var measuredTextHeight: CGFloat = 0
+    @State var isTextEditorFocused = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.scenePhase) private var scenePhase
-    private let disableAnimatedBordersForPerfProbe = false
+    @Environment(\.scenePhase) var scenePhase
+    let disableAnimatedBordersForPerfProbe = false
 
     private let processingGradientColors: [Color] = [
         .accentColor.opacity(0.7), .accentColor.opacity(0.4), .accentColor.opacity(0.7)
@@ -145,98 +145,7 @@ struct ChatInputBar: View {
             )
 
             if !showingVoiceRecording {
-                HStack(spacing: Layout.rowSpacing) {
-                    Button(action: presentAttachmentPicker) {
-                        Image(systemName: "paperclip")
-                            .font(.system(size: Layout.iconSize, weight: .medium))
-                            .foregroundStyle(!isSessionReady ? .tertiary : .secondary)
-                            .frame(width: Layout.attachmentControlSize, height: Layout.attachmentControlSize)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!isSessionReady)
-                    .transition(.opacity)
-
-                    if let agentSession = session, !agentSession.availableModels.isEmpty {
-                        ModelSelectorMenu(
-                            session: agentSession,
-                            selectedAgent: selectedAgent,
-                            onAgentSelect: onAgentSelect,
-                            showsBackground: false
-                        )
-                            .transition(.opacity)
-                    }
-
-                    if currentModeId == "plan" {
-                        Label("Plan", systemImage: "checklist")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.blue)
-                    }
-
-                    Spacer(minLength: Layout.rowSpacing)
-
-                    HStack(spacing: Layout.rowSpacing) {
-                        Button(action: {
-                            Task {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    showingVoiceRecording = true
-                                }
-                                do {
-                                    try await audioService.startRecording()
-                                } catch {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        showingVoiceRecording = false
-                                    }
-                                    if let recordingError = error as? AudioService.RecordingError {
-                                        permissionErrorMessage = recordingError.localizedDescription + "\n\nPlease enable Microphone and Speech Recognition permissions in System Settings."
-                                        showingPermissionError = true
-                                    }
-                                    logger.error("Failed to start recording: \(error.localizedDescription)")
-                                }
-                            }
-                        }) {
-                            Image(systemName: "mic.fill")
-                                .font(.system(size: 16, weight: .regular))
-                                .foregroundStyle(!isSessionReady ? .tertiary : .secondary)
-                                .frame(width: Layout.controlSize, height: Layout.controlSize)
-                                .contentShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!isSessionReady)
-                        .transition(.opacity)
-
-                        if isProcessing {
-                            Button(action: onCancel) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.white)
-                                    Image(systemName: "stop.fill")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(Color.black.opacity(0.9))
-                                }
-                                .frame(width: Layout.controlSize, height: Layout.controlSize)
-                            }
-                            .buttonStyle(.plain)
-                            .transition(.opacity)
-                        } else {
-                            Button(action: onSend) {
-                                ZStack {
-                                    Circle()
-                                        .fill(canSend ? Color.white : Color.white.opacity(0.3))
-                                    Image(systemName: "arrow.up")
-                                        .font(.system(size: 15, weight: .bold))
-                                        .foregroundStyle(canSend ? Color.black.opacity(0.9) : Color.secondary)
-                                }
-                                .frame(width: Layout.controlSize, height: Layout.controlSize)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(!canSend)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: canSend)
-                            .transition(.opacity)
-                        }
-                    }
-                    .frame(height: Layout.controlSize)
-                }
+                controlsRow
                 .padding(.top, 4)
             }
         }
@@ -285,68 +194,6 @@ struct ChatInputBar: View {
         } else {
             shape.fill(.ultraThinMaterial)
         }
-    }
-
-    private func handleAutocompleteNavigation(_ action: AutocompleteNavigationAction) -> Bool {
-        guard autocompleteHandler.state.isActive else { return false }
-
-        switch action {
-        case .up:
-            return autocompleteHandler.navigateUp()
-        case .down:
-            return autocompleteHandler.navigateDown()
-        case .select:
-            if autocompleteHandler.state.selectedItem != nil {
-                onAutocompleteSelect()
-                return true
-            }
-            return false
-        case .dismiss:
-            autocompleteHandler.dismissAutocomplete()
-            return true
-        }
-    }
-
-    private func presentAttachmentPicker() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowedContentTypes = [.item]
-
-        if !worktreePath.isEmpty {
-            panel.directoryURL = URL(fileURLWithPath: worktreePath)
-        }
-
-        panel.begin { response in
-            if response == .OK {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    attachments.append(contentsOf: panel.urls.map { .file($0) })
-                }
-            }
-        }
-    }
-
-    private var canSend: Bool {
-        let hasText = !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let hasAttachments = !attachments.isEmpty
-        return (hasText || hasAttachments) && !isProcessing && isSessionReady
-    }
-
-    private var inputCornerRadius: CGFloat {
-        if showingVoiceRecording {
-            return Layout.cornerRadiusVoice
-        }
-        return Layout.cornerRadiusNormal
-    }
-
-    private var textEditorHeight: CGFloat {
-        let measured = measuredTextHeight > 0 ? measuredTextHeight : Layout.textMinHeight
-        return min(max(measured, Layout.textMinHeight), Layout.textMaxHeight)
-    }
-
-    private var shouldAnimateBorder: Bool {
-        !disableAnimatedBordersForPerfProbe && scenePhase == .active && isTextEditorFocused
     }
 
 }
