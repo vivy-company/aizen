@@ -58,52 +58,6 @@ actor AgentTerminalDelegate {
     private let defaultOutputByteLimit = 1_000_000
     private let maxReleasedOutputEntries = 50
 
-    // MARK: - Private Cleanup
-
-    /// Drain remaining data from a pipe synchronously
-    private func drainPipe(_ pipe: Pipe, terminalId: String) {
-        let handle = pipe.fileHandleForReading
-
-        // Disable handler first to avoid race
-        handle.readabilityHandler = nil
-
-        // Drain any remaining data synchronously
-        // Use throwing API since handle may already be closed by readabilityHandler
-        do {
-            while true {
-                // readToEnd returns nil at EOF, throws if handle is closed
-                guard let data = try handle.read(upToCount: 65536), !data.isEmpty else {
-                    break
-                }
-                if let output = String(data: data, encoding: .utf8) {
-                    appendOutput(terminalId: terminalId, output: output)
-                }
-            }
-        } catch {
-            // File handle already closed, nothing to drain
-        }
-    }
-
-    /// Clean up pipe handlers to prevent file handle leaks
-    private func cleanupProcessPipes(_ process: Process, terminalId: String? = nil) {
-        if let outputPipe = process.standardOutput as? Pipe {
-            if let id = terminalId {
-                drainPipe(outputPipe, terminalId: id)
-            } else {
-                outputPipe.fileHandleForReading.readabilityHandler = nil
-            }
-            try? outputPipe.fileHandleForReading.close()
-        }
-        if let errorPipe = process.standardError as? Pipe {
-            if let id = terminalId {
-                drainPipe(errorPipe, terminalId: id)
-            } else {
-                errorPipe.fileHandleForReading.readabilityHandler = nil
-            }
-            try? errorPipe.fileHandleForReading.close()
-        }
-    }
-
     // MARK: - Initialization
 
     init() {}
@@ -152,52 +106,17 @@ actor AgentTerminalDelegate {
         let state = TerminalState(process: process, outputByteLimit: outputByteLimit ?? defaultOutputByteLimit)
         terminals[terminalIdValue] = state
 
-        // Capture output asynchronously
-        // Use read(upToCount:) instead of availableData to get Swift errors instead of ObjC exceptions
-        outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            do {
-                guard let data = try handle.read(upToCount: 65536) else {
-                    handle.readabilityHandler = nil
-                    try? handle.close()
-                    return
-                }
-                if data.isEmpty {
-                    handle.readabilityHandler = nil
-                    try? handle.close()
-                    return
-                }
-                if let output = String(data: data, encoding: .utf8) {
-                    Task {
-                        await self?.appendOutput(terminalId: terminalIdValue, output: output)
-                    }
-                }
-            } catch {
-                // File handle closed or unavailable - clean up
-                handle.readabilityHandler = nil
-            }
+        AgentTerminalProcessIO.installReadabilityHandler(
+            on: outputPipe,
+            terminalId: terminalIdValue
+        ) { [weak self] terminalId, output in
+            await self?.appendOutput(terminalId: terminalId, output: output)
         }
-
-        errorPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            do {
-                guard let data = try handle.read(upToCount: 65536) else {
-                    handle.readabilityHandler = nil
-                    try? handle.close()
-                    return
-                }
-                if data.isEmpty {
-                    handle.readabilityHandler = nil
-                    try? handle.close()
-                    return
-                }
-                if let output = String(data: data, encoding: .utf8) {
-                    Task {
-                        await self?.appendOutput(terminalId: terminalIdValue, output: output)
-                    }
-                }
-            } catch {
-                // File handle closed or unavailable - clean up
-                handle.readabilityHandler = nil
-            }
+        AgentTerminalProcessIO.installReadabilityHandler(
+            on: errorPipe,
+            terminalId: terminalIdValue
+        ) { [weak self] terminalId, output in
+            await self?.appendOutput(terminalId: terminalId, output: output)
         }
 
         try process.run()
@@ -317,7 +236,12 @@ actor AgentTerminalDelegate {
         }
 
         // Clean up pipe handlers and drain remaining data before caching output
-        cleanupProcessPipes(state.process, terminalId: terminalId.value)
+        AgentTerminalProcessIO.cleanupProcessPipes(
+            state.process,
+            terminalId: terminalId.value
+        ) { [weak self] drainedTerminalId, output in
+            await self?.appendOutput(terminalId: drainedTerminalId, output: output)
+        }
 
         // Re-fetch state after draining (output may have been appended)
         state = terminals[terminalId.value] ?? state
@@ -351,7 +275,7 @@ actor AgentTerminalDelegate {
                 state.process.waitUntilExit()
             }
             // Clean up pipe handlers to prevent leaks
-            cleanupProcessPipes(state.process)
+            AgentTerminalProcessIO.cleanupProcessPipes(state.process)
             // Wake up any waiters
             let exitCode = Int(state.process.terminationStatus)
             for waiter in state.exitWaiters {
@@ -386,34 +310,11 @@ actor AgentTerminalDelegate {
     /// Drain available output without removing handlers (safe for running processes)
     /// Uses read(upToCount:) which throws Swift errors instead of availableData which throws ObjC exceptions
     private func drainAvailableOutput(terminalId: String, process: Process) {
-        // Only drain if process is still running - if terminated, the handles may be invalid
-        guard process.isRunning else { return }
-        
-        // Drain stdout non-blocking
-        if let outputPipe = process.standardOutput as? Pipe {
-            let handle = outputPipe.fileHandleForReading
-            do {
-                // Use read(upToCount:) which throws Swift errors instead of availableData
-                // which throws ObjC NSException when the file handle is closed
-                if let data = try handle.read(upToCount: 65536), !data.isEmpty,
-                   let output = String(data: data, encoding: .utf8) {
-                    appendOutput(terminalId: terminalId, output: output)
-                }
-            } catch {
-                // File handle closed or process terminated - nothing to drain
-            }
-        }
-        // Drain stderr non-blocking
-        if let errorPipe = process.standardError as? Pipe {
-            let handle = errorPipe.fileHandleForReading
-            do {
-                if let data = try handle.read(upToCount: 65536), !data.isEmpty,
-                   let output = String(data: data, encoding: .utf8) {
-                    appendOutput(terminalId: terminalId, output: output)
-                }
-            } catch {
-                // File handle closed or process terminated - nothing to drain
-            }
+        AgentTerminalProcessIO.drainAvailableOutput(
+            terminalId: terminalId,
+            process: process
+        ) { [weak self] drainedTerminalId, output in
+            await self?.appendOutput(terminalId: drainedTerminalId, output: output)
         }
     }
 
