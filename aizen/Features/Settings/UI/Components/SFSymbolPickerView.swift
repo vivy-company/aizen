@@ -15,16 +15,16 @@ struct SFSymbolPickerView: View {
     @Binding var isPresented: Bool
     @Environment(\.colorScheme) private var colorScheme
 
-    @State private var searchText = ""
-    @State private var selectedCategory = "all"
-    @State private var displayLimit = 200
-    @StateObject private var recentManager = RecentSymbolsStore.shared
+    @State var searchText = ""
+    @State var selectedCategory = "all"
+    @State var displayLimit = 200
+    @StateObject var recentManager = RecentSymbolsStore.shared
 
-    private let provider = SFSymbolsProvider.shared
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 8)
-    private let pageSize = 200
+    let provider = SFSymbolsProvider.shared
+    let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 8)
+    let pageSize = 200
 
-    private var surfaceColor: Color {
+    var surfaceColor: Color {
         AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
     }
 
@@ -117,86 +117,5 @@ struct SFSymbolPickerView: View {
     private func selectCategory(_ category: String) {
         selectedCategory = category
         displayLimit = pageSize
-    }
-
-    // MARK: - Symbol Grid
-
-    private var allFilteredSymbols: [String] {
-        if !searchText.isEmpty {
-            return provider.search(searchText)
-        }
-        if selectedCategory == "recent" {
-            return recentManager.recentSymbols
-        }
-        return provider.symbols(for: selectedCategory)
-    }
-
-    private var displayedSymbols: [String] {
-        Array(allFilteredSymbols.prefix(displayLimit))
-    }
-
-    private var hasMore: Bool {
-        allFilteredSymbols.count > displayLimit
-    }
-
-    private var symbolGridView: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                // Count label
-                HStack {
-                    Text("\(allFilteredSymbols.count) symbols")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
-
-                // Grid
-                LazyVGrid(columns: columns, spacing: 4) {
-                    ForEach(displayedSymbols, id: \.self) { symbol in
-                        symbolButton(symbol)
-                    }
-                }
-                .padding(.horizontal, 12)
-
-                // Load more button
-                if hasMore {
-                    Button {
-                        displayLimit += pageSize
-                    } label: {
-                        Text("Load more (\(allFilteredSymbols.count - displayLimit) remaining)")
-                            .font(.caption)
-                            .foregroundColor(.accentColor)
-                            .padding(.vertical, 12)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.bottom, 12)
-        }
-        .background(Color(NSColor.controlBackgroundColor))
-    }
-
-    private func symbolButton(_ symbol: String) -> some View {
-        Button {
-            selectedSymbol = symbol
-            recentManager.addRecent(symbol)
-            isPresented = false
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 20))
-                .frame(width: 56, height: 56)
-                .foregroundColor(selectedSymbol == symbol ? .white : .primary)
-                .background(
-                    selectedSymbol == symbol ?
-                    Color.accentColor :
-                    surfaceColor
-                )
-                .cornerRadius(8)
-        }
-        .buttonStyle(.plain)
-        .help(symbol)
     }
 }
