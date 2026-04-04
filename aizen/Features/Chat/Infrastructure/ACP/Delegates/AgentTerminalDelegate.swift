@@ -35,7 +35,7 @@ actor AgentTerminalDelegate {
 
     // MARK: - Private Properties
 
-    private var terminals: [String: TerminalState] = [:]
+    var terminals: [String: TerminalState] = [:]
     private var releasedOutputs: [String: ReleasedTerminalOutput] = [:]
     private var releasedOutputOrder: [String] = []
     private let defaultOutputByteLimit = 1_000_000
@@ -141,44 +141,6 @@ actor AgentTerminalDelegate {
         )
     }
 
-    /// Wait for a terminal process to exit
-    func handleTerminalWaitForExit(terminalId: TerminalId, sessionId: String) async throws -> WaitForExitResponse {
-        guard let state = terminals[terminalId.value] else {
-            throw TerminalError.terminalNotFound(terminalId.value)
-        }
-
-        guard !state.isReleased else {
-            throw TerminalError.terminalReleased(terminalId.value)
-        }
-
-        // If already exited, return immediately
-        if !state.process.isRunning {
-            return WaitForExitResponse(
-                exitCode: Int(state.process.terminationStatus),
-                signal: nil,
-                _meta: nil
-            )
-        }
-
-        // Wait for exit
-        let result = await withCheckedContinuation { continuation in
-            var waiterState = state
-            waiterState.exitWaiters.append(continuation)
-            terminals[terminalId.value] = waiterState
-
-            // Start monitoring process in background
-            Task {
-                await self.monitorProcessExit(terminalId: terminalId)
-            }
-        }
-
-        return WaitForExitResponse(
-            exitCode: result.exitCode,
-            signal: result.signal,
-            _meta: nil
-        )
-    }
-
     /// Kill a terminal process
     func handleTerminalKill(terminalId: TerminalId, sessionId: String) async throws -> KillTerminalResponse {
         guard var state = terminals[terminalId.value] else {
@@ -197,10 +159,7 @@ actor AgentTerminalDelegate {
 
         // Wake up any waiters
         let exitCode = Int(state.process.terminationStatus)
-        for waiter in state.exitWaiters {
-            waiter.resume(returning: (exitCode, nil))
-        }
-        state.exitWaiters.removeAll()
+        resumeExitWaiters(in: &state, exitCode: exitCode)
         terminals[terminalId.value] = state
 
         return KillTerminalResponse(success: true, _meta: nil)
@@ -231,9 +190,7 @@ actor AgentTerminalDelegate {
 
         // Wake up any waiters
         let exitCode = Int(state.process.terminationStatus)
-        for waiter in state.exitWaiters {
-            waiter.resume(returning: (exitCode, nil))
-        }
+        resumeExitWaiters(in: &state, exitCode: exitCode)
 
         // Cache output for UI display before removing
         cacheReleasedOutput(
@@ -261,9 +218,8 @@ actor AgentTerminalDelegate {
             AgentTerminalProcessIO.cleanupProcessPipes(state.process)
             // Wake up any waiters
             let exitCode = Int(state.process.terminationStatus)
-            for waiter in state.exitWaiters {
-                waiter.resume(returning: (exitCode, nil))
-            }
+            var currentState = state
+            resumeExitWaiters(in: &currentState, exitCode: exitCode)
         }
         terminals.removeAll()
         releasedOutputs.removeAll()
@@ -331,28 +287,5 @@ actor AgentTerminalDelegate {
             releasedOutputOrder.removeFirst()
             releasedOutputs.removeValue(forKey: oldest)
         }
-    }
-
-    private func monitorProcessExit(terminalId: TerminalId) async {
-        guard let state = terminals[terminalId.value] else { return }
-        let process = state.process
-
-        // Poll for process exit
-        while process.isRunning {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-            // Check if terminal was released/killed while waiting
-            guard terminals[terminalId.value] != nil else { return }
-        }
-
-        // Process exited, wake up waiters if not already handled by kill/release
-        guard var currentState = terminals[terminalId.value],
-              !currentState.exitWaiters.isEmpty else { return }
-
-        let exitCode = Int(process.terminationStatus)
-        for waiter in currentState.exitWaiters {
-            waiter.resume(returning: (exitCode, nil))
-        }
-        currentState.exitWaiters.removeAll()
-        terminals[terminalId.value] = currentState
     }
 }
