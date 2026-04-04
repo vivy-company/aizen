@@ -7,16 +7,16 @@ struct PostCreateActionEditorSheet: View {
     let onCancel: () -> Void
     var repositoryPath: String?
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
 
-    @State private var selectedType: PostCreateActionType = .copyFiles
+    @State var selectedType: PostCreateActionType = .copyFiles
     @State var selectedFiles: Set<String> = []
     @State var customPattern: String = ""
-    @State private var command: String = ""
-    @State private var workingDirectory: WorkingDirectory = .newWorktree
-    @State private var symlinkSource: String = ""
-    @State private var symlinkTarget: String = ""
-    @State private var customScript: String = ""
+    @State var command: String = ""
+    @State var workingDirectory: WorkingDirectory = .newWorktree
+    @State var symlinkSource: String = ""
+    @State var symlinkTarget: String = ""
+    @State var customScript: String = ""
     @State var detectedFiles: [DetectedFile] = []
 
     struct DetectedFile: Identifiable, Hashable {
@@ -168,23 +168,6 @@ struct PostCreateActionEditorSheet: View {
         }
     }
 
-    private var isValid: Bool {
-        switch selectedType {
-        case .copyFiles:
-            return !selectedFiles.isEmpty
-        case .runCommand:
-            return !command.trimmingCharacters(in: .whitespaces).isEmpty
-        case .symlink:
-            return !symlinkSource.trimmingCharacters(in: .whitespaces).isEmpty
-        case .customScript:
-            return !customScript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
-    }
-
-    private var effectiveSymlinkTarget: String {
-        symlinkTarget.isEmpty ? symlinkSource : symlinkTarget
-    }
-
     private func selectSymlinkSource() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
@@ -210,45 +193,5 @@ struct PostCreateActionEditorSheet: View {
             }
             symlinkSource = url.lastPathComponent
         }
-    }
-
-    private func loadAction(_ action: PostCreateAction) {
-        selectedType = action.type
-        switch action.config {
-        case .copyFiles(let config):
-            selectedFiles = Set(config.patterns)
-        case .runCommand(let config):
-            command = config.command
-            workingDirectory = config.workingDirectory
-        case .symlink(let config):
-            symlinkSource = config.source
-            symlinkTarget = config.target
-        case .customScript(let config):
-            customScript = config.script
-        }
-    }
-
-    private func saveAction() {
-        let config: ActionConfig
-        switch selectedType {
-        case .copyFiles:
-            config = .copyFiles(CopyFilesConfig(patterns: Array(selectedFiles).sorted()))
-        case .runCommand:
-            config = .runCommand(RunCommandConfig(command: command, workingDirectory: workingDirectory))
-        case .symlink:
-            config = .symlink(SymlinkConfig(source: symlinkSource, target: effectiveSymlinkTarget))
-        case .customScript:
-            config = .customScript(CustomScriptConfig(script: customScript))
-        }
-
-        let newAction = PostCreateAction(
-            id: action?.id ?? UUID(),
-            type: selectedType,
-            enabled: action?.enabled ?? true,
-            config: config
-        )
-
-        onSave(newAction)
-        dismiss()
     }
 }
