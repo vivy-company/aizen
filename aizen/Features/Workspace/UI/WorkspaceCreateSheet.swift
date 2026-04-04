@@ -11,9 +11,9 @@ struct WorkspaceCreateSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
 
-    @State private var workspaceName = ""
-    @State private var selectedColor: Color = .blue
-    @State private var errorMessage: String?
+    @State var workspaceName = ""
+    @State var selectedColor: Color = .blue
+    @State var errorMessage: String?
 
     let availableColors: [Color] = [
         .blue, .purple, .pink, .red, .orange, .yellow, .green, .teal, .cyan, .indigo
@@ -30,52 +30,8 @@ struct WorkspaceCreateSheet: View {
 
             Divider()
 
-            // Content
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("workspace.create.name", bundle: .main)
-                            .font(.headline)
-
-                        TextField(String(localized: "workspace.create.namePlaceholder"), text: $workspaceName)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("workspace.create.color", bundle: .main)
-                            .font(.headline)
-
-                        HStack(spacing: 12) {
-                            ForEach(availableColors, id: \.self) { color in
-                                Circle()
-                                    .fill(color)
-                                    .frame(width: 30, height: 30)
-                                    .overlay {
-                                        if selectedColor == color {
-                                            Circle()
-                                                .strokeBorder(.white, lineWidth: 3)
-                                            Image(systemName: "checkmark")
-                                                .foregroundStyle(.white)
-                                                .font(.caption)
-                                        }
-                                    }
-                                    .onTapGesture {
-                                        selectedColor = color
-                                    }
-                            }
-                        }
-                    }
-
-                    if let error = errorMessage {
-                        Text(error)
-                            .font(.callout)
-                            .foregroundStyle(.red)
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-                .padding()
+                formContent
             }
 
             Divider()
