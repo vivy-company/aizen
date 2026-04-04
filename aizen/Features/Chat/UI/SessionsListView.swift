@@ -31,40 +31,7 @@ struct SessionsListView: View {
         }
         .frame(minWidth: 700, idealWidth: 900, maxWidth: .infinity, minHeight: 500, idealHeight: 650, maxHeight: .infinity)
         .background(surfaceColor)
-        .toolbarBackground(surfaceColor, for: .windowToolbar)
-        .toolbarBackground(.visible, for: .windowToolbar)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Picker("", selection: $viewModel.selectedFilter) {
-                    Label("All", systemImage: "square.grid.2x2").tag(SessionsListStore.SessionFilter.all)
-                    Label("Active", systemImage: "bolt.fill").tag(SessionsListStore.SessionFilter.active)
-                    Label("Archived", systemImage: "archivebox").tag(SessionsListStore.SessionFilter.archived)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
-
-            ToolbarItem(placement: .navigation) {
-                Spacer().frame(width: 12)
-            }
-
-            ToolbarItem(placement: .navigation) {
-                agentFilterMenu
-            }
-        }
-        .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search sessions")
-        .alert("Error", isPresented: Binding(
-            get: { viewModel.errorMessage != nil },
-            set: { if !$0 { viewModel.errorMessage = nil } }
-        )) {
-            Button("OK") {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-            }
-        }
+        .sessionsListChrome(self)
         .task(id: reloadKey) {
             await viewModel.reloadSessions(in: viewContext)
         }
