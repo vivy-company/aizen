@@ -11,29 +11,29 @@ struct RepositoryRow: View {
     let onRemove: () -> Void
     @Environment(\.controlActiveState) private var controlActiveState
 
-    @State private var showingRemoveConfirmation = false
-    @State private var alsoDeleteFromFilesystem = false
-    @State private var showingNoteEditor = false
-    @State private var showingPostCreateActions = false
+    @State var showingRemoveConfirmation = false
+    @State var alsoDeleteFromFilesystem = false
+    @State var showingNoteEditor = false
+    @State var showingPostCreateActions = false
 
-    @AppStorage("defaultTerminalBundleId") private var defaultTerminalBundleId: String?
-    @AppStorage("defaultEditorBundleId") private var defaultEditorBundleId: String?
+    @AppStorage("defaultTerminalBundleId") var defaultTerminalBundleId: String?
+    @AppStorage("defaultEditorBundleId") var defaultEditorBundleId: String?
 
-    private var defaultTerminal: DetectedApp? {
+    var defaultTerminal: DetectedApp? {
         guard let bundleId = defaultTerminalBundleId else { return nil }
         return AppDetector.shared.getTerminals().first { $0.bundleIdentifier == bundleId }
     }
 
-    private var defaultEditor: DetectedApp? {
+    var defaultEditor: DetectedApp? {
         guard let bundleId = defaultEditorBundleId else { return nil }
         return AppDetector.shared.getEditors().first { $0.bundleIdentifier == bundleId }
     }
 
-    private var finderApp: DetectedApp? {
+    var finderApp: DetectedApp? {
         AppDetector.shared.getApps(for: .finder).first
     }
 
-    private func sortedApps(_ apps: [DetectedApp], defaultBundleId: String?) -> [DetectedApp] {
+    func sortedApps(_ apps: [DetectedApp], defaultBundleId: String?) -> [DetectedApp] {
         guard let defaultId = defaultBundleId else { return apps }
         var sorted = apps.filter { $0.bundleIdentifier != defaultId }
         if let defaultApp = apps.first(where: { $0.bundleIdentifier == defaultId }) {
@@ -45,146 +45,7 @@ struct RepositoryRow: View {
     var body: some View {
         repositoryLabel
             .background(selectionBackground)
-            .contextMenu {
-                Button {
-                    if let path = repository.path {
-                        if let terminal = defaultTerminal {
-                            AppDetector.shared.openPath(path, with: terminal)
-                        } else {
-                            repositoryManager.openInTerminal(path)
-                        }
-                    }
-                } label: {
-                    if let terminal = defaultTerminal {
-                        AppMenuLabel(app: terminal)
-                    } else {
-                        Label("workspace.repository.openTerminal", systemImage: "terminal")
-                    }
-                }
-
-                Button {
-                    if let path = repository.path {
-                        repositoryManager.openInFinder(path)
-                    }
-                } label: {
-                    if let finder = finderApp {
-                        AppMenuLabel(app: finder)
-                    } else {
-                        Label("workspace.repository.openFinder", systemImage: "folder")
-                    }
-                }
-
-                Button {
-                    if let path = repository.path {
-                        if let editor = defaultEditor {
-                            AppDetector.shared.openPath(path, with: editor)
-                        } else {
-                            repositoryManager.openInEditor(path)
-                        }
-                    }
-                } label: {
-                    if let editor = defaultEditor {
-                        AppMenuLabel(app: editor)
-                    } else {
-                        Label("workspace.repository.openEditor", systemImage: "chevron.left.forwardslash.chevron.right")
-                    }
-                }
-
-                Menu {
-                    Text("Terminals")
-                        .font(.caption)
-
-                    ForEach(sortedApps(AppDetector.shared.getTerminals(), defaultBundleId: defaultTerminalBundleId)) { terminal in
-                        Button {
-                            if let path = repository.path {
-                                AppDetector.shared.openPath(path, with: terminal)
-                            }
-                        } label: {
-                            HStack {
-                                AppMenuLabel(app: terminal)
-                                if terminal.bundleIdentifier == defaultTerminalBundleId {
-                                    Spacer()
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-
-                    Divider()
-
-                    Text("Editors")
-                        .font(.caption)
-
-                    ForEach(sortedApps(AppDetector.shared.getEditors(), defaultBundleId: defaultEditorBundleId)) { editor in
-                        Button {
-                            if let path = repository.path {
-                                AppDetector.shared.openPath(path, with: editor)
-                            }
-                        } label: {
-                            HStack {
-                                AppMenuLabel(app: editor)
-                                if editor.bundleIdentifier == defaultEditorBundleId {
-                                    Spacer()
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Label("Open in...", systemImage: "arrow.up.forward.app")
-                }
-
-                Button {
-                    if let path = repository.path {
-                        Clipboard.copy(path)
-                    }
-                } label: {
-                    Label("workspace.repository.copyPath", systemImage: "doc.on.doc")
-                }
-
-                Divider()
-
-                Menu {
-                    ForEach(ItemStatus.allCases) { status in
-                        Button {
-                            setStatus(status)
-                        } label: {
-                            HStack {
-                                Circle()
-                                    .fill(status.color)
-                                    .frame(width: 8, height: 8)
-                                Text(status.title)
-                                if repositoryStatus == status {
-                                    Spacer()
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Label("repository.setStatus", systemImage: "circle.fill")
-                }
-
-                Button {
-                    showingNoteEditor = true
-                } label: {
-                    Label("repository.editNote", systemImage: "note.text")
-                }
-
-                Button {
-                    showingPostCreateActions = true
-                } label: {
-                    Label("Post-Create Actions", systemImage: "gearshape.2")
-                }
-
-                Divider()
-
-                Button(role: .destructive) {
-                    showingRemoveConfirmation = true
-                } label: {
-                    Label("workspace.repository.remove", systemImage: "trash")
-                }
-            }
+            .contextMenu { repositoryContextMenu }
             .sheet(isPresented: $showingRemoveConfirmation) {
                 RepositoryRemoveSheet(
                     repositoryName: repository.name ?? String(localized: "workspace.repository.unknown"),
@@ -216,7 +77,7 @@ struct RepositoryRow: View {
             }
     }
 
-    private func setStatus(_ status: ItemStatus) {
+    func setStatus(_ status: ItemStatus) {
         do {
             try repositoryManager.updateRepositoryStatus(repository, status: status)
         } catch {
@@ -224,7 +85,7 @@ struct RepositoryRow: View {
         }
     }
 
-    private var repositoryStatus: ItemStatus {
+    var repositoryStatus: ItemStatus {
         ItemStatus(rawValue: repository.status ?? "active") ?? .active
     }
 
