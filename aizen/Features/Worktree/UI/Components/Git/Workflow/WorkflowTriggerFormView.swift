@@ -13,12 +13,12 @@ struct WorkflowTriggerFormView: View {
     @ObservedObject var service: WorkflowService
     let onDismiss: () -> Void
 
-    @State private var inputs: [WorkflowInput] = []
-    @State private var inputValues: [String: String] = [:]
-    @State private var selectedBranch: String = ""
-    @State private var isLoading: Bool = true
-    @State private var isSubmitting: Bool = false
-    @State private var error: String?
+    @State var inputs: [WorkflowInput] = []
+    @State var inputValues: [String: String] = [:]
+    @State var selectedBranch: String = ""
+    @State var isLoading: Bool = true
+    @State var isSubmitting: Bool = false
+    @State var error: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -178,65 +178,6 @@ struct WorkflowTriggerFormView: View {
 
     // MARK: - Helpers
 
-    private func binding(for input: WorkflowInput) -> Binding<String> {
-        Binding(
-            get: { inputValues[input.id] ?? input.defaultValue ?? input.type.defaultEmptyValue },
-            set: { inputValues[input.id] = $0 }
-        )
-    }
-
-    private var canSubmit: Bool {
-        guard !isSubmitting else { return false }
-        guard !selectedBranch.isEmpty else { return false }
-
-        // Check all required inputs have values
-        for input in inputs where input.required {
-            let value = inputValues[input.id] ?? input.defaultValue ?? ""
-            if value.isEmpty {
-                return false
-            }
-        }
-
-        return true
-    }
-
-    private func loadInputs() async {
-        selectedBranch = currentBranch
-        inputs = await service.getWorkflowInputs(workflow: workflow)
-
-        // Initialize default values
-        for input in inputs {
-            if let defaultValue = input.defaultValue {
-                inputValues[input.id] = defaultValue
-            }
-        }
-
-        isLoading = false
-    }
-
-    private func triggerWorkflow() async {
-        isSubmitting = true
-        error = nil
-
-        // Build inputs dictionary (only non-empty values)
-        var finalInputs: [String: String] = [:]
-        for input in inputs {
-            if let value = inputValues[input.id], !value.isEmpty {
-                finalInputs[input.id] = value
-            } else if let defaultValue = input.defaultValue {
-                finalInputs[input.id] = defaultValue
-            }
-        }
-
-        let success = await service.triggerWorkflow(workflow, branch: selectedBranch, inputs: finalInputs)
-
-        if success {
-            onDismiss()
-        } else {
-            error = service.error?.localizedDescription ?? "Failed to trigger workflow"
-            isSubmitting = false
-        }
-    }
 }
 
 // MARK: - Input Field View
