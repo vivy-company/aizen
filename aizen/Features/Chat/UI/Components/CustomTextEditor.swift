@@ -145,9 +145,9 @@ struct CustomTextEditor: NSViewRepresentable {
         private var eventMonitor: Any?
         var lastMeasuredText: String = ""
         var lastMeasuredWidth: CGFloat = 0
-        private var lastCursorPosition: Int = -1
+        var lastCursorPosition: Int = -1
         var lastKnownFocus: Bool = false
-        private var lastCursorText: String = ""
+        var lastCursorText: String = ""
         private var didApplyMentionHighlight = false
         private static let mentionRegex = try? NSRegularExpression(pattern: "@[^\\s]+", options: [])
 
@@ -296,47 +296,6 @@ struct CustomTextEditor: NSViewRepresentable {
             notifyCursorChange(textView)
         }
 
-        private func notifyCursorChange(_ textView: NSTextView) {
-            let currentText = textView.string
-            let cursorPosition = textView.selectedRange().location
-            if cursorPosition == lastCursorPosition && currentText == lastCursorText {
-                return
-            }
-            lastCursorPosition = cursorPosition
-            lastCursorText = currentText
-            if !currentText.contains("@") && !currentText.contains("/") {
-                onCursorChange?(currentText, cursorPosition, .zero)
-                return
-            }
-            let cursorRect = cursorScreenRect(for: cursorPosition, in: textView)
-            onCursorChange?(currentText, cursorPosition, cursorRect)
-        }
-
-        private func cursorScreenRect(for position: Int, in textView: NSTextView) -> NSRect {
-            guard let layoutManager = textView.layoutManager,
-                  let textContainer = textView.textContainer else {
-                return .zero
-            }
-
-            let range = NSRange(location: position, length: 0)
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-            var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
-
-            // Add text container inset
-            rect.origin.x += textView.textContainerInset.width
-            rect.origin.y += textView.textContainerInset.height
-
-            // Convert to window coordinates
-            rect = textView.convert(rect, to: nil)
-
-            // Convert to screen coordinates
-            if let window = textView.window {
-                rect = window.convertToScreen(rect)
-            }
-
-            return rect
-        }
-
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             // Handle autocomplete navigation first
             if let navigate = onAutocompleteNavigate {
@@ -372,21 +331,6 @@ struct CustomTextEditor: NSViewRepresentable {
             }
 
             return false
-        }
-
-        // Replace text at range and position cursor after
-        func replaceText(in range: NSRange, with replacement: String) {
-            guard let textView = textView else { return }
-
-            let nsString = textView.string as NSString
-            let newText = nsString.replacingCharacters(in: range, with: replacement)
-            textView.string = newText
-            text = newText
-
-            // Position cursor after replacement
-            let newPosition = range.location + replacement.count
-            textView.setSelectedRange(NSRange(location: newPosition, length: 0))
-            notifyCursorChange(textView)
         }
     }
 }
