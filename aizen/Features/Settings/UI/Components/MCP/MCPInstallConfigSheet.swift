@@ -174,12 +174,20 @@ struct MCPInstallConfigSheet: View {
 
                     // Package selection
                     if installType == .package && hasPackages {
-                        packageSection
+                        MCPInstallSourceDetailsSection.package(
+                            server: server,
+                            selectedPackageIndex: $selectedPackageIndex,
+                            selectedPackage: selectedPackage
+                        )
                     }
 
                     // Remote selection
                     if installType == .remote && hasRemotes {
-                        remoteSection
+                        MCPInstallSourceDetailsSection.remote(
+                            server: server,
+                            selectedRemoteIndex: $selectedRemoteIndex,
+                            selectedRemote: selectedRemote
+                        )
                     }
 
                     // Environment variables
@@ -242,122 +250,6 @@ struct MCPInstallConfigSheet: View {
         .settingsSheetChrome()
         .onAppear {
             setupInitialState()
-        }
-    }
-
-    // MARK: - Sections
-
-    @ViewBuilder
-    private var packageSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Package")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.secondary)
-
-                if server.packages!.count > 1 {
-                    Picker("Package", selection: $selectedPackageIndex) {
-                        ForEach(Array(server.packages!.enumerated()), id: \.offset) { index, pkg in
-                            Text("\(pkg.registryBadge): \(pkg.packageName)").tag(index)
-                        }
-                    }
-                    .labelsHidden()
-                } else if let package = selectedPackage {
-                    HStack(spacing: 8) {
-                        TagBadge(text: package.registryBadge, color: .purple)
-                        TagBadge(text: package.transportType, color: .gray)
-                        Text(package.packageName)
-                            .font(.system(.body, design: .monospaced))
-                    }
-                }
-            }
-
-            // Runtime info
-            if let package = selectedPackage {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Runtime")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    HStack(spacing: 4) {
-                        CodePill(
-                            text: package.runtimeHint,
-                            font: .system(.caption, design: .monospaced),
-                            backgroundColor: Color(NSColor.textBackgroundColor),
-                            horizontalPadding: 8,
-                            verticalPadding: 4
-                        )
-
-                        if let runtimeArgs = package.runtimeArguments, !runtimeArgs.isEmpty {
-                            CodePill(
-                                text: runtimeArgs.map { $0.displayValue }.joined(separator: " "),
-                                font: .system(.caption, design: .monospaced),
-                                textColor: .secondary,
-                                backgroundColor: Color(NSColor.textBackgroundColor),
-                                horizontalPadding: 8,
-                                verticalPadding: 4
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var remoteSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Remote")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.secondary)
-
-                if server.remotes!.count > 1 {
-                    Picker("Remote", selection: $selectedRemoteIndex) {
-                        ForEach(Array(server.remotes!.enumerated()), id: \.offset) { index, remote in
-                            Text("\(remote.transportBadge): \(remote.url)").tag(index)
-                        }
-                    }
-                    .labelsHidden()
-                } else if let remote = selectedRemote {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            TagBadge(text: remote.transportBadge, color: .blue)
-                            TagBadge(text: "Remote", color: .teal)
-                        }
-
-                        CodePill(
-                            text: remote.url,
-                            font: .system(.caption, design: .monospaced),
-                            backgroundColor: Color(NSColor.textBackgroundColor),
-                            horizontalPadding: 8,
-                            verticalPadding: 4,
-                            selectable: true,
-                            lineLimit: 1
-                        )
-                    }
-                }
-            }
-
-            // Headers info (if any)
-            if let remote = selectedRemote, let headers = remote.headers, !headers.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Required Headers")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    ForEach(headers, id: \.name) { header in
-                        HStack {
-                            Text(header.name)
-                                .font(.system(.caption, design: .monospaced))
-                            if header.isRequired == true {
-                                Text("*")
-                                    .foregroundColor(.red)
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 
