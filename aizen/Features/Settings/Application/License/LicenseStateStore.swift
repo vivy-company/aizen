@@ -24,12 +24,12 @@ final class LicenseStateStore: ObservableObject {
         case error(message: String)
     }
 
-    @Published private(set) var status: Status = .unlicensed
-    @Published private(set) var licenseType: String?
-    @Published private(set) var licenseStatus: String?
-    @Published private(set) var expiresAt: Date?
-    @Published private(set) var lastValidatedAt: Date?
-    @Published private(set) var lastMessage: String?
+    @Published var status: Status = .unlicensed
+    @Published var licenseType: String?
+    @Published var licenseStatus: String?
+    @Published var expiresAt: Date?
+    @Published var lastValidatedAt: Date?
+    @Published var lastMessage: String?
 
     @Published var licenseToken: String = ""
 
@@ -57,14 +57,14 @@ final class LicenseStateStore: ObservableObject {
         pendingDeepLink != nil
     }
 
-    private let store = LicenseStore()
+    let store = LicenseStore()
 
-    private let client = LicenseClient()
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "License")
+    let client = LicenseClient()
+    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "License")
 
     private var validationTask: Task<Void, Never>?
-    private let validationInterval: TimeInterval = 24 * 60 * 60
-    private let offlineGraceDays = 7
+    let validationInterval: TimeInterval = 24 * 60 * 60
+    let offlineGraceDays = 7
 
     private init() {
         loadFromStore()
@@ -263,46 +263,6 @@ final class LicenseStateStore: ObservableObject {
         await validateNow()
     }
 
-    private func loadFromStore() {
-        licenseToken = store.loadToken() ?? ""
-        if let cache = store.loadCache() {
-            applyCache(cache)
-        } else if licenseToken.isEmpty {
-            status = .unlicensed
-        }
-    }
-
-    private func updateCache(type: String?, status: String?, expiresAt: Date?, isValid: Bool) {
-        let cache = LicenseCache(
-            type: type,
-            status: status,
-            expiresAt: expiresAt,
-            isValid: isValid,
-            lastValidatedAt: Date()
-        )
-        store.saveCache(cache)
-        applyCache(cache)
-    }
-
-    private func applyCache(_ cache: LicenseCache) {
-        licenseType = cache.type
-        licenseStatus = cache.status
-        expiresAt = cache.expiresAt
-        lastValidatedAt = cache.lastValidatedAt
-
-        if cache.isValid {
-            if let expiresAt, expiresAt < Date() {
-                status = .expired
-            } else {
-                status = .active
-            }
-        } else if licenseToken.isEmpty {
-            status = .unlicensed
-        } else {
-            status = .expired
-        }
-    }
-
     private func handleValidationFailure(_ error: Error) {
         logger.error("License validation failed: \(error.localizedDescription)")
 
@@ -325,12 +285,12 @@ final class LicenseStateStore: ObservableObject {
 
     // MARK: - Helpers
 
-    private var currentToken: String? {
+    var currentToken: String? {
         let trimmed = licenseToken.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    private var currentDeviceAuth: LicenseClient.DeviceAuth? {
+    var currentDeviceAuth: LicenseClient.DeviceAuth? {
         guard let deviceId = store.loadDeviceId(),
               let deviceSecret = store.loadDeviceSecret() else {
             return nil
@@ -338,7 +298,7 @@ final class LicenseStateStore: ObservableObject {
         return LicenseClient.DeviceAuth(deviceId: deviceId, deviceSecret: deviceSecret)
     }
 
-    private var deviceAuthService: LicenseDeviceAuthService {
+    var deviceAuthService: LicenseDeviceAuthService {
         LicenseDeviceAuthService(store: store, client: client, logger: logger)
     }
 
@@ -359,15 +319,10 @@ final class LicenseStateStore: ObservableObject {
         }
     }
 
-    private func offlineGraceDaysLeft(from date: Date) -> Int? {
+    func offlineGraceDaysLeft(from date: Date) -> Int? {
         let elapsed = Date().timeIntervalSince(date)
         let remaining = (Double(offlineGraceDays) * 86400) - elapsed
         guard remaining > 0 else { return nil }
         return Int(ceil(remaining / 86400))
-    }
-
-    private func parseDate(_ string: String?) -> Date? {
-        guard let string else { return nil }
-        return ISO8601DateParser.shared.parse(string)
     }
 }
