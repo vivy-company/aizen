@@ -1,8 +1,8 @@
 //
-//  ChatAgentSessionMessaging.swift
+//  ChatAgentSession+PromptLifecycle.swift
 //  aizen
 //
-//  Messaging logic for ChatAgentSession
+//  Prompt lifecycle logic for ChatAgentSession
 //
 
 import ACP
