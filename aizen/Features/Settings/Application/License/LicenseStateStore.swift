@@ -7,10 +7,7 @@
 
 import Foundation
 import AppKit
-import CryptoKit
-import IOKit
 import os.log
-import Darwin
 import Combine
 
 @MainActor
@@ -103,7 +100,7 @@ final class LicenseStateStore: ObservableObject {
         status = .checking
         lastMessage = nil
 
-        let fingerprint = getOrCreateDeviceFingerprint()
+        let fingerprint = deviceAuthService.getOrCreateDeviceFingerprint()
 
         do {
             let response = try await client.activate(
@@ -209,8 +206,8 @@ final class LicenseStateStore: ObservableObject {
             }
         } catch {
             if allowReauth,
-               isInvalidDeviceAuth(error),
-               await refreshDeviceAuth(token: token, deviceName: Host.current().localizedName ?? "Mac") {
+               deviceAuthService.isInvalidDeviceAuth(error),
+               await deviceAuthService.refreshDeviceAuth(token: token, deviceName: Host.current().localizedName ?? "Mac") {
                 await openBillingPortalInternal(returnUrl: returnUrl, allowReauth: false)
             } else {
                 lastMessage = error.localizedDescription
@@ -241,8 +238,8 @@ final class LicenseStateStore: ObservableObject {
                 lastMessage = response.error ?? "Unable to deactivate"
             }
         } catch {
-            if allowReauth && isInvalidDeviceAuth(error),
-               await refreshDeviceAuth(token: token, deviceName: Host.current().localizedName ?? "Mac") {
+            if allowReauth && deviceAuthService.isInvalidDeviceAuth(error),
+               await deviceAuthService.refreshDeviceAuth(token: token, deviceName: Host.current().localizedName ?? "Mac") {
                 await deactivateThisMacInternal(allowReauth: false)
             } else {
                 lastMessage = error.localizedDescription
@@ -309,10 +306,10 @@ final class LicenseStateStore: ObservableObject {
     private func handleValidationFailure(_ error: Error) {
         logger.error("License validation failed: \(error.localizedDescription)")
 
-        if isInvalidDeviceAuth(error),
+        if deviceAuthService.isInvalidDeviceAuth(error),
            let token = currentToken {
             Task {
-                _ = await refreshDeviceAuth(token: token, deviceName: Host.current().localizedName ?? "Mac")
+                _ = await deviceAuthService.refreshDeviceAuth(token: token, deviceName: Host.current().localizedName ?? "Mac")
             }
         } else if let cache = store.loadCache(),
                   cache.isValid,
@@ -339,6 +336,10 @@ final class LicenseStateStore: ObservableObject {
             return nil
         }
         return LicenseClient.DeviceAuth(deviceId: deviceId, deviceSecret: deviceSecret)
+    }
+
+    private var deviceAuthService: LicenseDeviceAuthService {
+        LicenseDeviceAuthService(store: store, client: client, logger: logger)
     }
 
     private func clearDeviceCredentials() {
@@ -368,88 +369,5 @@ final class LicenseStateStore: ObservableObject {
     private func parseDate(_ string: String?) -> Date? {
         guard let string else { return nil }
         return ISO8601DateParser.shared.parse(string)
-    }
-
-    private func getOrCreateDeviceFingerprint() -> String {
-        if let stored = store.loadDeviceFingerprint() {
-            return stored
-        }
-
-        let raw = [
-            ioRegistryValue(key: "IOPlatformUUID"),
-            ioRegistryValue(key: "IOPlatformSerialNumber"),
-            hardwareModel()
-        ]
-        .compactMap { $0 }
-        .joined(separator: "-")
-
-        let source = raw.isEmpty ? UUID().uuidString : raw
-        let fingerprint = sha256Hex(source)
-        store.saveDeviceFingerprint(fingerprint)
-        return fingerprint
-    }
-
-    private func sha256Hex(_ value: String) -> String {
-        let digest = SHA256.hash(data: Data(value.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
-    }
-
-    private func isInvalidDeviceAuth(_ error: Error) -> Bool {
-        if let apiError = error as? LicenseAPIError {
-            switch apiError {
-            case .server(let message):
-                return message.localizedCaseInsensitiveContains("invalid device authentication")
-            default:
-                return false
-            }
-        }
-
-        return error.localizedDescription.localizedCaseInsensitiveContains("invalid device authentication")
-    }
-
-    private func refreshDeviceAuth(token: String, deviceName: String) async -> Bool {
-        let fingerprint = getOrCreateDeviceFingerprint()
-        do {
-            let response = try await client.activate(
-                token: token,
-                deviceFingerprint: fingerprint,
-                deviceName: deviceName
-            )
-
-            if response.success == true,
-               let deviceId = response.deviceId,
-               let deviceSecret = response.deviceSecret {
-                store.saveToken(token)
-                store.saveDeviceId(deviceId)
-                store.saveDeviceSecret(deviceSecret)
-                return true
-            }
-        } catch {
-            logger.error("Device re-auth failed: \(error.localizedDescription)")
-        }
-
-        return false
-    }
-
-    private func ioRegistryValue(key: String) -> String? {
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"))
-        guard service != 0 else { return nil }
-        defer { IOObjectRelease(service) }
-
-        guard let cfValue = IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0) else {
-            return nil
-        }
-
-        return (cfValue.takeRetainedValue() as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func hardwareModel() -> String? {
-        var size = 0
-        sysctlbyname("hw.model", nil, &size, nil, 0)
-        guard size > 0 else { return nil }
-        var buffer = [CChar](repeating: 0, count: size)
-        sysctlbyname("hw.model", &buffer, &size, nil, 0)
-        let value = String(cString: buffer)
-        return value.isEmpty ? nil : value
     }
 }
