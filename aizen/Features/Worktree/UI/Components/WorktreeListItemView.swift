@@ -15,7 +15,7 @@ struct WorktreeListItemView: View {
     let allWorktrees: [Worktree]
     @Binding var selectedWorktree: Worktree?
     @ObservedObject var tabStateManager: WorktreeTabStateStore
-    @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.controlActiveState) var controlActiveState
 
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "WorktreeListItemView")
 
@@ -70,89 +70,33 @@ struct WorktreeListItemView: View {
         isGitEnvironment && (worktree.isLinkedEnvironment || worktree.isPrimary)
     }
 
-    private var activeViewType: String {
+    var activeViewType: String {
         guard let worktreeId = worktree.id else { return "" }
         return tabStateManager.getState(for: worktreeId).viewType
     }
 
-    private var chatSessionCount: Int {
+    var chatSessionCount: Int {
         let sessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
         return sessions.filter { !$0.isDeleted }.count
     }
 
-    private var terminalSessionCount: Int {
+    var terminalSessionCount: Int {
         let sessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
         return sessions.filter { !$0.isDeleted }.count
     }
 
-    private var browserSessionCount: Int {
+    var browserSessionCount: Int {
         let sessions = (worktree.browserSessions as? Set<BrowserSession>) ?? []
         return sessions.filter { !$0.isDeleted }.count
     }
 
-    private var fileSessionCount: Int {
+    var fileSessionCount: Int {
         guard let session = worktree.fileBrowserSession, !session.isDeleted else { return 0 }
         return 1
     }
 
-    private var primaryTextColor: Color {
-        isSelected ? selectedForegroundColor : .primary
-    }
-
-    private var secondaryTextColor: Color {
-        isSelected ? selectedForegroundColor.opacity(0.78) : .secondary
-    }
-
-    private var selectedForegroundColor: Color {
-        controlActiveState == .key ? .accentColor : .accentColor.opacity(0.78)
-    }
-
-    private var selectionFillColor: Color {
-        let base = NSColor.unemphasizedSelectedContentBackgroundColor
-        let alpha: Double = controlActiveState == .key ? 0.26 : 0.18
-        return Color(nsColor: base).opacity(alpha)
-    }
-
     var mergeSourceStatuses: [WorktreeStatusInfo] {
         worktreeStatuses.filter { $0.worktree.id != worktree.id }
-    }
-
-    private func sessionIconColor(for viewType: String) -> Color {
-        let isActive = activeViewType == viewType
-        if isSelected {
-            return selectedForegroundColor.opacity(isActive ? 1.0 : 0.75)
-        }
-        return isActive ? .primary : .secondary
-    }
-
-    @ViewBuilder
-    private var sessionIcons: some View {
-        HStack(spacing: 8) {
-            if chatSessionCount > 0 {
-                Image(systemName: "message")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(sessionIconColor(for: "chat"))
-                    .help("Chat")
-            }
-            if terminalSessionCount > 0 {
-                Image(systemName: "terminal")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(sessionIconColor(for: "terminal"))
-                    .help("Terminal")
-            }
-            if browserSessionCount > 0 {
-                Image(systemName: "globe")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(sessionIconColor(for: "browser"))
-                    .help("Browser")
-            }
-            if fileSessionCount > 0 {
-                Image(systemName: "folder")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(sessionIconColor(for: "files"))
-                    .help("Files")
-            }
-        }
     }
 
     var body: some View {
