@@ -39,9 +39,9 @@ struct WorktreeDetailView: View {
     @StateObject var tabConfig = TabConfigurationStore.shared
     @State var fileSearchWindowController: FileSearchWindowController?
     @State var fileToOpenFromSearch: String?
-    @State private var cachedTerminalBackgroundColor: Color?
+    @State var cachedTerminalBackgroundColor: Color?
     @State var hasLoadedTabState = false
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorScheme) var colorScheme
 
     init(
         worktree: Worktree,
@@ -87,17 +87,6 @@ struct WorktreeDetailView: View {
         selectedTab != "files" && selectedTab != "browser" && hasActiveSessions
     }
 
-    private var detailSurfaceColor: Color {
-        if selectedTab == "terminal", let cachedTerminalBackgroundColor {
-            return cachedTerminalBackgroundColor
-        }
-        return AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
-    }
-
-    private func getTerminalBackgroundColor() -> Color {
-        AppSurfaceTheme.backgroundColor(colorScheme: colorScheme)
-    }
-
     @ViewBuilder
     var contentView: some View {
         Group {
@@ -137,7 +126,7 @@ struct WorktreeDetailView: View {
             .filter { isTabVisible($0) }
     }
 
-    private func validateSelectedTab() {
+    func validateSelectedTab() {
         let visibleTabs = tabConfig.tabOrder.filter { isTabVisible($0.id) }
         if !visibleTabs.contains(where: { $0.id == selectedTab }) {
             selectedTab = visibleTabs.first?.id ?? "files"
@@ -145,7 +134,7 @@ struct WorktreeDetailView: View {
     }
 
     @ViewBuilder
-    private var mainContentWithSidebars: some View {
+    var mainContentWithSidebars: some View {
         ZStack(alignment: .top) {
             contentView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -200,93 +189,6 @@ struct WorktreeDetailView: View {
         NavigationStack {
             navigationContent
         }
-    }
-
-    @ViewBuilder
-    private var contentWithBasicModifiers: some View {
-        mainContentWithSidebars
-            .navigationTitle(worktree.branch ?? String(localized: "worktree.session.worktree"))
-            .background(detailSurfaceColor.ignoresSafeArea(.container, edges: .top))
-            .toolbarBackground(.visible, for: .windowToolbar)
-            .toast()
-            .onAppear {
-                cachedTerminalBackgroundColor = getTerminalBackgroundColor()
-            }
-            .task(id: colorScheme) {
-                cachedTerminalBackgroundColor = getTerminalBackgroundColor()
-            }
-            .toolbar {
-                leadingToolbarItems
-
-                tabPickerToolbarItem
-
-                sessionToolbarItems
-
-                if #available(macOS 26.0, *) {
-                    ToolbarSpacer()
-                } else {
-                    ToolbarItem(placement: .automatic) {
-                        Spacer()
-                    }
-                }
-
-                trailingToolbarItems
-            }
-            .background {
-                Group {
-                    Button("") { cycleVisibleTab(step: 1) }
-                        .keyboardShortcut(.tab, modifiers: [.control])
-                    Button("") { cycleVisibleTab(step: -1) }
-                        .keyboardShortcut(.tab, modifiers: [.control, .shift])
-                    Button("") { selectVisibleTab(at: 1) }
-                        .keyboardShortcut("1", modifiers: .command)
-                    Button("") { selectVisibleTab(at: 2) }
-                        .keyboardShortcut("2", modifiers: .command)
-                    Button("") { selectVisibleTab(at: 3) }
-                        .keyboardShortcut("3", modifiers: .command)
-                    Button("") { selectVisibleTab(at: 4) }
-                        .keyboardShortcut("4", modifiers: .command)
-                }
-                .hidden()
-            }
-            .task(id: worktree.id) {
-                hasLoadedTabState = false
-                loadTabState()
-                validateSelectedTab()
-                hasLoadedTabState = true
-                worktreeRuntime.attachDetail(showXcode: showXcodeBuild)
-            }
-    }
-
-    @ViewBuilder
-    private var navigationContent: some View {
-        contentWithBasicModifiers
-            .task(id: selectedTab) {
-                guard hasLoadedTabState else { return }
-                saveTabState()
-            }
-            .task(id: viewModel.selectedChatSessionId) {
-                guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(viewModel.selectedChatSessionId, for: "chat", worktreeId: worktreeId)
-            }
-            .task(id: viewModel.selectedTerminalSessionId) {
-                guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(viewModel.selectedTerminalSessionId, for: "terminal", worktreeId: worktreeId)
-            }
-            .task(id: viewModel.selectedBrowserSessionId) {
-                guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(viewModel.selectedBrowserSessionId, for: "browser", worktreeId: worktreeId)
-            }
-            .task(id: viewModel.selectedFileSessionId) {
-                guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(viewModel.selectedFileSessionId, for: "files", worktreeId: worktreeId)
-            }
-            .onDisappear {
-                worktreeRuntime.detachDetail()
-            }
-            .task(id: showXcodeBuild) {
-                worktreeRuntime.updateDetailOptions(showXcode: showXcodeBuild)
-            }
     }
 
 }
