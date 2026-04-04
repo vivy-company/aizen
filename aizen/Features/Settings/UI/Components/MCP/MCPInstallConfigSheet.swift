@@ -24,7 +24,7 @@ struct MCPInstallConfigSheet: View {
     @State private var isInstalling = false
     @State private var errorMessage: String?
 
-    private enum InstallType: String, CaseIterable {
+    enum InstallType: String, CaseIterable {
         case package = "Package"
         case remote = "Remote"
     }
@@ -249,23 +249,13 @@ struct MCPInstallConfigSheet: View {
         .frame(width: 520, height: 520)
         .settingsSheetChrome()
         .onAppear {
-            setupInitialState()
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func setupInitialState() {
-        if !hasPackages && hasRemotes {
-            installType = .remote
-        }
-
-        if let package = selectedPackage {
-            for envVar in package.environmentVariables ?? [] {
-                if let defaultValue = envVar.default {
-                    envValues[envVar.name] = defaultValue
-                }
-            }
+            MCPInstallConfigSupport.setupInitialState(
+                hasPackages: hasPackages,
+                hasRemotes: hasRemotes,
+                selectedPackage: selectedPackage,
+                installType: &installType,
+                envValues: &envValues
+            )
         }
     }
 
@@ -274,21 +264,15 @@ struct MCPInstallConfigSheet: View {
         errorMessage = nil
 
         do {
-            if installType == .package, let package = selectedPackage {
-                try await mcpManager.installPackage(
-                    server: server,
-                    package: package,
-                    agentId: agentId,
-                    env: envValues.filter { !$0.value.isEmpty }
-                )
-            } else if installType == .remote, let remote = selectedRemote {
-                try await mcpManager.installRemote(
-                    server: server,
-                    remote: remote,
-                    agentId: agentId,
-                    env: [:]
-                )
-            }
+            try await MCPInstallConfigSupport.install(
+                manager: mcpManager,
+                installType: installType,
+                server: server,
+                agentId: agentId,
+                selectedPackage: selectedPackage,
+                selectedRemote: selectedRemote,
+                envValues: envValues
+            )
             onInstalled()
             dismiss()
         } catch {
