@@ -23,12 +23,12 @@ struct WorkspaceSidebarView: View {
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @Environment(\.controlActiveState) var controlActiveState
     @StateObject private var licenseManager = LicenseStateStore.shared
-    @State private var showingWorkspaceSheet = false
+    @State var showingWorkspaceSheet = false
     @State var showingWorkspaceSwitcher = false
-    @State private var showingSupportSheet = false
+    @State var showingSupportSheet = false
     @State var showingRepositorySearch = false
     @State var showingRepositoryFilters = false
-    @State private var workspaceToEdit: Workspace?
+    @State var workspaceToEdit: Workspace?
     @State var refreshTask: Task<Void, Never>?
     @State var missingRepository: WorkspaceRepositoryStore.MissingRepository?
     @AppStorage("repositoryStatusFilters") var storedStatusFilters: String = ""
@@ -256,31 +256,7 @@ struct WorkspaceSidebarView: View {
             }
         }
         .navigationTitle(LocalizedStringKey("workspace.repositories.title"))
-        .sheet(isPresented: $showingWorkspaceSheet) {
-            WorkspaceCreateSheet(repositoryManager: repositoryManager)
-        }
-        .sheet(isPresented: $showingWorkspaceSwitcher) {
-            WorkspaceSwitcherSheet(
-                repositoryManager: repositoryManager,
-                workspaces: workspaces,
-                selectedWorkspace: $selectedWorkspace
-            )
-        }
-        .sheet(item: $workspaceToEdit) { workspace in
-            WorkspaceEditSheet(workspace: workspace, repositoryManager: repositoryManager)
-        }
-        .sheet(isPresented: $showingSupportSheet) {
-            SupportSheet()
-        }
-        .sheet(item: $missingRepository) { missing in
-            MissingRepositorySheet(
-                missing: missing,
-                repositoryManager: repositoryManager,
-                selectedRepository: $selectedRepository,
-                selectedWorktree: $selectedWorktree,
-                onDismiss: { missingRepository = nil }
-            )
-        }
+        .workspaceSidebarPresentation(view: self)
         .onAppear {
             startPeriodicRefresh()
         }
