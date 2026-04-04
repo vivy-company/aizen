@@ -119,42 +119,14 @@ actor AgentTerminalDelegate {
         env: [EnvVariable]?,
         outputByteLimit: Int?
     ) async throws -> CreateTerminalResponse {
-        // Determine executable and final args
-        var executablePath: String
-        var finalArgs: [String]
-
-        // Check if command contains shell operators that require shell interpretation
-        let shellOperators = ["|", "&&", "||", ";", ">", ">>", "<", "$(", "`", "&"]
-        let needsShell = shellOperators.contains { command.contains($0) }
-
-        if needsShell {
-            // Execute through shell to handle pipes, redirections, etc.
-            executablePath = "/bin/sh"
-            if let args = args, !args.isEmpty {
-                // If args provided separately, join command + args
-                finalArgs = ["-c", ([command] + args).joined(separator: " ")]
-            } else {
-                finalArgs = ["-c", command]
-            }
-        } else if args == nil || args?.isEmpty == true {
-            // No args provided - check if command contains spaces/quotes
-            if command.contains(" ") || command.contains("\"") {
-                let (parsedExecutable, parsedArgs) = try parseCommandString(command)
-                executablePath = try resolveExecutablePath(parsedExecutable)
-                finalArgs = parsedArgs
-            } else {
-                executablePath = try resolveExecutablePath(command)
-                finalArgs = []
-            }
-        } else {
-            // Args provided separately
-            executablePath = try resolveExecutablePath(command)
-            finalArgs = args ?? []
-        }
+        let commandResolution = try AgentTerminalCommandResolver.resolve(
+            command: command,
+            args: args
+        )
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: executablePath)
-        process.arguments = finalArgs
+        process.executableURL = URL(fileURLWithPath: commandResolution.executablePath)
+        process.arguments = commandResolution.arguments
 
         if let cwd = cwd {
             process.currentDirectoryURL = URL(fileURLWithPath: cwd)
@@ -498,120 +470,5 @@ actor AgentTerminalDelegate {
         }
         currentState.exitWaiters.removeAll()
         terminals[terminalId.value] = currentState
-    }
-
-    /// Parse a shell command string into executable and arguments
-    /// Handles quoted strings and escaped quotes properly
-    private func parseCommandString(_ command: String) throws -> (String, [String]) {
-        var executable: String?
-        var args: [String] = []
-        var currentArg = ""
-        var inQuotes = false
-        var escapeNext = false
-
-        for char in command {
-            if escapeNext {
-                currentArg.append(char)
-                escapeNext = false
-                continue
-            }
-
-            if char == "\\" {
-                escapeNext = true
-                continue
-            }
-
-            if char == "\"" {
-                inQuotes = !inQuotes
-                continue
-            }
-
-            if char == " " && !inQuotes {
-                if !currentArg.isEmpty {
-                    if executable == nil {
-                        executable = currentArg
-                    } else {
-                        args.append(currentArg)
-                    }
-                    currentArg = ""
-                }
-                continue
-            }
-
-            currentArg.append(char)
-        }
-
-        // Add final argument if any
-        if !currentArg.isEmpty {
-            if executable == nil {
-                executable = currentArg
-            } else {
-                args.append(currentArg)
-            }
-        }
-
-        guard let exec = executable, !exec.isEmpty else {
-            throw TerminalError.commandParsingFailed(command)
-        }
-
-        return (exec, args)
-    }
-
-    /// Resolve executable path from command name
-    /// Handles both absolute paths and command names
-    private func resolveExecutablePath(_ command: String) throws -> String {
-        let fileManager = FileManager.default
-
-        // If it's an absolute path and exists, use it
-        if command.hasPrefix("/") {
-            if fileManager.fileExists(atPath: command) {
-                return command
-            }
-            throw TerminalError.executableNotFound(command)
-        }
-
-        // Common binary paths on macOS
-        let commonPaths = [
-            "/usr/local/bin/\(command)",
-            "/usr/bin/\(command)",
-            "/bin/\(command)",
-            "/opt/homebrew/bin/\(command)",
-            "/opt/local/bin/\(command)",
-        ]
-
-        for path in commonPaths {
-            if fileManager.fileExists(atPath: path) {
-                return path
-            }
-        }
-
-        // Try using 'which' to find the command
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = [command]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-
-        defer {
-            try? pipe.fileHandleForReading.close()
-        }
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            // Use read(upToCount:) to get Swift errors instead of ObjC exceptions
-            if let data = try? pipe.fileHandleForReading.read(upToCount: 4096),
-               let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                if !path.isEmpty && FileManager.default.fileExists(atPath: path) {
-                    return path
-                }
-            }
-        } catch {
-            // Fallback if 'which' fails
-        }
-
-        // If nothing found, throw error
-        throw TerminalError.executableNotFound(command)
     }
 }
