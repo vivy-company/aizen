@@ -36,10 +36,10 @@ actor AgentTerminalDelegate {
     // MARK: - Private Properties
 
     var terminals: [String: TerminalState] = [:]
-    private var releasedOutputs: [String: ReleasedTerminalOutput] = [:]
-    private var releasedOutputOrder: [String] = []
+    var releasedOutputs: [String: ReleasedTerminalOutput] = [:]
+    var releasedOutputOrder: [String] = []
     private let defaultOutputByteLimit = 1_000_000
-    private let maxReleasedOutputEntries = 50
+    let maxReleasedOutputEntries = 50
 
     // MARK: - Initialization
 
@@ -222,8 +222,7 @@ actor AgentTerminalDelegate {
             resumeExitWaiters(in: &currentState, exitCode: exitCode)
         }
         terminals.removeAll()
-        releasedOutputs.removeAll()
-        releasedOutputOrder.removeAll()
+        clearReleasedOutputs()
     }
 
     // MARK: - Public Helpers
@@ -237,8 +236,7 @@ actor AgentTerminalDelegate {
             // Re-fetch state after draining
             return terminals[terminalId.value]?.outputBuffer ?? state.outputBuffer
         }
-        // Then check released terminals cache
-        return releasedOutputs[terminalId.value]?.output
+        return cachedReleasedOutput(for: terminalId.value)
     }
 
     /// Check if terminal is still running
@@ -275,17 +273,5 @@ actor AgentTerminalDelegate {
         }
 
         terminals[terminalId] = state
-    }
-
-    private func cacheReleasedOutput(terminalId: String, output: String, exitCode: Int) {
-        releasedOutputs[terminalId] = ReleasedTerminalOutput(output: output, exitCode: exitCode)
-        releasedOutputOrder.removeAll { $0 == terminalId }
-        releasedOutputOrder.append(terminalId)
-
-        while releasedOutputOrder.count > maxReleasedOutputEntries,
-              let oldest = releasedOutputOrder.first {
-            releasedOutputOrder.removeFirst()
-            releasedOutputs.removeValue(forKey: oldest)
-        }
     }
 }
