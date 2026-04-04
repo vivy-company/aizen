@@ -202,110 +202,7 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
         return result.stdout
     }
 
-    // Pre-compiled regex patterns for log parsing
-    nonisolated private static let timestampRegex = try? NSRegularExpression(pattern: #"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"#)
-
-    func getStructuredLogs(repoPath: String, runId: String, jobId: String, steps: [WorkflowStep]) async throws -> WorkflowLogs {
-        // Use gh api to get raw logs for the job
-        // Note: This only works after job completion - returns 404 for in-progress jobs
-        let result = try await executeGH(["api", "repos/{owner}/{repo}/actions/jobs/\(jobId)/logs"], workingDirectory: repoPath)
-        let rawLogs = result.stdout
-
-        // Sort steps by start time (descending) for proper matching
-        let sortedSteps = steps.sorted { step1, step2 in
-            guard let start1 = step1.startedAt, let start2 = step2.startedAt else {
-                return step1.number > step2.number
-            }
-            return start1 > start2
-        }
-
-        // Parse log lines and correlate with steps
-        var logLines: [WorkflowLogLine] = []
-        logLines.reserveCapacity(rawLogs.count / 80)
-
-        let lines = rawLogs.components(separatedBy: .newlines)
-        var lineIndex = 0
-
-        for line in lines {
-            guard !line.isEmpty else { continue }
-
-            let range = NSRange(line.startIndex..<line.endIndex, in: line)
-            var timestamp: Date?
-            var content = line
-
-            // Parse timestamp from line (format: 2025-12-17T07:30:39.5778140Z ...)
-            if let match = Self.timestampRegex?.firstMatch(in: line, range: range),
-               let timestampRange = Range(match.range(at: 1), in: line) {
-                let timestampStr = String(line[timestampRange])
-                timestamp = ISO8601DateParser.shared.parse(timestampStr + "Z")
-
-                // Remove timestamp from content
-                if let fullRange = Range(match.range, in: line) {
-                    content = String(line[fullRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-                    // Remove microseconds suffix (e.g., ".5778140Z ")
-                    if content.hasPrefix(".") {
-                        if let spaceIndex = content.firstIndex(of: " ") {
-                            content = String(content[content.index(after: spaceIndex)...])
-                        }
-                    }
-                }
-            }
-
-            // Find matching step by timestamp (checking newest first)
-            var stepName = "Setup"
-            var stepNumber: Int?
-
-            if let ts = timestamp {
-                for step in sortedSteps {
-                    if let stepStart = step.startedAt, ts >= stepStart {
-                        stepName = step.name
-                        stepNumber = step.number
-                        break
-                    }
-                }
-            }
-
-            // Check for error markers
-            let isError = content.contains("##[error]")
-
-            // Check for group markers
-            let isGroupStart = content.contains("##[group]")
-            let isGroupEnd = content.contains("##[endgroup]")
-            var groupName: String?
-
-            if isGroupStart {
-                groupName = content.replacingOccurrences(of: "##[group]", with: "")
-            }
-
-            // Clean up GitHub Actions markers
-            content = content
-                .replacingOccurrences(of: "##[error]", with: "")
-                .replacingOccurrences(of: "##[warning]", with: "")
-                .replacingOccurrences(of: "##[group]", with: "")
-                .replacingOccurrences(of: "##[endgroup]", with: "")
-
-            logLines.append(WorkflowLogLine(
-                id: lineIndex,
-                stepName: stepName,
-                stepNumber: stepNumber,
-                content: content,
-                timestamp: timestamp,
-                isError: isError,
-                isGroupStart: isGroupStart,
-                isGroupEnd: isGroupEnd,
-                groupName: groupName
-            ))
-            lineIndex += 1
-        }
-
-        return WorkflowLogs(
-            runId: runId,
-            jobId: jobId,
-            lines: logLines,
-            rawContent: rawLogs,
-            lastUpdated: Date()
-        )
-    }
+    nonisolated static let timestampRegex = try? NSRegularExpression(pattern: #"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"#)
 
     // MARK: - Auth
 
@@ -326,7 +223,7 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
 
     // MARK: - Private Helpers
 
-    private func executeGH(_ arguments: [String], workingDirectory: String) async throws -> ProcessResult {
+    func executeGH(_ arguments: [String], workingDirectory: String) async throws -> ProcessResult {
         logger.debug("Executing: gh \(arguments.joined(separator: " "))")
 
         let env = ShellEnvironment.loadUserShellEnvironment()
@@ -345,7 +242,7 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
         return result
     }
 
-    private func parseRunStatus(_ status: String) -> RunStatus {
+    func parseRunStatus(_ status: String) -> RunStatus {
         switch status.lowercased() {
         case "queued": return .queued
         case "in_progress": return .inProgress
@@ -357,7 +254,7 @@ actor GitHubWorkflowProvider: WorkflowProviderProtocol {
         }
     }
 
-    private func parseConclusion(_ conclusion: String) -> RunConclusion? {
+    func parseConclusion(_ conclusion: String) -> RunConclusion? {
         switch conclusion.lowercased() {
         case "success": return .success
         case "failure": return .failure
