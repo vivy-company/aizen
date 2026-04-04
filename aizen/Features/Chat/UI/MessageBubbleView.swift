@@ -40,7 +40,7 @@ struct MessageBubbleView: View {
         }
     }
 
-    private var agentAttachmentBlocks: [ContentBlock] {
+    var agentAttachmentBlocks: [ContentBlock] {
         message.contentBlocks.filter { block in
             switch block {
             case .text:
@@ -51,7 +51,7 @@ struct MessageBubbleView: View {
         }
     }
 
-    private var shouldShowAgentMessage: Bool {
+    var shouldShowAgentMessage: Bool {
         guard message.role == .agent else { return true }
         let hasContent = !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         return hasContent || !agentAttachmentBlocks.isEmpty
@@ -59,16 +59,8 @@ struct MessageBubbleView: View {
 
     var body: some View {
         VStack(alignment: alignment, spacing: 4) {
-            if message.role == .agent, let identifier = agentName, shouldShowAgentMessage {
-                HStack(spacing: 4) {
-                    AgentIconView(agent: identifier, size: 16)
-                    Text(agentDisplayName.capitalized)
-                        .font(.system(size: 13, weight: .bold))
-                }
-                .padding(.vertical, 4)
-            }
+            agentHeader
 
-            // User message bubble
             if message.role == .user {
                 HStack {
                     Spacer(minLength: 60)
@@ -84,54 +76,12 @@ struct MessageBubbleView: View {
                 }
             }
 
-            // Agent message - hide if content is empty and message is complete
             else if message.role == .agent {
-                if shouldShowAgentMessage {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 6) {
-                            if !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                MessageContentView(
-                                    content: message.content,
-                                    basePath: markdownBasePath,
-                                    onOpenFileInEditor: onOpenFileInEditor
-                                )
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            if !agentAttachmentBlocks.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    ForEach(Array(agentAttachmentBlocks.enumerated()), id: \.offset) { _, block in
-                                        ContentBlockRenderer(block: block, style: .full)
-                                    }
-                                }
-                            }
-
-                            HStack(spacing: 8) {
-                                Text(formatTimestamp(message.timestamp))
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.tertiary)
-
-                                if let executionTime = message.executionTime {
-                                    Text(DurationFormatter.short(executionTime))
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
-                        }
-
-                        Spacer(minLength: 60)
-                    }
-                }
-                // Empty agent message - render nothing
+                agentBubble
             }
 
-            // System message
             else if message.role == .system {
-                Text(message.content)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: true, vertical: false)
+                systemMessage
             }
         }
         .frame(maxWidth: .infinity, alignment: bubbleAlignment)
@@ -143,7 +93,7 @@ struct MessageBubbleView: View {
         .animation(message.isComplete ? .spring(response: 0.4, dampingFraction: 0.8) : nil, value: message.isComplete)
     }
 
-    private var agentDisplayName: String {
+    var agentDisplayName: String {
         guard let agentName else { return "" }
         if let meta = AgentRegistry.shared.getMetadata(for: agentName) {
             return meta.name
@@ -152,7 +102,7 @@ struct MessageBubbleView: View {
     }
 
     @ViewBuilder
-    private var backgroundView: some View {
+    var backgroundView: some View {
         Color.clear
             .background(.ultraThinMaterial)
             .overlay {
@@ -161,7 +111,7 @@ struct MessageBubbleView: View {
             }
     }
 
-    private func copyMessage() {
+    func copyMessage() {
         Clipboard.copy(message.content)
 
         withAnimation {
@@ -175,7 +125,7 @@ struct MessageBubbleView: View {
         }
     }
 
-    private func formatTimestamp(_ date: Date) -> String {
+    func formatTimestamp(_ date: Date) -> String {
         DateFormatters.shortTime.string(from: date)
     }
 }
