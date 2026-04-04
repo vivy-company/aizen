@@ -46,35 +46,7 @@ struct RepositoryRow: View {
         repositoryLabel
             .background(selectionBackground)
             .contextMenu { repositoryContextMenu }
-            .sheet(isPresented: $showingRemoveConfirmation) {
-                RepositoryRemoveSheet(
-                    repositoryName: repository.name ?? String(localized: "workspace.repository.unknown"),
-                    alsoDeleteFromFilesystem: $alsoDeleteFromFilesystem,
-                    onCancel: {
-                        showingRemoveConfirmation = false
-                        alsoDeleteFromFilesystem = false
-                    },
-                    onRemove: {
-                        showingRemoveConfirmation = false
-                        removeRepository()
-                    }
-                )
-            }
-            .sheet(isPresented: $showingNoteEditor) {
-                NoteEditorView(
-                    note: Binding(
-                        get: { repository.note ?? "" },
-                        set: { repository.note = $0 }
-                    ),
-                    title: String(localized: "repository.note.title \(repository.name ?? "")"),
-                    onSave: {
-                        try? repositoryManager.updateRepositoryNote(repository, note: repository.note)
-                    }
-                )
-            }
-            .sheet(isPresented: $showingPostCreateActions) {
-                PostCreateActionsSheet(repository: repository)
-            }
+            .repositoryRowPresentation(view: self)
     }
 
     func setStatus(_ status: ItemStatus) {
@@ -180,7 +152,7 @@ struct RepositoryRow: View {
         }
     }
 
-    private func removeRepository() {
+    func removeRepository() {
         Task {
             do {
                 if alsoDeleteFromFilesystem, let path = repository.path {
