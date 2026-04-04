@@ -1,1 +1,1 @@
-../../../aizen/Utilities/CrossProjectWorkspacePath.swift
+../../../aizen/Shared/Workspace/CrossProjectWorkspacePath.swift
