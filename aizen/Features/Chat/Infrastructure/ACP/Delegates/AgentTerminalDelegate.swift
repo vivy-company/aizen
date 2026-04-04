@@ -106,41 +106,6 @@ actor AgentTerminalDelegate {
         return CreateTerminalResponse(terminalId: terminalId, _meta: nil)
     }
 
-    /// Get output from a terminal process
-    func handleTerminalOutput(terminalId: TerminalId, sessionId: String) async throws -> TerminalOutputResponse {
-        guard var state = terminals[terminalId.value] else {
-            throw TerminalError.terminalNotFound(terminalId.value)
-        }
-
-        guard !state.isReleased else {
-            throw TerminalError.terminalReleased(terminalId.value)
-        }
-
-        // Always drain available output synchronously to avoid race with async handlers
-        // This ensures we capture all data that's been read but not yet appended
-        drainAvailableOutput(terminalId: terminalId.value, process: state.process)
-        // Re-fetch state after draining
-        state = terminals[terminalId.value] ?? state
-
-        let exitStatus: TerminalExitStatus?
-        if state.process.isRunning {
-            exitStatus = nil
-        } else {
-            exitStatus = TerminalExitStatus(
-                exitCode: Int(state.process.terminationStatus),
-                signal: nil,
-                _meta: nil
-            )
-        }
-
-        return TerminalOutputResponse(
-            output: state.outputBuffer,
-            exitStatus: exitStatus,
-            truncated: state.wasTruncated,
-            _meta: nil
-        )
-    }
-
     /// Kill a terminal process
     func handleTerminalKill(terminalId: TerminalId, sessionId: String) async throws -> KillTerminalResponse {
         guard var state = terminals[terminalId.value] else {
@@ -227,51 +192,8 @@ actor AgentTerminalDelegate {
 
     // MARK: - Public Helpers
 
-    /// Get terminal output for display (checks both active and released terminals)
-    func getOutput(terminalId: TerminalId) -> String? {
-        // First check active terminals
-        if let state = terminals[terminalId.value] {
-            // Always drain available output to capture any pending data
-            drainAvailableOutput(terminalId: terminalId.value, process: state.process)
-            // Re-fetch state after draining
-            return terminals[terminalId.value]?.outputBuffer ?? state.outputBuffer
-        }
-        return cachedReleasedOutput(for: terminalId.value)
-    }
-
     /// Check if terminal is still running
     func isRunning(terminalId: TerminalId) -> Bool {
         return terminals[terminalId.value]?.process.isRunning ?? false
-    }
-
-    /// Drain available output without removing handlers (safe for running processes)
-    /// Uses read(upToCount:) which throws Swift errors instead of availableData which throws ObjC exceptions
-    private func drainAvailableOutput(terminalId: String, process: Process) {
-        AgentTerminalProcessIO.drainAvailableOutput(
-            terminalId: terminalId,
-            process: process
-        ) { [weak self] drainedTerminalId, output in
-            await self?.appendOutput(terminalId: drainedTerminalId, output: output)
-        }
-    }
-
-    // MARK: - Private Helpers
-
-    private func appendOutput(terminalId: String, output: String) {
-        guard var state = terminals[terminalId] else { return }
-
-        state.outputBuffer += output
-
-        // Apply byte limit truncation
-        if let limit = state.outputByteLimit, state.outputBuffer.count > limit {
-            let startIndex = state.outputBuffer.index(
-                state.outputBuffer.startIndex,
-                offsetBy: state.outputBuffer.count - limit
-            )
-            state.outputBuffer = String(state.outputBuffer[startIndex...])
-            state.wasTruncated = true
-        }
-
-        terminals[terminalId] = state
     }
 }
