@@ -8,23 +8,6 @@
 import ACP
 import Foundation
 
-/// Tracks state of a single terminal
-private struct TerminalState {
-    let process: Process
-    var outputBuffer: String = ""
-    var outputByteLimit: Int?
-    var lastReadIndex: Int = 0
-    var isReleased: Bool = false
-    var wasTruncated: Bool = false
-    var exitWaiters: [CheckedContinuation<(exitCode: Int?, signal: String?), Never>] = []
-}
-
-/// Cached output for released terminals (for UI display)
-private struct ReleasedTerminalOutput {
-    let output: String
-    let exitCode: Int?
-}
-
 /// Actor responsible for handling terminal operations for agent sessions
 actor AgentTerminalDelegate {
 
