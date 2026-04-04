@@ -277,57 +277,6 @@ struct SessionRowView: View {
         }
         return "Untitled Session"
     }
-
-    private func computeSessionSummary() -> String {
-        // Use most recent user message for summary
-        guard let messages = session.messages as? Set<ChatMessage> else {
-            return "No messages yet"
-        }
-
-        let sortedMessages = messages
-            .filter { $0.role == "user" }
-            .sorted { (m1, m2) -> Bool in
-                let t1 = m1.timestamp ?? Date.distantPast
-                let t2 = m2.timestamp ?? Date.distantPast
-                return t1 > t2
-            }
-
-        guard let latestMessage = sortedMessages.first,
-              let contentJSON = latestMessage.contentJSON else {
-            return "No user messages yet"
-        }
-        
-        // Extract text from contentJSON
-        guard let contentData = contentJSON.data(using: .utf8) else {
-            return "Unable to load message"
-        }
-        
-        guard let contentBlocks = try? JSONDecoder().decode([ContentBlock].self, from: contentData) else {
-            return contentJSON
-        }
-        
-        var textParts: [String] = []
-        for block in contentBlocks {
-            if case .text(let textContent) = block {
-                textParts.append(textContent.text)
-            }
-        }
-        
-        let text = textParts.joined(separator: " ")
-        
-        if text.isEmpty {
-            return "Empty message"
-        }
-        
-        // Truncate to reasonable length
-        let maxLength = 120
-        if text.count > maxLength {
-            let truncated = String(text.prefix(maxLength))
-            return truncated + "..."
-        }
-        
-        return text
-    }
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -402,7 +351,7 @@ struct SessionRowView: View {
             isHovered = hovering
         }
         .task(id: session.id) {
-            cachedSummary = computeSessionSummary()
+            cachedSummary = SessionRowSummaryBuilder.summary(for: session)
         }
     }
     
