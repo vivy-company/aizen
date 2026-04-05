@@ -12,7 +12,7 @@ struct WorkflowRunRow: View {
     let onSelect: () -> Void
     let onCancel: () -> Void
 
-    @State private var isHovered: Bool = false
+    @State var isHovered: Bool = false
 
     var body: some View {
         Button(action: onSelect) {
@@ -51,8 +51,8 @@ struct WorkflowRunRow: View {
 
                 Spacer()
 
-                if let startedAt = run.startedAt {
-                    Text(RelativeDateFormatter.shared.string(from: startedAt))
+                if let startedAt = relativeStartedAt {
+                    Text(startedAt)
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 }
@@ -76,10 +76,7 @@ struct WorkflowRunRow: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isHovered ? Color(nsColor: .unemphasizedSelectedContentBackgroundColor) : Color.clear)
-            )
+            .background(rowBackground)
         }
         .buttonStyle(.plain)
         .onHover { hovering in
