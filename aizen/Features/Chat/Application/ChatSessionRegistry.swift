@@ -19,9 +19,9 @@ class ChatSessionRegistry: ObservableObject {
     @Published private(set) var sessionsWithPendingPermissions: Set<UUID> = []
 
     private var permissionObservers: [UUID: AnyCancellable] = [:]
-    private var pendingMessages: [UUID: String] = [:]
-    private var pendingInputText: [UUID: String] = [:]
-    private var pendingAttachments: [UUID: [ChatAttachment]] = [:]
+    var pendingMessages: [UUID: String] = [:]
+    var pendingInputText: [UUID: String] = [:]
+    var pendingAttachments: [UUID: [ChatAttachment]] = [:]
     private var sessionOrder: [UUID] = []
     private let maxCachedSessions = 20
 
@@ -86,12 +86,12 @@ class ChatSessionRegistry: ObservableObject {
         sessionsWithPendingPermissions.contains(chatSessionId)
     }
 
-    private func touch(_ chatSessionId: UUID) {
+    func touch(_ chatSessionId: UUID) {
         sessionOrder.removeAll { $0 == chatSessionId }
         sessionOrder.append(chatSessionId)
     }
 
-    private func evictIfNeeded() {
+    func evictIfNeeded() {
         while agentSessions.count > maxCachedSessions,
               let oldest = sessionOrder.first {
             sessionOrder.removeFirst()
@@ -102,55 +102,9 @@ class ChatSessionRegistry: ObservableObject {
         }
     }
 
-    private func cleanupPendingData(for chatSessionId: UUID) {
+    func cleanupPendingData(for chatSessionId: UUID) {
         pendingMessages.removeValue(forKey: chatSessionId)
         pendingInputText.removeValue(forKey: chatSessionId)
         pendingAttachments.removeValue(forKey: chatSessionId)
-    }
-
-    // MARK: - Pending Messages
-
-    func setPendingMessage(_ message: String, for chatSessionId: UUID) {
-        pendingMessages[chatSessionId] = message
-        touch(chatSessionId)
-        evictIfNeeded()
-    }
-
-    func consumePendingMessage(for chatSessionId: UUID) -> String? {
-        return pendingMessages.removeValue(forKey: chatSessionId)
-    }
-
-    // MARK: - Pending Input Text (for prefilling input field without auto-sending)
-
-    func setPendingInputText(_ text: String, for chatSessionId: UUID) {
-        pendingInputText[chatSessionId] = text
-        touch(chatSessionId)
-        evictIfNeeded()
-    }
-
-    func consumePendingInputText(for chatSessionId: UUID) -> String? {
-        return pendingInputText.removeValue(forKey: chatSessionId)
-    }
-
-    /// Get draft input text without consuming it (for tab switching)
-    func getDraftInputText(for chatSessionId: UUID) -> String? {
-        return pendingInputText[chatSessionId]
-    }
-
-    /// Clear draft input text (call after message is sent)
-    func clearDraftInputText(for chatSessionId: UUID) {
-        pendingInputText.removeValue(forKey: chatSessionId)
-    }
-
-    // MARK: - Pending Attachments
-
-    func setPendingAttachments(_ attachments: [ChatAttachment], for chatSessionId: UUID) {
-        pendingAttachments[chatSessionId] = attachments
-        touch(chatSessionId)
-        evictIfNeeded()
-    }
-
-    func consumePendingAttachments(for chatSessionId: UUID) -> [ChatAttachment]? {
-        return pendingAttachments.removeValue(forKey: chatSessionId)
     }
 }
