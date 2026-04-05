@@ -13,17 +13,17 @@ import Combine
 class ChatSessionRegistry: ObservableObject {
     static let shared = ChatSessionRegistry()
 
-    private var agentSessions: [UUID: ChatAgentSession] = [:]
+    var agentSessions: [UUID: ChatAgentSession] = [:]
 
     /// Sessions with pending permission requests (for UI indicators)
-    @Published private(set) var sessionsWithPendingPermissions: Set<UUID> = []
+    @Published var sessionsWithPendingPermissions: Set<UUID> = []
 
-    private var permissionObservers: [UUID: AnyCancellable] = [:]
+    var permissionObservers: [UUID: AnyCancellable] = [:]
     var pendingMessages: [UUID: String] = [:]
     var pendingInputText: [UUID: String] = [:]
     var pendingAttachments: [UUID: [ChatAttachment]] = [:]
-    private var sessionOrder: [UUID] = []
-    private let maxCachedSessions = 20
+    var sessionOrder: [UUID] = []
+    let maxCachedSessions = 20
 
     private init() {}
 
@@ -50,23 +50,6 @@ class ChatSessionRegistry: ObservableObject {
         observePermissionState(for: chatSessionId, session: session)
     }
 
-    private func observePermissionState(for chatSessionId: UUID, session: ChatAgentSession) {
-        // Remove existing observer
-        permissionObservers[chatSessionId]?.cancel()
-
-        // Observe showingPermissionAlert changes
-        permissionObservers[chatSessionId] = session.permissionHandler.$showingPermissionAlert
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] showing in
-                guard let self = self else { return }
-                if showing {
-                    self.sessionsWithPendingPermissions.insert(chatSessionId)
-                } else {
-                    self.sessionsWithPendingPermissions.remove(chatSessionId)
-                }
-            }
-    }
-
     func removeAgentSession(for chatSessionId: UUID) {
         // Clean up permission observer
         permissionObservers[chatSessionId]?.cancel()
@@ -79,27 +62,6 @@ class ChatSessionRegistry: ObservableObject {
         }
         cleanupPendingData(for: chatSessionId)
         sessionOrder.removeAll { $0 == chatSessionId }
-    }
-
-    /// Check if a session has a pending permission request
-    func hasPendingPermission(for chatSessionId: UUID) -> Bool {
-        sessionsWithPendingPermissions.contains(chatSessionId)
-    }
-
-    func touch(_ chatSessionId: UUID) {
-        sessionOrder.removeAll { $0 == chatSessionId }
-        sessionOrder.append(chatSessionId)
-    }
-
-    func evictIfNeeded() {
-        while agentSessions.count > maxCachedSessions,
-              let oldest = sessionOrder.first {
-            sessionOrder.removeFirst()
-            if let session = agentSessions.removeValue(forKey: oldest) {
-                Task { await session.close() }
-            }
-            cleanupPendingData(for: oldest)
-        }
     }
 
     func cleanupPendingData(for chatSessionId: UUID) {
