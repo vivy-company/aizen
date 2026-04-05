@@ -28,22 +28,4 @@ struct WorkflowRunStatusIconView: View {
                 .foregroundStyle(colorOverride ?? statusColor)
         }
     }
-
-    @ViewBuilder
-    private var progressView: some View {
-        switch progressStyle {
-        case .mini:
-            ProgressView()
-                .controlSize(.mini)
-                .tint(colorOverride ?? statusColor)
-                .frame(width: progressFrame, height: progressFrame)
-        case .scaled(let scale):
-            ScaledProgressView(size: progressFrame, scale: scale)
-                .tint(colorOverride ?? statusColor)
-        }
-    }
-
-    private var statusColor: Color {
-        WorkflowStatusIcon.color(status: run.status, conclusion: run.conclusion)
-    }
 }
