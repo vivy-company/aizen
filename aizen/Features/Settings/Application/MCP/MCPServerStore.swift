@@ -71,7 +71,7 @@ nonisolated struct MCPHeaderDefinition: Codable, Equatable, Sendable {
     let value: String
 }
 
-private nonisolated struct MCPServerStoreSnapshot: Codable, Sendable {
+nonisolated struct MCPServerStoreSnapshot: Codable, Sendable {
     var agentDefaults: [String: [String: MCPServerDefinition]]
     var sessionOverrides: [String: [String: MCPServerDefinition]]
 
@@ -115,34 +115,9 @@ actor MCPServerStore {
         try saveSnapshot(snapshot)
     }
 
-    // MARK: - Session Overrides
-
-    func servers(for agentId: String, sessionId: UUID?) -> [String: MCPServerDefinition] {
-        var merged = defaultServers(for: agentId)
-        guard let sessionId else { return merged }
-
-        let snapshot = loadSnapshot()
-        for (name, entry) in snapshot.sessionOverrides[sessionId.uuidString] ?? [:] {
-            merged[name] = entry
-        }
-        return merged
-    }
-
-    func replaceSessionServers(_ servers: [String: MCPServerDefinition], sessionId: UUID) throws {
-        var snapshot = loadSnapshot()
-        snapshot.sessionOverrides[sessionId.uuidString] = servers
-        try saveSnapshot(snapshot)
-    }
-
-    func clearSessionServers(sessionId: UUID) throws {
-        var snapshot = loadSnapshot()
-        snapshot.sessionOverrides.removeValue(forKey: sessionId.uuidString)
-        try saveSnapshot(snapshot)
-    }
-
     // MARK: - Private Helpers
 
-    private func loadSnapshot() -> MCPServerStoreSnapshot {
+    func loadSnapshot() -> MCPServerStoreSnapshot {
         guard let data = defaults.data(forKey: storageKey) else {
             return .empty
         }
@@ -154,7 +129,7 @@ actor MCPServerStore {
         }
     }
 
-    private func saveSnapshot(_ snapshot: MCPServerStoreSnapshot) throws {
+    func saveSnapshot(_ snapshot: MCPServerStoreSnapshot) throws {
         let data = try encoder.encode(snapshot)
         defaults.set(data, forKey: storageKey)
     }
