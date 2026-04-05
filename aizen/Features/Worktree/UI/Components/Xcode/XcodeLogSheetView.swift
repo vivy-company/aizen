@@ -14,29 +14,7 @@ struct XcodeLogSheetView: View {
     @State var autoScroll = true
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-
-            Divider()
-
-            logContent
-            .background(Color(nsColor: .textBackgroundColor))
-
-            Divider()
-
-            footer
-        }
-        .frame(width: 700, height: 500)
-        .onAppear {
-            // Auto-start streaming when sheet opens
-            if !buildManager.isLogStreamActive && buildManager.launchedBundleId != nil {
-                buildManager.startLogStream()
-            }
-        }
-        .onDisappear {
-            // Stop streaming when sheet closes
-            buildManager.stopLogStream()
-        }
+        sheetBody
     }
 }
 
