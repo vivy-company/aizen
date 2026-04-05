@@ -86,21 +86,6 @@ enum ClaudeOAuthUsageFetcher {
     }
 }
 
-struct ClaudeStatsigIdentity {
-    let accountID: String?
-    let organizationID: String?
-    let subscriptionType: String?
-}
-
-func extractStatsigValue(_ key: String, in text: String) -> String? {
-    let needle = "\"\(key)\":\""
-    guard let range = text.range(of: needle) else { return nil }
-    let start = range.upperBound
-    guard let end = text[start...].firstIndex(of: "\"") else { return nil }
-    let value = text[start..<end].trimmingCharacters(in: .whitespacesAndNewlines)
-    return value.isEmpty ? nil : value
-}
-
 struct OAuthUsageResponse: Decodable {
     let fiveHour: OAuthUsageWindow?
     let sevenDay: OAuthUsageWindow?
