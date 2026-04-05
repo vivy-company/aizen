@@ -22,7 +22,6 @@ struct WorkflowTriggerFormView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             header
 
             GitWindowDivider()
@@ -30,7 +29,6 @@ struct WorkflowTriggerFormView: View {
             if isLoading {
                 loadingView
             } else {
-                // Form content
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         branchSelector
@@ -46,61 +44,12 @@ struct WorkflowTriggerFormView: View {
 
                 GitWindowDivider()
 
-                // Footer with actions
                 footer
             }
         }
         .frame(width: 450, height: 500)
         .task {
             await loadInputs()
-        }
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        DetailHeaderBar(showsBackground: false) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Run Workflow")
-                    .font(.headline)
-
-                Text(workflow.name)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        } trailing: {
-            DetailCloseButton(action: onDismiss, size: 16)
-        }
-    }
-
-    // MARK: - Loading
-
-    private var loadingView: some View {
-        VStack {
-            Spacer()
-            ProgressView()
-            Text("Loading workflow inputs...")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, 8)
-            Spacer()
-        }
-    }
-
-    // MARK: - Branch Selector
-
-    private var branchSelector: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Branch")
-                .font(.subheadline)
-                .fontWeight(.medium)
-
-            TextField("Branch", text: $selectedBranch)
-                .textFieldStyle(.roundedBorder)
-
-            Text("The branch to run the workflow on")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
         }
     }
 
@@ -135,45 +84,6 @@ struct WorkflowTriggerFormView: View {
         .frame(maxWidth: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
         .cornerRadius(8)
-    }
-
-    // MARK: - Footer
-
-    private var footer: some View {
-        HStack {
-            if let error = error {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.yellow)
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-
-            Spacer()
-
-            Button("Cancel") {
-                onDismiss()
-            }
-            .keyboardShortcut(.escape)
-
-            Button {
-                Task {
-                    await triggerWorkflow()
-                }
-            } label: {
-                if isSubmitting {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Text("Run Workflow")
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!canSubmit)
-            .keyboardShortcut(.return)
-        }
-        .padding()
     }
 
     // MARK: - Helpers
