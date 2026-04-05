@@ -14,15 +14,15 @@ extension Notification.Name {
 nonisolated final class AgentRegistry {
     static let shared = AgentRegistry()
 
-    private let defaults: UserDefaults
-    private let store: AgentRegistryStore
+    let defaults: UserDefaults
+    let store: AgentRegistryStore
     private let authPreferences: AgentAuthPreferences
     private let launchResolver = AgentLaunchResolver()
 
-    private let stateLock = NSLock()
-    private var cachedSnapshot: AgentRegistrySnapshot
-    private var bootstrapTask: Task<Void, Never>?
-    private let mutationGate = AgentRegistryMutationGate()
+    let stateLock = NSLock()
+    var cachedSnapshot: AgentRegistrySnapshot
+    var bootstrapTask: Task<Void, Never>?
+    let mutationGate = AgentRegistryMutationGate()
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -180,46 +180,9 @@ nonisolated final class AgentRegistry {
         authPreferences.displayableAuthMethodName(for: agentName)
     }
 
-    // MARK: - Internal
-
-    func bootstrapDefaultAgents() async {
-        await mutationGate.perform {
-            let currentSnapshot = snapshotValue()
-            let mergedSnapshot = await store.bootstrapSnapshot(from: currentSnapshot)
-            applySnapshot(mergedSnapshot)
-            ensureDefaultAgentPreference(for: mergedSnapshot)
-        }
-    }
-
-    private func snapshotValue() -> AgentRegistrySnapshot {
-        stateLock.lock()
-        defer { stateLock.unlock() }
-        return cachedSnapshot
-    }
-
-    private func applySnapshot(_ snapshot: AgentRegistrySnapshot, notify: Bool = true) {
-        stateLock.lock()
-        cachedSnapshot = snapshot
-        stateLock.unlock()
-
-        Task { @MainActor in
-            AgentCatalogStore.shared.update(snapshot: snapshot)
-        }
-
-        if notify {
-            NotificationCenter.default.post(name: .agentMetadataDidChange, object: nil)
-        }
-    }
-
-    private func ensureDefaultAgentPreference(for snapshot: AgentRegistrySnapshot) {
-        let defaultAgent = defaults.string(forKey: "defaultACPAgent")
-        if defaultAgent == nil || snapshot.metadata(for: defaultAgent ?? "") == nil {
-            defaults.set(Self.defaultAgentID, forKey: "defaultACPAgent")
-        }
-    }
 }
 
-private actor AgentRegistryMutationGate {
+actor AgentRegistryMutationGate {
     func perform<T>(_ operation: () async -> T) async -> T {
         await operation()
     }
