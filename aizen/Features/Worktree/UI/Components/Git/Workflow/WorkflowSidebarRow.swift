@@ -6,19 +6,9 @@ struct WorkflowSidebarRow: View {
     let onSelect: () -> Void
     let onTrigger: (Workflow) -> Void
 
-    @Environment(\.controlActiveState) private var controlActiveState
-    @State private var isHovered: Bool = false
-    @State private var isButtonHovered: Bool = false
-
-    private var selectedHighlightColor: Color {
-        controlActiveState == .key ? Color(nsColor: .systemRed) : Color(nsColor: .systemRed).opacity(0.78)
-    }
-
-    private var selectionFillColor: Color {
-        let base = NSColor.unemphasizedSelectedContentBackgroundColor
-        let alpha: Double = controlActiveState == .key ? 0.26 : 0.18
-        return Color(nsColor: base).opacity(alpha)
-    }
+    @Environment(\.controlActiveState) var controlActiveState
+    @State var isHovered: Bool = false
+    @State var isButtonHovered: Bool = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -71,14 +61,7 @@ struct WorkflowSidebarRow: View {
                 Button {
                     onTrigger(workflow)
                 } label: {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(isButtonHovered ? .white : .secondary)
-                        .frame(width: 34, height: 34)
-                        .background(
-                            Circle()
-                                .fill(isButtonHovered ? Color.accentColor : Color.white.opacity(0.05))
-                        )
+                    triggerButtonIcon
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering in
@@ -88,17 +71,7 @@ struct WorkflowSidebarRow: View {
                 .padding(.trailing, 10)
             }
         }
-        .background(
-            Group {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(selectionFillColor)
-                } else if isHovered {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.06))
-                } else {
-                    Color.clear
-                }
-            }
-        )
+        .background(backgroundFill)
         .contentShape(Rectangle())
         .onTapGesture {
             onSelect()
