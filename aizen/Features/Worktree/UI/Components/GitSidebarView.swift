@@ -21,50 +21,7 @@ struct GitSidebarView: View {
     var onCommitWithSignoff: (String) -> Void
     var onFileClick: (String) -> Void
 
-    @State private var commitMessage: String = ""
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            GitSidebarHeader(
-                gitStatus: gitStatus,
-                isOperationPending: isOperationPending,
-                hasUnstagedChanges: hasUnstagedChanges,
-                onStageAll: onStageAll,
-                onUnstageAll: onUnstageAll,
-                onDiscardAll: onDiscardAll,
-                onCleanUntracked: onCleanUntracked
-            )
-
-            // File list
-            GitFileList(
-                gitStatus: gitStatus,
-                isOperationPending: isOperationPending,
-                selectedFile: selectedDiffFile,
-                onStageFile: onStageFile,
-                onUnstageFile: onUnstageFile,
-                onFileClick: onFileClick
-            )
-
-            // Commit section
-            GitCommitSection(
-                gitStatus: gitStatus,
-                isOperationPending: isOperationPending,
-                commitMessage: $commitMessage,
-                onCommit: onCommit,
-                onAmendCommit: onAmendCommit,
-                onCommitWithSignoff: onCommitWithSignoff,
-                onStageAll: onStageAll
-            )
-            .padding(12)
-        }
-        .frame(maxHeight: .infinity)
-        .animation(nil, value: gitStatus)
-    }
-
-    private var hasUnstagedChanges: Bool {
-        !gitStatus.modifiedFiles.isEmpty || !gitStatus.untrackedFiles.isEmpty
-    }
+    @State var commitMessage: String = ""
 }
 
 // MARK: - Preview
