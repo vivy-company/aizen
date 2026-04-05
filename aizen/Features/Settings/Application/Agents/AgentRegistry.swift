@@ -16,8 +16,8 @@ nonisolated final class AgentRegistry {
 
     let defaults: UserDefaults
     let store: AgentRegistryStore
-    private let authPreferences: AgentAuthPreferences
-    private let launchResolver = AgentLaunchResolver()
+    let authPreferences: AgentAuthPreferences
+    let launchResolver = AgentLaunchResolver()
 
     let stateLock = NSLock()
     var cachedSnapshot: AgentRegistrySnapshot
@@ -53,50 +53,6 @@ nonisolated final class AgentRegistry {
 
     func getMetadata(for agentId: String) -> AgentMetadata? {
         AgentRegistryQueries.metadata(for: agentId, from: snapshotValue())
-    }
-
-    // MARK: - Launch
-
-    func getAgentPath(for agentName: String) -> String? {
-        AgentRegistryQueries.agentPath(for: agentName, from: snapshotValue())
-    }
-
-    func getAgentLaunchArgs(for agentName: String) -> [String] {
-        AgentRegistryQueries.launchArguments(for: agentName, from: snapshotValue())
-    }
-
-    func getAgentLaunchEnvironment(for agentName: String) -> [String: String] {
-        AgentRegistryQueries.launchEnvironment(for: agentName, from: snapshotValue())
-    }
-
-    func resolvedAgentLaunchEnvironment(for agentName: String) async -> [String: String] {
-        await launchResolver.resolvedEnvironment(for: agentName, snapshot: snapshotValue())
-    }
-
-    // MARK: - Auth Preferences
-
-    func saveAuthPreference(agentName: String, authMethodId: String) {
-        authPreferences.savePreference(agentName: agentName, authMethodId: authMethodId)
-    }
-
-    func getAuthPreference(for agentName: String) -> String? {
-        authPreferences.preference(for: agentName)
-    }
-
-    func saveSkipAuth(for agentName: String) {
-        authPreferences.saveSkipAuth(for: agentName)
-    }
-
-    func shouldSkipAuth(for agentName: String) -> Bool {
-        authPreferences.shouldSkipAuth(for: agentName)
-    }
-
-    func clearAuthPreference(for agentName: String) {
-        authPreferences.clearPreference(for: agentName)
-    }
-
-    func getAuthMethodName(for agentName: String) -> String? {
-        authPreferences.displayableAuthMethodName(for: agentName)
     }
 
 }
