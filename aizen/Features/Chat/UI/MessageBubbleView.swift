@@ -16,46 +16,7 @@ struct MessageBubbleView: View {
     var markdownBasePath: String? = nil
     var onOpenFileInEditor: ((String) -> Void)? = nil
 
-    @State private var showCopyConfirmation = false
-
-    private var alignment: HorizontalAlignment {
-        switch message.role {
-        case .user:
-            return .trailing
-        case .agent:
-            return .leading
-        case .system:
-            return .center
-        }
-    }
-
-    private var bubbleAlignment: Alignment {
-        switch message.role {
-        case .user:
-            return .trailing
-        case .agent:
-            return .leading
-        case .system:
-            return .center
-        }
-    }
-
-    var agentAttachmentBlocks: [ContentBlock] {
-        message.contentBlocks.filter { block in
-            switch block {
-            case .text:
-                return false
-            case .image, .audio, .resource, .resourceLink:
-                return true
-            }
-        }
-    }
-
-    var shouldShowAgentMessage: Bool {
-        guard message.role == .agent else { return true }
-        let hasContent = !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return hasContent || !agentAttachmentBlocks.isEmpty
-    }
+    @State var showCopyConfirmation = false
 
     var body: some View {
         VStack(alignment: alignment, spacing: 4) {
@@ -93,41 +54,6 @@ struct MessageBubbleView: View {
         .animation(message.isComplete ? .spring(response: 0.4, dampingFraction: 0.8) : nil, value: message.isComplete)
     }
 
-    var agentDisplayName: String {
-        guard let agentName else { return "" }
-        if let meta = AgentRegistry.shared.getMetadata(for: agentName) {
-            return meta.name
-        }
-        return agentName
-    }
-
-    @ViewBuilder
-    var backgroundView: some View {
-        Color.clear
-            .background(.ultraThinMaterial)
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.separator.opacity(0.3), lineWidth: 0.5)
-            }
-    }
-
-    func copyMessage() {
-        Clipboard.copy(message.content)
-
-        withAnimation {
-            showCopyConfirmation = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation {
-                showCopyConfirmation = false
-            }
-        }
-    }
-
-    func formatTimestamp(_ date: Date) -> String {
-        DateFormatters.shortTime.string(from: date)
-    }
 }
 
 // MARK: - Preview
