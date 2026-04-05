@@ -84,49 +84,7 @@ struct WorkflowLogTableView: NSViewRepresentable {
         var fontSize: CGFloat = 11
         var showTimestamps: Bool = false
 
-        private var parseTask: Task<Void, Never>?
-
-        func parseLogs(_ logs: String, structuredLogs: WorkflowLogs? = nil, fontSize: CGFloat, showTimestamps: Bool, provider: WorkflowProvider = .github) {
-            currentLogs = logs
-            self.fontSize = fontSize
-            self.showTimestamps = showTimestamps
-
-            parseTask?.cancel()
-            let logsSnapshot = logs
-            let structuredSnapshot = structuredLogs
-            let fontSizeSnapshot = fontSize
-            let providerSnapshot = provider
-
-            parseTask = Task.detached(priority: .userInitiated) {
-                let parsed: [LogStep]
-                if let structured = structuredSnapshot, !structured.lines.isEmpty {
-                    parsed = WorkflowLogParser.parseStructuredLogs(structured, fontSize: fontSizeSnapshot)
-                } else {
-                    parsed = WorkflowLogParser.parseLogSteps(
-                        logsSnapshot,
-                        fontSize: fontSizeSnapshot,
-                        provider: providerSnapshot
-                    )
-                }
-
-                await MainActor.run { [weak self] in
-                    guard let self = self else { return }
-                    self.steps = parsed
-                    self.rebuildDisplayRows()
-                    self.tableView?.reloadData()
-
-                    // Recalculate heights after layout settles
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                        self?.recalculateAllHeights()
-                    }
-                }
-            }
-        }
-
-        private func recalculateAllHeights() {
-            guard let tableView = tableView, displayRows.count > 0 else { return }
-            tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<displayRows.count))
-        }
+        var parseTask: Task<Void, Never>?
 
         var workflowLogFrameObserver: NSObjectProtocol?
         var workflowLogColumnObserver: NSObjectProtocol?
