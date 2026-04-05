@@ -20,25 +20,6 @@ struct BranchSelectorView: View {
 
     @Environment(\.dismiss) var dismiss
 
-    var filteredBranches: [BranchInfo] {
-        if searchText.isEmpty {
-            return branches
-        }
-        return branches.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText)
-        }
-    }
-
-    private var searchBinding: Binding<String> {
-        Binding(
-            get: { searchText },
-            set: { newValue in
-                searchText = newValue
-                displayedCount = pageSize
-            }
-        )
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             // Header with search and close
@@ -71,33 +52,6 @@ struct BranchSelectorView: View {
         .background(AppSurfaceTheme.backgroundColor())
         .onAppear {
             loadBranches()
-        }
-    }
-
-    func createBranch() {
-        guard !searchText.isEmpty else { return }
-        onCreateBranch?(searchText)
-        dismiss()
-    }
-
-    private func loadBranches() {
-        isLoading = true
-        errorMessage = nil
-
-        Task {
-            do {
-                let loadedBranches = try await repositoryManager.getBranches(for: repository)
-                await MainActor.run {
-                    branches = loadedBranches
-                    displayedCount = pageSize
-                    isLoading = false
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = String(localized: "git.branch.loadFailed \(error.localizedDescription)")
-                    isLoading = false
-                }
-            }
         }
     }
 }
