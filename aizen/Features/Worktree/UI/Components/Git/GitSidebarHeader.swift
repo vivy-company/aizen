@@ -100,27 +100,4 @@ struct GitSidebarHeader: View {
             Text(String(localized: "git.sidebar.removeUntrackedMessage \(gitStatus.untrackedFiles.count)"))
         }
     }
-
-    private var chipBackground: some ShapeStyle {
-        Color.white.opacity(0.08)
-    }
-
-    private var canPerformBulkAction: Bool {
-        !isOperationPending && hasAnyChanges
-    }
-
-    private var hasAnyChanges: Bool {
-        !(gitStatus.stagedFiles.isEmpty && gitStatus.modifiedFiles.isEmpty && gitStatus.untrackedFiles.isEmpty)
-    }
-
-    private var headerTitle: String {
-        let total = gitStatus.stagedFiles.count + gitStatus.modifiedFiles.count + gitStatus.untrackedFiles.count
-        if total == 0 {
-            return String(localized: "git.sidebar.noChanges")
-        } else if total == 1 {
-            return String(localized: "git.sidebar.changesSingular")
-        } else {
-            return String(localized: "git.sidebar.changes \(total)")
-        }
-    }
 }
