@@ -30,66 +30,7 @@ struct MCPInstallConfigSheet: View {
 
             Divider()
 
-            // Content
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Description
-                    if let description = server.description {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("About")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundColor(.secondary)
-
-                            Text(description)
-                                .font(.callout)
-                                .foregroundColor(.primary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.bottom, 4)
-                    }
-
-                    Divider()
-
-                    // Source picker (if both are available)
-                    if hasPackages && hasRemotes {
-                        Picker("Source", selection: $installType) {
-                            ForEach(InstallType.allCases, id: \.self) { type in
-                                Text(type.rawValue).tag(type)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-
-                    // Package selection
-                    if installType == .package && hasPackages {
-                        MCPInstallSourceDetailsSection.package(
-                            server: server,
-                            selectedPackageIndex: $selectedPackageIndex,
-                            selectedPackage: selectedPackage
-                        )
-                    }
-
-                    // Remote selection
-                    if installType == .remote && hasRemotes {
-                        MCPInstallSourceDetailsSection.remote(
-                            server: server,
-                            selectedRemoteIndex: $selectedRemoteIndex,
-                            selectedRemote: selectedRemote
-                        )
-                    }
-
-                    // Environment variables
-                    if installType == .package, !requiredEnvVars.isEmpty || !optionalEnvVars.isEmpty {
-                        MCPInstallEnvironmentVariablesSection(
-                            requiredEnvVars: requiredEnvVars,
-                            optionalEnvVars: optionalEnvVars,
-                            envValues: $envValues,
-                            showSecrets: $showSecrets
-                        )
-                    }
-                }
-                .padding()
-            }
+            contentView
 
             // Error message
             if let error = errorMessage {
