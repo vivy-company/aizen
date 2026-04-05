@@ -38,15 +38,6 @@ struct XcodeBuildLogPopover: View {
     var body: some View {
         popoverContent
     }
-
-    func copyToClipboard() {
-        Clipboard.copy(log)
-
-        showCopiedFeedback = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            showCopiedFeedback = false
-        }
-    }
 }
 
 #Preview {
