@@ -12,6 +12,16 @@ import Foundation
 
 @MainActor
 extension ChatAgentSession {
+    func isAuthRequiredError(_ error: Error) -> Bool {
+        let message = error.localizedDescription.lowercased()
+        return message.contains("auth") ||
+            message.contains("api key") ||
+            message.contains("unauthorized") ||
+            message.contains("401") ||
+            message.contains("forbidden") ||
+            message.contains("login")
+    }
+
     func handleAuthenticationHandshake(
         authMethods: [AuthMethod],
         agentName: String,
