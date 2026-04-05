@@ -6,9 +6,7 @@
 //
 
 import Combine
-import Darwin
 import Foundation
-import SwiftUI
 
 @MainActor
 final class ActiveWorktreesMetrics: ObservableObject {
@@ -28,15 +26,4 @@ final class ActiveWorktreesMetrics: ObservableObject {
     var lastSample: ResourceSample?
     var lastHostSample: HostCPUSample?
     let maxHistoryCount = 60
-
-    var maxMemoryHistoryBytes: UInt64 {
-        memoryHistory.max() ?? max(memoryBytes, 1)
-    }
-
-    var energyLabel: String {
-        if energyScore < 20 { return "Low" }
-        if energyScore < 50 { return "Medium" }
-        if energyScore < 80 { return "High" }
-        return "Very High"
-    }
 }
