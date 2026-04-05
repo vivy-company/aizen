@@ -59,90 +59,6 @@ actor GitLabWorkflowProvider: WorkflowProviderProtocol {
         return GitLabWorkflowVariableParser.parse(yaml: content)
     }
 
-    // MARK: - Runs (Pipelines)
-
-    func listRuns(repoPath: String, workflow: Workflow?, branch: String?, limit: Int) async throws -> [WorkflowRun] {
-        var args = ["ci", "list", "--output", "json"]
-
-        if let branch = branch {
-            args.append(contentsOf: ["--ref", branch])
-        }
-
-        let result = try await executeGLab(args, workingDirectory: repoPath)
-
-        guard let data = result.stdout.data(using: .utf8) else {
-            throw WorkflowError.parseError("Invalid UTF-8 output")
-        }
-
-        let items = try parseJSON(data, as: [GitLabPipelineResponse].self)
-        return items.prefix(limit).map { item in
-            WorkflowRun(
-                id: String(item.id),
-                workflowId: "gitlab-ci",
-                workflowName: "GitLab CI",
-                runNumber: item.id,
-                status: parseRunStatus(item.status),
-                conclusion: parseConclusion(item.status),
-                branch: item.ref,
-                commit: String(item.sha.prefix(7)),
-                commitMessage: nil,
-                event: item.source ?? "push",
-                actor: item.user?.username ?? "unknown",
-                startedAt: item.createdAt,
-                completedAt: item.updatedAt,
-                url: item.webUrl
-            )
-        }
-    }
-
-    func getRun(repoPath: String, runId: String) async throws -> WorkflowRun {
-        let result = try await executeGLab(["ci", "get", runId, "--output", "json"], workingDirectory: repoPath)
-
-        guard let data = result.stdout.data(using: .utf8) else {
-            throw WorkflowError.parseError("Invalid UTF-8 output")
-        }
-
-        let item = try parseJSON(data, as: GitLabPipelineResponse.self)
-        return WorkflowRun(
-            id: String(item.id),
-            workflowId: "gitlab-ci",
-            workflowName: "GitLab CI",
-            runNumber: item.id,
-            status: parseRunStatus(item.status),
-            conclusion: parseConclusion(item.status),
-            branch: item.ref,
-            commit: String(item.sha.prefix(7)),
-            commitMessage: nil,
-            event: item.source ?? "push",
-            actor: item.user?.username ?? "unknown",
-            startedAt: item.createdAt,
-            completedAt: item.updatedAt,
-            url: item.webUrl
-        )
-    }
-
-    func getRunJobs(repoPath: String, runId: String) async throws -> [WorkflowJob] {
-        // glab doesn't have a direct jobs JSON output, use API via glab api
-        let result = try await executeGLab(["api", "projects/:id/pipelines/\(runId)/jobs"], workingDirectory: repoPath)
-
-        guard let data = result.stdout.data(using: .utf8) else {
-            throw WorkflowError.parseError("Invalid UTF-8 output")
-        }
-
-        let items = try parseJSON(data, as: [GitLabJobResponse].self)
-        return items.map { job in
-            WorkflowJob(
-                id: String(job.id),
-                name: job.name,
-                status: parseRunStatus(job.status),
-                conclusion: parseConclusion(job.status),
-                startedAt: job.startedAt,
-                completedAt: job.finishedAt,
-                steps: []  // GitLab jobs don't have steps in the same way
-            )
-        }
-    }
-
     // MARK: - Actions
 
     func triggerWorkflow(repoPath: String, workflow: Workflow, branch: String, inputs: [String: String]) async throws -> WorkflowRun? {
@@ -237,7 +153,7 @@ actor GitLabWorkflowProvider: WorkflowProviderProtocol {
 
     // MARK: - Private Helpers
 
-    private func executeGLab(_ arguments: [String], workingDirectory: String) async throws -> ProcessResult {
+    func executeGLab(_ arguments: [String], workingDirectory: String) async throws -> ProcessResult {
         logger.debug("Executing: glab \(arguments.joined(separator: " "))")
 
         let env = ShellEnvironment.loadUserShellEnvironment()
@@ -256,7 +172,7 @@ actor GitLabWorkflowProvider: WorkflowProviderProtocol {
         return result
     }
 
-    private func parseRunStatus(_ status: String) -> RunStatus {
+    func parseRunStatus(_ status: String) -> RunStatus {
         switch status.lowercased() {
         case "pending", "created", "waiting_for_resource", "preparing", "scheduled":
             return .pending
@@ -269,7 +185,7 @@ actor GitLabWorkflowProvider: WorkflowProviderProtocol {
         }
     }
 
-    private func parseConclusion(_ status: String) -> RunConclusion? {
+    func parseConclusion(_ status: String) -> RunConclusion? {
         switch status.lowercased() {
         case "success":
             return .success
