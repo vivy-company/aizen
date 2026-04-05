@@ -21,7 +21,7 @@ struct GitPanelWindowContent: View {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitPanelWindow")
     @State var selectedHistoryCommit: GitCommit?
     @State var historyDiffOutput: String = ""
-    @State private var leftPanelWidth: CGFloat = 350
+    @State var leftPanelWidth: CGFloat = 350
     @State var visibleFile: String?
     @State var scrollToFile: String?
     @State var commentPopoverLine: DiffLine?
@@ -36,19 +36,19 @@ struct GitPanelWindowContent: View {
 
     @AppStorage(AppearanceSettings.codeFontFamilyKey) var editorFontFamily: String = AppearanceSettings.defaultCodeFontFamily
     @AppStorage(AppearanceSettings.diffFontSizeKey) var diffFontSize: Double = AppearanceSettings.defaultDiffFontSize
-    @AppStorage(AppearanceSettings.themeNameKey) private var terminalThemeName = AppearanceSettings.defaultDarkTheme
-    @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
-    @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var usePerAppearanceTheme = false
-    @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject private var gitSummaryStore: GitSummaryStore
+    @AppStorage(AppearanceSettings.themeNameKey) var terminalThemeName = AppearanceSettings.defaultDarkTheme
+    @AppStorage(AppearanceSettings.lightThemeNameKey) var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
+    @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) var usePerAppearanceTheme = false
+    @Environment(\.colorScheme) var colorScheme
+    @ObservedObject var gitSummaryStore: GitSummaryStore
     @ObservedObject var gitDiffStore: GitDiffRuntimeStore
     @ObservedObject var gitOperationService: GitOperationService
     @ObservedObject var workflowService: WorkflowService
 
-    private let minLeftPanelWidth: CGFloat = 280
-    private let maxLeftPanelWidth: CGFloat = 500
+    let minLeftPanelWidth: CGFloat = 280
+    let maxLeftPanelWidth: CGFloat = 500
 
-    private var worktree: Worktree { context.worktree }
+    var worktree: Worktree { context.worktree }
     var worktreePath: String { worktree.path ?? "" }
 
     init(
@@ -81,151 +81,8 @@ struct GitPanelWindowContent: View {
 
     var gitStatus: GitStatus { gitSummaryStore.status }
 
-    private var repositoryState: GitRepositoryState {
-        gitSummaryStore.repositoryState
-    }
-
-    private var shouldShowInitializeGitView: Bool {
-        repositoryState == .notRepository
-    }
-
     var allChangedFiles: [String] {
         cachedChangedFiles
-    }
-
-    private var effectiveThemeName: String {
-        guard usePerAppearanceTheme else { return terminalThemeName }
-        return AppearanceSettings.effectiveThemeName(colorScheme: colorScheme)
-    }
-
-    private struct RuntimeVisibilityKey: Equatable {
-        let selectedTab: GitPanelTab
-        let selectedHistoryCommitID: String?
-    }
-
-    private var runtimeVisibilityKey: RuntimeVisibilityKey {
-        RuntimeVisibilityKey(
-            selectedTab: selectedTab,
-            selectedHistoryCommitID: selectedHistoryCommit?.id
-        )
-    }
-
-    private var surfaceColor: Color {
-        Color(nsColor: GhosttyThemeParser.loadBackgroundColor(named: effectiveThemeName))
-    }
-
-    var body: some View {
-        Group {
-            if shouldShowInitializeGitView {
-                initializeGitView
-            } else if selectedTab == .prs {
-                // PRs tab has its own split view layout
-                PullRequestsView(repoPath: worktreePath)
-            } else {
-                HStack(spacing: 0) {
-                    // Left: Tab content
-                    leftPanel
-                        .frame(width: leftPanelWidth)
-
-                    // Resizable divider
-                    resizableDivider
-
-                    // Right: Diff view or Workflow details
-                    rightPanel
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            }
-        }
-        .background(surfaceColor)
-        .toolbarBackground(surfaceColor, for: .windowToolbar)
-        .toolbarBackground(.visible, for: .windowToolbar)
-        .onAppear {
-            syncRuntimeVisibility()
-            reviewManager.load(for: worktreePath)
-            _ = updateChangedFilesCache()
-        }
-        .onDisappear {
-            runtime.setGitPanelVisible(false, showsWorkingDiff: false, showsWorkflow: false)
-        }
-        .task(id: gitStatus) {
-            let changed = updateChangedFilesCache()
-            guard changed, selectedHistoryCommit != nil else { return }
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            await synchronizeDiffOutput(for: selectedHistoryCommit)
-        }
-        .task(id: selectedHistoryCommit?.id) {
-            await synchronizeDiffOutput(for: selectedHistoryCommit)
-        }
-        .task(id: runtimeVisibilityKey) {
-            syncRuntimeVisibility()
-        }
-        .sheet(item: $commentPopoverLine) { line in
-            CommentPopover(
-                diffLine: line,
-                filePath: commentPopoverFilePath ?? "",
-                existingComment: reviewManager.comments.first {
-                    $0.filePath == commentPopoverFilePath && $0.lineNumber == line.lineNumber
-                },
-                onSave: { text in
-                    if let existing = reviewManager.comments.first(where: {
-                        $0.filePath == commentPopoverFilePath && $0.lineNumber == line.lineNumber
-                    }) {
-                        reviewManager.updateComment(id: existing.id, comment: text)
-                    } else {
-                        reviewManager.addComment(for: line, filePath: commentPopoverFilePath ?? "", comment: text)
-                    }
-                    commentPopoverLine = nil
-                },
-                onCancel: {
-                    commentPopoverLine = nil
-                },
-                onDelete: reviewManager.comments.first(where: {
-                    $0.filePath == commentPopoverFilePath && $0.lineNumber == line.lineNumber
-                }).map { existing in
-                    {
-                        reviewManager.deleteComment(id: existing.id)
-                        commentPopoverLine = nil
-                    }
-                }
-            )
-        }
-        .sheet(isPresented: $showAgentPicker) {
-            SendToAgentSheet(
-                worktree: worktree,
-                commentsMarkdown: reviewManager.exportToMarkdown(),
-                onDismiss: {
-                    showAgentPicker = false
-                },
-                onSend: {
-                    reviewManager.clearAll()
-                    onClose()
-                }
-            )
-        }
-        .sheet(item: $selectedWorkflowForTrigger) { workflow in
-            WorkflowTriggerFormView(
-                workflow: workflow,
-                currentBranch: gitStatus.currentBranch.isEmpty ? "main" : gitStatus.currentBranch,
-                service: workflowService,
-                onDismiss: {
-                    selectedWorkflowForTrigger = nil
-                }
-            )
-        }
-    }
-
-    // MARK: - Diff Panel
-
-    // MARK: - Right Panel
-
-    // MARK: - Divider
-
-    private var resizableDivider: some View {
-        GitResizableDivider { value in
-            let newWidth = leftPanelWidth + value.translation.width
-            leftPanelWidth = min(max(newWidth, minLeftPanelWidth), maxLeftPanelWidth)
-        }
     }
 
     // MARK: - Helper Methods
