@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-private extension View {
+extension View {
     @ViewBuilder
     func removingSidebarToggle() -> some View {
         if #available(macOS 14.0, *) {
@@ -38,91 +38,12 @@ struct SettingsView: View {
     @AppStorage("defaultACPAgent") var defaultACPAgent = AgentRegistry.defaultAgentID
     @State var selection: SettingsSelection? = .general
     @State var agents: [AgentMetadata] = []
-    @State private var showingAddCustomAgent = false
+    @State var showingAddCustomAgent = false
     @StateObject var licenseManager = LicenseStateStore.shared
 
     var body: some View {
         NavigationSplitView {
-            VStack(spacing: 0) {
-                List(selection: $selection) {
-                    // Static settings items
-                    Label("General", systemImage: "gear")
-                        .tag(SettingsSelection.general)
-
-                    Label("Appearance", systemImage: "paintpalette")
-                        .tag(SettingsSelection.appearance)
-
-                    Label("Transcription", systemImage: "waveform")
-                        .tag(SettingsSelection.transcription)
-
-                    Label("Git", systemImage: "arrow.triangle.branch")
-                        .tag(SettingsSelection.git)
-
-                    Label("Terminal", systemImage: "terminal")
-                        .tag(SettingsSelection.terminal)
-
-                    Label("Editor", systemImage: "doc.text")
-                        .tag(SettingsSelection.editor)
-
-                    // Agents section
-                    Section("Agents") {
-                        ForEach(agents, id: \.id) { agent in
-                            HStack(spacing: 8) {
-                                AgentIconView(metadata: agent, size: 20)
-                                Text(agent.name)
-                                Spacer()
-                                if agent.id == defaultACPAgent {
-                                    Circle()
-                                        .fill(.blue)
-                                        .frame(width: 8, height: 8)
-                                }
-                            }
-                            .tag(SettingsSelection.agent(agent.id))
-                            .contextMenu {
-                                if agent.id != defaultACPAgent {
-                                    Button("Make Default") {
-                                        defaultACPAgent = agent.id
-                                    }
-                                }
-                            }
-                        }
-
-                        Button {
-                            RegistryAgentsWindowController.shared.show()
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "plus.square.on.square")
-                                    .foregroundStyle(.secondary)
-                                Text("Add From Registry")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            showingAddCustomAgent = true
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "plus.circle")
-                                    .foregroundStyle(.secondary)
-                                Text("Add Custom Agent")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .listStyle(.sidebar)
-                .frame(minWidth: 220, maxHeight: .infinity)
-                .navigationSplitViewColumnWidth(220)
-                .removingSidebarToggle()
-
-                Divider()
-
-                proSidebarRow
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-            }
+            sidebarView
         } detail: {
             if #available(macOS 14.0, *) {
                 NavigationStack {
