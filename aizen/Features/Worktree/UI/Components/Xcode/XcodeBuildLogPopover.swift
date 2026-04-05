@@ -16,8 +16,8 @@ struct XcodeBuildLogPopover: View {
     let onDismiss: (() -> Void)?
     let lines: [String]
 
-    @State private var showingSendToAgent = false
-    @State private var showCopiedFeedback = false
+    @State var showingSendToAgent = false
+    @State var showCopiedFeedback = false
     @State var showFullLog = false
 
     init(
@@ -36,96 +36,7 @@ struct XcodeBuildLogPopover: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            header
-
-            Divider()
-
-            // Log content
-            logContent
-
-            Divider()
-
-            // Action buttons
-            actionBar
-        }
-        .frame(width: 600, height: 400)
-        .sheet(isPresented: $showingSendToAgent) {
-            SendToAgentSheet(
-                worktree: worktree,
-                attachment: .buildError(buildErrorMarkdown),
-                onDismiss: { showingSendToAgent = false },
-                onSend: { onDismiss?() }
-            )
-        }
-        .sheet(isPresented: $showFullLog) {
-            fullLogSheet
-        }
-    }
-
-    @ViewBuilder
-    private var header: some View {
-        HStack {
-            Image(systemName: "xmark.circle.fill")
-                .foregroundStyle(.red)
-            Text("Build Failed")
-                .font(.headline)
-
-            Spacer()
-
-            if let duration = duration {
-                Text(DurationFormatter.short(duration))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding()
-    }
-
-    @ViewBuilder
-    private var actionBar: some View {
-        HStack(spacing: 12) {
-            // Copy button
-            Button {
-                copyToClipboard()
-            } label: {
-                Label(showCopiedFeedback ? "Copied" : "Copy", systemImage: showCopiedFeedback ? "checkmark" : "doc.on.doc")
-            }
-            .disabled(log.isEmpty)
-
-            if truncatedLines {
-                Button {
-                    showFullLog = true
-                } label: {
-                    Label("Open Full Log", systemImage: "arrow.up.left.and.arrow.down.right")
-                }
-            }
-
-            // Send to agent button
-            if worktree != nil {
-                Button {
-                    showingSendToAgent = true
-                } label: {
-                    Label("Send to Agent", systemImage: "paperplane")
-                }
-                .disabled(log.isEmpty)
-            }
-
-            Spacer()
-
-            // Retry button
-            if let onRetry = onRetry {
-                Button {
-                    onDismiss?()
-                    onRetry()
-                } label: {
-                    Label("Retry Build", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding()
+        popoverContent
     }
 
     func copyToClipboard() {
