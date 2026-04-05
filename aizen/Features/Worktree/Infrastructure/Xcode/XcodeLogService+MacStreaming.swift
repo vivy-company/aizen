@@ -46,73 +46,17 @@ extension XcodeLogService {
         continuation.yield("[os_log] Streaming unified logs for \(bundleId)...")
         continuation.yield("[os_log] Predicate: \(predicate)")
         continuation.yield("---")
-
-        let outputPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = outputPipe
-
-        let outputHandle = outputPipe.fileHandleForReading
+        let outputHandle = prepareStreamingOutput(for: process, continuation: continuation)
 
         do {
-            // Use readabilityHandler for non-blocking output (no busy-wait loop)
-            outputHandle.readabilityHandler = { handle in
-                do {
-                    guard let data = try handle.read(upToCount: 65536) else {
-                        // Empty data means EOF, clean up handler
-                        handle.readabilityHandler = nil
-                        try? handle.close()
-                        return
-                    }
-                    guard !data.isEmpty else {
-                        handle.readabilityHandler = nil
-                        try? handle.close()
-                        return
-                    }
-
-                    if let text = String(data: data, encoding: .utf8) {
-                        let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
-                        for line in lines {
-                            continuation.yield(line)
-                        }
-                    }
-                } catch {
-                    handle.readabilityHandler = nil
-                }
-            }
-
             try process.run()
             self.macLogProcess = process
             logger.info("Started Mac log streaming for \(bundleId)")
 
-            // Wait for process termination using async continuation
-            await withTaskCancellationHandler {
-                await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                    process.terminationHandler = { _ in
-                        // Clean up handler
-                        outputHandle.readabilityHandler = nil
-                        try? outputHandle.close()
-
-                        // Read any remaining data
-                        if let remainingData = try? outputHandle.readToEnd(),
-                           let text = String(data: remainingData, encoding: .utf8),
-                           !text.isEmpty {
-                            let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
-                            for line in lines {
-                                continuation.yield(line)
-                            }
-                        }
-
-                        cont.resume()
-                    }
-                }
-            } onCancel: {
-                process.terminate()
-            }
-
+            await waitForStreamingProcessTermination(process, outputHandle: outputHandle, continuation: continuation)
             logger.info("Mac log streaming ended for \(bundleId)")
         } catch {
-            outputHandle.readabilityHandler = nil
-            try? outputHandle.close()
+            cleanupStreamingOutput(outputHandle, continuation: continuation)
             logger.error("Failed to start Mac log streaming: \(error.localizedDescription)")
             continuation.yield("Error: Failed to start Mac log streaming - \(error.localizedDescription)")
         }
