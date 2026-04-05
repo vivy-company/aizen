@@ -68,7 +68,7 @@ struct aizenApp: App {
     // Sparkle updater controller
     private let updaterController: SPUStandardUpdaterController
     private let shortcutMonitor = KeyboardShortcutMonitor()
-    @State private var aboutWindow: NSWindow?
+    @State var aboutWindow: NSWindow?
 
     // Terminal settings observers
     @AppStorage("terminalFontName") private var terminalFontName = "Menlo"
@@ -76,7 +76,7 @@ struct aizenApp: App {
     @AppStorage("terminalThemeName") private var terminalThemeName = "Aizen Dark"
     @AppStorage("terminalThemeNameLight") private var terminalThemeNameLight = "Aizen Light"
     @AppStorage("terminalUsePerAppearanceTheme") private var terminalUsePerAppearanceTheme = false
-    @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
+    @AppStorage("terminalSessionPersistence") var sessionPersistence = false
 
     init() {
         // Initialize crash reporter early to catch startup crashes
@@ -223,66 +223,5 @@ struct aizenApp: App {
             }
         }
 
-    }
-
-    // MARK: - About Window
-
-    private func showAboutWindow() {
-        if let existingWindow = aboutWindow, existingWindow.isVisible {
-            existingWindow.makeKeyAndOrderFront(nil)
-            return
-        }
-
-        let aboutView = AboutView()
-            .modifier(AppearanceModifier())
-        let hostingController = NSHostingController(rootView: aboutView)
-
-        let window = NSWindow(contentViewController: hostingController)
-        window.title = "About Aizen"
-        window.styleMask = [.titled, .closable]
-        window.isReleasedWhenClosed = false
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-
-        aboutWindow = window
-    }
-
-    private func installCLIFromMenu() {
-        let result = CLISymlinkService.install()
-        let alert = NSAlert()
-        alert.messageText = "CLI Installation"
-        alert.informativeText = result.message
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
-
-    // MARK: - Settings Window
-
-    // MARK: - tmux Session Cleanup
-
-    /// Clean up orphaned tmux sessions that no longer have matching Core Data panes
-    private func cleanupOrphanedTmuxSessions() async {
-        guard sessionPersistence else { return }
-
-        let context = persistenceController.container.viewContext
-        var validPaneIds = Set<String>()
-
-        // Fetch all terminal sessions and extract their pane IDs
-        await context.perform {
-            let request: NSFetchRequest<TerminalSession> = TerminalSession.fetchRequest()
-            do {
-                let sessions = try context.fetch(request)
-                for session in sessions {
-                    if let layoutJSON = session.splitLayout,
-                       let layout = SplitLayoutHelper.decode(layoutJSON) {
-                        validPaneIds.formUnion(layout.allPaneIds())
-                    }
-                }
-            } catch {
-                // Silently fail - orphan cleanup is best-effort
-            }
-        }
-
-        await TmuxSessionRuntime.shared.cleanupOrphanedSessions(validPaneIds: validPaneIds)
     }
 }
