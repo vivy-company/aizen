@@ -103,29 +103,13 @@ struct GitPanelWindowContentWithToolbar: View {
     @State var prOperationInProgress: Bool = false
     @State var hostingInfoTask: Task<Void, Never>?
     @AppStorage(AppearanceSettings.gitDiffRenderStyleKey)
-    private var diffRenderStyleRawValue: String = AppearanceSettings.defaultGitDiffRenderStyleRawValue
+    var diffRenderStyleRawValue: String = AppearanceSettings.defaultGitDiffRenderStyleRawValue
 
     let runtime: WorktreeRuntime
-    @ObservedObject private var gitSummaryStore: GitSummaryStore
+    @ObservedObject var gitSummaryStore: GitSummaryStore
     @ObservedObject var gitOperationService: GitOperationService
 
     let gitHostingService = GitHostingService.shared
-
-    var worktree: Worktree { context.worktree }
-    var gitStatus: GitStatus { gitSummaryStore.status }
-    var isOperationPending: Bool { gitOperationService.isOperationPending }
-    var gitFeaturesAvailable: Bool { gitSummaryStore.repositoryState == .ready }
-
-    var diffRenderStyleBinding: Binding<VVDiffRenderStyle> {
-        Binding(
-            get: {
-                AppearanceSettings.gitDiffRenderStyle(from: diffRenderStyleRawValue)
-            },
-            set: { newValue in
-                diffRenderStyleRawValue = AppearanceSettings.gitDiffRenderStyleRawValue(for: newValue)
-            }
-        )
-    }
 
     init(context: GitChangesContext, repositoryManager: WorkspaceRepositoryStore, onClose: @escaping () -> Void) {
         self.context = context
@@ -137,22 +121,4 @@ struct GitPanelWindowContentWithToolbar: View {
     }
 
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "GitPanelToolbar")
-
-    var gitOperations: WorktreeGitOperations {
-        WorktreeGitOperations(
-            gitOperationService: gitOperationService,
-            repositoryManager: repositoryManager,
-            worktree: worktree,
-            logger: logger
-        )
-    }
-
-    enum GitToolbarOperation: String {
-        case fetch = "Fetching..."
-        case pull = "Pulling..."
-        case push = "Pushing..."
-        case createPR = "Creating PR..."
-        case mergePR = "Merging..."
-    }
-
 }
