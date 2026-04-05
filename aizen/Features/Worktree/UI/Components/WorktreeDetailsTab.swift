@@ -21,9 +21,4 @@ struct DetailsTabView: View {
     @State var showingDeleteConfirmation = false
     @State var hasUnsavedChanges = false
     @State var errorMessage: String?
-
-    var body: some View {
-        detailsContent
-            .modifier(detailsTabLifecycle())
-    }
 }
