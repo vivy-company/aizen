@@ -7,11 +7,6 @@
 
 import SwiftUI
 
-enum WorkflowRunProgressStyle {
-    case mini
-    case scaled(CGFloat)
-}
-
 struct WorkflowRunStatusIconView: View {
     let run: WorkflowRun
     var iconSize: CGFloat = 12
