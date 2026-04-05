@@ -1,26 +1,16 @@
 //
-//  XcodeLogService.swift
+//  XcodeLogService+MacStreaming.swift
 //  aizen
 //
 //  Created by Uladzislau Yakauleu on 10.12.25.
 //
 
 import Foundation
-import os.log
+import os
 
-actor XcodeLogService {
-    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "XcodeLogService")
-
-    var isStreamingFlag = false
-
-    var macLogProcess: Process?
-
-    // MARK: - Log Streaming via log command (for simulators)
-
-    private var currentProcess: Process?
-
-    func startStreaming(bundleId: String, destination: XcodeDestination) -> AsyncStream<String> {
-        stopStreamingSync()
+extension XcodeLogService {
+    func startStreamingForMacApp(bundleId: String, processName: String) -> AsyncStream<String> {
+        stopMacLogStreamSync()
         isStreamingFlag = true
 
         return AsyncStream { [weak self] continuation in
@@ -30,29 +20,31 @@ actor XcodeLogService {
             }
 
             Task {
-                await self.runLogStream(bundleId: bundleId, destination: destination, continuation: continuation)
+                await self.runMacLogStream(bundleId: bundleId, processName: processName, continuation: continuation)
             }
         }
     }
 
-    private func runLogStream(bundleId: String, destination: XcodeDestination, continuation: AsyncStream<String>.Continuation) async {
+    private func runMacLogStream(
+        bundleId: String,
+        processName: String,
+        continuation: AsyncStream<String>.Continuation
+    ) async {
         let process = Process()
 
         // Only show logs from the app's subsystem - excludes all Apple framework noise
         let predicate = "subsystem BEGINSWITH '\(bundleId)'"
 
-        // For simulators, use xcrun simctl spawn to access the simulator's log stream
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/log")
         process.arguments = [
-            "simctl", "spawn", destination.id,
-            "log", "stream",
+            "stream",
             "--predicate", predicate,
             "--style", "compact",
             "--level", "debug"
         ]
 
-        continuation.yield("Streaming unified logs for \(bundleId)...")
-        continuation.yield("Predicate: \(predicate)")
+        continuation.yield("[os_log] Streaming unified logs for \(bundleId)...")
+        continuation.yield("[os_log] Predicate: \(predicate)")
         continuation.yield("---")
 
         let outputPipe = Pipe()
@@ -89,8 +81,8 @@ actor XcodeLogService {
             }
 
             try process.run()
-            self.currentProcess = process
-            logger.info("Started log streaming for \(bundleId) on \(destination.name)")
+            self.macLogProcess = process
+            logger.info("Started Mac log streaming for \(bundleId)")
 
             // Wait for process termination using async continuation
             await withTaskCancellationHandler {
@@ -117,39 +109,27 @@ actor XcodeLogService {
                 process.terminate()
             }
 
-            logger.info("Log streaming ended for \(bundleId)")
+            logger.info("Mac log streaming ended for \(bundleId)")
         } catch {
             outputHandle.readabilityHandler = nil
             try? outputHandle.close()
-            logger.error("Failed to start log streaming: \(error.localizedDescription)")
-            continuation.yield("Error: Failed to start log streaming - \(error.localizedDescription)")
+            logger.error("Failed to start Mac log streaming: \(error.localizedDescription)")
+            continuation.yield("Error: Failed to start Mac log streaming - \(error.localizedDescription)")
         }
 
         continuation.finish()
-        self.currentProcess = nil
-        isStreamingFlag = false
+        self.macLogProcess = nil
     }
 
-    func stopStreaming() {
-        stopStreamingSync()
+    func stopMacLogStream() {
         stopMacLogStreamSync()
     }
 
-    private func stopStreamingSync() {
-        if let process = currentProcess, process.isRunning {
+    func stopMacLogStreamSync() {
+        if let process = macLogProcess, process.isRunning {
             process.terminate()
-            logger.info("Stopped log streaming")
+            logger.info("Stopped Mac log streaming")
         }
-        currentProcess = nil
-        isStreamingFlag = false
-    }
-
-    func stopAllStreaming() {
-        stopStreamingSync()
-        stopMacLogStreamSync()
-    }
-
-    var isStreaming: Bool {
-        isStreamingFlag
+        macLogProcess = nil
     }
 }
