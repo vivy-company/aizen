@@ -47,86 +47,16 @@ final class CodexRPCClient: @unchecked Sendable {
         arguments: [String] = ["-s", "read-only", "-a", "untrusted", "app-server"],
         environment: [String: String]? = nil
     ) throws {
-        var stdoutContinuation: AsyncStream<Data>.Continuation!
-        self.stdoutLineStream = AsyncStream<Data> { continuation in
-            stdoutContinuation = continuation
-        }
-        self.stdoutLineContinuation = stdoutContinuation
+        let stream = Self.makeStdoutLineStream()
+        self.stdoutLineStream = stream.stream
+        self.stdoutLineContinuation = stream.continuation
 
-        let resolvedExec = resolveCodexBinary(executable: executable, environment: environment)
-        guard let resolvedExec else {
-            throw RPCWireError.startFailed("Codex CLI not found. Install the codex agent and retry.")
-        }
-
-        var env = environment ?? ProcessInfo.processInfo.environment
-        env["PATH"] = mergedPATH(
-            primary: env["PATH"],
-            secondary: ProcessInfo.processInfo.environment["PATH"],
-            extras: ["/opt/homebrew/bin", "/usr/local/bin"]
+        try configureAndLaunchProcess(
+            executable: executable,
+            arguments: arguments,
+            environment: environment
         )
-
-        self.process.environment = env
-        self.process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        self.process.arguments = [resolvedExec] + arguments
-        self.process.standardInput = self.stdinPipe
-        self.process.standardOutput = self.stdoutPipe
-        self.process.standardError = self.stderrPipe
-
-        do {
-            try self.process.run()
-        } catch {
-            throw RPCWireError.startFailed(error.localizedDescription)
-        }
-
-        let stdoutHandle = self.stdoutPipe.fileHandleForReading
-        let stdoutLineContinuation = self.stdoutLineContinuation
-        let stdoutBuffer = LineBuffer()
-        stdoutHandle.readabilityHandler = { handle in
-            do {
-                guard let data = try handle.read(upToCount: 65536) else {
-                    handle.readabilityHandler = nil
-                    try? handle.close()
-                    stdoutLineContinuation.finish()
-                    return
-                }
-                guard !data.isEmpty else {
-                    handle.readabilityHandler = nil
-                    try? handle.close()
-                    stdoutLineContinuation.finish()
-                    return
-                }
-
-                let lines = stdoutBuffer.appendAndDrainLines(data)
-                for lineData in lines {
-                    stdoutLineContinuation.yield(lineData)
-                }
-            } catch {
-                handle.readabilityHandler = nil
-                stdoutLineContinuation.finish()
-            }
-        }
-
-        let stderrHandle = self.stderrPipe.fileHandleForReading
-        stderrHandle.readabilityHandler = { handle in
-            do {
-                guard let data = try handle.read(upToCount: 65536) else {
-                    handle.readabilityHandler = nil
-                    try? handle.close()
-                    return
-                }
-                guard !data.isEmpty else {
-                    handle.readabilityHandler = nil
-                    try? handle.close()
-                    return
-                }
-                guard let text = String(data: data, encoding: .utf8), !text.isEmpty else { return }
-                for line in text.split(whereSeparator: \.isNewline) {
-                    self.recordStderr(String(line))
-                }
-            } catch {
-                handle.readabilityHandler = nil
-            }
-        }
+        installReadabilityHandlers()
     }
 
     func initialize(clientName: String, clientVersion: String) async throws {
@@ -149,52 +79,6 @@ final class CodexRPCClient: @unchecked Sendable {
     }
 
     func shutdown() {
-        if self.process.isRunning {
-            self.process.terminate()
-        }
+        terminateProcessIfRunning()
     }
-}
-
-func resolveCodexBinary(executable: String, environment: [String: String]?) -> String? {
-    let env = environment ?? ProcessInfo.processInfo.environment
-    if let override = env["CODEX_CLI_PATH"], FileManager.default.isExecutableFile(atPath: override) {
-        return override
-    }
-    let merged = mergedPATH(
-        primary: env["PATH"],
-        secondary: ProcessInfo.processInfo.environment["PATH"],
-        extras: ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
-    )
-    for dir in merged.split(separator: ":") {
-        let candidate = "\(dir)/\(executable)"
-        if FileManager.default.isExecutableFile(atPath: candidate) {
-            return candidate
-        }
-    }
-    return nil
-}
-
-func mergedPATH(primary: String?, secondary: String?, extras: [String]) -> String {
-    var parts: [String] = []
-    if let primary, !primary.isEmpty {
-        parts.append(contentsOf: primary.split(separator: ":").map(String.init))
-    }
-    if let secondary, !secondary.isEmpty {
-        parts.append(contentsOf: secondary.split(separator: ":").map(String.init))
-    }
-    parts.append(contentsOf: extras)
-
-    if parts.isEmpty {
-        parts = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
-    }
-
-    var seen = Set<String>()
-    let deduped = parts.compactMap { part -> String? in
-        guard !part.isEmpty else { return nil }
-        if seen.insert(part).inserted {
-            return part
-        }
-        return nil
-    }
-    return deduped.joined(separator: ":")
 }
