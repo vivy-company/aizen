@@ -8,17 +8,17 @@
 import SwiftUI
 
 struct AgentConfigEditorSheet: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
 
     let configFile: AgentConfigFile
     let agentName: String
 
-    @State private var content: String = ""
-    @State private var originalContent: String = ""
-    @State private var isSaving = false
-    @State private var isLoading = true
-    @State private var errorMessage: String?
-    @State private var validationError: String?
+    @State var content: String = ""
+    @State var originalContent: String = ""
+    @State var isSaving = false
+    @State var isLoading = true
+    @State var errorMessage: String?
+    @State var validationError: String?
 
     private var hasChanges: Bool {
         content != originalContent
@@ -123,142 +123,4 @@ struct AgentConfigEditorSheet: View {
         }
     }
 
-    private func loadFile() {
-        let path = configFile.expandedPath
-        if FileManager.default.fileExists(atPath: path) {
-            do {
-                content = try String(contentsOfFile: path, encoding: .utf8)
-                originalContent = content
-            } catch {
-                errorMessage = "Failed to load file: \(error.localizedDescription)"
-            }
-        } else {
-            // Create default content based on file type
-            content = defaultContent()
-            originalContent = ""
-        }
-        isLoading = false
-    }
-
-    private func defaultContent() -> String {
-        switch configFile.type {
-        case .toml:
-            return "# \(agentName) Configuration\n\n"
-        case .json:
-            return "{\n  \n}\n"
-        case .markdown:
-            return "# \(agentName) Rules\n\n"
-        }
-    }
-
-    private func validateContent() {
-        validationError = nil
-
-        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return
-        }
-
-        switch configFile.type {
-        case .json:
-            do {
-                _ = try JSONSerialization.jsonObject(
-                    with: Data(content.utf8),
-                    options: []
-                )
-            } catch let error as NSError {
-                validationError = "Invalid JSON: \(error.localizedDescription)"
-            }
-        case .toml:
-            // Basic TOML validation - check for obvious syntax errors
-            if let error = validateTOML(content) {
-                validationError = error
-            }
-        case .markdown:
-            // No validation needed for markdown
-            break
-        }
-    }
-
-    private func validateTOML(_ content: String) -> String? {
-        let lines = content.components(separatedBy: .newlines)
-        var inMultilineString = false
-        var bracketStack: [Character] = []
-
-        for (index, line) in lines.enumerated() {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-            // Skip comments and empty lines
-            if trimmed.isEmpty || trimmed.hasPrefix("#") {
-                continue
-            }
-
-            // Track multiline strings
-            let tripleQuotes = trimmed.components(separatedBy: "\"\"\"").count - 1
-            if tripleQuotes % 2 == 1 {
-                inMultilineString.toggle()
-            }
-
-            if inMultilineString {
-                continue
-            }
-
-            // Check bracket balance for arrays/tables
-            for char in trimmed {
-                if char == "[" || char == "{" {
-                    bracketStack.append(char)
-                } else if char == "]" {
-                    if bracketStack.isEmpty || bracketStack.last != "[" {
-                        return "Line \(index + 1): Unmatched ]"
-                    }
-                    bracketStack.removeLast()
-                } else if char == "}" {
-                    if bracketStack.isEmpty || bracketStack.last != "{" {
-                        return "Line \(index + 1): Unmatched }"
-                    }
-                    bracketStack.removeLast()
-                }
-            }
-
-            // Check for basic key = value syntax (excluding table headers)
-            if !trimmed.hasPrefix("[") && trimmed.contains("=") {
-                let parts = trimmed.split(separator: "=", maxSplits: 1)
-                if parts.count < 2 {
-                    return "Line \(index + 1): Invalid key-value pair"
-                }
-            }
-        }
-
-        if !bracketStack.isEmpty {
-            return "Unclosed brackets: \(bracketStack)"
-        }
-
-        return nil
-    }
-
-    private func saveFile() {
-        isSaving = true
-        errorMessage = nil
-
-        let path = configFile.expandedPath
-        let directory = (path as NSString).deletingLastPathComponent
-
-        do {
-            // Create directory if needed
-            if !FileManager.default.fileExists(atPath: directory) {
-                try FileManager.default.createDirectory(
-                    atPath: directory,
-                    withIntermediateDirectories: true
-                )
-            }
-
-            // Write file
-            try content.write(toFile: path, atomically: true, encoding: .utf8)
-            originalContent = content
-            dismiss()
-        } catch {
-            errorMessage = "Failed to save: \(error.localizedDescription)"
-        }
-
-        isSaving = false
-    }
 }
