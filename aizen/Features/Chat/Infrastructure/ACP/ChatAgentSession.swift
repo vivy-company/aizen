@@ -67,12 +67,12 @@ class ChatAgentSession: ObservableObject {
     var notificationTask: Task<Void, Never>?
     var notificationProcessingTask: Task<Void, Never>?
     var versionCheckTask: Task<Void, Never>?
-    private var finalizeMessageTask: Task<Void, Never>?
+    var finalizeMessageTask: Task<Void, Never>?
     
     // Session persistence
     var chatSessionId: UUID?  // Core Data ChatSession ID for persistence
-    private var lastAgentChunkAt: Date?
-    private static let finalizeIdleDelay: TimeInterval = 0.2
+    var lastAgentChunkAt: Date?
+    static let finalizeIdleDelay: TimeInterval = 0.2
     var isModeChanging = false
     @Published var isResumingSession = false
     var resumeReplayAgentMessages: [String] = []
@@ -80,13 +80,13 @@ class ChatAgentSession: ObservableObject {
     var resumeReplayBuffer: String = ""
     var suppressResumedAgentMessages = false
     var persistedToolCallIds: Set<String> = []
-    private var thoughtBuffer: String = ""
-    private var thoughtFlushTask: Task<Void, Never>?
-    private static let thoughtUpdateInterval: TimeInterval = 0.06
-    private var pendingAgentText: String = ""
-    private var pendingAgentBlocks: [ContentBlock] = []
-    private var agentMessageFlushTask: Task<Void, Never>?
-    private static let agentMessageFlushInterval: TimeInterval = 0.0
+    var thoughtBuffer: String = ""
+    var thoughtFlushTask: Task<Void, Never>?
+    static let thoughtUpdateInterval: TimeInterval = 0.06
+    var pendingAgentText: String = ""
+    var pendingAgentBlocks: [ContentBlock] = []
+    var agentMessageFlushTask: Task<Void, Never>?
+    static let agentMessageFlushInterval: TimeInterval = 0.0
 
     /// Currently pending Task tool calls (subagents) - used for parent tracking
     /// When only one Task is active, child tool calls are assigned to it
@@ -108,135 +108,6 @@ class ChatAgentSession: ObservableObject {
         self.agentName = agentName
         self.workingDirectory = workingDirectory
         self.clientDelegateBridge = ChatAgentSessionClientDelegate(session: self)
-    }
-
-    // MARK: - Streaming Finalization
-
-    func resetFinalizeState() {
-        finalizeMessageTask?.cancel()
-        finalizeMessageTask = nil
-        lastAgentChunkAt = nil
-    }
-
-    func appendThoughtChunk(_ text: String) {
-        thoughtBuffer += text
-        scheduleThoughtFlush()
-    }
-
-    func clearThoughtBuffer() {
-        thoughtBuffer = ""
-        thoughtFlushTask?.cancel()
-        thoughtFlushTask = nil
-        if currentThought != nil {
-            currentThought = nil
-        }
-    }
-
-    private func scheduleThoughtFlush() {
-        guard thoughtFlushTask == nil else { return }
-        thoughtFlushTask = Task { @MainActor in
-            defer { thoughtFlushTask = nil }
-            try? await Task.sleep(for: .seconds(Self.thoughtUpdateInterval))
-            let nextThought: String? = thoughtBuffer.isEmpty ? nil : thoughtBuffer
-            if currentThought != nextThought {
-                currentThought = nextThought
-            }
-        }
-    }
-
-    func appendAgentMessageChunk(text: String, contentBlocks: [ContentBlock]) {
-        pendingAgentText += text
-        if !contentBlocks.isEmpty {
-            pendingAgentBlocks.append(contentsOf: contentBlocks)
-        }
-        scheduleAgentMessageFlush()
-    }
-
-    func flushAgentMessageBuffer() {
-        guard !pendingAgentText.isEmpty || !pendingAgentBlocks.isEmpty else { return }
-        agentMessageFlushTask?.cancel()
-        agentMessageFlushTask = nil
-
-        if let lastIndex = messages.lastIndex(where: { $0.role == .agent && !$0.isComplete }) {
-            let lastAgentMessage = messages[lastIndex]
-            let newContent = lastAgentMessage.content + pendingAgentText
-            var newBlocks = lastAgentMessage.contentBlocks
-            if !pendingAgentBlocks.isEmpty {
-                newBlocks.append(contentsOf: pendingAgentBlocks)
-            }
-            let updatedMessage = MessageItem(
-                id: lastAgentMessage.id,
-                role: .agent,
-                content: newContent,
-                timestamp: lastAgentMessage.timestamp,
-                toolCalls: lastAgentMessage.toolCalls,
-                contentBlocks: newBlocks,
-                isComplete: false,
-                startTime: lastAgentMessage.startTime,
-                executionTime: lastAgentMessage.executionTime,
-                requestId: lastAgentMessage.requestId
-            )
-            var updatedMessages = messages
-            updatedMessages[lastIndex] = updatedMessage
-            messages = updatedMessages
-        }
-
-        pendingAgentText = ""
-        pendingAgentBlocks = []
-    }
-
-    func clearAgentMessageBuffer() {
-        pendingAgentText = ""
-        pendingAgentBlocks = []
-        agentMessageFlushTask?.cancel()
-        agentMessageFlushTask = nil
-    }
-
-    private func scheduleAgentMessageFlush() {
-        if Self.agentMessageFlushInterval == 0 {
-            flushAgentMessageBuffer()
-            return
-        }
-
-        guard agentMessageFlushTask == nil else { return }
-        agentMessageFlushTask = Task { @MainActor in
-            defer { agentMessageFlushTask = nil }
-            try? await Task.sleep(for: .seconds(Self.agentMessageFlushInterval))
-            flushAgentMessageBuffer()
-        }
-    }
-
-    func recordAgentChunk() {
-        lastAgentChunkAt = Date()
-    }
-
-    func scheduleFinalizeLastMessage() {
-        finalizeMessageTask?.cancel()
-        finalizeMessageTask = Task { @MainActor in
-            while true {
-                let delay: TimeInterval
-                if let last = lastAgentChunkAt {
-                    let elapsed = Date().timeIntervalSince(last)
-                    delay = max(0.0, Self.finalizeIdleDelay - elapsed)
-                } else {
-                    delay = Self.finalizeIdleDelay
-                }
-
-                if delay > 0 {
-                    try? await Task.sleep(for: .seconds(delay))
-                }
-
-                guard !Task.isCancelled else { return }
-
-                if let last = lastAgentChunkAt,
-                   Date().timeIntervalSince(last) < Self.finalizeIdleDelay {
-                    continue
-                }
-
-                markLastMessageComplete()
-                return
-            }
-        }
     }
 
     // MARK: - Session Management
