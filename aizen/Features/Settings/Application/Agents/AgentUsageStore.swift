@@ -33,14 +33,14 @@ struct AgentUsageStats: Codable, Equatable {
 final class AgentUsageStore: ObservableObject {
     static let shared = AgentUsageStore()
 
-    @Published private(set) var statsByAgent: [String: AgentUsageStats] = [:]
+    @Published var statsByAgent: [String: AgentUsageStats] = [:]
 
-    private let defaults: UserDefaults
-    private let storeKey = "agentUsageStats"
-    private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
-    private var persistTask: Task<Void, Never>?
-    private let persistDelay: TimeInterval = 0.5
+    let defaults: UserDefaults
+    let storeKey = "agentUsageStats"
+    let encoder = JSONEncoder()
+    let decoder = JSONDecoder()
+    var persistTask: Task<Void, Never>?
+    let persistDelay: TimeInterval = 0.5
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -89,31 +89,5 @@ final class AgentUsageStore: ObservableObject {
         update(&stats)
         statsByAgent[agentId] = stats
         schedulePersist()
-    }
-
-    private func load() {
-        guard let data = defaults.data(forKey: storeKey) else { return }
-        do {
-            statsByAgent = try decoder.decode([String: AgentUsageStats].self, from: data)
-        } catch {
-            statsByAgent = [:]
-        }
-    }
-
-    private func persist() {
-        do {
-            let data = try encoder.encode(statsByAgent)
-            defaults.set(data, forKey: storeKey)
-        } catch {
-            // Best effort persistence; ignore write failures.
-        }
-    }
-
-    private func schedulePersist() {
-        persistTask?.cancel()
-        persistTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(persistDelay))
-            persist()
-        }
     }
 }
