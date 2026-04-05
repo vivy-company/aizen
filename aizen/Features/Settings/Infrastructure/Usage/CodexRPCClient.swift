@@ -59,25 +59,6 @@ final class CodexRPCClient: @unchecked Sendable {
         installReadabilityHandlers()
     }
 
-    func initialize(clientName: String, clientVersion: String) async throws {
-        _ = try await self.request(
-            method: "initialize",
-            params: ["clientInfo": ["name": clientName, "version": clientVersion]]
-        )
-        try self.sendNotification(method: "initialized")
-    }
-
-    func fetchRateLimits() async throws -> RateLimitsSnapshot {
-        let message = try await self.request(method: "account/rateLimits/read")
-        let response = try self.decodeResult(from: message, as: RPCRateLimitsResponse.self)
-        return RateLimitsSnapshot(from: response.rateLimits)
-    }
-
-    func fetchAccount() async throws -> RPCAccountResponse {
-        let message = try await self.request(method: "account/read")
-        return try self.decodeResult(from: message, as: RPCAccountResponse.self)
-    }
-
     func shutdown() {
         terminateProcessIfRunning()
     }
