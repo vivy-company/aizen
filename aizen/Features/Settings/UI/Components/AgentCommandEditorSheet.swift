@@ -8,22 +8,22 @@
 import SwiftUI
 
 struct AgentCommandEditorSheet: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
 
     let command: AgentCommand?
     let commandsDirectory: String
     let agentName: String
     let onDismiss: () -> Void
 
-    @State private var commandName: String = ""
-    @State private var content: String = ""
-    @State private var originalContent: String = ""
-    @State private var isSaving = false
-    @State private var isLoading = true
-    @State private var errorMessage: String?
+    @State var commandName: String = ""
+    @State var content: String = ""
+    @State var originalContent: String = ""
+    @State var isSaving = false
+    @State var isLoading = true
+    @State var errorMessage: String?
     @State private var showingDeleteConfirmation = false
 
-    private var isNewCommand: Bool {
+    var isNewCommand: Bool {
         command == nil
     }
 
@@ -152,58 +152,4 @@ struct AgentCommandEditorSheet: View {
         }
     }
 
-    private func loadCommand() {
-        if let command = command {
-            commandName = command.name
-            if let fileContent = command.content {
-                content = fileContent
-                originalContent = fileContent
-            }
-        } else {
-            content = ""
-            originalContent = ""
-        }
-        isLoading = false
-    }
-
-    private func saveCommand() {
-        isSaving = true
-        errorMessage = nil
-
-        let name = isNewCommand ? commandName.trimmingCharacters(in: .whitespaces) : (command?.name ?? "")
-        let filename = "\(name).md"
-        let path = (commandsDirectory as NSString).appendingPathComponent(filename)
-
-        do {
-            // Create directory if needed
-            if !FileManager.default.fileExists(atPath: commandsDirectory) {
-                try FileManager.default.createDirectory(
-                    atPath: commandsDirectory,
-                    withIntermediateDirectories: true
-                )
-            }
-
-            // Write file
-            try content.write(toFile: path, atomically: true, encoding: .utf8)
-            originalContent = content
-            dismiss()
-            onDismiss()
-        } catch {
-            errorMessage = "Failed to save: \(error.localizedDescription)"
-        }
-
-        isSaving = false
-    }
-
-    private func deleteCommand() {
-        guard let command = command else { return }
-
-        do {
-            try FileManager.default.removeItem(atPath: command.path)
-            dismiss()
-            onDismiss()
-        } catch {
-            errorMessage = "Failed to delete: \(error.localizedDescription)"
-        }
-    }
 }
