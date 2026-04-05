@@ -16,22 +16,7 @@ struct WorkflowRunsListView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Recent Runs")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                TagBadge(
-                    text: branch,
-                    color: Color(nsColor: .controlBackgroundColor),
-                    font: .caption,
-                    backgroundOpacity: 1,
-                    textColor: .secondary
-                )
-            }
+            header
 
             if isLoading && runs.isEmpty {
                 loadingState
