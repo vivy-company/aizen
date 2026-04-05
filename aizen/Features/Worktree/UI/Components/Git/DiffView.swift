@@ -11,10 +11,10 @@ import VVCode
 
 struct DiffView: View {
     // Input mode 1: Raw diff string (for multi-file view)
-    private let diffOutput: String?
+    let diffOutput: String?
 
     // Input mode 2: Pre-parsed lines (for single-file view)
-    private let preloadedLines: [DiffLine]?
+    let preloadedLines: [DiffLine]?
 
     let fontSize: Double
     let fontFamily: String
@@ -27,7 +27,7 @@ struct DiffView: View {
     let commentedLines: Set<String>
     let onAddComment: ((DiffLine, String) -> Void)?
 
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorScheme) var colorScheme
 
     // Init for raw diff output (used by GitChangesOverlayView)
     init(
@@ -81,57 +81,6 @@ struct DiffView: View {
         self.onAddComment = onAddComment
     }
 
-    private var theme: VVTheme {
-        AppearanceSettings.resolvedTheme(colorScheme: colorScheme)
-    }
-
-    private var configuration: VVConfiguration {
-        // Match the upstream VVDevKit diff playground, which renders with the
-        // system monospace font and avoids file-header glyph corruption.
-        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
-
-        return VVConfiguration.default
-            .with(font: font)
-            .with(showLineNumbers: true)
-            .with(showGutter: true)
-            .with(showGitGutter: false)
-            .with(wrapLines: true)
-    }
-
-    private var unifiedDiff: String {
-        if let diffOutput {
-            return diffOutput
-        }
-
-        guard let preloadedLines else {
-            return ""
-        }
-
-        return Self.unifiedDiff(from: preloadedLines)
-    }
-
-    private var displayDiff: String {
-        let collapsed = Self.collapsedDeletedFileSections(in: unifiedDiff)
-        return Self.normalizeDiffPaths(in: collapsed, repoPath: repoPath)
-    }
-
-    private var filePaths: [String] {
-        Self.filePaths(in: displayDiff)
-    }
-
-    private var showsDeletedFilePlaceholder: Bool {
-        guard let preloadedLines, !preloadedLines.isEmpty else {
-            return false
-        }
-
-        let hasDeletedMarker = preloadedLines.contains { line in
-            line.type == .header && line.content.hasPrefix("deleted file mode")
-        }
-        let hasDeletedLines = preloadedLines.contains { $0.type == .deleted }
-        let hasAdditionsOrContext = preloadedLines.contains { $0.type == .added || $0.type == .context }
-        return (hasDeletedMarker || hasDeletedLines) && !hasAdditionsOrContext
-    }
-
     var body: some View {
         Group {
             if showsDeletedFilePlaceholder {
@@ -162,19 +111,4 @@ struct DiffView: View {
             }
         }
     }
-
-    private var deletedFilePlaceholderView: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "trash")
-                .foregroundStyle(.secondary)
-            Text("File removed. Diff content omitted.")
-                .font(.system(size: max(fontSize - 1, 10)))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color(nsColor: .textBackgroundColor))
-    }
-
 }
