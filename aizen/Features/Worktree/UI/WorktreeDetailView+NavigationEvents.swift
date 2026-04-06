@@ -4,36 +4,18 @@ import Foundation
 
 extension WorktreeDetailView {
     func navigateToChatSession(_ sessionId: UUID) {
-        guard let worktreeId = worktree.id else { return }
-        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktreeId as CVarArg)
-        request.fetchLimit = 1
-
-        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
-            selectedTab = "chat"
-            viewModel.selectedChatSessionId = sessionId
-        } else {
-            NotificationCenter.default.post(
-                name: .navigateToChatSession,
-                object: nil,
-                userInfo: ["chatSessionId": sessionId]
-            )
+        if activateLocalChatSession(sessionId) {
+            return
         }
+
+        postNavigateToChatSession(sessionId)
     }
 
     func handleSwitchToChatSession(_ notification: Notification) {
         guard let sessionId = notification.userInfo?["chatSessionId"] as? UUID else {
             return
         }
-        guard let worktreeId = worktree.id else { return }
-        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktreeId as CVarArg)
-        request.fetchLimit = 1
-
-        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
-            selectedTab = "chat"
-            viewModel.selectedChatSessionId = sessionId
-        }
+        _ = activateLocalChatSession(sessionId)
     }
 
     func handleSwitchToWorktreeTab(_ notification: Notification) {
@@ -56,11 +38,7 @@ extension WorktreeDetailView {
             return
         }
 
-        let request: NSFetchRequest<TerminalSession> = TerminalSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, targetWorktreeId as CVarArg)
-        request.fetchLimit = 1
-
-        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
+        if containsTerminalSession(sessionId, worktreeId: targetWorktreeId) {
             selectedTab = "terminal"
             viewModel.selectedTerminalSessionId = sessionId
         }
@@ -74,11 +52,7 @@ extension WorktreeDetailView {
             return
         }
 
-        let request: NSFetchRequest<BrowserSession> = BrowserSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, targetWorktreeId as CVarArg)
-        request.fetchLimit = 1
-
-        if let _ = try? worktree.managedObjectContext?.fetch(request).first {
+        if containsBrowserSession(sessionId, worktreeId: targetWorktreeId) {
             selectedTab = "browser"
             viewModel.selectedBrowserSessionId = sessionId
         }
@@ -101,16 +75,7 @@ extension WorktreeDetailView {
 
         ChatSessionRegistry.shared.setPendingAttachments([attachment], for: sessionId)
 
-        if doesChatSessionBelongToCurrentWorktree(sessionId) {
-            selectedTab = "chat"
-            viewModel.selectedChatSessionId = sessionId
-        } else {
-            NotificationCenter.default.post(
-                name: .navigateToChatSession,
-                object: nil,
-                userInfo: ["chatSessionId": sessionId]
-            )
-        }
+        routeToChatSession(sessionId)
     }
 
     func handleSwitchToChat(_ notification: Notification) {
@@ -119,27 +84,6 @@ extension WorktreeDetailView {
             return
         }
 
-        if doesChatSessionBelongToCurrentWorktree(sessionId) {
-            selectedTab = "chat"
-            viewModel.selectedChatSessionId = sessionId
-        } else {
-            NotificationCenter.default.post(
-                name: .navigateToChatSession,
-                object: nil,
-                userInfo: ["chatSessionId": sessionId]
-            )
-        }
-    }
-
-    func doesChatSessionBelongToCurrentWorktree(_ sessionId: UUID) -> Bool {
-        guard let worktreeId = worktree.id else { return false }
-        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(
-            format: "id == %@ AND worktree.id == %@",
-            sessionId as CVarArg,
-            worktreeId as CVarArg
-        )
-        request.fetchLimit = 1
-        return ((try? worktree.managedObjectContext?.fetch(request).first) != nil)
+        routeToChatSession(sessionId)
     }
 }
