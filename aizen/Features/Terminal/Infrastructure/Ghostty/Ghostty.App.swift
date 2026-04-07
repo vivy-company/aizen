@@ -65,10 +65,10 @@ extension Ghostty {
 
         // MARK: - Terminal Settings from AppStorage
 
-        @AppStorage(AppearanceSettings.terminalFontFamilyKey) private var terminalFontName = AppearanceSettings.defaultTerminalFontFamily
-        @AppStorage(AppearanceSettings.terminalFontSizeKey) private var terminalFontSize = AppearanceSettings.defaultTerminalFontSize
-        @AppStorage(AppearanceSettings.themeNameKey) private var terminalThemeName = AppearanceSettings.defaultDarkTheme
-        @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
+        @AppStorage(AppearanceSettings.terminalFontFamilyKey) var terminalFontName = AppearanceSettings.defaultTerminalFontFamily
+        @AppStorage(AppearanceSettings.terminalFontSizeKey) var terminalFontSize = AppearanceSettings.defaultTerminalFontSize
+        @AppStorage(AppearanceSettings.themeNameKey) var terminalThemeName = AppearanceSettings.defaultDarkTheme
+        @AppStorage(AppearanceSettings.lightThemeNameKey) var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
         @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) var usePerAppearanceTheme = false
         @AppStorage("appearanceMode") private var appearanceMode = "system"
 
@@ -257,65 +257,6 @@ extension Ghostty {
 
             // Unset XDG_CONFIG_HOME so it doesn't affect fish/shell config loading
             unsetenv("XDG_CONFIG_HOME")
-        }
-
-        // MARK: - Private Helpers
-
-        /// Generate and load config content into a ghostty_config_t
-        private func loadConfigIntoGhostty(_ config: ghostty_config_t) {
-            // Create temp config directory and use Ghostty themes
-            let tempDir = NSTemporaryDirectory()
-            let ghosttyConfigDir = (tempDir as NSString).appendingPathComponent(".config/ghostty")
-            let configFilePath = (ghosttyConfigDir as NSString).appendingPathComponent("config")
-
-            do {
-                try FileManager.default.createDirectory(atPath: ghosttyConfigDir, withIntermediateDirectories: true)
-
-                // Detect shell for integration
-                let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-                let shellName = (shell as NSString).lastPathComponent
-
-                // Create config with font settings, shell integration, and theme
-                let configContent = """
-                font-family = \(terminalFontName)
-                font-size = \(Int(terminalFontSize))
-                window-inherit-font-size = false
-                window-padding-balance = false
-                window-padding-x = 0
-                window-padding-y = 0
-                window-padding-color = extend-always
-
-                # Enable shell integration (resources dir auto-detected from app bundle)
-                shell-integration = \(shellName)
-                shell-integration-features = no-cursor,sudo,title
-
-                # Cursor
-                cursor-style-blink = true
-
-                theme = \(effectiveThemeName)
-
-                # Disable audible bell
-                audible-bell = false
-
-                # Custom keybinds
-                keybind = shift+enter=text:\\n
-
-                """
-
-                try configContent.write(toFile: configFilePath, atomically: true, encoding: .utf8)
-
-                // Set XDG_CONFIG_HOME to our temp directory
-                // With bundle ID "com.aizen.terminal", Ghostty will look for config at:
-                // ~/Library/Application Support/com.aizen.terminal/config (won't exist)
-                // So it will use our XDG config only
-                setenv("XDG_CONFIG_HOME", (tempDir as NSString).appendingPathComponent(".config"), 1)
-
-                // Load default files - will load our XDG config
-                // Will NOT load user's Ghostty config (com.mitchellh.ghostty) since bundle ID is different
-                ghostty_config_load_default_files(config)
-            } catch {
-                Ghostty.logger.warning("Failed to write config: \(error)")
-            }
         }
 
         // MARK: - Callbacks (macOS)
