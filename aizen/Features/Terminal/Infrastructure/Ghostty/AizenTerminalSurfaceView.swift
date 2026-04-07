@@ -146,17 +146,17 @@ extension Ghostty {
         @Published private(set) var cursorVisible: Bool = true
 
         /// The configuration derived from the Ghostty config so we don't need to rely on references.
-        @Published private(set) var derivedConfig: DerivedConfig
+        @Published var derivedConfig: DerivedConfig
 
         /// The background color within the color palette of the surface. This is only set if it is
         /// dynamically updated. Otherwise, the background color is the default background color.
-        @Published private(set) var backgroundColor: Color?
+        @Published var backgroundColor: Color?
 
         /// True when the bell is active. This is set inactive on focus or event.
-        @Published private(set) var bell: Bool = false
+        @Published var bell: Bool = false
 
         /// True when the surface is in readonly mode.
-        @Published private(set) var readonly: Bool = false
+        @Published var readonly: Bool = false
 
         /// True when the surface should show a highlight effect (e.g., when presented via goto_split).
         @Published private(set) var highlighted: Bool = false
@@ -252,7 +252,7 @@ extension Ghostty {
 
         // True when we've consumed a left mouse-down only to move focus and
         // should suppress the matching mouse-up from being reported.
-        private var suppressNextLeftMouseUp: Bool = false
+        var suppressNextLeftMouseUp: Bool = false
 
         // A small delay that is introduced before a title change to avoid flickers
         private var titleChangeTimer: Timer?
@@ -639,189 +639,6 @@ extension Ghostty {
                     return
                 }
                 self?.title = title
-            }
-        }
-
-        // MARK: Local Events
-
-        private func localEventHandler(_ event: NSEvent) -> NSEvent? {
-            return switch event.type {
-            case .keyUp:
-                localEventKeyUp(event)
-
-            case .leftMouseDown:
-                localEventLeftMouseDown(event)
-
-            default:
-                event
-            }
-        }
-
-        private func localEventLeftMouseDown(_ event: NSEvent) -> NSEvent? {
-            // We only want to process events that are on this window.
-            guard let window,
-                  event.window != nil,
-                  window == event.window else { return event }
-
-            // Ghostty assumes the surface is the actual topmost hit target.
-            // In Aizen the split divider lives above the embedded surface in
-            // the SwiftUI host tree, so we must not steal divider clicks here.
-            guard isTopmostSurfaceHit(for: event) else { return event }
-
-            // We always assume that we're resetting our mouse suppression
-            // unless we see the specific scenario below to set it.
-            suppressNextLeftMouseUp = false
-
-            // If we're already the first responder then no focus transfer is
-            // happening, so the click should continue as normal.
-            guard window.firstResponder !== self else {
-                return event
-            }
-
-            // If our window/app is already focused, then this click is only
-            // being used to transfer split focus. Consume it so it does not
-            // get forwarded to the terminal as a mouse click.
-            if NSApp.isActive && window.isKeyWindow {
-                window.makeFirstResponder(self)
-                suppressNextLeftMouseUp = true
-                return nil
-            }
-
-            // Make ourselves the first responder
-            window.makeFirstResponder(self)
-
-            // We have to keep processing the event so that AppKit can properly
-            // focus the window and dispatch events. If you return nil here then
-            // nobody gets a windowDidBecomeKey event and so on.
-            return event
-        }
-
-        private func isTopmostSurfaceHit(for event: NSEvent) -> Bool {
-            guard let window else { return false }
-
-            let localPoint = convert(event.locationInWindow, from: nil)
-            guard bounds.contains(localPoint) else { return false }
-
-            // Bounds containment alone is not enough here because the split
-            // divider sits above terminal surfaces in the host hierarchy. If a
-            // sibling view won hit-testing for this point, we must not steal
-            // the click for focus transfer or the first drag on the divider
-            // turns into a focus-only click.
-            if let contentView = window.contentView,
-               let hitView = contentView.hitTest(event.locationInWindow),
-               hitView !== self,
-               !hitView.isDescendant(of: self) {
-                return false
-            }
-
-            return true
-        }
-
-        private var isCurrentFirstResponder: Bool {
-            window?.firstResponder === self
-        }
-
-        private func localEventKeyUp(_ event: NSEvent) -> NSEvent? {
-            // We only care about events with "command" because all others will
-            // trigger the normal responder chain.
-            if !event.modifierFlags.contains(.command) { return event }
-
-            // Command keyUp events are never sent to the normal responder chain
-            // so we send them here.
-            guard isCurrentFirstResponder || focused else { return event }
-            self.keyUp(with: event)
-            return nil
-        }
-
-        // MARK: - Notifications
-
-        @objc private func onUpdateRendererHealth(notification: Foundation.Notification) {
-            guard let healthAny = notification.userInfo?["health"] else { return }
-            guard let health = healthAny as? ghostty_action_renderer_health_e else { return }
-            DispatchQueue.main.async { [weak self] in
-                self?.healthy = health == GHOSTTY_RENDERER_HEALTH_HEALTHY
-            }
-        }
-
-        @objc private func ghosttyDidContinueKeySequence(notification: Foundation.Notification) {
-            guard let keyAny = notification.userInfo?[Ghostty.Notification.KeySequenceKey] else { return }
-            guard let key = keyAny as? KeyboardShortcut else { return }
-            DispatchQueue.main.async { [weak self] in
-                self?.keySequence.append(key)
-            }
-        }
-
-        @objc private func ghosttyDidEndKeySequence(notification: Foundation.Notification) {
-            DispatchQueue.main.async { [weak self] in
-                self?.keySequence = []
-            }
-        }
-
-        @objc private func ghosttyDidChangeKeyTable(notification: Foundation.Notification) {
-            guard let action = notification.userInfo?[Ghostty.Notification.KeyTableKey] as? Ghostty.Action.KeyTable else { return }
-
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                switch action {
-                case .activate(let name):
-                    self.keyTables.append(name)
-                case .deactivate:
-                    _ = self.keyTables.popLast()
-                case .deactivateAll:
-                    self.keyTables.removeAll()
-                }
-            }
-        }
-
-        @objc private func ghosttyConfigDidChange(_ notification: Foundation.Notification) {
-            DispatchQueue.main.async { [weak self] in
-                self?.derivedConfig = DerivedConfig()
-            }
-        }
-
-        @objc private func ghosttyColorDidChange(_ notification: Foundation.Notification) {
-            guard let change = notification.userInfo?[
-                Foundation.Notification.Name.GhosttyColorChangeKey
-            ] as? Ghostty.Action.ColorChange else { return }
-
-            switch change.kind {
-            case .background:
-                DispatchQueue.main.async { [weak self] in
-                    self?.backgroundColor = change.color
-                }
-
-            default:
-                // We don't do anything for the other colors yet.
-                break
-            }
-        }
-
-        @objc private func ghosttyBellDidRing(_ notification: Foundation.Notification) {
-            // Bell state goes to true
-            bell = true
-        }
-
-        @objc private func ghosttyDidChangeReadonly(_ notification: Foundation.Notification) {
-            guard let value = notification.userInfo?[Foundation.Notification.Name.ReadonlyKey] as? Bool else { return }
-            readonly = value
-        }
-
-        @objc private func windowDidChangeScreen(notification: Foundation.Notification) {
-            guard let window = self.window else { return }
-            guard let object = notification.object as? NSWindow, window == object else { return }
-            guard let screen = window.screen else { return }
-            guard let surface = self.surface else { return }
-
-            // When the window changes screens, we need to update libghostty with the screen
-            // ID. If vsync is enabled, this will be used with the CVDisplayLink to ensure
-            // the proper refresh rate is going.
-            ghostty_surface_set_display_id(surface, screen.displayID ?? 0)
-
-            // We also just trigger a backing property change. Just in case the screen has
-            // a different scaling factor, this ensures that we update our content scale.
-            // Issue: https://github.com/ghostty-org/ghostty/issues/2731
-            DispatchQueue.main.async { [weak self] in
-                self?.viewDidChangeBackingProperties()
             }
         }
 
