@@ -133,7 +133,7 @@ extension Ghostty {
         @Published var surfaceSize: ghostty_surface_size_s?
 
         // Whether the pointer should be visible or not
-        @Published private(set) var pointerStyle: CursorStyle = .horizontalText
+        @Published var pointerStyle: CursorStyle = .horizontalText
 
         // Whether the mouse is currently over this surface
         @Published var mouseOverSurface: Bool = false
@@ -143,7 +143,7 @@ extension Ghostty {
         @Published var mouseLocationInSurface: CGPoint?
 
         // Whether the cursor is currently visible (not hidden by typing, etc.)
-        @Published private(set) var cursorVisible: Bool = true
+        @Published var cursorVisible: Bool = true
 
         /// The configuration derived from the Ghostty config so we don't need to rely on references.
         @Published var derivedConfig: DerivedConfig
@@ -237,7 +237,7 @@ extension Ghostty {
         var notificationIdentifiers: Set<String> = []
 
         var markedText: NSMutableAttributedString
-        private(set) var focused: Bool = false
+        var focused: Bool = false
 
         /// Monotonic counter incremented every time any surface becomes first
         /// responder.  ``Ghostty.moveFocus`` captures this at dispatch time and
@@ -456,199 +456,23 @@ extension Ghostty {
             guard self.focused != focused else { return }
             self.focused = focused
 
-            // If we lost our focus then remove the mouse event suppression so
-            // our mouse release event leaving the surface can properly be
-            // sent to stop things like mouse selection.
             if !focused {
                 suppressNextLeftMouseUp = false
             }
 
-            // Notify libghostty
             ghostty_surface_set_focus(surface, focused)
 
-            // Update our secure input state if we are a password input
             if passwordInput {
                 SecureInput.shared.setScoped(ObjectIdentifier(self), focused: focused)
             }
 
             if focused {
-                // On macOS 13+ we can store our continuous clock...
                 focusInstant = ContinuousClock.now
-
-                // We unset our bell state if we gained focus
                 bell = false
-
             }
-        }
-
-        func sizeDidChange(_ size: CGSize) {
-            // Ghostty wants to know the actual framebuffer size... It is very important
-            // here that we use "size" and NOT the view frame. If we're in the middle of
-            // an animation (i.e. a fullscreen animation), the frame will not yet be updated.
-            // The size represents our final size we're going for.
-            let scaledSize = self.convertToBacking(size)
-            setSurfaceSize(width: UInt32(scaledSize.width), height: UInt32(scaledSize.height))
-            // Store this size so we can reuse it when backing properties change
-            contentSize = size
-        }
-
-        func setSurfaceSize(width: UInt32, height: UInt32) {
-            guard let surface = self.surface else { return }
-
-            // Update our core surface
-            ghostty_surface_set_size(surface, width, height)
-
-            // Update our cached size metrics
-            let size = ghostty_surface_size(surface)
-            DispatchQueue.main.async {
-                // DispatchQueue required since this may be called by SwiftUI off
-                // the main thread and Published changes need to be on the main
-                // thread. This caused a crash on macOS <= 14.
-                self.surfaceSize = size
-            }
-        }
-
-        func setCursorShape(_ shape: ghostty_action_mouse_shape_e) {
-            switch shape {
-            case GHOSTTY_MOUSE_SHAPE_DEFAULT:
-                pointerStyle = .default
-
-            case GHOSTTY_MOUSE_SHAPE_TEXT:
-                pointerStyle = .horizontalText
-
-            case GHOSTTY_MOUSE_SHAPE_GRAB:
-                pointerStyle = .grabIdle
-
-            case GHOSTTY_MOUSE_SHAPE_GRABBING:
-                pointerStyle = .grabActive
-
-            case GHOSTTY_MOUSE_SHAPE_POINTER:
-                pointerStyle = .link
-
-            case GHOSTTY_MOUSE_SHAPE_W_RESIZE:
-                pointerStyle = .resizeLeft
-
-            case GHOSTTY_MOUSE_SHAPE_E_RESIZE:
-                pointerStyle = .resizeRight
-
-            case GHOSTTY_MOUSE_SHAPE_N_RESIZE:
-                pointerStyle = .resizeUp
-
-            case GHOSTTY_MOUSE_SHAPE_S_RESIZE:
-                pointerStyle = .resizeDown
-
-            case GHOSTTY_MOUSE_SHAPE_NS_RESIZE:
-                pointerStyle = .resizeUpDown
-
-            case GHOSTTY_MOUSE_SHAPE_EW_RESIZE:
-                pointerStyle = .resizeLeftRight
-
-            case GHOSTTY_MOUSE_SHAPE_VERTICAL_TEXT:
-                pointerStyle = .verticalText
-
-            case GHOSTTY_MOUSE_SHAPE_CONTEXT_MENU:
-                pointerStyle = .contextMenu
-
-            case GHOSTTY_MOUSE_SHAPE_CROSSHAIR:
-                pointerStyle = .crosshair
-
-            case GHOSTTY_MOUSE_SHAPE_NOT_ALLOWED:
-                pointerStyle = .operationNotAllowed
-
-            default:
-                // We ignore unknown shapes.
-                return
-            }
-        }
-
-        func setCursorVisibility(_ visible: Bool) {
-            cursorVisible = visible
-            // Technically this action could be called anytime we want to
-            // change the mouse visibility but at the time of writing this
-            // mouse-hide-while-typing is the only use case so this is the
-            // preferred method.
-            NSCursor.setHiddenUntilMouseMoves(!visible)
         }
 
         // MARK: - NSView
-
-        override func becomeFirstResponder() -> Bool {
-            let result = super.becomeFirstResponder()
-            if result {
-                Self.focusChangeCounter &+= 1
-                focusDidChange(true)
-            }
-            return result
-        }
-
-        override func resignFirstResponder() -> Bool {
-            let result = super.resignFirstResponder()
-
-            // We sometimes call this manually (see SplitView) as a way to force us to
-            // yield our focus state.
-            if result { focusDidChange(false) }
-
-            return result
-        }
-
-        override func updateTrackingAreas() {
-            // To update our tracking area we just recreate it all.
-            trackingAreas.forEach { removeTrackingArea($0) }
-
-            // This tracking area is across the entire frame to notify us of mouse movements.
-            addTrackingArea(NSTrackingArea(
-                rect: frame,
-                options: [
-                    .mouseEnteredAndExited,
-                    .mouseMoved,
-
-                    // Only send mouse events that happen in our visible (not obscured) rect
-                    .inVisibleRect,
-
-                    // We want active always because we want to still send mouse reports
-                    // even if we're not focused or key.
-                    .activeAlways,
-                ],
-                owner: self,
-                userInfo: nil))
-        }
-
-        override func viewDidChangeBackingProperties() {
-            super.viewDidChangeBackingProperties()
-
-            // The Core Animation compositing engine uses the layer's contentsScale property
-            // to determine whether to scale its contents during compositing. When the window
-            // moves between a high DPI display and a low DPI display, or the user modifies
-            // the DPI scaling for a display in the system settings, this can result in the
-            // layer being scaled inappropriately. Since we handle the adjustment of scale
-            // and resolution ourselves below, we update the layer's contentsScale property
-            // to match the window's backingScaleFactor, so as to ensure it is not scaled by
-            // the compositor.
-            //
-            // Ref: High Resolution Guidelines for OS X
-            // https://developer.apple.com/library/archive/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/CapturingScreenContents/CapturingScreenContents.html#//apple_ref/doc/uid/TP40012302-CH10-SW27
-            if let window = window {
-                CATransaction.begin()
-                // Disable the implicit transition animation that Core Animation applies to
-                // property changes. Otherwise it will apply a scale animation to the layer
-                // contents which looks pretty janky.
-                CATransaction.setDisableActions(true)
-                layer?.contentsScale = window.backingScaleFactor
-                CATransaction.commit()
-            }
-
-            guard let surface = self.surface else { return }
-
-            // Detect our X/Y scale factor so we can update our surface
-            let fbFrame = self.convertToBacking(self.frame)
-            let xScale = fbFrame.size.width / self.frame.size.width
-            let yScale = fbFrame.size.height / self.frame.size.height
-            ghostty_surface_set_content_scale(surface, xScale, yScale)
-
-            // When our scale factor changes, so does our fb size so we send that too
-            let scaledSize = self.convertToBacking(contentSize)
-            setSurfaceSize(width: UInt32(scaledSize.width), height: UInt32(scaledSize.height))
-        }
 
         /// Records the timestamp of the last event to performKeyEquivalent that we need to save.
         /// We currently save all commands with command or control set.
