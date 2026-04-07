@@ -35,7 +35,7 @@ extension Ghostty {
         // The current title of the surface as defined by the pty. This can be
         // changed with escape codes. This is public because the callbacks go
         // to the app level and it is set from there.
-        @Published private(set) var title: String = "" {
+        @Published var title: String = "" {
             didSet {
                 if !title.isEmpty {
                     titleFallbackTimer?.invalidate()
@@ -255,7 +255,7 @@ extension Ghostty {
         var suppressNextLeftMouseUp: Bool = false
 
         // A small delay that is introduced before a title change to avoid flickers
-        private var titleChangeTimer: Timer?
+        var titleChangeTimer: Timer?
 
         // A timer to fallback to ghost emoji if no title is set within the grace period
         private var titleFallbackTimer: Timer?
@@ -266,7 +266,7 @@ extension Ghostty {
         // This is the title from the terminal. This is nil if we're currently using
         // the terminal title as the main title property. If the title is set manually
         // by the user, this is set to the prior value (which may be empty, but non-nil).
-        private var titleFromTerminal: String?
+        var titleFromTerminal: String?
 
         // The cached contents of the screen.
         private(set) var cachedScreenContents: CachedValue<String>
@@ -568,78 +568,6 @@ extension Ghostty {
             // mouse-hide-while-typing is the only use case so this is the
             // preferred method.
             NSCursor.setHiddenUntilMouseMoves(!visible)
-        }
-
-        /// Set the title by prompting the user.
-        func promptTitle() {
-            // Create an alert dialog
-            let alert = NSAlert()
-            alert.messageText = "Change Terminal Title"
-            alert.informativeText = "Leave blank to restore the default."
-            alert.alertStyle = .informational
-
-            // Add a text field to the alert
-            let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 250, height: 24))
-            textField.stringValue = title
-            alert.accessoryView = textField
-
-            // Add buttons
-            alert.addButton(withTitle: "OK")
-            alert.addButton(withTitle: "Cancel")
-
-            // Make the text field the first responder so it gets focus
-            alert.window.initialFirstResponder = textField
-
-            let completionHandler: (NSApplication.ModalResponse) -> Void = { [weak self] response in
-                guard let self else { return }
-
-                // Check if the user clicked "OK"
-                guard response == .alertFirstButtonReturn  else { return }
-
-                // Get the input text
-                let newTitle = textField.stringValue
-                if newTitle.isEmpty {
-                    // Empty means that user wants the title to be set automatically
-                    // We also need to reload the config for the "title" property to be
-                    // used again by this tab.
-                    let prevTitle = titleFromTerminal ?? "👻"
-                    titleFromTerminal = nil
-                    setTitle(prevTitle)
-                } else {
-                    // Set the title and prevent it from being changed automatically
-                    titleFromTerminal = title
-                    title = newTitle
-                }
-            }
-
-            // We prefer to run our alert in a sheet modal if we have a window.
-            if let window {
-                alert.beginSheetModal(for: window, completionHandler: completionHandler)
-            } else {
-                // On macOS 26 RC, this codepath results in the "OK" button not being
-                // visible. The above codepath should be taken most times but I'm just
-                // noting this as something I noticed consistently.
-                completionHandler(alert.runModal())
-            }
-        }
-
-        func setTitle(_ title: String) {
-            // This fixes an issue where very quick changes to the title could
-            // cause an unpleasant flickering. We set a timer so that we can
-            // coalesce rapid changes. The timer is short enough that it still
-            // feels "instant".
-            titleChangeTimer?.invalidate()
-            titleChangeTimer = Timer.scheduledTimer(
-                withTimeInterval: 0.075,
-                repeats: false
-            ) { [weak self] _ in
-                // Set the title if it wasn't manually set.
-                guard self?.titleFromTerminal == nil else {
-                    self?.titleFromTerminal = title
-                    return
-                }
-                self?.title = title
-            }
         }
 
         // MARK: - NSView
