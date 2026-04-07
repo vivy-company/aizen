@@ -55,10 +55,10 @@ extension Ghostty {
         private var activeSurfaces: [Ghostty.SurfaceReference] = []
 
         /// Track last known appearance to detect changes
-        private var lastKnownAppearance: NSAppearance.Name?
+        var lastKnownAppearance: NSAppearance.Name?
 
         /// Track last known theme to detect changes
-        private var lastKnownTheme: String?
+        var lastKnownTheme: String?
 
         /// Observer for in-app appearance setting changes
         private var appearanceSettingObserver: NSObjectProtocol?
@@ -69,10 +69,10 @@ extension Ghostty {
         @AppStorage(AppearanceSettings.terminalFontSizeKey) private var terminalFontSize = AppearanceSettings.defaultTerminalFontSize
         @AppStorage(AppearanceSettings.themeNameKey) private var terminalThemeName = AppearanceSettings.defaultDarkTheme
         @AppStorage(AppearanceSettings.lightThemeNameKey) private var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
-        @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) private var usePerAppearanceTheme = false
+        @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) var usePerAppearanceTheme = false
         @AppStorage("appearanceMode") private var appearanceMode = "system"
 
-        private var effectiveThemeName: String {
+        var effectiveThemeName: String {
             if !usePerAppearanceTheme {
                 return terminalThemeName
             }
@@ -178,48 +178,6 @@ extension Ghostty {
                 object: nil
             )
 
-        }
-
-        @objc private func systemAppearanceDidChange(_ notification: Foundation.Notification) {
-            handleAppearanceChange()
-        }
-
-        @objc private func keyboardSelectionDidChange(_ notification: Foundation.Notification) {
-            guard let app = self.app else { return }
-            ghostty_app_keyboard_changed(app)
-        }
-
-        @objc private func applicationDidBecomeActive(_ notification: Foundation.Notification) {
-            guard let app = self.app else { return }
-            ghostty_app_set_focus(app, true)
-        }
-
-        @objc private func applicationDidResignActive(_ notification: Foundation.Notification) {
-            guard let app = self.app else { return }
-            ghostty_app_set_focus(app, false)
-        }
-
-        private func handleAppearanceChange() {
-            guard usePerAppearanceTheme else { return }
-
-            let currentAppearance = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
-            guard currentAppearance != lastKnownAppearance else { return }
-
-            lastKnownAppearance = currentAppearance
-            reloadIfThemeChanged()
-        }
-
-        private func checkAppearanceSettingChange() {
-            guard usePerAppearanceTheme else { return }
-            reloadIfThemeChanged()
-        }
-
-        private func reloadIfThemeChanged() {
-            let newTheme = effectiveThemeName
-            guard newTheme != lastKnownTheme else { return }
-
-            lastKnownTheme = newTheme
-            reloadConfig()
         }
 
         deinit {
