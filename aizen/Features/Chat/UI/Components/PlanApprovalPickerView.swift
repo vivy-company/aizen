@@ -1,0 +1,130 @@
+import AppKit
+import ACP
+import SwiftUI
+
+struct PlanApprovalPickerView: View {
+    private enum Layout {
+        static let cornerRadius: CGFloat = 22
+        static let horizontalPadding: CGFloat = 14
+        static let topPadding: CGFloat = 14
+        static let bottomPadding: CGFloat = 12
+    }
+
+    @ObservedObject var session: ChatAgentSession
+    let request: RequestPermissionRequest
+    let onDismissWithoutResponse: () -> Void
+
+    @State var selectedIndex = 0
+    @State var keyMonitor: Any?
+
+    var options: [PermissionOption] {
+        request.options ?? []
+    }
+
+    private var prompt: PermissionRequestPrompt {
+        request.promptDescription
+    }
+
+    private var optionIdentityKey: String {
+        options.map(\.optionId).joined(separator: "|")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(prompt.title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            if let detail = prompt.detail {
+                Text(detail)
+                    .font(.system(size: 12, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(alignment: .top, spacing: 8) {
+                VStack(spacing: 4) {
+                    if options.isEmpty {
+                        Text("No options available")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        ForEach(Array(options.enumerated()), id: \.offset) { index, option in
+                            optionRow(option: option, index: index)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(spacing: 4) {
+                    pickerArrowButton(systemName: "arrow.up", action: { moveSelection(-1) })
+                    pickerArrowButton(systemName: "arrow.down", action: { moveSelection(1) })
+                }
+                .padding(.top, 1)
+                .opacity(options.count > 1 ? 1 : 0.45)
+            }
+
+            HStack(spacing: 8) {
+                Spacer(minLength: 8)
+
+                Button {
+                    dismissRequest()
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("Dismiss")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("ESC")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color.primary.opacity(0.08), in: Capsule())
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .keyboardShortcut(.escape, modifiers: [])
+
+                Button {
+                    submitSelectedOption()
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("Submit")
+                        Text("ENTER")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color.primary.opacity(0.08), in: Capsule())
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(canSubmit ? .white : .secondary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 7)
+                .background(canSubmit ? Color.accentColor : Color.secondary.opacity(0.18), in: Capsule())
+                .disabled(!canSubmit)
+                .keyboardShortcut(.return, modifiers: [])
+            }
+        }
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.top, Layout.topPadding)
+        .padding(.bottom, Layout.bottomPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { liquidGlassBackground }
+        .onAppear {
+            selectedIndex = min(selectedIndex, max(options.count - 1, 0))
+            installKeyboardMonitorIfNeeded()
+        }
+        .task(id: optionIdentityKey) {
+            selectedIndex = min(selectedIndex, max(options.count - 1, 0))
+        }
+        .onDisappear {
+            removeKeyboardMonitor()
+        }
+    }
+}
