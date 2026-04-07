@@ -74,7 +74,7 @@ nonisolated struct GitStatusColors {
     )
 }
 
-extension GhosttyThemeParser {
+nonisolated extension GhosttyThemeParser {
     struct ParsedTheme {
         var background: NSColor?
         var foreground: NSColor?
