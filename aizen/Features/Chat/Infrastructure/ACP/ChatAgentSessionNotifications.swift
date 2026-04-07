@@ -122,36 +122,11 @@ extension ChatAgentSession {
                     activeTaskIds.removeAll { $0 == toolCallId }
                 }
             case .agentMessageChunk(let block):
-                clearThoughtBuffer()
-                currentThought = nil
-                let (text, blockContent) = textAndContent(from: block)
-                if shouldSkipResumedAgentChunk(text: text, hasContentBlocks: !blockContent.isEmpty) {
-                    break
-                }
-                if text.isEmpty && blockContent.isEmpty { break }
-                recordAgentChunk()
-
-                // Find the last agent message (not just last message)
-                // This prevents system messages (like mode changes) from splitting the stream
-                let lastAgentMessage = messages.last { $0.role == .agent }
-
-                if let lastAgentMessage = lastAgentMessage,
-                   !lastAgentMessage.isComplete {
-                    // Append to the active agent message immediately so the timeline can stream each chunk.
-                    appendAgentMessageChunk(text: text, contentBlocks: blockContent)
-                } else {
-                    let initialText = text
-                    let initialBlocks = blockContent
-                    AgentUsageStore.shared.recordAgentMessage(agentId: agentName)
-                    clearAgentMessageBuffer()
-                    addAgentMessage(initialText, contentBlocks: initialBlocks, isComplete: false, startTime: Date())
-                }
+                handleAgentMessageChunk(block)
             case .userMessageChunk:
                 break
             case .agentThoughtChunk(let block):
-                let (text, _) = textAndContent(from: block)
-                if text.isEmpty { break }
-                appendThoughtChunk(text)
+                handleAgentThoughtChunk(block)
             case .plan(let plan):
                 // Coalesce plan updates - only update if content changed
                 // This prevents excessive UI rebuilds when multiple agents stream plan updates
@@ -234,7 +209,7 @@ extension ChatAgentSession {
     }
 
     /// Extract plain text from a content block (best effort)
-    private func textAndContent(from block: ContentBlock) -> (String, [ContentBlock]) {
+    func textAndContent(from block: ContentBlock) -> (String, [ContentBlock]) {
         switch block {
         case .text(let text):
             return (text.text, [.text(text)])
