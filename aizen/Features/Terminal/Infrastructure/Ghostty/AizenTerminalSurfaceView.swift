@@ -136,11 +136,11 @@ extension Ghostty {
         @Published private(set) var pointerStyle: CursorStyle = .horizontalText
 
         // Whether the mouse is currently over this surface
-        @Published private(set) var mouseOverSurface: Bool = false
+        @Published var mouseOverSurface: Bool = false
 
         // The last known mouse location in the surface's local coordinate space,
         // used by overlays such as the split drag handle reveal region.
-        @Published private(set) var mouseLocationInSurface: CGPoint?
+        @Published var mouseLocationInSurface: CGPoint?
 
         // Whether the cursor is currently visible (not hidden by typing, etc.)
         @Published private(set) var cursorVisible: Bool = true
@@ -244,7 +244,7 @@ extension Ghostty {
         /// skips execution when it has changed, preventing stale async focus
         /// requests from stealing focus after a user click.
         static var focusChangeCounter: Int = 0
-        private var prevPressureStage: Int = 0
+        var prevPressureStage: Int = 0
         private var appearanceObserver: NSKeyValueObservation?
 
         // This is set to non-null during keyDown to accumulate insertText contents
@@ -720,194 +720,6 @@ extension Ghostty {
             // When our scale factor changes, so does our fb size so we send that too
             let scaledSize = self.convertToBacking(contentSize)
             setSurfaceSize(width: UInt32(scaledSize.width), height: UInt32(scaledSize.height))
-        }
-
-        override func mouseDown(with event: NSEvent) {
-            guard let surface = self.surface else { return }
-            let mods = Ghostty.ghosttyMods(event.modifierFlags)
-            ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT, mods)
-        }
-
-        override func mouseUp(with event: NSEvent) {
-            // If this mouse-up corresponds to a focus-only click transfer,
-            // suppress it so we don't emit a release without a press.
-            if suppressNextLeftMouseUp {
-                suppressNextLeftMouseUp = false
-                return
-            }
-
-            // Always reset our pressure when the mouse goes up
-            prevPressureStage = 0
-
-            // If we have an active surface, report the event
-            guard let surface = self.surface else { return }
-            let mods = Ghostty.ghosttyMods(event.modifierFlags)
-            ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_LEFT, mods)
-
-            // Release pressure
-            ghostty_surface_mouse_pressure(surface, 0, 0)
-        }
-
-        override func otherMouseDown(with event: NSEvent) {
-            guard let surface = self.surface else { return }
-            let mods = Ghostty.ghosttyMods(event.modifierFlags)
-            let button = Ghostty.Input.MouseButton(fromNSEventButtonNumber: event.buttonNumber)
-            ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, button.cMouseButton, mods)
-        }
-
-        override func otherMouseUp(with event: NSEvent) {
-            guard let surface = self.surface else { return }
-            let mods = Ghostty.ghosttyMods(event.modifierFlags)
-            let button = Ghostty.Input.MouseButton(fromNSEventButtonNumber: event.buttonNumber)
-            ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, button.cMouseButton, mods)
-        }
-
-        override func rightMouseDown(with event: NSEvent) {
-            guard let surface = self.surface else { return super.rightMouseDown(with: event) }
-
-            let mods = Ghostty.ghosttyMods(event.modifierFlags)
-            if ghostty_surface_mouse_button(
-                surface,
-                GHOSTTY_MOUSE_PRESS,
-                GHOSTTY_MOUSE_RIGHT,
-                mods
-            ) {
-                // Consumed
-                return
-            }
-
-            // Mouse event not consumed
-            super.rightMouseDown(with: event)
-        }
-
-        override func rightMouseUp(with event: NSEvent) {
-            guard let surface = self.surface else { return super.rightMouseUp(with: event) }
-
-            let mods = Ghostty.ghosttyMods(event.modifierFlags)
-            if ghostty_surface_mouse_button(
-                surface,
-                GHOSTTY_MOUSE_RELEASE,
-                GHOSTTY_MOUSE_RIGHT,
-                mods
-            ) {
-                // Handled
-                return
-            }
-
-            // Mouse event not consumed
-            super.rightMouseUp(with: event)
-        }
-
-        override func mouseEntered(with event: NSEvent) {
-            mouseOverSurface = true
-            super.mouseEntered(with: event)
-
-            let pos = self.convert(event.locationInWindow, from: nil)
-            mouseLocationInSurface = pos
-
-            guard let surfaceModel else { return }
-
-            // On mouse enter we need to reset our cursor position. This is
-            // super important because we set it to -1/-1 on mouseExit and
-            // lots of mouse logic (i.e. whether to send mouse reports) depend
-            // on the position being in the viewport if it is.
-            let mouseEvent = Ghostty.Input.MousePosEvent(
-                x: pos.x,
-                y: frame.height - pos.y,
-                mods: .init(nsFlags: event.modifierFlags)
-            )
-            surfaceModel.sendMousePos(mouseEvent)
-        }
-
-        override func mouseExited(with event: NSEvent) {
-            mouseOverSurface = false
-            mouseLocationInSurface = nil
-            guard let surfaceModel else { return }
-
-            // If the mouse is being dragged then we don't have to emit
-            // this because we get mouse drag events even if we've already
-            // exited the viewport (i.e. mouseDragged)
-            if NSEvent.pressedMouseButtons != 0 {
-                return
-            }
-
-            // Negative values indicate cursor has left the viewport
-            let mouseEvent = Ghostty.Input.MousePosEvent(
-                x: -1,
-                y: -1,
-                mods: .init(nsFlags: event.modifierFlags)
-            )
-            surfaceModel.sendMousePos(mouseEvent)
-        }
-
-        override func mouseMoved(with event: NSEvent) {
-            let pos = self.convert(event.locationInWindow, from: nil)
-            mouseLocationInSurface = pos
-
-            guard let surfaceModel else { return }
-
-            // Convert window position to view position. Note (0, 0) is bottom left.
-            let mouseEvent = Ghostty.Input.MousePosEvent(
-                x: pos.x,
-                y: frame.height - pos.y,
-                mods: .init(nsFlags: event.modifierFlags)
-            )
-            surfaceModel.sendMousePos(mouseEvent)
-        }
-
-        override func mouseDragged(with event: NSEvent) {
-            self.mouseMoved(with: event)
-        }
-
-        override func rightMouseDragged(with event: NSEvent) {
-            self.mouseMoved(with: event)
-        }
-
-        override func otherMouseDragged(with event: NSEvent) {
-            self.mouseMoved(with: event)
-        }
-
-        override func scrollWheel(with event: NSEvent) {
-            guard let surfaceModel else { return }
-
-            var x = event.scrollingDeltaX
-            var y = event.scrollingDeltaY
-            let precision = event.hasPreciseScrollingDeltas
-
-            if precision {
-                // We do a 2x speed multiplier. This is subjective, it "feels" better to me.
-                x *= 2
-                y *= 2
-
-                // TODO(mitchellh): do we have to scale the x/y here by window scale factor?
-            }
-
-            let scrollEvent = Ghostty.Input.MouseScrollEvent(
-                x: x,
-                y: y,
-                mods: .init(precision: precision, momentum: .init(event.momentumPhase))
-            )
-            surfaceModel.sendMouseScroll(scrollEvent)
-        }
-
-        override func pressureChange(with event: NSEvent) {
-            guard let surface = self.surface else { return }
-
-            // Notify Ghostty first. We do this because this will let Ghostty handle
-            // state setup that we'll need for later pressure handling (such as
-            // QuickLook)
-            ghostty_surface_mouse_pressure(surface, UInt32(event.stage), Double(event.pressure))
-
-            // Pressure stage 2 is force click. We only want to execute this on the
-            // initial transition to stage 2, and not for any repeated events.
-            guard self.prevPressureStage < 2 else { return }
-            prevPressureStage = event.stage
-            guard event.stage == 2 else { return }
-
-            // If the user has force click enabled then we do a quick look. There
-            // is no public API for this as far as I can tell.
-            guard UserDefaults.standard.bool(forKey: "com.apple.trackpad.forceClick") else { return }
-            quickLook(with: event)
         }
 
         override func keyDown(with event: NSEvent) {
