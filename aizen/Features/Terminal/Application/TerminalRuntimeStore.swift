@@ -16,57 +16,11 @@ struct TerminalRuntimeCounts {
 class TerminalRuntimeStore {
     static let shared = TerminalRuntimeStore()
 
-    private var terminals: [String: AizenTerminalSurfaceView] = [:]
-    private var accessOrder: [String] = []
-    private let maxTerminals = 50
+    var terminals: [String: AizenTerminalSurfaceView] = [:]
+    var accessOrder: [String] = []
+    let maxTerminals = 50
 
     private init() {}
-
-    private func key(for sessionId: UUID, paneId: String) -> String {
-        "\(sessionId.uuidString)-\(paneId)"
-    }
-
-    private func keyPrefix(for sessionId: UUID) -> String {
-        "\(sessionId.uuidString)-"
-    }
-
-    func getTerminal(for sessionId: UUID, paneId: String) -> AizenTerminalSurfaceView? {
-        let key = key(for: sessionId, paneId: paneId)
-        if let terminal = terminals[key] {
-            touch(key)
-            return terminal
-        }
-        return nil
-    }
-
-    func setTerminal(_ terminal: AizenTerminalSurfaceView, for sessionId: UUID, paneId: String) {
-        let key = key(for: sessionId, paneId: paneId)
-        terminals[key] = terminal
-        touch(key)
-        evictIfNeeded()
-    }
-
-    func removeTerminal(for sessionId: UUID, paneId: String) {
-        let key = key(for: sessionId, paneId: paneId)
-        if let terminal = terminals.removeValue(forKey: key) {
-            cleanupTerminal(terminal)
-        }
-        accessOrder.removeAll { $0 == key }
-    }
-
-    func removeAllTerminals(for sessionId: UUID) {
-        let prefix = keyPrefix(for: sessionId)
-        for (key, terminal) in terminals where key.hasPrefix(prefix) {
-            cleanupTerminal(terminal)
-            terminals.removeValue(forKey: key)
-        }
-        accessOrder.removeAll { $0.hasPrefix(prefix) }
-    }
-
-    func getTerminalCount(for sessionId: UUID) -> Int {
-        let prefix = keyPrefix(for: sessionId)
-        return terminals.keys.filter { $0.hasPrefix(prefix) }.count
-    }
 
     @MainActor
     func paneIds(for sessionId: UUID) -> [String] {
@@ -104,28 +58,6 @@ class TerminalRuntimeStore {
         }
 
         return nil
-    }
-
-    private func touch(_ key: String) {
-        accessOrder.removeAll { $0 == key }
-        accessOrder.append(key)
-    }
-
-    private func evictIfNeeded() {
-        while terminals.count > maxTerminals, let oldest = accessOrder.first {
-            accessOrder.removeFirst()
-            if let terminal = terminals.removeValue(forKey: oldest) {
-                cleanupTerminal(terminal)
-            }
-        }
-    }
-
-    private func cleanupTerminal(_ terminal: AizenTerminalSurfaceView) {
-        terminal.onProcessExit = nil
-        terminal.onFocus = nil
-        terminal.onTitleChange = nil
-        terminal.onProgressReport = nil
-        terminal.onReady = nil
     }
 
     /// Check if any terminal pane needs confirmation before closing
