@@ -21,8 +21,8 @@ final class AutocompletePopupModel: ObservableObject {
 }
 
 final class AutocompleteWindowController: NSWindowController {
-    private var isWindowAboveCursor = false
-    private weak var parentWindow: NSWindow?
+    var isWindowAboveCursor = false
+    weak var parentWindow: NSWindow?
     private let model = AutocompletePopupModel()
     private var lastItemCount: Int = -1
     private var lastItemIds: Set<String> = []
@@ -60,49 +60,8 @@ final class AutocompleteWindowController: NSWindowController {
         }
     }
 
-    private func updateWindowAppearance() {
-        let appearanceMode = UserDefaults.standard.string(forKey: "appearanceMode") ?? "system"
-        let appearance: NSAppearance?
-
-        switch appearanceMode {
-        case "dark":
-            appearance = NSAppearance(named: .darkAqua)
-        case "light":
-            appearance = NSAppearance(named: .aqua)
-        default:
-            appearance = nil  // System default
-        }
-
-        window?.appearance = appearance
-    }
-
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
-    }
-
-    private static let defaultWidth: CGFloat = 360
-
-    static func makeWindow() -> NSWindow {
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: defaultWidth, height: 120),
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        panel.titleVisibility = .hidden
-        panel.titlebarAppearsTransparent = true
-        panel.isExcludedFromWindowsMenu = true
-        panel.isReleasedWhenClosed = false
-        panel.level = .popUpMenu
-        panel.hasShadow = false
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.animationBehavior = .utilityWindow
-        panel.hidesOnDeactivate = false
-        panel.becomesKeyOnlyIfNeeded = true
-        panel.acceptsMouseMovedEvents = true
-        panel.ignoresMouseEvents = false
-        return panel
     }
 
     private var currentHostingView: NSView?
@@ -133,25 +92,6 @@ final class AutocompleteWindowController: NSWindowController {
         }
     }
 
-    func updateWindowSize(itemCount: Int) {
-        // Calculate height based on content
-        let headerHeight: CGFloat = 38
-        let emptyStateHeight: CGFloat = 54
-        let rowHeight: CGFloat = 44
-        let maxVisibleItems = 5
-
-        let contentHeight: CGFloat
-        if itemCount == 0 {
-            contentHeight = headerHeight + emptyStateHeight
-        } else {
-            let visibleItems = min(itemCount, maxVisibleItems)
-            contentHeight = headerHeight + CGFloat(visibleItems) * rowHeight
-        }
-
-        let size = NSSize(width: Self.defaultWidth, height: contentHeight)
-        window?.setContentSize(size)
-    }
-
     var hasContent: Bool {
         currentHostingView != nil
     }
@@ -173,47 +113,6 @@ final class AutocompleteWindowController: NSWindowController {
 
     func updatePosition(at cursorRect: NSRect) {
         positionWindow(at: cursorRect)
-    }
-
-    private func positionWindow(at cursorRect: NSRect) {
-        guard let window = window else { return }
-
-        // Get effective cursor rect - use parent window bottom-center if cursor rect is zero
-        var effectiveCursorRect = cursorRect
-        if cursorRect == .zero, let parentFrame = parentWindow?.frame {
-            // Position above parent window's bottom center
-            effectiveCursorRect = NSRect(
-                x: parentFrame.midX,
-                y: parentFrame.minY + 100,
-                width: 1,
-                height: 20
-            )
-        }
-
-        // Use screen containing cursor, or main screen as fallback
-        let screenFrame = NSScreen.screens.first(where: { $0.frame.contains(effectiveCursorRect.origin) })?.visibleFrame
-            ?? NSScreen.main?.visibleFrame
-            ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
-
-        // Use actual window size (set by setContent)
-        let windowSize = window.frame.size
-
-        var origin = NSPoint(x: effectiveCursorRect.minX, y: effectiveCursorRect.minY)
-
-        // Always position above cursor
-        origin.y = effectiveCursorRect.maxY + 4
-        isWindowAboveCursor = true
-
-        // Check if goes above screen - flip to below only if necessary
-        if origin.y + windowSize.height > screenFrame.maxY {
-            origin.y = effectiveCursorRect.minY - windowSize.height - 4
-            isWindowAboveCursor = false
-        }
-
-        // Horizontal bounds
-        origin.x = max(screenFrame.minX + 8, min(origin.x, screenFrame.maxX - windowSize.width - 8))
-
-        window.setFrameOrigin(origin)
     }
 
     func dismiss() {
