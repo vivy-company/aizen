@@ -50,4 +50,9 @@ extension ChatMessageList {
     func timelineMessage(withID messageID: String) -> MessageItem? {
         lastBuildMetadata.messagesByID[messageID]
     }
+
+    func handleUserMessageCopyHoverChange(_ messageID: String?) {
+        guard hoveredCopyUserMessageID != messageID else { return }
+        hoveredCopyUserMessageID = messageID
+    }
 }
