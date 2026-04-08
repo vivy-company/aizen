@@ -161,40 +161,6 @@ class AizenTerminalScrollView: NSView {
         observers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
-    // The entire bounds is a safe area, so we override any default
-    // insets. This is necessary for the content view to match the
-    // surface view if we have the "hidden" titlebar style.
-    override var safeAreaInsets: NSEdgeInsets { return NSEdgeInsetsZero }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-
-        guard window != nil else { return }
-
-        // SwiftUI can attach us to the window before it has driven a stable layout pass.
-        // Re-run layout on the next turn so the surface gets a real size/content-scale.
-        DispatchQueue.main.async { [weak self] in
-            self?.synchronizeForHostUpdate()
-        }
-    }
-
-    override func layout() {
-        super.layout()
-
-        // Fill entire bounds with scroll view
-        scrollView.frame = bounds
-        surfaceView.frame.size = scrollView.bounds.size
-
-        // We only set the width of the documentView here, as the height depends
-        // on the scrollbar state and is updated in synchronizeScrollView
-        documentView.frame.size.width = scrollView.bounds.width
-
-        // When our scrollview changes make sure our scroller and surface views are synchronized
-        synchronizeScrollView()
-        synchronizeSurfaceView()
-        synchronizeCoreSurface()
-    }
-
     func updateContentSize(_ size: CGSize) {
         let currentSize = frame.size
         if abs(currentSize.width - size.width) > 0.5 || abs(currentSize.height - size.height) > 0.5 {
@@ -217,7 +183,7 @@ class AizenTerminalScrollView: NSView {
         updateTrackingAreas()
     }
 
-    private func synchronizeForHostUpdate() {
+    func synchronizeForHostUpdate() {
         needsLayout = true
         layoutSubtreeIfNeeded()
 
@@ -226,31 +192,4 @@ class AizenTerminalScrollView: NSView {
         surfaceView.layer?.setNeedsDisplay()
     }
 
-    // MARK: Mouse events
-
-    override func mouseMoved(with: NSEvent) {
-        // When the OS preferred style is .legacy, the user should be able to
-        // click and drag the scroller without using scroll wheels or gestures,
-        // so we flash it when the mouse is moved over the scrollbar area.
-        guard NSScroller.preferredScrollerStyle == .legacy else { return }
-        scrollView.flashScrollers()
-    }
-
-    override func updateTrackingAreas() {
-        // To update our tracking area we just recreate it all.
-        trackingAreas.forEach { removeTrackingArea($0) }
-
-        super.updateTrackingAreas()
-
-        // Our tracking area is the scroller frame
-        guard let scroller = scrollView.verticalScroller else { return }
-        addTrackingArea(NSTrackingArea(
-            rect: convert(scroller.bounds, from: scroller),
-            options: [
-                .mouseMoved,
-                .activeInKeyWindow,
-            ],
-            owner: self,
-            userInfo: nil))
-    }
 }
