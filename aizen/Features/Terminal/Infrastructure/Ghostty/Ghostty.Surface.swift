@@ -76,73 +76,6 @@ extension Ghostty {
             return Input.BindingFlags(cFlags: flags)
         }
 
-        /// Whether the terminal has captured mouse input.
-        ///
-        /// When the mouse is captured, the terminal application is receiving mouse events
-        /// directly rather than the host system handling them. This typically occurs when
-        /// a terminal application enables mouse reporting mode.
-        @MainActor
-        var mouseCaptured: Bool {
-            ghostty_surface_mouse_captured(surface)
-        }
-
-        /// Whether closing this terminal requires user confirmation.
-        ///
-        /// Returns true if the terminal is busy (command running, cursor not at prompt).
-        /// Uses Ghostty's internal prompt detection to avoid confirming idle shells.
-        @MainActor
-        var needsConfirmQuit: Bool {
-            ghostty_surface_needs_confirm_quit(surface)
-        }
-
-        /// Send a mouse button event to the terminal.
-        ///
-        /// This sends a complete mouse button event including the button state (press/release),
-        /// which button was pressed, and any modifier keys that were held during the event.
-        /// The terminal processes this event according to its mouse handling configuration.
-        ///
-        /// - Parameter event: The mouse button event to send to the terminal
-        @MainActor
-        func sendMouseButton(_ event: Input.MouseButtonEvent) -> Bool {
-            ghostty_surface_mouse_button(
-                surface,
-                event.action.cMouseState,
-                event.button.cMouseButton,
-                event.mods.cMods)
-        }
-
-        /// Send a mouse position event to the terminal.
-        ///
-        /// This reports the current mouse position to the terminal, which may be used
-        /// for mouse tracking, hover effects, or other position-dependent features.
-        /// The terminal will only receive these events if mouse reporting is enabled.
-        ///
-        /// - Parameter event: The mouse position event to send to the terminal
-        @MainActor
-        func sendMousePos(_ event: Input.MousePosEvent) {
-            ghostty_surface_mouse_pos(
-                surface,
-                event.x,
-                event.y,
-                event.mods.cMods)
-        }
-
-        /// Send a mouse scroll event to the terminal.
-        ///
-        /// This sends scroll wheel input to the terminal with delta values for both
-        /// horizontal and vertical scrolling, along with precision and momentum information.
-        /// The terminal processes this according to its scroll handling configuration.
-        ///
-        /// - Parameter event: The mouse scroll event to send to the terminal
-        @MainActor
-        func sendMouseScroll(_ event: Input.MouseScrollEvent) {
-            ghostty_surface_mouse_scroll(
-                surface,
-                event.x,
-                event.y,
-                event.mods.cScrollMods)
-        }
-
         /// Perform a keybinding action.
         ///
         /// The action can be any valid keybind parameter. e.g. `keybind = goto_tab:4`
@@ -180,6 +113,15 @@ extension Ghostty {
                 cellWidthPx: cSize.cell_width_px,
                 cellHeightPx: cSize.cell_height_px
             )
+        }
+
+        /// Whether closing this terminal requires user confirmation.
+        ///
+        /// Returns true if the terminal is busy (command running, cursor not at prompt).
+        /// Uses Ghostty's internal prompt detection to avoid confirming idle shells.
+        @MainActor
+        var needsConfirmQuit: Bool {
+            ghostty_surface_needs_confirm_quit(surface)
         }
     }
 }
