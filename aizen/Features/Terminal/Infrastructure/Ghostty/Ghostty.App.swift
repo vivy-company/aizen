@@ -185,30 +185,5 @@ extension Ghostty {
             // The app will be freed when the instance is deallocated
             // For proper cleanup, call a cleanup method before deinitialization
         }
-
-        // MARK: - App Operations
-
-        // MARK: - Callbacks (macOS)
-
-        static func wakeup(_ userdata: UnsafeMutableRawPointer?) {
-            guard let userdata = userdata else { return }
-            let state = Unmanaged<App>.fromOpaque(userdata).takeUnretainedValue()
-
-            // Schedule tick on main thread
-            DispatchQueue.main.async {
-                state.appTick()
-            }
-        }
-
-        static func closeSurface(_ userdata: UnsafeMutableRawPointer?, processAlive: Bool) {
-            // userdata is the AizenTerminalSurfaceView instance
-            guard let userdata = userdata else { return }
-            let terminalView = Unmanaged<AizenTerminalSurfaceView>.fromOpaque(userdata).takeUnretainedValue()
-
-            // Trigger process exit callback on main thread
-            DispatchQueue.main.async {
-                terminalView.onProcessExit?()
-            }
-        }
     }
 }
