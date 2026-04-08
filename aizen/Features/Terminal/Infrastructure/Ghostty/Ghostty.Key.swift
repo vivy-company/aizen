@@ -194,16 +194,5 @@ extension Ghostty.Input {
         case copy
         case cut
         case paste
-
-        /// Get a key from a keycode
-        init?(keyCode: UInt16) {
-            if let key = Key.allCases.first(where: { $0.keyCode == keyCode }) {
-                self = key
-                return
-            }
-
-            return nil
-        }
-
     }
 }
