@@ -12,12 +12,12 @@ import Combine
 struct AgentLoadingView: View {
     let agentName: String
 
-    @State private var currentTipIndex: Int = 0
-    @State private var tipOpacity: Double = 1.0
+    @State var currentTipIndex: Int = 0
+    @State var tipOpacity: Double = 1.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
 
-    private let tips = [
+    let tips = [
         "⌘D to split terminal right, ⇧⌘D to split down",
         "⇧⌘A to switch between active environments",
         "⇧⌘Z to toggle Zen Mode for distraction-free coding",
@@ -78,52 +78,8 @@ struct AgentLoadingView: View {
             rotateTip()
         }
     }
-
-    // MARK: - Computed Properties
-
-    private var displayName: String {
-        if let meta = AgentRegistry.shared.getMetadata(for: agentName) {
-            return meta.name
-        }
-        return agentName.capitalized
-    }
-
-    private var agentColor: Color {
-        switch agentName.lowercased() {
-        case "claude-acp":
-            return Color(red: 0.85, green: 0.55, blue: 0.35)  // Claude orange/tan
-        case "gemini":
-            return Color(red: 0.4, green: 0.5, blue: 0.9)  // Gemini blue
-        case "codex-acp":
-            return Color(red: 0.3, green: 0.75, blue: 0.65)  // OpenAI teal
-        case "github-copilot-cli":
-            return Color(red: 0.25, green: 0.6, blue: 0.9)  // Copilot blue
-        case "factory-droid":
-            return Color(red: 0.933, green: 0.376, blue: 0.094)  // Droid orange (#EE6018)
-        case "kimi":
-            return Color(red: 0.6, green: 0.4, blue: 0.8)  // Kimi purple
-        default:
-            return Color.accentColor
-        }
-    }
-
-    // MARK: - Animations
-
-    private func rotateTip() {
-        // Fade out
-        withAnimation(.easeOut(duration: 0.2)) {
-            tipOpacity = 0
-        }
-
-        // Change tip and fade in
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            currentTipIndex = (currentTipIndex + 1) % tips.count
-            withAnimation(.easeIn(duration: 0.3)) {
-                tipOpacity = 1
-            }
-        }
-    }
 }
+
 #Preview {
     AgentLoadingView(agentName: "claude")
         .frame(width: 400, height: 500)
