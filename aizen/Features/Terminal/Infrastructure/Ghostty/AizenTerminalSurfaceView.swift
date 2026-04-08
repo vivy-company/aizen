@@ -109,7 +109,7 @@ extension Ghostty {
         }
 
         // Cancellable for search state needle changes
-        private var searchNeedleCancellable: AnyCancellable?
+        var searchNeedleCancellable: AnyCancellable?
 
         // The time this surface last became focused. This is a ContinuousClock.Instant
         // on supported platforms.
@@ -245,10 +245,10 @@ extension Ghostty {
         var titleChangeTimer: Timer?
 
         // A timer to fallback to ghost emoji if no title is set within the grace period
-        private var titleFallbackTimer: Timer?
+        var titleFallbackTimer: Timer?
 
         // Timer to remove progress report after 15 seconds
-        private var progressReportTimer: Timer?
+        var progressReportTimer: Timer?
 
         // This is the title from the terminal. This is nil if we're currently using
         // the terminal title as the main title property. If the title is set manually
@@ -256,11 +256,11 @@ extension Ghostty {
         var titleFromTerminal: String?
 
         // The cached contents of the screen.
-        private(set) var cachedScreenContents: CachedValue<String>
-        private(set) var cachedVisibleContents: CachedValue<String>
+        var cachedScreenContents: CachedValue<String>
+        var cachedVisibleContents: CachedValue<String>
 
         /// Event monitor (see individual events for why)
-        private var eventMonitor: Any?
+        var eventMonitor: Any?
 
         // We need to support being a first responder so that we can get input events
         override var acceptsFirstResponder: Bool { return true }
@@ -283,119 +283,10 @@ extension Ghostty {
             // can do SOMETHING.
             super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
 
-            // Our cache of screen data
-            cachedScreenContents = .init(duration: .milliseconds(500)) { [weak self] in
-                guard let self else { return "" }
-                guard let surface = self.surface else { return "" }
-                var text = ghostty_text_s()
-                let sel = ghostty_selection_s(
-                    top_left: ghostty_point_s(
-                        tag: GHOSTTY_POINT_SCREEN,
-                        coord: GHOSTTY_POINT_COORD_TOP_LEFT,
-                        x: 0,
-                        y: 0),
-                    bottom_right: ghostty_point_s(
-                        tag: GHOSTTY_POINT_SCREEN,
-                        coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT,
-                        x: 0,
-                        y: 0),
-                    rectangle: false)
-                guard ghostty_surface_read_text(surface, sel, &text) else { return "" }
-                defer { ghostty_surface_free_text(surface, &text) }
-                return String(cString: text.text)
-            }
-            cachedVisibleContents = .init(duration: .milliseconds(500)) { [weak self] in
-                guard let self else { return "" }
-                guard let surface = self.surface else { return "" }
-                var text = ghostty_text_s()
-                let sel = ghostty_selection_s(
-                    top_left: ghostty_point_s(
-                        tag: GHOSTTY_POINT_VIEWPORT,
-                        coord: GHOSTTY_POINT_COORD_TOP_LEFT,
-                        x: 0,
-                        y: 0),
-                    bottom_right: ghostty_point_s(
-                        tag: GHOSTTY_POINT_VIEWPORT,
-                        coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT,
-                        x: 0,
-                        y: 0),
-                    rectangle: false)
-                guard ghostty_surface_read_text(surface, sel, &text) else { return "" }
-                defer { ghostty_surface_free_text(surface, &text) }
-                return String(cString: text.text)
-            }
-
-            // Set a timer to show the ghost emoji after 500ms if no title is set
-            titleFallbackTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
-                if let self = self, self.title.isEmpty {
-                    self.title = "👻"
-                }
-            }
-
-            // Before we initialize the surface we want to register our notifications
-            // so there is no window where we can't receive them.
-            let center = NotificationCenter.default
-            center.addObserver(
-                self,
-                selector: #selector(onUpdateRendererHealth),
-                name: Ghostty.Notification.didUpdateRendererHealth,
-                object: self)
-            center.addObserver(
-                self,
-                selector: #selector(ghosttyDidContinueKeySequence),
-                name: Ghostty.Notification.didContinueKeySequence,
-                object: self)
-            center.addObserver(
-                self,
-                selector: #selector(ghosttyDidEndKeySequence),
-                name: Ghostty.Notification.didEndKeySequence,
-                object: self)
-            center.addObserver(
-                self,
-                selector: #selector(ghosttyDidChangeKeyTable),
-                name: Ghostty.Notification.didChangeKeyTable,
-                object: self)
-            center.addObserver(
-                self,
-                selector: #selector(ghosttyConfigDidChange(_:)),
-                name: .ghosttyConfigDidChange,
-                object: self)
-            center.addObserver(
-                self,
-                selector: #selector(ghosttyColorDidChange(_:)),
-                name: .ghosttyColorDidChange,
-                object: self)
-            center.addObserver(
-                self,
-                selector: #selector(ghosttyBellDidRing(_:)),
-                name: .ghosttyBellDidRing,
-                object: self)
-            center.addObserver(
-                self,
-                selector: #selector(ghosttyDidChangeReadonly(_:)),
-                name: .ghosttyDidChangeReadonly,
-                object: self)
-            center.addObserver(
-                self,
-                selector: #selector(windowDidChangeScreen),
-                name: NSWindow.didChangeScreenNotification,
-                object: nil)
-
-            // Listen for local events that we need to know of outside of
-            // single surface handlers.
-            self.eventMonitor = NSEvent.addLocalMonitorForEvents(
-                matching: [
-                    // We need keyUp because command+key events don't trigger keyUp.
-                    .keyUp,
-
-                    // We need leftMouseDown to determine if we should focus ourselves
-                    // when the app/window isn't in focus. We do this instead of
-                    // "acceptsFirstMouse" because that forces us to also handle the
-                    // event and encode the event to the pty which we want to avoid.
-                    // (Issue 2595)
-                    .leftMouseDown,
-                ]
-            ) { [weak self] event in self?.localEventHandler(event) }
+            configureCaches()
+            scheduleFallbackTitle()
+            installNotifications()
+            installEventMonitor()
 
             // Setup our surface. This will also initialize all the terminal IO.
             let surface_cfg = baseConfig ?? SurfaceConfiguration()
