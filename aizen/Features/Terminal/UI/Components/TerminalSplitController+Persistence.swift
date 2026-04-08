@@ -10,55 +10,6 @@ import CoreData
 import os
 
 extension TerminalSplitController {
-    func saveContext() {
-        scheduleDebouncedSave()
-    }
-
-    func scheduleDebouncedSave() {
-        contextSaveTask?.cancel()
-        contextSaveTask = Task { @MainActor [weak session] in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled,
-                  let session,
-                  !session.isDeleted,
-                  let context = session.managedObjectContext else { return }
-            do {
-                try context.save()
-            } catch {
-                Logger.terminal.error("Failed to save split layout: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    func seedSessionLayoutIfNeeded() {
-        guard !session.isDeleted else { return }
-        guard let context = session.managedObjectContext else { return }
-
-        let resolvedPaneId = TerminalLayoutDefaults.paneId(
-            sessionId: session.id,
-            focusedPaneId: focusedPaneId
-        )
-
-        var didChange = false
-        if session.focusedPaneId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
-            session.focusedPaneId = resolvedPaneId
-            didChange = true
-        }
-
-        if session.splitLayout?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true,
-           let json = SplitLayoutHelper.encode(TerminalLayoutDefaults.defaultLayout(paneId: resolvedPaneId)) {
-            session.splitLayout = json
-            didChange = true
-        }
-
-        guard didChange else { return }
-        do {
-            try context.save()
-        } catch {
-            Logger.terminal.error("Failed to seed terminal session layout: \(error.localizedDescription)")
-        }
-    }
-
     func scheduleLayoutSave() {
         layoutSaveTask?.cancel()
         let currentLayout = layout

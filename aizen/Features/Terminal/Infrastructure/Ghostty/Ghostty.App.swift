@@ -16,22 +16,6 @@ import SwiftUI
 
 enum Ghostty {
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "Ghostty")
-
-    /// Wrapper to hold reference to a surface for tracking
-    /// Note: ghostty_surface_t is an opaque pointer, so we store it directly
-    /// The surface is freed when the AizenTerminalSurfaceView is deallocated
-    class SurfaceReference {
-        let surface: ghostty_surface_t
-        var isValid: Bool = true
-
-        init(_ surface: ghostty_surface_t) {
-            self.surface = surface
-        }
-
-        func invalidate() {
-            isValid = false
-        }
-    }
 }
 
 // MARK: - Ghostty.App
