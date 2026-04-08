@@ -91,31 +91,10 @@ extension Ghostty {
             }
 
             // Create runtime config with callbacks
-            var runtime_cfg = ghostty_runtime_config_s(
-                userdata: Unmanaged.passUnretained(self).toOpaque(),
-                supports_selection_clipboard: true,
-                wakeup_cb: { userdata in App.wakeup(userdata) },
-                action_cb: { app, target, action in App.handleAction(app!, target: target, action: action) },
-                read_clipboard_cb: { userdata, loc, state in App.readClipboard(userdata, location: loc, state: state) },
-                confirm_read_clipboard_cb: { userdata, str, state, request in App.confirmReadClipboard(userdata, string: str, state: state, request: request) },
-                write_clipboard_cb: { userdata, loc, content, count, confirm in
-                    App.writeClipboard(userdata, location: loc, contents: content, count: count, confirm: confirm)
-                },
-                close_surface_cb: { userdata, processAlive in App.closeSurface(userdata, processAlive: processAlive) }
-            )
+            var runtime_cfg = makeRuntimeConfig()
 
             // Create config and load Aizen terminal settings
-            guard let config = ghostty_config_new() else {
-                Ghostty.logger.critical("ghostty_config_new failed")
-                readiness = .error
-                return
-            }
-
-            // Load config from settings
-            loadConfigIntoGhostty(config)
-
-            // Finalize config (required before use)
-            ghostty_config_finalize(config)
+            guard let config = makeInitialConfig() else { return }
 
             // Create the ghostty app
             guard let app = ghostty_app_new(&runtime_cfg, config) else {
@@ -140,44 +119,7 @@ extension Ghostty {
             lastKnownAppearance = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
             lastKnownTheme = effectiveThemeName
 
-            // Observe system appearance changes via DistributedNotificationCenter
-            DistributedNotificationCenter.default().addObserver(
-                self,
-                selector: #selector(systemAppearanceDidChange),
-                name: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
-                object: nil
-            )
-
-            // Observe in-app appearance setting changes
-            appearanceSettingObserver = NotificationCenter.default.addObserver(
-                forName: UserDefaults.didChangeNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.checkAppearanceSettingChange()
-                }
-            }
-
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(keyboardSelectionDidChange),
-                name: NSTextInputContext.keyboardSelectionDidChangeNotification,
-                object: nil
-            )
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(applicationDidBecomeActive),
-                name: NSApplication.didBecomeActiveNotification,
-                object: nil
-            )
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(applicationDidResignActive),
-                name: NSApplication.didResignActiveNotification,
-                object: nil
-            )
-
+            installObservers()
         }
 
         deinit {
