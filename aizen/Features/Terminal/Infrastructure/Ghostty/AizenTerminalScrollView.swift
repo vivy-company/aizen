@@ -18,8 +18,8 @@ class AizenTerminalScrollView: NSView {
     let scrollView: NSScrollView
     let documentView: NSView
     let surfaceView: AizenTerminalSurfaceView
-    private var observers: [NSObjectProtocol] = []
-    private var cancellables: Set<AnyCancellable> = []
+    var observers: [NSObjectProtocol] = []
+    var cancellables: Set<AnyCancellable> = []
     var isLiveScrolling = false
 
     /// The last row position sent via scroll_to_row action. Used to avoid
@@ -64,93 +64,8 @@ class AizenTerminalScrollView: NSView {
 
         // Apply initial scrollbar settings
         synchronizeAppearance()
-
-        // We listen for scroll events through bounds notifications on our NSClipView.
-        // This is based on: https://christiantietze.de/posts/2018/07/synchronize-nsscrollview/
-        scrollView.contentView.postsBoundsChangedNotifications = true
-        observers.append(NotificationCenter.default.addObserver(
-            forName: NSView.boundsDidChangeNotification,
-            object: scrollView.contentView,
-            queue: .main
-        ) { [weak self] notification in
-            self?.handleScrollChange(notification)
-        })
-
-        // Listen for scrollbar updates from Ghostty
-        observers.append(NotificationCenter.default.addObserver(
-            forName: .ghosttyDidUpdateScrollbar,
-            object: surfaceView,
-            queue: .main
-        ) { [weak self] notification in
-            self?.handleScrollbarUpdate(notification)
-        })
-
-        // Listen for live scroll events
-        observers.append(NotificationCenter.default.addObserver(
-            forName: NSScrollView.willStartLiveScrollNotification,
-            object: scrollView,
-            queue: .main
-        ) { [weak self] _ in
-            self?.isLiveScrolling = true
-        })
-
-        observers.append(NotificationCenter.default.addObserver(
-            forName: NSScrollView.didEndLiveScrollNotification,
-            object: scrollView,
-            queue: .main
-        ) { [weak self] _ in
-            self?.isLiveScrolling = false
-        })
-
-        observers.append(NotificationCenter.default.addObserver(
-            forName: NSScrollView.didLiveScrollNotification,
-            object: scrollView,
-            queue: .main
-        ) { [weak self] _ in
-            self?.handleLiveScroll()
-        })
-
-        observers.append(NotificationCenter.default.addObserver(
-            forName: NSScroller.preferredScrollerStyleDidChangeNotification,
-            object: nil,
-            // Since this observer is used to immediately override the event
-            // that produced the notification, we let it run synchronously on
-            // the posting thread.
-            queue: nil
-        ) { [weak self] _ in
-            self?.handleScrollerStyleChange()
-        })
-
-        // Listen for frame change events on macOS 26.0. See the docstring for
-        // handleFrameChangeForNSScrollPocket for why this is necessary.
-        if #unavailable(macOS 26.1) { if #available(macOS 26.0, *) {
-            observers.append(NotificationCenter.default.addObserver(
-                forName: NSView.frameDidChangeNotification,
-                object: nil,
-                // Since this observer is used to immediately override the event
-                // that produced the notification, we let it run synchronously on
-                // the posting thread.
-                queue: nil
-            ) { [weak self] notification in
-                self?.handleFrameChangeForNSScrollPocket(notification)
-            })
-        }}
-
-        surfaceView.$derivedConfig
-            .sink { [weak self] _ in
-                DispatchQueue.main.async { [weak self] in
-                    self?.handleConfigChange()
-                }
-            }
-            .store(in: &cancellables)
-
-        surfaceView.$pointerStyle
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] newStyle in
-                self?.scrollView.documentCursor = newStyle.cursor
-            }
-            .store(in: &cancellables)
-
+        installObservers()
+        installSubscriptions()
     }
 
     required init?(coder: NSCoder) {
