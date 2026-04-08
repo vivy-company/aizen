@@ -13,7 +13,7 @@ import SwiftUI
 /// Manages Metal rendering setup and configuration for Ghostty terminal
 @MainActor
 class GhosttyRenderingSetup {
-    nonisolated private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "GhosttyRendering")
+    nonisolated static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "GhosttyRendering")
 
     // MARK: - Terminal Settings from AppStorage
 
@@ -130,31 +130,4 @@ class GhosttyRenderingSetup {
 
         return cSurface
     }
-
-    // MARK: - Appearance Observation
-
-    /// Setup observation for system appearance changes (light/dark mode)
-    /// Implementation copied from Ghostty's SurfaceView_AppKit.swift
-    func setupAppearanceObservation(for view: NSView, surface: Ghostty.Surface?) -> NSKeyValueObservation? {
-        return view.observe(\.effectiveAppearance, options: [.new, .initial]) { view, change in
-            guard let appearance = change.newValue else { return }
-            guard let surface = surface?.unsafeCValue else { return }
-
-            let scheme: ghostty_color_scheme_e
-            switch (appearance.name) {
-            case .aqua, .vibrantLight:
-                scheme = GHOSTTY_COLOR_SCHEME_LIGHT
-
-            case .darkAqua, .vibrantDark:
-                scheme = GHOSTTY_COLOR_SCHEME_DARK
-
-            default:
-                scheme = GHOSTTY_COLOR_SCHEME_DARK
-            }
-
-            ghostty_surface_set_color_scheme(surface, scheme)
-            Self.logger.debug("Color scheme updated to: \(scheme == GHOSTTY_COLOR_SCHEME_DARK ? "dark" : "light")")
-        }
-    }
-
 }
