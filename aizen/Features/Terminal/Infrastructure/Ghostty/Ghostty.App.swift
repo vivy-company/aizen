@@ -52,7 +52,7 @@ extension Ghostty {
         @Published var readiness: Readiness = .loading
 
         /// Track active surfaces for config propagation
-        private var activeSurfaces: [Ghostty.SurfaceReference] = []
+        var activeSurfaces: [Ghostty.SurfaceReference] = []
 
         /// Track last known appearance to detect changes
         var lastKnownAppearance: NSAppearance.Name?
@@ -61,7 +61,7 @@ extension Ghostty {
         var lastKnownTheme: String?
 
         /// Observer for in-app appearance setting changes
-        private var appearanceSettingObserver: NSObjectProtocol?
+        var appearanceSettingObserver: NSObjectProtocol?
 
         // MARK: - Terminal Settings from AppStorage
 
@@ -187,77 +187,6 @@ extension Ghostty {
         }
 
         // MARK: - App Operations
-
-        /// Clean up the ghostty app resources
-        func cleanup() {
-            DistributedNotificationCenter.default().removeObserver(self)
-            NotificationCenter.default.removeObserver(self)
-
-            if let observer = appearanceSettingObserver {
-                NotificationCenter.default.removeObserver(observer)
-                appearanceSettingObserver = nil
-            }
-
-            if let app = self.app {
-                ghostty_app_free(app)
-                self.app = nil
-            }
-        }
-
-        func appTick() {
-            guard let app = self.app else { return }
-            ghostty_app_tick(app)
-        }
-
-        /// Register a surface for config update tracking
-        /// Returns the surface reference that should be stored by the view
-        @discardableResult
-        func registerSurface(_ surface: ghostty_surface_t) -> Ghostty.SurfaceReference {
-            let ref = Ghostty.SurfaceReference(surface)
-            activeSurfaces.append(ref)
-            // Clean up invalid surfaces
-            activeSurfaces = activeSurfaces.filter { $0.isValid }
-            return ref
-        }
-
-        /// Unregister a surface when it's being deallocated
-        func unregisterSurface(_ ref: Ghostty.SurfaceReference) {
-            ref.invalidate()
-            activeSurfaces = activeSurfaces.filter { $0.isValid }
-        }
-
-        /// Reload configuration (call when settings change)
-        func reloadConfig() {
-            guard let app = self.app else { return }
-
-            // Create new config with updated settings
-            guard let config = ghostty_config_new() else {
-                Ghostty.logger.error("ghostty_config_new failed during reload")
-                return
-            }
-
-            // Load config from settings
-            loadConfigIntoGhostty(config)
-
-            // Finalize config (required before use)
-            ghostty_config_finalize(config)
-
-            // Update the app config
-            ghostty_app_update_config(app, config)
-
-            // Propagate config to all existing surfaces
-            for surfaceRef in activeSurfaces where surfaceRef.isValid {
-                ghostty_surface_update_config(surfaceRef.surface, config)
-            }
-
-            // Clean up invalid surfaces
-            activeSurfaces = activeSurfaces.filter { $0.isValid }
-
-            ghostty_config_free(config)
-
-            // Unset XDG_CONFIG_HOME so it doesn't affect fish/shell config loading
-            unsetenv("XDG_CONFIG_HOME")
-        }
 
         // MARK: - Callbacks (macOS)
 
