@@ -19,7 +19,7 @@ struct CompanionPanelView: View {
     @Binding var terminalSessionId: UUID?
     @Binding var browserSessionId: UUID?
     @State private var fileToOpen: String?
-    @State private var gitDiffSubtitle: String = ""
+    @State var gitDiffSubtitle: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -71,74 +71,6 @@ struct CompanionPanelView: View {
                 .fill(Color(nsColor: .separatorColor).opacity(0.5))
                 .frame(height: 1)
         }
-    }
-
-    private var panelSubtitle: String {
-        switch panel {
-        case .terminal:
-            return terminalSubtitle
-        case .files:
-            return worktreePathSubtitle
-        case .browser:
-            return browserSubtitle
-        case .gitDiff:
-            return gitDiffSubtitle.isEmpty ? worktreeNameFallback : gitDiffSubtitle
-        }
-    }
-
-    private var terminalSubtitle: String {
-        if let session = selectedTerminalSession ?? terminalSessions.last {
-            if let title = session.title, !title.isEmpty {
-                return title
-            }
-        }
-        return worktreeNameFallback
-    }
-
-    private var browserSubtitle: String {
-        if let session = selectedBrowserSession ?? browserSessions.last {
-            if let title = session.title, !title.isEmpty {
-                return title
-            }
-            if let url = session.url, !url.isEmpty {
-                return url
-            }
-        }
-        return worktreeNameFallback
-    }
-
-    private var worktreePathSubtitle: String {
-        guard let path = worktree.path, !path.isEmpty else { return "No environment path" }
-        return path
-    }
-
-    private var worktreeNameFallback: String {
-        guard let path = worktree.path, !path.isEmpty else { return "Environment" }
-        return URL(fileURLWithPath: path).lastPathComponent
-    }
-
-    private var terminalSessions: [TerminalSession] {
-        let sessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
-        return sessions
-            .filter { !$0.isDeleted }
-            .sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
-    }
-
-    private var selectedTerminalSession: TerminalSession? {
-        guard let id = terminalSessionId else { return nil }
-        return terminalSessions.first(where: { $0.id == id })
-    }
-
-    private var browserSessions: [BrowserSession] {
-        let sessions = (worktree.browserSessions as? Set<BrowserSession>) ?? []
-        return sessions
-            .filter { !$0.isDeleted }
-            .sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
-    }
-
-    private var selectedBrowserSession: BrowserSession? {
-        guard let id = browserSessionId else { return nil }
-        return browserSessions.first(where: { $0.id == id })
     }
 
     @ViewBuilder
