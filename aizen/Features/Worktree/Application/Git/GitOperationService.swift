@@ -11,13 +11,13 @@ import os.log
 
 @MainActor
 final class GitOperationService: ObservableObject {
-    @Published private(set) var isOperationPending = false
+    @Published var isOperationPending = false
 
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "GitOperationService")
+    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "GitOperationService")
     private let operationRunner = GitOperationRunner()
 
     private let worktreePath: String
-    private let onMutationCompleted: @MainActor () -> Void
+    let onMutationCompleted: @MainActor () -> Void
 
     init(worktreePath: String, onMutationCompleted: @escaping @MainActor () -> Void) {
         self.worktreePath = worktreePath
@@ -188,66 +188,5 @@ final class GitOperationService: ObservableObject {
             },
             onError: onError
         )
-    }
-
-    // MARK: - Helpers
-
-    private func makeRefreshingSuccessHandler(original: (() -> Void)?) -> (() async -> Void) {
-        return { [weak self] in
-            guard let self else {
-                await MainActor.run { original?() }
-                return
-            }
-            await MainActor.run {
-                self.onMutationCompleted()
-                original?()
-            }
-        }
-    }
-
-    private func makeMutationOnlySuccessHandler() -> (() async -> Void) {
-        return { [weak self] in
-            guard let self else { return }
-            await MainActor.run {
-                self.onMutationCompleted()
-            }
-        }
-    }
-
-    private func enqueueOperation<T>(
-        _ operation: @escaping () async throws -> T,
-        onSuccess: ((T) async -> Void)? = nil,
-        onError: ((Error) -> Void)? = nil
-    ) {
-        Task { [weak self] in
-            guard let self else { return }
-            await self.executeOperationBackground(operation, onSuccess: onSuccess, onError: onError)
-        }
-    }
-
-    private func executeOperationBackground<T>(
-        _ operation: @escaping () async throws -> T,
-        onSuccess: ((T) async -> Void)? = nil,
-        onError: ((Error) -> Void)? = nil
-    ) async {
-        await MainActor.run {
-            self.isOperationPending = true
-        }
-
-        do {
-            let result = try await operation()
-            if let onSuccess {
-                await onSuccess(result)
-            }
-        } catch {
-            await MainActor.run {
-                onError?(error)
-            }
-            logger.error("Git operation failed: \(error.localizedDescription)")
-        }
-
-        await MainActor.run {
-            self.isOperationPending = false
-        }
     }
 }
