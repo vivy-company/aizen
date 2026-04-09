@@ -9,7 +9,7 @@ extension WorktreeDetailView {
     @ToolbarContentBuilder
     var tabPickerToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .automatic) {
-            Picker(String(localized: "worktree.session.tab"), selection: $selectedTab) {
+            Picker(String(localized: "worktree.session.tab"), selection: selectedTabBinding) {
                 ForEach(tabConfig.tabOrder) { tab in
                     if isTabVisible(tab.id) {
                         Label(LocalizedStringKey(tab.localizedKey), systemImage: tab.icon)

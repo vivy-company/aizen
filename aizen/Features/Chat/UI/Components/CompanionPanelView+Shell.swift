@@ -6,6 +6,13 @@
 import SwiftUI
 
 extension CompanionPanelView {
+    private var terminalHostIdentity: String {
+        let sessionIds = terminalSessions.compactMap { $0.id?.uuidString }.joined(separator: ",")
+        let selectedSession = terminalSessionId?.uuidString ?? "nil"
+        let sideKey = side == .left ? "left" : "right"
+        return "\(worktree.objectID.uriRepresentation().absoluteString)|\(selectedSession)|\(sessionIds)|\(sideKey)"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -62,10 +69,11 @@ extension CompanionPanelView {
     private var content: some View {
         switch panel {
         case .terminal:
-            AizenTerminalRootContainer {
+            AizenTerminalRootContainer(identity: terminalHostIdentity) {
                 TerminalTabView(
                     worktree: worktree,
                     sessions: terminalSessions,
+                    isVisible: true,
                     selectedSessionId: $terminalSessionId,
                     repositoryManager: repositoryManager
                 )
@@ -75,14 +83,26 @@ extension CompanionPanelView {
             FileTabView(
                 worktree: worktree,
                 fileToOpenFromSearch: $fileToOpen,
-                showPathHeader: false
+                showPathHeader: false,
+                store: fileBrowserStore
             )
 
         case .browser:
-            BrowserTabView(
-                worktree: worktree,
-                selectedSessionId: $browserSessionId
-            )
+            if let browserSessionStore {
+                BrowserTabView(
+                    manager: browserSessionStore,
+                    selectedSessionId: $browserSessionId,
+                    isSelected: true
+                )
+                .id(ObjectIdentifier(browserSessionStore))
+            } else {
+                BrowserTabView(
+                    worktree: worktree,
+                    selectedSessionId: $browserSessionId,
+                    isSelected: true
+                )
+                .id(worktree.objectID)
+            }
 
         case .gitDiff:
             CompanionGitDiffView(

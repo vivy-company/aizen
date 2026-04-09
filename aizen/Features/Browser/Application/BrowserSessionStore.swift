@@ -24,6 +24,9 @@ class BrowserSessionStore: ObservableObject {
     let worktree: Worktree
     private var saveTask: Task<Void, Never>?
     var activeWebView: WKWebView?
+    private var warmWebViewsBySessionId: [UUID: WKWebView] = [:]
+    private var warmWebViewOrder: [UUID] = []
+    private let maxWarmWebViews = 3
 
     init(viewContext: NSManagedObjectContext, worktree: Worktree) {
         self.viewContext = viewContext
@@ -91,7 +94,55 @@ class BrowserSessionStore: ObservableObject {
 
     func registerActiveWebView(_ webView: WKWebView, for sessionId: UUID) {
         guard activeSessionId == sessionId else { return }
+        cacheWebView(webView, for: sessionId)
         activeWebView = webView
+        syncNavigationState(from: webView)
+    }
+
+    func releaseActiveWebView() {
+        activeWebView = nil
+        canGoBack = false
+        canGoForward = false
+        isLoading = false
+        loadingProgress = 0
+    }
+
+    func cachedWebView(for sessionId: UUID) -> WKWebView? {
+        guard let webView = warmWebViewsBySessionId[sessionId] else { return nil }
+        touchWarmWebView(sessionId)
+        return webView
+    }
+
+    func clearWarmWebViews() {
+        for webView in warmWebViewsBySessionId.values {
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.uiDelegate = nil
+        }
+        warmWebViewsBySessionId.removeAll()
+        warmWebViewOrder.removeAll()
+        releaseActiveWebView()
+    }
+
+    func removeWarmWebView(for sessionId: UUID) {
+        if let webView = warmWebViewsBySessionId.removeValue(forKey: sessionId) {
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.uiDelegate = nil
+        }
+        warmWebViewOrder.removeAll { $0 == sessionId }
+        if activeSessionId == sessionId {
+            releaseActiveWebView()
+        }
+    }
+
+    func syncNavigationState(from webView: WKWebView) {
+        canGoBack = webView.canGoBack
+        canGoForward = webView.canGoForward
+        isLoading = webView.isLoading
+        loadingProgress = webView.estimatedProgress
+        currentURL = webView.url?.absoluteString ?? currentURL
+        pageTitle = webView.title ?? pageTitle
     }
 
     // MARK: - Computed Properties
@@ -99,5 +150,28 @@ class BrowserSessionStore: ObservableObject {
     var activeSession: BrowserSession? {
         guard let sessionId = activeSessionId else { return nil }
         return sessions.first { $0.id == sessionId }
+    }
+
+    private func cacheWebView(_ webView: WKWebView, for sessionId: UUID) {
+        warmWebViewsBySessionId[sessionId] = webView
+        touchWarmWebView(sessionId)
+        evictWarmWebViewsIfNeeded()
+    }
+
+    private func touchWarmWebView(_ sessionId: UUID) {
+        warmWebViewOrder.removeAll { $0 == sessionId }
+        warmWebViewOrder.append(sessionId)
+    }
+
+    private func evictWarmWebViewsIfNeeded() {
+        while warmWebViewsBySessionId.count > maxWarmWebViews,
+              let oldestSessionId = warmWebViewOrder.first {
+            warmWebViewOrder.removeFirst()
+            guard oldestSessionId != activeSessionId else {
+                warmWebViewOrder.append(oldestSessionId)
+                break
+            }
+            removeWarmWebView(for: oldestSessionId)
+        }
     }
 }

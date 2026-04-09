@@ -142,6 +142,7 @@ extension ContentView {
         if let worktree, worktree.isDeleted {
             selectionStore.selectedWorktree = nil
             selectedWorktreeId = nil
+            sceneRegistry.clearActiveScene()
             if let repository = selectionStore.selectedRepository {
                 let worktrees = workspaceGraphQueryController.worktrees(in: repository)
                 let fallback = worktrees.first(where: { $0.isPrimary })
@@ -155,7 +156,16 @@ extension ContentView {
         selectionStore.selectedWorktree = worktree
         selectedWorktreeId = worktree?.id?.uuidString
 
-        guard let worktree else { return }
+        guard let worktree else {
+            sceneRegistry.clearActiveScene()
+            return
+        }
+
+        sceneRegistry.activate(
+            worktree: worktree,
+            repositoryManager: repositoryManager,
+            tabStateManager: tabStateManager
+        )
 
         recordWorktreeInMRU(worktree)
         if let repository = selectionStore.selectedRepository {

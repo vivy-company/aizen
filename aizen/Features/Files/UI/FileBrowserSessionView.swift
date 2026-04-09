@@ -25,6 +25,16 @@ struct FileBrowserSessionView: View {
         self.showPathHeader = showPathHeader
     }
 
+    init(
+        viewModel: FileBrowserStore,
+        fileToOpenFromSearch: Binding<String?>,
+        showPathHeader: Bool = true
+    ) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+        _fileToOpenFromSearch = fileToOpenFromSearch
+        self.showPathHeader = showPathHeader
+    }
+
     var body: some View {
         Group {
             if showTree {

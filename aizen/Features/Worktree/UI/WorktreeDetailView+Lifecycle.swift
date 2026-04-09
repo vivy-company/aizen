@@ -67,11 +67,21 @@ extension WorktreeDetailView {
                 .hidden()
             }
             .task(id: worktree.id) {
-                hasLoadedTabState = false
                 loadTabState()
                 validateSelectedTab()
-                hasLoadedTabState = true
-                worktreeRuntime.attachDetail(showXcode: showXcodeBuild)
+            }
+            .task(id: visibleTabIds) {
+                guard isActive else { return }
+                try? await Task.sleep(for: .milliseconds(120))
+                guard !Task.isCancelled else { return }
+                scene.prewarmTabs(visibleTabIds)
+            }
+            .task(id: isActive) {
+                if isActive {
+                    worktreeRuntime.attachDetail(showXcode: showXcodeBuild)
+                } else {
+                    worktreeRuntime.detachDetail()
+                }
             }
     }
 
@@ -83,20 +93,20 @@ extension WorktreeDetailView {
                 saveTabState()
             }
             .task(id: viewModel.selectedChatSessionId) {
-                guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(viewModel.selectedChatSessionId, for: "chat", worktreeId: worktreeId)
+                guard hasLoadedTabState else { return }
+                scene.saveSessionId(viewModel.selectedChatSessionId, for: "chat")
             }
             .task(id: viewModel.selectedTerminalSessionId) {
-                guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(viewModel.selectedTerminalSessionId, for: "terminal", worktreeId: worktreeId)
+                guard hasLoadedTabState else { return }
+                scene.saveSessionId(viewModel.selectedTerminalSessionId, for: "terminal")
             }
             .task(id: viewModel.selectedBrowserSessionId) {
-                guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(viewModel.selectedBrowserSessionId, for: "browser", worktreeId: worktreeId)
+                guard hasLoadedTabState else { return }
+                scene.saveSessionId(viewModel.selectedBrowserSessionId, for: "browser")
             }
             .task(id: viewModel.selectedFileSessionId) {
-                guard let worktreeId = worktree.id else { return }
-                tabStateManager.saveSessionId(viewModel.selectedFileSessionId, for: "files", worktreeId: worktreeId)
+                guard hasLoadedTabState else { return }
+                scene.saveSessionId(viewModel.selectedFileSessionId, for: "files")
             }
             .onDisappear {
                 worktreeRuntime.detachDetail()

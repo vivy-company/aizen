@@ -57,8 +57,14 @@ extension ContentView {
     func selectCrossProjectWorktree(_ worktree: Worktree?) {
         selectionStore.crossProjectWorktree = worktree
         guard selectionStore.isCrossProjectSelected, let worktree, !worktree.isDeleted else {
+            sceneRegistry.clearActiveScene()
             return
         }
+        sceneRegistry.activate(
+            worktree: worktree,
+            repositoryManager: repositoryManager,
+            tabStateManager: tabStateManager
+        )
         recordWorktreeInMRU(worktree)
     }
 

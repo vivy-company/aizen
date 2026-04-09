@@ -17,17 +17,19 @@ struct ChatTabView: View {
     let recentSessions: [ChatSession]
     let terminalSessions: [TerminalSession]
     let browserSessions: [BrowserSession]
+    let fileBrowserStore: FileBrowserStore?
+    let browserSessionStore: BrowserSessionStore?
     @Binding var selectedSessionId: UUID?
     @Binding var selectedTerminalSessionId: UUID?
     @Binding var selectedBrowserSessionId: UUID?
+    let chatStoreProvider: (ChatSession) -> ChatSessionStore
 
     @Environment(\.managedObjectContext) var viewContext
     let sessionManager = ChatSessionRegistry.shared
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ChatTabView")
     @State var enabledAgents: [AgentMetadata] = []
     @State var cachedSessionIds: [UUID] = []
-    // Keep only the active chat session mounted to avoid hidden view layout churn.
-    let maxCachedSessions = 1
+    let maxCachedSessions = 3
     private let recentSessionsLimit = 3
 
     // Companion panel state (persisted) - Left
@@ -79,9 +81,12 @@ struct ChatTabView: View {
         recentSessions: [ChatSession],
         terminalSessions: [TerminalSession],
         browserSessions: [BrowserSession],
+        fileBrowserStore: FileBrowserStore?,
+        browserSessionStore: BrowserSessionStore?,
         selectedSessionId: Binding<UUID?>,
         selectedTerminalSessionId: Binding<UUID?>,
-        selectedBrowserSessionId: Binding<UUID?>
+        selectedBrowserSessionId: Binding<UUID?>,
+        chatStoreProvider: @escaping (ChatSession) -> ChatSessionStore
     ) {
         self.worktree = worktree
         self.repositoryManager = repositoryManager
@@ -89,9 +94,12 @@ struct ChatTabView: View {
         self.recentSessions = recentSessions
         self.terminalSessions = terminalSessions
         self.browserSessions = browserSessions
+        self.fileBrowserStore = fileBrowserStore
+        self.browserSessionStore = browserSessionStore
         self._selectedSessionId = selectedSessionId
         self._selectedTerminalSessionId = selectedTerminalSessionId
         self._selectedBrowserSessionId = selectedBrowserSessionId
+        self.chatStoreProvider = chatStoreProvider
     }
 
     var body: some View {

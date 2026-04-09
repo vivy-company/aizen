@@ -21,6 +21,9 @@ extension FileBrowserStore {
 
         if let existing = openFiles.first(where: { $0.path == path }) {
             selectedFileId = existing.id
+            if existing.content.isEmpty {
+                await hydrateRestoredFile(path: path, selectAfterHydration: true)
+            }
             return
         }
 
@@ -47,6 +50,36 @@ extension FileBrowserStore {
         selectedFileId = fileInfo.id
         if persistSession {
             saveSession()
+        }
+    }
+
+    func hydrateRestoredFile(path: String, selectAfterHydration: Bool = false) async {
+        guard let index = openFiles.firstIndex(where: { $0.path == path }) else {
+            return
+        }
+
+        let existing = openFiles[index]
+        guard existing.content.isEmpty else {
+            if selectAfterHydration {
+                selectedFileId = existing.id
+            }
+            return
+        }
+
+        guard let content = try? await fileService.readFile(path: path) else {
+            return
+        }
+
+        openFiles[index] = OpenFileInfo(
+            id: existing.id,
+            name: existing.name,
+            path: existing.path,
+            content: content,
+            hasUnsavedChanges: existing.hasUnsavedChanges
+        )
+
+        if selectAfterHydration {
+            selectedFileId = existing.id
         }
     }
 

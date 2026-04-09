@@ -2,18 +2,20 @@ import AppKit
 import SwiftUI
 
 struct AizenTerminalRootContainer<Content: View>: NSViewRepresentable {
+    let identity: AnyHashable
     let content: Content
 
-    init(@ViewBuilder content: () -> Content) {
+    init<Identity: Hashable>(identity: Identity, @ViewBuilder content: () -> Content) {
+        self.identity = AnyHashable(identity)
         self.content = content()
     }
 
     func makeNSView(context: Context) -> AizenTerminalRootContainerView<Content> {
-        AizenTerminalRootContainerView(rootView: content)
+        AizenTerminalRootContainerView(rootView: content, identity: identity)
     }
 
     func updateNSView(_ nsView: AizenTerminalRootContainerView<Content>, context: Context) {
-        nsView.update(rootView: content)
+        nsView.update(rootView: content, identity: identity)
     }
 }
 
@@ -25,9 +27,11 @@ final class AizenTerminalRootContainerView<Content: View>: NSView {
     private var bottomConstraint: NSLayoutConstraint?
     private var trailingConstraint: NSLayoutConstraint?
     private var lastBottomInset: CGFloat = 0
+    private var lastIdentity: AnyHashable
 
-    init(rootView: Content) {
+    init(rootView: Content, identity: AnyHashable) {
         self.hostingView = NSHostingView(rootView: rootView)
+        self.lastIdentity = identity
         super.init(frame: .zero)
         setup()
     }
@@ -47,7 +51,9 @@ final class AizenTerminalRootContainerView<Content: View>: NSView {
         updateInsets()
     }
 
-    func update(rootView: Content) {
+    func update(rootView: Content, identity: AnyHashable) {
+        guard lastIdentity != identity else { return }
+        lastIdentity = identity
         hostingView.rootView = rootView
         needsLayout = true
     }

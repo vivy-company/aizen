@@ -9,9 +9,20 @@ import Foundation
 
 extension FileBrowserStore {
     func listDirectory(path: String) throws -> [FileItem] {
+        if directoryCacheShowHiddenFiles != showHiddenFiles {
+            directoryItemsCache.removeAll()
+            directoryCacheShowHiddenFiles = showHiddenFiles
+        } else if directoryCacheShowHiddenFiles == nil {
+            directoryCacheShowHiddenFiles = showHiddenFiles
+        }
+
+        if let cachedItems = directoryItemsCache[path] {
+            return cachedItems
+        }
+
         let contents = try FileManager.default.contentsOfDirectory(atPath: path)
 
-        return contents.compactMap { name -> FileItem? in
+        let items = contents.compactMap { name -> FileItem? in
             let isHidden = name.hasPrefix(".")
 
             if isHidden && !showHiddenFiles {
@@ -39,6 +50,9 @@ extension FileBrowserStore {
             }
             return item1.name.localizedCaseInsensitiveCompare(item2.name) == .orderedAscending
         }
+
+        directoryItemsCache[path] = items
+        return items
     }
 
     func isBrowsableDirectory(_ url: URL) -> Bool {

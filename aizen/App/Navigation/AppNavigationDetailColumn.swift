@@ -9,6 +9,7 @@ import SwiftUI
 
 struct AppNavigationDetailColumn: View {
     @ObservedObject var selectionStore: AppNavigationSelectionStore
+    @ObservedObject var sceneRegistry: WorktreeSceneRegistry
     let isCrossProjectSelected: Bool
     let crossProjectWorktree: Worktree?
     let selectedWorktree: Worktree?
@@ -21,43 +22,51 @@ struct AppNavigationDetailColumn: View {
 
     var body: some View {
         if isCrossProjectSelected, let worktree = crossProjectWorktree, !worktree.isDeleted {
-            WorktreeDetailView(
-                worktree: worktree,
-                repositoryManager: repositoryManager,
-                navigationSelectionStore: selectionStore,
-                tabStateManager: tabStateManager,
-                gitChangesContext: $gitChangesContext,
-                onWorktreeDeleted: { _ in
-                    onSelectCrossProjectWorktree(nil)
-                    onPrepareCrossProjectWorkspaceIfNeeded()
-                },
+            cachedDetailHost(
+                activeWorktree: worktree,
                 showZenModeButton: false
-            )
-            .id(worktree.id)
+            ) { _ in
+                onSelectCrossProjectWorktree(nil)
+                onPrepareCrossProjectWorkspaceIfNeeded()
+            }
         } else if isCrossProjectSelected {
             Color.clear
                 .task {
                     onPrepareCrossProjectWorkspaceIfNeeded()
                 }
         } else if let worktree = selectedWorktree, !worktree.isDeleted {
-            WorktreeDetailView(
-                worktree: worktree,
-                repositoryManager: repositoryManager,
-                navigationSelectionStore: selectionStore,
-                tabStateManager: tabStateManager,
-                gitChangesContext: $gitChangesContext,
-                onWorktreeDeleted: { nextWorktree in
-                    onSelectWorktree(nextWorktree)
-                },
+            cachedDetailHost(
+                activeWorktree: worktree,
                 showZenModeButton: true
-            )
-            .id(worktree.id)
+            ) { nextWorktree in
+                onSelectWorktree(nextWorktree)
+            }
         } else {
             placeholderView(
                 titleKey: "contentView.selectWorktree",
                 systemImage: "arrow.triangle.branch",
                 descriptionKey: "contentView.selectWorktreeDescription"
             )
+        }
+    }
+
+    @ViewBuilder
+    private func cachedDetailHost(
+        activeWorktree: Worktree,
+        showZenModeButton: Bool,
+        onWorktreeDeleted: @escaping (Worktree?) -> Void
+    ) -> some View {
+        if let scene = sceneRegistry.scene(for: activeWorktree) {
+            WorktreeDetailView(
+                scene: scene,
+                navigationSelectionStore: selectionStore,
+                gitChangesContext: $gitChangesContext,
+                onWorktreeDeleted: onWorktreeDeleted,
+                showZenModeButton: showZenModeButton,
+                isActive: true
+            )
+        } else {
+            Color.clear
         }
     }
 }

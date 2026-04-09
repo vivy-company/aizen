@@ -56,9 +56,7 @@ extension BrowserSessionStore {
     func closeSession(_ sessionId: UUID) {
         guard let session = sessions.first(where: { $0.id == sessionId }) else { return }
 
-        if activeSessionId == sessionId {
-            activeWebView = nil
-        }
+        removeWarmWebView(for: sessionId)
 
         let needsNewActiveTab = activeSessionId == sessionId
         viewContext.delete(session)
@@ -95,10 +93,12 @@ extension BrowserSessionStore {
         currentURL = session.url ?? ""
         pageTitle = session.title ?? ""
 
-        activeWebView = nil
-        canGoBack = false
-        canGoForward = false
-        isLoading = false
+        if let webView = cachedWebView(for: sessionId) {
+            activeWebView = webView
+            syncNavigationState(from: webView)
+        } else {
+            releaseActiveWebView()
+        }
     }
 
     func handleURLChange(sessionId: UUID, url: String) {

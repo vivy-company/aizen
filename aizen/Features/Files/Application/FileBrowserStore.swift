@@ -84,6 +84,9 @@ class FileBrowserStore: ObservableObject {
     let fileService = FileService()
     let gitRuntime = FileBrowserGitRuntime()
     var sessionSaveTask: Task<Void, Never>?
+    var sessionRestoreTask: Task<Void, Never>?
+    var directoryItemsCache: [String: [FileItem]] = [:]
+    var directoryCacheShowHiddenFiles: Bool?
 
     init(worktree: Worktree, context: NSManagedObjectContext) {
         self.worktree = worktree
@@ -101,6 +104,7 @@ class FileBrowserStore: ObservableObject {
 
     deinit {
         sessionSaveTask?.cancel()
+        sessionRestoreTask?.cancel()
     }
 
     func toggleExpanded(path: String) {
@@ -117,6 +121,7 @@ class FileBrowserStore: ObservableObject {
     }
 
     func refreshTree() {
+        directoryItemsCache.removeAll()
         treeRefreshTrigger = UUID()
     }
 

@@ -1,6 +1,13 @@
 import SwiftUI
 
 extension WorktreeDetailView {
+    var terminalHostIdentity: String {
+        let sessionIds = sessionManager.terminalSessions.compactMap { $0.id?.uuidString }.joined(separator: ",")
+        let selectedSessionId = viewModel.selectedTerminalSessionId?.uuidString ?? "nil"
+        let isTerminalVisible = selectedTab == "terminal"
+        return "\(worktree.objectID.uriRepresentation().absoluteString)|\(selectedSessionId)|\(sessionIds)|\(isTerminalVisible)"
+    }
+
     var sessionManager: WorktreeSessionCoordinator {
         WorktreeSessionCoordinator(
             worktree: worktree,
@@ -11,6 +18,10 @@ extension WorktreeDetailView {
 
     var browserSessions: [BrowserSession] {
         viewModel.browserSessions
+    }
+
+    var mountedTabIds: [String] {
+        visibleTabIds.filter(scene.isTabWarm(_:))
     }
 
     var hasActiveSessions: Bool {
@@ -25,38 +36,14 @@ extension WorktreeDetailView {
 
     @ViewBuilder
     var contentView: some View {
-        Group {
-            if selectedTab == "chat" {
-                ChatTabView(
-                    worktree: worktree,
-                    repositoryManager: repositoryManager,
-                    chatSessions: viewModel.chatSessions,
-                    recentSessions: viewModel.recentChatSessions,
-                    terminalSessions: viewModel.terminalSessions,
-                    browserSessions: viewModel.browserSessions,
-                    selectedSessionId: $viewModel.selectedChatSessionId,
-                    selectedTerminalSessionId: $viewModel.selectedTerminalSessionId,
-                    selectedBrowserSessionId: $viewModel.selectedBrowserSessionId
-                )
-            } else if selectedTab == "terminal" {
-                AizenTerminalRootContainer {
-                    TerminalTabView(
-                        worktree: worktree,
-                        sessions: sessionManager.terminalSessions,
-                        selectedSessionId: $viewModel.selectedTerminalSessionId,
-                        repositoryManager: repositoryManager
-                    )
-                }
-            } else if selectedTab == "files" {
-                FileTabView(
-                    worktree: worktree,
-                    fileToOpenFromSearch: $fileToOpenFromSearch
-                )
-            } else if selectedTab == "browser" {
-                BrowserTabView(
-                    worktree: worktree,
-                    selectedSessionId: $viewModel.selectedBrowserSessionId
-                )
+        ZStack {
+            ForEach(mountedTabIds, id: \.self) { tabId in
+                tabView(for: tabId)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .opacity(selectedTab == tabId ? 1 : 0)
+                    .allowsHitTesting(selectedTab == tabId)
+                    .accessibilityHidden(selectedTab != tabId)
+                    .zIndex(selectedTab == tabId ? 1 : 0)
             }
         }
     }
@@ -115,6 +102,54 @@ extension WorktreeDetailView {
         }
         .onChange(of: navigationSelectionStore.pendingWorktreeDestination) { _, _ in
             applyPendingNavigationDestinationIfNeeded()
+        }
+    }
+
+    @ViewBuilder
+    private func tabView(for tabId: String) -> some View {
+        switch tabId {
+        case "chat":
+            ChatTabView(
+                worktree: worktree,
+                repositoryManager: repositoryManager,
+                chatSessions: viewModel.chatSessions,
+                recentSessions: viewModel.recentChatSessions,
+                terminalSessions: viewModel.terminalSessions,
+                browserSessions: viewModel.browserSessions,
+                fileBrowserStore: scene.fileBrowserStore,
+                browserSessionStore: scene.browserSessionStore,
+                selectedSessionId: $viewModel.selectedChatSessionId,
+                selectedTerminalSessionId: $viewModel.selectedTerminalSessionId,
+                selectedBrowserSessionId: $viewModel.selectedBrowserSessionId,
+                chatStoreProvider: scene.chatStore(for:)
+            )
+        case "terminal":
+            AizenTerminalRootContainer(identity: terminalHostIdentity) {
+                TerminalTabView(
+                    worktree: worktree,
+                    sessions: sessionManager.terminalSessions,
+                    isVisible: selectedTab == "terminal",
+                    selectedSessionId: $viewModel.selectedTerminalSessionId,
+                    repositoryManager: repositoryManager
+                )
+            }
+        case "files":
+            FileTabView(
+                worktree: worktree,
+                fileToOpenFromSearch: $fileToOpenFromSearch,
+                store: scene.fileBrowserStore
+            )
+        case "browser":
+            if let browserSessionStore = scene.browserSessionStore {
+                BrowserTabView(
+                    manager: browserSessionStore,
+                    selectedSessionId: $viewModel.selectedBrowserSessionId,
+                    isSelected: selectedTab == "browser"
+                )
+                .id(ObjectIdentifier(browserSessionStore))
+            }
+        default:
+            EmptyView()
         }
     }
 }

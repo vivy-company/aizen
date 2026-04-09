@@ -5,18 +5,26 @@ import WebKit
 
 struct BrowserTabView: View {
     let worktree: Worktree
+    let isSelected: Bool
     @Binding var selectedSessionId: UUID?
 
-    @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var manager: BrowserSessionStore
 
-    init(worktree: Worktree, selectedSessionId: Binding<UUID?>) {
+    init(worktree: Worktree, selectedSessionId: Binding<UUID?>, isSelected: Bool = true) {
         self.worktree = worktree
+        self.isSelected = isSelected
         self._selectedSessionId = selectedSessionId
 
         // Initialize manager with worktree and viewContext
         let context = PersistenceController.shared.container.viewContext
         _manager = StateObject(wrappedValue: BrowserSessionStore(viewContext: context, worktree: worktree))
+    }
+
+    init(manager: BrowserSessionStore, selectedSessionId: Binding<UUID?>, isSelected: Bool = true) {
+        self.worktree = manager.worktree
+        self.isSelected = isSelected
+        self._selectedSessionId = selectedSessionId
+        _manager = StateObject(wrappedValue: manager)
     }
 
     var body: some View {
@@ -54,6 +62,7 @@ struct BrowserTabView: View {
                         if !sessionURL.isEmpty {
                             WebViewWrapper(
                                 url: sessionURL,
+                                existingWebView: manager.cachedWebView(for: sessionId),
                                 canGoBack: $manager.canGoBack,
                                 canGoForward: $manager.canGoForward,
                                 onURLChange: { newURL in
@@ -89,18 +98,11 @@ struct BrowserTabView: View {
             }
         }
         .task {
-            // Initialize session if empty
-            if manager.sessions.isEmpty {
-                manager.createSession()
-            }
-
-            // Sync selection bidirectionally
-            if selectedSessionId == nil {
-                selectedSessionId = manager.activeSessionId
-            } else if let sessionId = selectedSessionId,
-                      sessionId != manager.activeSessionId {
-                manager.selectSession(sessionId)
-            }
+            syncSelectionState()
+        }
+        .task(id: isSelected) {
+            guard isSelected else { return }
+            syncSelectionState()
         }
         .task(id: manager.activeSessionId) {
             // Keep binding synced with manager state
@@ -141,6 +143,19 @@ struct BrowserTabView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppSurfaceTheme.backgroundColor())
+    }
+
+    private func syncSelectionState() {
+        if manager.sessions.isEmpty, isSelected {
+            manager.createSession()
+        }
+
+        if selectedSessionId == nil {
+            selectedSessionId = manager.activeSessionId
+        } else if let sessionId = selectedSessionId,
+                  sessionId != manager.activeSessionId {
+            manager.selectSession(sessionId)
+        }
     }
 }
 

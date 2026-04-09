@@ -14,6 +14,7 @@ struct ContentView: View {
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @StateObject var selectionStore = AppNavigationSelectionStore()
     @StateObject var tabStateManager = WorktreeTabStateStore()
+    @StateObject var sceneRegistry: WorktreeSceneRegistry
     @StateObject var navigator = AppWorktreeNavigator()
     @StateObject var workspaceGraphQueryController: WorkspaceGraphQueryController
 
@@ -41,6 +42,7 @@ struct ContentView: View {
 
     init(context: NSManagedObjectContext, repositoryManager: WorkspaceRepositoryStore, gitChangesContext: Binding<GitChangesContext?>) {
         self.repositoryManager = repositoryManager
+        _sceneRegistry = StateObject(wrappedValue: WorktreeSceneRegistry(viewContext: context))
         _workspaceGraphQueryController = StateObject(
             wrappedValue: WorkspaceGraphQueryController(viewContext: context)
         )
@@ -77,6 +79,7 @@ struct ContentView: View {
                 } detail: {
                     AppNavigationDetailColumn(
                         selectionStore: selectionStore,
+                        sceneRegistry: sceneRegistry,
                         isCrossProjectSelected: selectionStore.isCrossProjectSelected,
                         crossProjectWorktree: selectionStore.crossProjectWorktree,
                         selectedWorktree: selectionStore.selectedWorktree,

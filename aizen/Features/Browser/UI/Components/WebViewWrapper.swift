@@ -6,6 +6,7 @@ import os.log
 
 struct WebViewWrapper: NSViewRepresentable {
     let url: String
+    let existingWebView: WKWebView?
     @Binding var canGoBack: Bool
     @Binding var canGoForward: Bool
     let onURLChange: (String) -> Void
@@ -22,6 +23,7 @@ struct WebViewWrapper: NSViewRepresentable {
 
     init(
         url: String,
+        existingWebView: WKWebView? = nil,
         canGoBack: Binding<Bool>,
         canGoForward: Binding<Bool>,
         onURLChange: @escaping (String) -> Void,
@@ -34,6 +36,7 @@ struct WebViewWrapper: NSViewRepresentable {
         onLoadError: ((String) -> Void)? = nil
     ) {
         self.url = url
+        self.existingWebView = existingWebView
         self._canGoBack = canGoBack
         self._canGoForward = canGoForward
         self.onURLChange = onURLChange
@@ -51,6 +54,80 @@ struct WebViewWrapper: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSView {
+        let webView = resolvedWebView(for: context)
+        let containerView = NSView(frame: .zero)
+        attach(webView: webView, to: containerView, context: context)
+
+        if existingWebView == nil,
+           !url.isEmpty,
+           let initialURL = URL(string: url) {
+            DispatchQueue.main.async {
+                webView.load(URLRequest(url: initialURL))
+            }
+        }
+
+        return containerView
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: WebViewCoordinator) {
+        coordinator.detach()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        // Update coordinator's parent reference to get latest closures
+        context.coordinator.parent = self
+
+        let desiredWebView = resolvedWebView(for: context)
+        attach(webView: desiredWebView, to: nsView, context: context)
+
+        // Don't reload if URL is empty
+        guard !url.isEmpty else { return }
+
+        let currentURL = desiredWebView.url?.absoluteString ?? ""
+
+        // Don't reload if the URL is the same (prevents infinite loops)
+        guard currentURL != url else { return }
+
+        // Don't retry if this URL previously failed to load
+        if url == context.coordinator.lastFailedURL {
+            return
+        }
+
+        // Don't reload if we're currently loading (prevents interrupting navigation)
+        guard !desiredWebView.isLoading else { return }
+
+        // Clear failed URL on new navigation attempt
+        context.coordinator.lastFailedURL = nil
+
+        // Validate and load URL with error handling
+        guard let newURL = URL(string: url) else {
+            Self.logger.error("Invalid URL string: \(url)")
+            return
+        }
+
+        // Additional validation for URL components
+        guard newURL.scheme != nil || url.hasPrefix("about:") else {
+            Self.logger.error("URL missing scheme: \(url)")
+            return
+        }
+
+        // Load the URL
+        desiredWebView.load(URLRequest(url: newURL))
+    }
+
+    private func resolvedWebView(for context: Context) -> WKWebView {
+        if let existingWebView {
+            existingWebView.navigationDelegate = context.coordinator
+            existingWebView.uiDelegate = context.coordinator
+            existingWebView.allowsBackForwardNavigationGestures = true
+            existingWebView.allowsMagnification = true
+            context.coordinator.attach(to: existingWebView)
+            DispatchQueue.main.async {
+                onWebViewCreated?(existingWebView)
+            }
+            return existingWebView
+        }
+
         let preferences = WKWebpagePreferences()
         preferences.allowsContentJavaScript = true
 
@@ -103,15 +180,6 @@ struct WebViewWrapper: NSViewRepresentable {
         // Observe loading progress, URL changes, and title changes
         context.coordinator.attach(to: webView)
 
-        // Create wrapper view to fix Web Inspector flickering
-        // Wrapping WKWebView prevents autolayout conflicts with inspector
-        let containerView = NSView(frame: .zero)
-        containerView.addSubview(webView)
-
-        // Set webView frame to match container
-        webView.frame = containerView.bounds
-        webView.autoresizingMask = [.width, .height]
-
         // Notify that WebView was created (defer to avoid publishing during view update)
         if let callback = onWebViewCreated {
             DispatchQueue.main.async {
@@ -119,59 +187,19 @@ struct WebViewWrapper: NSViewRepresentable {
             }
         }
 
-        // Defer initial load to avoid blocking view update
-        if let url = URL(string: url) {
-            DispatchQueue.main.async {
-                webView.load(URLRequest(url: url))
-            }
-        }
-
-        return containerView
+        return webView
     }
 
-    static func dismantleNSView(_ nsView: NSView, coordinator: WebViewCoordinator) {
-        coordinator.detach()
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        // Update coordinator's parent reference to get latest closures
-        context.coordinator.parent = self
-
-        // Get the WKWebView from container
-        guard let webView = nsView.subviews.first(where: { $0 is WKWebView }) as? WKWebView else { return }
-        // Don't reload if URL is empty
-        guard !url.isEmpty else { return }
-
-        let currentURL = webView.url?.absoluteString ?? ""
-
-        // Don't reload if the URL is the same (prevents infinite loops)
-        guard currentURL != url else { return }
-
-        // Don't retry if this URL previously failed to load
-        if url == context.coordinator.lastFailedURL {
-            return
+    private func attach(webView: WKWebView, to containerView: NSView, context: Context) {
+        if webView.superview !== containerView {
+            webView.removeFromSuperview()
+            containerView.addSubview(webView)
         }
-
-        // Don't reload if we're currently loading (prevents interrupting navigation)
-        guard !webView.isLoading else { return }
-
-        // Clear failed URL on new navigation attempt
-        context.coordinator.lastFailedURL = nil
-
-        // Validate and load URL with error handling
-        guard let newURL = URL(string: url) else {
-            Self.logger.error("Invalid URL string: \(url)")
-            return
-        }
-
-        // Additional validation for URL components
-        guard newURL.scheme != nil || url.hasPrefix("about:") else {
-            Self.logger.error("URL missing scheme: \(url)")
-            return
-        }
-
-        // Load the URL
-        webView.load(URLRequest(url: newURL))
+        webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
+        webView.frame = containerView.bounds
+        webView.autoresizingMask = [.width, .height]
+        context.coordinator.attach(to: webView)
     }
 
     // MARK: - Navigation Methods

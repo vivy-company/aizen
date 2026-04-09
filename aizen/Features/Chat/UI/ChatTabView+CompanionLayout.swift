@@ -26,7 +26,7 @@ extension ChatTabView {
                     worktree: worktree,
                     session: session,
                     sessionManager: sessionManager,
-                    viewContext: viewContext,
+                    viewModel: chatStoreProvider(session),
                     isSelected: isSelected,
                     isCompanionResizing: isResizingCompanion
                 )

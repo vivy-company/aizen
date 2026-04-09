@@ -25,23 +25,12 @@ extension FileBrowserStore {
             if let selectedPath = existingSession.selectedFilePath {
                 if let openPathsArray = existingSession.value(forKey: "openFilesPaths") as? [String],
                    openPathsArray.contains(selectedPath) {
-                    // Selection is restored after reopened files finish loading.
+                    // Selection is restored after selected file hydration completes.
                 }
             }
 
             if let openPathsArray = existingSession.value(forKey: "openFilesPaths") as? [String] {
-                Task {
-                    for path in openPathsArray {
-                        await openFile(path: path, persistSession: false)
-                    }
-
-                    if let selectedPath = existingSession.selectedFilePath,
-                       let selectedFile = openFiles.first(where: { $0.path == selectedPath }) {
-                        selectedFileId = selectedFile.id
-                    }
-
-                    saveSession()
-                }
+                restoreOpenFiles(openPathsArray, selectedPath: existingSession.selectedFilePath)
             }
         } else {
             let newSession = FileBrowserSession(context: viewContext)
@@ -53,6 +42,40 @@ extension FileBrowserStore {
             session = newSession
 
             saveSession(immediately: true)
+        }
+    }
+
+    func restoreOpenFiles(_ paths: [String], selectedPath: String?) {
+        sessionRestoreTask?.cancel()
+
+        openFiles = paths.map { path in
+            OpenFileInfo(
+                name: URL(fileURLWithPath: path).lastPathComponent,
+                path: path,
+                content: ""
+            )
+        }
+
+        if let selectedPath,
+           let selectedFile = openFiles.first(where: { $0.path == selectedPath }) {
+            selectedFileId = selectedFile.id
+        } else {
+            selectedFileId = openFiles.last?.id
+        }
+
+        sessionRestoreTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            if let selectedPath {
+                await self.hydrateRestoredFile(path: selectedPath, selectAfterHydration: true)
+            }
+
+            for path in paths where path != selectedPath {
+                guard !Task.isCancelled else { return }
+                await self.hydrateRestoredFile(path: path)
+            }
+
+            self.saveSession()
         }
     }
 

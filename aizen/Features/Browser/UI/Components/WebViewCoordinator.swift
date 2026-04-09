@@ -30,7 +30,6 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     func detach() {
         guard let webView = webView else { return }
 
-        webView.stopLoading()
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
 

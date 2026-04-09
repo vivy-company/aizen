@@ -11,6 +11,7 @@ import os.log
 import SwiftUI
 
 struct WorktreeDetailView: View {
+    @ObservedObject var scene: WorktreeSceneStore
     @ObservedObject var worktree: Worktree
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @ObservedObject var navigationSelectionStore: AppNavigationSelectionStore
@@ -18,11 +19,11 @@ struct WorktreeDetailView: View {
     @Binding var gitChangesContext: GitChangesContext?
     var onWorktreeDeleted: ((Worktree?) -> Void)?
     let showZenModeButton: Bool
+    let isActive: Bool
 
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "WorktreeDetailView")
 
-    @StateObject var viewModel: WorktreeDetailStore
-    @ObservedObject var tabStateManager: WorktreeTabStateStore
+    @ObservedObject var viewModel: WorktreeDetailStore
 
     @AppStorage("showChatTab") var showChatTab = true
     @AppStorage("showTerminalTab") var showTerminalTab = true
@@ -32,8 +33,6 @@ struct WorktreeDetailView: View {
     @AppStorage("showGitStatus") var showGitStatus = true
     @AppStorage("showXcodeBuild") var showXcodeBuild = true
     @AppStorage("zenModeEnabled") var zenModeEnabled = false
-    @State var selectedTab = "chat"
-    @State var lastOpenedApp: DetectedApp?
     let worktreeRuntime: WorktreeRuntime
     @ObservedObject var gitSummaryStore: GitSummaryStore
     @ObservedObject var xcodeBuildManager: XcodeBuildStore
@@ -41,30 +40,51 @@ struct WorktreeDetailView: View {
     @State var fileSearchWindowController: FileSearchWindowController?
     @State var fileToOpenFromSearch: String?
     @State var cachedTerminalBackgroundColor: Color?
-    @State var hasLoadedTabState = false
     @Environment(\.colorScheme) var colorScheme
 
     init(
-        worktree: Worktree,
-        repositoryManager: WorkspaceRepositoryStore,
+        scene: WorktreeSceneStore,
         navigationSelectionStore: AppNavigationSelectionStore,
-        tabStateManager: WorktreeTabStateStore,
         gitChangesContext: Binding<GitChangesContext?>,
         onWorktreeDeleted: ((Worktree?) -> Void)? = nil,
-        showZenModeButton: Bool = true
+        showZenModeButton: Bool = true,
+        isActive: Bool
     ) {
-        self.worktree = worktree
-        self.repositoryManager = repositoryManager
+        self.scene = scene
+        self.worktree = scene.worktree
+        self.repositoryManager = scene.repositoryManager
         self.navigationSelectionStore = navigationSelectionStore
-        self.tabStateManager = tabStateManager
         _gitChangesContext = gitChangesContext
         self.onWorktreeDeleted = onWorktreeDeleted
         self.showZenModeButton = showZenModeButton
-        let runtime = WorktreeRuntimeCoordinator.shared.runtime(for: worktree.path ?? "")
+        self.isActive = isActive
+        let runtime = scene.runtime
         self.worktreeRuntime = runtime
-        _viewModel = StateObject(wrappedValue: WorktreeDetailStore(worktree: worktree, repositoryManager: repositoryManager))
+        _viewModel = ObservedObject(wrappedValue: scene.detailStore)
         _gitSummaryStore = ObservedObject(wrappedValue: runtime.summaryStore)
         _xcodeBuildManager = ObservedObject(wrappedValue: runtime.xcodeBuildManager)
+    }
+
+    var selectedTab: String {
+        get { scene.selectedTab }
+        nonmutating set { scene.selectTab(newValue) }
+    }
+
+    var selectedTabBinding: Binding<String> {
+        Binding(
+            get: { selectedTab },
+            set: { selectedTab = $0 }
+        )
+    }
+
+    var lastOpenedApp: DetectedApp? {
+        get { scene.lastOpenedApp }
+        nonmutating set { scene.lastOpenedApp = newValue }
+    }
+
+    var hasLoadedTabState: Bool {
+        get { scene.hasLoadedTabState }
+        nonmutating set { scene.hasLoadedTabState = newValue }
     }
 
     var visibleTabIds: [String] {
@@ -90,10 +110,14 @@ struct WorktreeDetailView: View {
 
 #Preview {
     WorktreeDetailView(
-        worktree: Worktree(),
-        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext),
+        scene: WorktreeSceneStore(
+            worktree: Worktree(),
+            repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext),
+            tabStateManager: WorktreeTabStateStore(),
+            viewContext: PersistenceController.preview.container.viewContext
+        ),
         navigationSelectionStore: AppNavigationSelectionStore(),
-        tabStateManager: WorktreeTabStateStore(),
-        gitChangesContext: .constant(nil)
+        gitChangesContext: .constant(nil),
+        isActive: true
     )
 }

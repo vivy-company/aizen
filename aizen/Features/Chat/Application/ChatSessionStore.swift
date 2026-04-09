@@ -84,6 +84,9 @@ class ChatSessionStore: ObservableObject {
     var skipNextToolCallsEmission: Bool = false
     var gitPauseApplied: Bool = false
     var settingUpSessionId: UUID? = nil
+    var hasLoadedWarmState = false
+    var hasIndexedAutocompleteWorktree = false
+    var indexedAutocompleteWorktreePath = ""
 
     // MARK: - Computed Properties
 

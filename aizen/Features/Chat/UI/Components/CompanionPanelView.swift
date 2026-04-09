@@ -14,6 +14,8 @@ struct CompanionPanelView: View {
     let repositoryManager: WorkspaceRepositoryStore
     let terminalSessions: [TerminalSession]
     let browserSessions: [BrowserSession]
+    let fileBrowserStore: FileBrowserStore?
+    let browserSessionStore: BrowserSessionStore?
     let side: CompanionSide
     let onClose: () -> Void
     let isResizing: Bool

@@ -19,7 +19,7 @@ struct ChatSessionView: View {
 
     @Environment(\.managedObjectContext) var viewContext
 
-    @StateObject var viewModel: ChatSessionStore
+    @ObservedObject var viewModel: ChatSessionStore
 
     // UI-only state
     @State var showingVoiceRecording = false
@@ -52,7 +52,7 @@ struct ChatSessionView: View {
         worktree: Worktree,
         session: ChatSession,
         sessionManager: ChatSessionRegistry,
-        viewContext: NSManagedObjectContext,
+        viewModel: ChatSessionStore,
         isSelected: Bool,
         isCompanionResizing: Bool = false
     ) {
@@ -61,15 +61,7 @@ struct ChatSessionView: View {
         self.sessionManager = sessionManager
         self.isSelected = isSelected
         self.isCompanionResizing = isCompanionResizing
-        self._viewContext = Environment(\.managedObjectContext)
-
-        let vm = ChatSessionStore(
-            worktree: worktree,
-            session: session,
-            sessionManager: sessionManager,
-            viewContext: viewContext
-        )
-        self._viewModel = StateObject(wrappedValue: vm)
+        _viewModel = ObservedObject(wrappedValue: viewModel)
     }
 
     var body: some View {

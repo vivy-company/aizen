@@ -17,11 +17,8 @@ extension ChatSessionStore {
         guard settingUpSessionId != sessionId else { return }
         settingUpSessionId = sessionId
 
-        resetTimelineSyncState()
-        loadPendingAttachmentsIfNeeded()
-        loadHistoricalMessages()
-
         let worktreePath = worktree.path ?? ""
+        prepareWarmState(worktreePath: worktreePath)
         autocompleteHandler.worktreePath = worktreePath
 
         if let existingSession = sessionManager.getAgentSession(for: sessionId) {
@@ -38,11 +35,7 @@ extension ChatSessionStore {
             bootstrapTimelineState(from: existingSession)
             setupSessionObservers(session: existingSession)
 
-            if !worktreePath.isEmpty {
-                Task {
-                    await autocompleteHandler.indexWorktree()
-                }
-            }
+            scheduleAutocompleteIndexIfNeeded(for: worktreePath)
 
             if !existingSession.isActive {
                 guard !worktreePath.isEmpty else {
@@ -93,7 +86,7 @@ extension ChatSessionStore {
 
         Task {
             defer { self.settingUpSessionId = nil }
-            await autocompleteHandler.indexWorktree()
+            self.scheduleAutocompleteIndexIfNeeded(for: worktreePath)
 
             if !newSession.isActive {
                 do {
@@ -195,6 +188,32 @@ extension ChatSessionStore {
                 return
             }
             throw error
+        }
+    }
+
+    private func prepareWarmState(worktreePath: String) {
+        resetTimelineSyncState()
+        loadPendingAttachmentsIfNeeded()
+
+        if !hasLoadedWarmState {
+            loadHistoricalMessages()
+            hasLoadedWarmState = true
+        }
+
+        if indexedAutocompleteWorktreePath != worktreePath {
+            hasIndexedAutocompleteWorktree = false
+            indexedAutocompleteWorktreePath = worktreePath
+        }
+    }
+
+    private func scheduleAutocompleteIndexIfNeeded(for worktreePath: String) {
+        guard !worktreePath.isEmpty else { return }
+        guard !hasIndexedAutocompleteWorktree else { return }
+
+        hasIndexedAutocompleteWorktree = true
+        Task { [weak self] in
+            guard let self else { return }
+            await self.autocompleteHandler.indexWorktree()
         }
     }
 }
