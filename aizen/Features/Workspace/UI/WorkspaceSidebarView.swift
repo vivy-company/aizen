@@ -21,6 +21,7 @@ struct WorkspaceSidebarView: View {
     @Binding var showingAddRepository: Bool
 
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
+    @ObservedObject var workspaceGraphQueryController: WorkspaceGraphQueryController
     @Environment(\.controlActiveState) var controlActiveState
     @StateObject var licenseManager = LicenseStateStore.shared
     @State var showingWorkspaceSheet = false
@@ -58,6 +59,9 @@ struct WorkspaceSidebarView: View {
         selectedWorktree: .constant(nil),
         searchText: .constant(""),
         showingAddRepository: .constant(false),
-        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext)
+        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext),
+        workspaceGraphQueryController: WorkspaceGraphQueryController(
+            viewContext: PersistenceController.preview.container.viewContext
+        )
     )
 }

@@ -5,10 +5,10 @@ import os
 extension ChatTabView {
     func syncSelectionAndCache() {
         if selectedSessionId == nil {
-            selectedSessionId = sessions.last?.id
+            selectedSessionId = chatSessions.last?.id
         } else if let currentId = selectedSessionId,
-                  !sessions.contains(where: { $0.id == currentId }) {
-            selectedSessionId = sessions.last?.id
+                  !chatSessions.contains(where: { $0.id == currentId }) {
+            selectedSessionId = chatSessions.last?.id
         }
         pruneCache()
         updateCacheForSelection()
@@ -16,7 +16,7 @@ extension ChatTabView {
 
     func updateCacheForSelection() {
         guard let selectedId = selectedSessionId else { return }
-        guard sessions.contains(where: { $0.id == selectedId }) else { return }
+        guard chatSessions.contains(where: { $0.id == selectedId }) else { return }
         cachedSessionIds.removeAll { $0 == selectedId }
         cachedSessionIds.append(selectedId)
         if cachedSessionIds.count > maxCachedSessions {
@@ -25,7 +25,7 @@ extension ChatTabView {
     }
 
     func pruneCache() {
-        let validIds = Set(sessions.compactMap { $0.id })
+        let validIds = Set(chatSessions.compactMap { $0.id })
         cachedSessionIds.removeAll { !validIds.contains($0) }
     }
 

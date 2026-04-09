@@ -1,6 +1,10 @@
 import SwiftUI
 
 extension WorktreeListView {
+    var repositoryWorktrees: [Worktree] {
+        workspaceGraphQueryController.worktrees(in: repository)
+    }
+
     var selectedStatusFilters: Set<ItemStatus> {
         ItemStatus.decode(storedStatusFilters)
     }
@@ -13,8 +17,7 @@ extension WorktreeListView {
     }
 
     var sortedWorktrees: [Worktree] {
-        let wts = (repository.worktrees as? Set<Worktree>) ?? []
-        return wts.sorted { wt1, wt2 in
+        repositoryWorktrees.sorted { wt1, wt2 in
             if wt1.isPrimary != wt2.isPrimary {
                 return wt1.isPrimary
             }
@@ -40,6 +43,15 @@ extension WorktreeListView {
         }
 
         return result
+    }
+
+    var worktreeSessionCounts: [UUID: WorktreeSessionCounts] {
+        Dictionary(
+            uniqueKeysWithValues: worktrees.compactMap { worktree in
+                guard let worktreeId = worktree.id else { return nil }
+                return (worktreeId, WorktreeSessionSnapshotBuilder.counts(for: worktree))
+            }
+        )
     }
 
     var searchFieldStroke: Color {

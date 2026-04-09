@@ -20,23 +20,24 @@ extension ChatSessionStore {
         let force: Bool
     }
 
-    func rebuildTimeline() {
-        timelineRenderEpoch &+= 1
-    }
-
-    func rebuildTimelineWithGrouping(isStreaming: Bool) {
-        _ = isStreaming
-        timelineRenderEpoch &+= 1
-    }
-
     func syncMessages(_ newMessages: [MessageItem]) {
-        previousMessageIds = Set(newMessages.map(\.id))
-        timelineRenderEpoch &+= 1
+        messages = filteredTimelineMessages(from: newMessages)
     }
 
     func syncToolCalls(_ newToolCalls: [ToolCall]) {
-        previousToolCallIds = Set(newToolCalls.map(\.id))
-        timelineRenderEpoch &+= 1
+        toolCalls = newToolCalls
+    }
+
+    func syncTimeline(messages newMessages: [MessageItem], toolCalls newToolCalls: [ToolCall]) {
+        syncMessages(newMessages)
+        syncToolCalls(newToolCalls)
+    }
+
+    private func filteredTimelineMessages(from source: [MessageItem]) -> [MessageItem] {
+        source.filter { message in
+            guard message.role == .agent else { return true }
+            return !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     }
 
     // MARK: - Scrolling

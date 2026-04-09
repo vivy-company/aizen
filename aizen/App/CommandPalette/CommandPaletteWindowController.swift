@@ -14,6 +14,7 @@ class CommandPaletteWindowController: NSWindowController {
 
     convenience init(
         managedObjectContext: NSManagedObjectContext,
+        workspaceGraphQueryController: WorkspaceGraphQueryController,
         currentRepositoryId: String?,
         currentWorkspaceId: String?,
         onNavigate: @escaping (CommandPaletteNavigationAction) -> Void
@@ -24,6 +25,7 @@ class CommandPaletteWindowController: NSWindowController {
         )
         let panel = CommandPalettePanel(
             managedObjectContext: managedObjectContext,
+            workspaceGraphQueryController: workspaceGraphQueryController,
             viewModel: viewModel,
             onNavigate: onNavigate
         )

@@ -30,28 +30,14 @@ extension WorktreeDetailView {
     }
 
     func doesChatSessionBelongToCurrentWorktree(_ sessionId: UUID) -> Bool {
-        guard let worktreeId = worktree.id else { return false }
-        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(
-            format: "id == %@ AND worktree.id == %@",
-            sessionId as CVarArg,
-            worktreeId as CVarArg
-        )
-        request.fetchLimit = 1
-        return ((try? worktree.managedObjectContext?.fetch(request).first) != nil)
+        viewModel.containsChatSession(sessionId)
     }
 
-    func containsTerminalSession(_ sessionId: UUID, worktreeId: UUID) -> Bool {
-        let request: NSFetchRequest<TerminalSession> = TerminalSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktreeId as CVarArg)
-        request.fetchLimit = 1
-        return ((try? worktree.managedObjectContext?.fetch(request).first) != nil)
+    func containsTerminalSession(_ sessionId: UUID) -> Bool {
+        viewModel.containsTerminalSession(sessionId)
     }
 
-    func containsBrowserSession(_ sessionId: UUID, worktreeId: UUID) -> Bool {
-        let request: NSFetchRequest<BrowserSession> = BrowserSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND worktree.id == %@", sessionId as CVarArg, worktreeId as CVarArg)
-        request.fetchLimit = 1
-        return ((try? worktree.managedObjectContext?.fetch(request).first) != nil)
+    func containsBrowserSession(_ sessionId: UUID) -> Bool {
+        viewModel.containsBrowserSession(sessionId)
     }
 }

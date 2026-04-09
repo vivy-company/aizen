@@ -23,7 +23,6 @@ extension ChatAgentSession {
         if let chatSessionId = chatSessionId {
             Task {
                 do {
-                    try await updateChatSessionMetadata(chatSessionId: chatSessionId)
                     try await self.persistMessage(
                         id: messageId,
                         role: "user",

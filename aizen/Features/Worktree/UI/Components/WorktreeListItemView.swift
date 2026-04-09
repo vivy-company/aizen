@@ -10,6 +10,7 @@ import os.log
 
 struct WorktreeListItemView: View {
     @ObservedObject var worktree: Worktree
+    let sessionCounts: WorktreeSessionCounts
     let isSelected: Bool
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     let allWorktrees: [Worktree]

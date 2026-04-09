@@ -1,25 +1,6 @@
 import SwiftUI
 
 extension RepositoryRow {
-    var activeSessionCount: Int {
-        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-        return worktrees.reduce(0) { total, worktree in
-            guard !worktree.isDeleted else { return total }
-
-            let chatCount = ((worktree.chatSessions as? Set<ChatSession>) ?? [])
-                .filter { !$0.isDeleted }
-                .count
-            let terminalCount = ((worktree.terminalSessions as? Set<TerminalSession>) ?? [])
-                .filter { !$0.isDeleted }
-                .count
-            let browserCount = ((worktree.browserSessions as? Set<BrowserSession>) ?? [])
-                .filter { !$0.isDeleted }
-                .count
-
-            return total + chatCount + terminalCount + browserCount
-        }
-    }
-
     var sessionIndicatorColor: Color {
         isSelected ? selectedForegroundColor.opacity(0.9) : .secondary
     }

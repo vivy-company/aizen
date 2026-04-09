@@ -64,6 +64,8 @@ struct OpenFileInfo: Identifiable, Equatable {
 
 @MainActor
 class FileBrowserStore: ObservableObject {
+    static let sessionSaveDelay = Duration.milliseconds(150)
+
     @Published var currentPath: String
     @Published var openFiles: [OpenFileInfo] = []
     @Published var selectedFileId: UUID?
@@ -81,6 +83,7 @@ class FileBrowserStore: ObservableObject {
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "FileBrowser")
     let fileService = FileService()
     let gitRuntime = FileBrowserGitRuntime()
+    var sessionSaveTask: Task<Void, Never>?
 
     init(worktree: Worktree, context: NSManagedObjectContext) {
         self.worktree = worktree
@@ -94,6 +97,10 @@ class FileBrowserStore: ObservableObject {
         Task {
             await loadGitStatus()
         }
+    }
+
+    deinit {
+        sessionSaveTask?.cancel()
     }
 
     func toggleExpanded(path: String) {

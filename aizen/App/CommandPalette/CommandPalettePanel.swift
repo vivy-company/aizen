@@ -16,6 +16,7 @@ class CommandPalettePanel: NSPanel {
 
     init(
         managedObjectContext: NSManagedObjectContext,
+        workspaceGraphQueryController: WorkspaceGraphQueryController,
         viewModel: WorktreeSearchViewModel,
         onNavigate: @escaping (CommandPaletteNavigationAction) -> Void
     ) {
@@ -48,7 +49,8 @@ class CommandPalettePanel: NSPanel {
                         self?.close()
                     }
                 },
-                viewModel: viewModel
+                viewModel: viewModel,
+                workspaceGraphQueryController: workspaceGraphQueryController
             )
             .environment(\.managedObjectContext, managedObjectContext)
             .environmentObject(interaction)

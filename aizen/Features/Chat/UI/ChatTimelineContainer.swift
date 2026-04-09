@@ -2,16 +2,7 @@ import ACP
 import SwiftUI
 import VVChatTimeline
 
-struct ChatTimelineRenderKey: Equatable {
-    let timelineRenderEpoch: UInt64
-    let isSessionInitializing: Bool
-    let pendingPlanRequestIdentity: String
-    let selectedAgent: String
-    let scrollRequestId: UUID?
-}
-
-struct ChatTimelineContainer: View, Equatable {
-    let key: ChatTimelineRenderKey
+struct ChatTimelineContainer: View {
     let messages: [MessageItem]
     let toolCalls: [ToolCall]
     let isStreaming: Bool
@@ -23,10 +14,6 @@ struct ChatTimelineContainer: View, Equatable {
     let isAutoScrollEnabled: () -> Bool
     let onAppear: () -> Void
     let onTimelineStateChange: (VVChatTimelineState) -> Void
-
-    static func == (lhs: ChatTimelineContainer, rhs: ChatTimelineContainer) -> Bool {
-        lhs.key == rhs.key
-    }
 
     var body: some View {
         ChatMessageList(

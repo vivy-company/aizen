@@ -20,24 +20,11 @@ struct WorktreeSessionCoordinator {
     let logger: Logger
 
     var chatSessions: [ChatSession] {
-        let sessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
-        return sessions
-            .filter { !$0.isDeleted && !$0.archived }
-            .sorted {
-                let lhsDate = $0.createdAt ?? Date()
-                let rhsDate = $1.createdAt ?? Date()
-                if lhsDate == rhsDate {
-                    return ($0.id?.uuidString ?? "") < ($1.id?.uuidString ?? "")
-                }
-                return lhsDate < rhsDate
-            }
+        viewModel.chatSessions
     }
 
     var terminalSessions: [TerminalSession] {
-        let sessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
-        return sessions
-            .filter { !$0.isDeleted }
-            .sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
+        viewModel.terminalSessions
     }
 
     func closeChatSession(_ session: ChatSession) {
@@ -151,8 +138,6 @@ struct WorktreeSessionCoordinator {
     func createNewTerminalSession(withPreset preset: TerminalPreset?) {
         guard let context = worktree.managedObjectContext else { return }
 
-        let terminalSessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
-
         let session = TerminalSession(context: context)
         session.id = UUID()
         session.createdAt = Date()
@@ -165,7 +150,7 @@ struct WorktreeSessionCoordinator {
             session.title = preset.name
             session.initialCommand = preset.command
         } else {
-            session.title = String(localized: "worktree.session.terminalTitle \(terminalSessions.count + 1)")
+            session.title = String(localized: "worktree.session.terminalTitle \(viewModel.terminalSessions.count + 1)")
         }
 
         do {

@@ -33,17 +33,14 @@ extension ChatSessionStore {
     }
 
     func performAgentSwitch(to newAgent: String) {
-        agentSwitcher.performAgentSwitch(to: newAgent, worktree: worktree) {
-            self.objectWillChange.send()
-        }
+        agentSwitcher.performAgentSwitch(to: newAgent)
 
         if let sessionId = session.id {
             sessionManager.removeAgentSession(for: sessionId)
         }
         currentAgentSession = nil
-        previousMessageIds = []
-        previousToolCallIds = []
-        timelineRenderEpoch &+= 1
+        messages = []
+        toolCalls = []
 
         setupAgentSession()
         pendingAgentSwitch = nil
@@ -84,9 +81,8 @@ extension ChatSessionStore {
                 currentAgentSession = freshAgentSession
                 autocompleteHandler.agentSession = freshAgentSession
 
-                previousMessageIds = []
-                previousToolCallIds = []
-                timelineRenderEpoch &+= 1
+                messages = []
+                toolCalls = []
 
                 setupSessionObservers(session: freshAgentSession)
 

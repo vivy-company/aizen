@@ -6,7 +6,6 @@
 //
 
 import Combine
-import Combine
 import CoreData
 import SwiftUI
 
@@ -17,6 +16,7 @@ final class AppWorktreeNavigator: ObservableObject {
 
     func showCommandPalette(
         viewContext: NSManagedObjectContext,
+        workspaceGraphQueryController: WorkspaceGraphQueryController,
         currentRepositoryId: String?,
         currentWorkspaceId: String?,
         onNavigate: @escaping (CommandPaletteNavigationAction) -> Void
@@ -29,6 +29,7 @@ final class AppWorktreeNavigator: ObservableObject {
 
         let controller = CommandPaletteWindowController(
             managedObjectContext: viewContext,
+            workspaceGraphQueryController: workspaceGraphQueryController,
             currentRepositoryId: currentRepositoryId,
             currentWorkspaceId: currentWorkspaceId,
             onNavigate: onNavigate
@@ -39,36 +40,24 @@ final class AppWorktreeNavigator: ObservableObject {
 
     func navigateToChatSession(
         chatSessionId: UUID,
-        viewContext: NSManagedObjectContext,
+        workspaceGraphQueryController: WorkspaceGraphQueryController,
+        selectionStore: AppNavigationSelectionStore,
         navigateToWorktree: @escaping (UUID, UUID, UUID) -> Void
     ) {
-        let request: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", chatSessionId as CVarArg)
-        request.fetchLimit = 1
-
-        guard let chatSession = try? viewContext.fetch(request).first,
-              let worktree = chatSession.worktree,
-              let worktreeId = worktree.id,
-              let repository = worktree.repository,
-              let repoId = repository.id,
-              let workspace = repository.workspace,
-              let workspaceId = workspace.id else {
+        guard let route = workspaceGraphQueryController.route(for: chatSessionId) else {
             return
         }
 
-        navigateToWorktree(workspaceId, repoId, worktreeId)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            NotificationCenter.default.post(
-                name: .switchToChatSession,
-                object: nil,
-                userInfo: ["chatSessionId": chatSessionId]
-            )
-        }
+        navigateToWorktree(route.workspaceId, route.repoId, route.worktreeId)
+        selectionStore.pendingWorktreeDestination = .chatSession(
+            worktreeId: route.worktreeId,
+            sessionId: chatSessionId
+        )
     }
 
     func handleCommandPaletteNavigation(
         _ action: CommandPaletteNavigationAction,
+        selectionStore: AppNavigationSelectionStore,
         navigateToWorktree: @escaping (UUID, UUID, UUID) -> Void
     ) {
         switch action {
@@ -76,59 +65,28 @@ final class AppWorktreeNavigator: ObservableObject {
             navigateToWorktree(workspaceId, repoId, worktreeId)
         case .tab(let workspaceId, let repoId, let worktreeId, let tabId):
             navigateToWorktree(workspaceId, repoId, worktreeId)
-            postNavigationNotification(
-                name: .switchToWorktreeTab,
-                userInfo: [
-                    "worktreeId": worktreeId,
-                    "tabId": tabId
-                ],
-                primaryDelay: 0.08,
-                retryDelay: 0.22
+            selectionStore.pendingWorktreeDestination = .tab(
+                worktreeId: worktreeId,
+                tabId: tabId
             )
         case .chatSession(let workspaceId, let repoId, let worktreeId, let sessionId):
             navigateToWorktree(workspaceId, repoId, worktreeId)
-            postNavigationNotification(
-                name: .switchToChatSession,
-                userInfo: ["chatSessionId": sessionId],
-                primaryDelay: 0.1,
-                retryDelay: 0.24
+            selectionStore.pendingWorktreeDestination = .chatSession(
+                worktreeId: worktreeId,
+                sessionId: sessionId
             )
         case .terminalSession(let workspaceId, let repoId, let worktreeId, let sessionId):
             navigateToWorktree(workspaceId, repoId, worktreeId)
-            postNavigationNotification(
-                name: .switchToTerminalSession,
-                userInfo: [
-                    "worktreeId": worktreeId,
-                    "sessionId": sessionId
-                ],
-                primaryDelay: 0.1,
-                retryDelay: 0.24
+            selectionStore.pendingWorktreeDestination = .terminalSession(
+                worktreeId: worktreeId,
+                sessionId: sessionId
             )
         case .browserSession(let workspaceId, let repoId, let worktreeId, let sessionId):
             navigateToWorktree(workspaceId, repoId, worktreeId)
-            postNavigationNotification(
-                name: .switchToBrowserSession,
-                userInfo: [
-                    "worktreeId": worktreeId,
-                    "sessionId": sessionId
-                ],
-                primaryDelay: 0.1,
-                retryDelay: 0.24
+            selectionStore.pendingWorktreeDestination = .browserSession(
+                worktreeId: worktreeId,
+                sessionId: sessionId
             )
-        }
-    }
-
-    private func postNavigationNotification(
-        name: Notification.Name,
-        userInfo: [String: Any],
-        primaryDelay: TimeInterval,
-        retryDelay: TimeInterval
-    ) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + primaryDelay) {
-            NotificationCenter.default.post(name: name, object: nil, userInfo: userInfo)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + retryDelay) {
-            NotificationCenter.default.post(name: name, object: nil, userInfo: userInfo)
         }
     }
 }

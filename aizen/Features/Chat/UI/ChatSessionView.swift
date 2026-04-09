@@ -83,7 +83,6 @@ struct ChatSessionView: View {
             VStack(spacing: 0) {
                 ZStack(alignment: .bottom) {
                     ChatTimelineContainer(
-                        key: timelineRenderKey,
                         messages: viewModel.messages,
                         toolCalls: viewModel.toolCalls,
                         isStreaming: viewModel.currentAgentSession?.isStreaming ?? false,
@@ -102,7 +101,6 @@ struct ChatSessionView: View {
                             )
                         }
                     )
-                    .equatable()
                     .padding(.horizontal, 20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .layoutPriority(1)

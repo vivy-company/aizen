@@ -31,10 +31,10 @@ extension ContentView {
         if selectionStore.selectedWorkspace == nil {
             if let workspaceId = selectedWorkspaceId,
                let uuid = UUID(uuidString: workspaceId),
-               let workspace = workspaces.first(where: { $0.id == uuid }) {
+               let workspace = workspaceGraphQueryController.workspace(id: uuid) {
                 selectWorkspace(workspace)
             } else {
-                selectWorkspace(workspaces.first)
+                selectWorkspace(workspaceGraphQueryController.workspaces.first)
             }
         }
 
@@ -66,7 +66,8 @@ extension ContentView {
         }
         navigator.navigateToChatSession(
             chatSessionId: chatSessionId,
-            viewContext: viewContext,
+            workspaceGraphQueryController: workspaceGraphQueryController,
+            selectionStore: selectionStore,
             navigateToWorktree: navigateToWorktree
         )
     }

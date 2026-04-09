@@ -13,6 +13,7 @@ struct AppNavigationContentColumn: View {
     @Binding var selectedWorktree: Worktree?
     let repositoryManager: WorkspaceRepositoryStore
     let tabStateManager: WorktreeTabStateStore
+    let workspaceGraphQueryController: WorkspaceGraphQueryController
     let zenModeEnabled: Bool
 
     var body: some View {
@@ -24,7 +25,8 @@ struct AppNavigationContentColumn: View {
                     repository: repository,
                     selectedWorktree: $selectedWorktree,
                     repositoryManager: repositoryManager,
-                    tabStateManager: tabStateManager
+                    tabStateManager: tabStateManager,
+                    workspaceGraphQueryController: workspaceGraphQueryController
                 )
             } else {
                 placeholderView(

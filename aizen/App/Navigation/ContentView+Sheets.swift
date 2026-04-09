@@ -11,7 +11,7 @@ extension ContentView {
     func withPresentationSheets<Content: View>(_ content: Content) -> some View {
         content
             .sheet(isPresented: $showingAddRepository) {
-                if let workspace = selectionStore.selectedWorkspace ?? workspaces.first {
+                if let workspace = selectionStore.selectedWorkspace ?? workspaceGraphQueryController.workspaces.first {
                     RepositoryAddSheet(
                         workspace: workspace,
                         repositoryManager: repositoryManager,

@@ -72,14 +72,14 @@ extension WorkspaceSidebarView {
                 ForEach(filteredRepositories, id: \.id) { repository in
                     RepositoryRow(
                         repository: repository,
+                        activeSessionCount: repository.id.flatMap { repositoryActiveSessionCounts[$0] } ?? 0,
                         isSelected: selectedRepository?.id == repository.id,
                         repositoryManager: repositoryManager,
                         onSelect: {
                             isCrossProjectSelected = false
                             selectedRepository = repository
                             if selectedWorktree == nil {
-                                let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-                                selectedWorktree = worktrees.first(where: { $0.isPrimary })
+                                selectedWorktree = workspaceGraphQueryController.primaryOrFirstWorktree(in: repository)
                             }
                         },
                         onRemove: {

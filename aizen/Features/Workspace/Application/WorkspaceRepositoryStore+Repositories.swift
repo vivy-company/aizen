@@ -89,10 +89,8 @@ extension WorkspaceRepositoryStore {
     }
 
     func deleteRepository(_ repository: Repository) throws {
-        let workspace = repository.workspace
         viewContext.delete(repository)
         try viewContext.save()
-        workspace?.objectWillChange.send()
     }
 
     // MARK: - Repository Status and Note Operations

@@ -5,6 +5,7 @@ import os.log
 struct RepositoryRow: View {
     private let logger = Logger.workspace
     @ObservedObject var repository: Repository
+    let activeSessionCount: Int
     let isSelected: Bool
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     let onSelect: () -> Void

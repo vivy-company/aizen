@@ -3,8 +3,9 @@ import Foundation
 
 extension ActiveWorktreesView {
     func buildSeed(for worktree: Worktree) -> ActiveWorktreesMonitorRowSeed {
-        let counts = sessionCounts(for: worktree)
-        let runtime = terminalRuntime(for: worktree)
+        let sessionLists = WorktreeSessionSnapshotBuilder.lists(for: worktree)
+        let counts = sessionCounts(for: worktree, sessionLists: sessionLists)
+        let runtime = terminalRuntime(for: sessionLists.terminalSessions)
         let repository = worktree.repository?.name ?? "Environment"
         let branch = worktree.branch?.isEmpty == false ? worktree.branch! : "detached"
 
@@ -45,47 +46,30 @@ extension ActiveWorktreesView {
     }
 
     func isActive(_ worktree: Worktree) -> Bool {
-        chatCount(for: worktree) > 0 ||
-            terminalCount(for: worktree) > 0 ||
-            browserCount(for: worktree) > 0 ||
-            fileCount(for: worktree) > 0
-    }
-
-    private func chatCount(for worktree: Worktree) -> Int {
-        let sessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
-        return sessions.filter { !$0.isDeleted }.count
-    }
-
-    private func terminalCount(for worktree: Worktree) -> Int {
-        let sessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
-        return sessions.filter { !$0.isDeleted }.count
-    }
-
-    private func browserCount(for worktree: Worktree) -> Int {
-        let sessions = (worktree.browserSessions as? Set<BrowserSession>) ?? []
-        return sessions.filter { !$0.isDeleted }.count
-    }
-
-    private func fileCount(for worktree: Worktree) -> Int {
-        if let session = worktree.fileBrowserSession, !session.isDeleted {
-            return 1
-        }
-        return 0
+        sessionCounts(for: worktree).total > 0
     }
 
     private func sessionCounts(for worktree: Worktree) -> ActiveWorktreesSessionCounts {
-        ActiveWorktreesSessionCounts(
-            chats: chatCount(for: worktree),
-            terminals: terminalCount(for: worktree),
-            browsers: browserCount(for: worktree),
-            files: fileCount(for: worktree)
+        sessionCounts(for: worktree, sessionLists: WorktreeSessionSnapshotBuilder.lists(for: worktree))
+    }
+
+    private func sessionCounts(for worktree: Worktree, sessionLists: WorktreeSessionLists) -> ActiveWorktreesSessionCounts {
+        let snapshotCounts = WorktreeSessionCounts(
+            chats: sessionLists.chatSessions.count,
+            terminals: sessionLists.terminalSessions.count,
+            browsers: sessionLists.browserSessions.count,
+            files: (worktree.fileBrowserSession?.isDeleted == false) ? 1 : 0
+        )
+
+        return ActiveWorktreesSessionCounts(
+            chats: snapshotCounts.chats,
+            terminals: snapshotCounts.terminals,
+            browsers: snapshotCounts.browsers,
+            files: snapshotCounts.files
         )
     }
 
-    private func terminalRuntime(for worktree: Worktree) -> ActiveWorktreesTerminalRuntimeSnapshot {
-        let terminalSessions = ((worktree.terminalSessions as? Set<TerminalSession>) ?? [])
-            .filter { !$0.isDeleted }
-
+    private func terminalRuntime(for terminalSessions: [TerminalSession]) -> ActiveWorktreesTerminalRuntimeSnapshot {
         var expectedPanes = 0
         var livePanes = 0
         var runningPanes = 0

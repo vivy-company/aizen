@@ -14,12 +14,7 @@ struct ActiveWorktreesView: View {
     @Environment(\.managedObjectContext) var viewContext
     @Environment(\.colorScheme) var colorScheme
     @StateObject var metrics = ActiveWorktreesMetrics()
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Worktree.lastAccessed, ascending: false)],
-        animation: .default
-    )
-    var worktrees: FetchedResults<Worktree>
+    @StateObject var workspaceGraphQueryController: WorkspaceGraphQueryController
 
     @AppStorage("terminalSessionPersistence") var sessionPersistence = false
 
@@ -32,4 +27,10 @@ struct ActiveWorktreesView: View {
         KeyPathComparator(\.chatSessions, order: .reverse),
         KeyPathComparator(\.lastAccessed, order: .reverse)
     ]
+
+    init(context: NSManagedObjectContext) {
+        _workspaceGraphQueryController = StateObject(
+            wrappedValue: WorkspaceGraphQueryController(viewContext: context)
+        )
+    }
 }

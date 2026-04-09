@@ -86,7 +86,7 @@ class ChatAgentSession: ObservableObject {
     var pendingAgentText: String = ""
     var pendingAgentBlocks: [ContentBlock] = []
     var agentMessageFlushTask: Task<Void, Never>?
-    static let agentMessageFlushInterval: TimeInterval = 0.0
+    static let agentMessageFlushInterval: TimeInterval = 0.05
 
     /// Currently pending Task tool calls (subagents) - used for parent tracking
     /// When only one Task is active, child tool calls are assigned to it

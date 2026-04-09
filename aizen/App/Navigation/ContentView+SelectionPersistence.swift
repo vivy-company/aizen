@@ -67,10 +67,7 @@ extension ContentView {
     }
 
     func quickSwitchToPreviousWorktree() {
-        let request: NSFetchRequest<Worktree> = Worktree.fetchRequest()
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Worktree.lastAccessed, ascending: false)]
-
-        guard let fetchedWorktrees = try? viewContext.fetch(request) else { return }
+        let fetchedWorktrees = workspaceGraphQueryController.worktrees
 
         guard let target = WorktreeQuickSwitcher.nextTarget(
             from: fetchedWorktrees,
@@ -82,7 +79,7 @@ extension ContentView {
 
         encodeWorktreeMRUOrder(target.updatedMRUOrder)
 
-        guard let selectedTarget = fetchedWorktrees.first(where: { $0.id == target.worktreeId }) else {
+        guard let selectedTarget = workspaceGraphQueryController.worktree(id: target.worktreeId) else {
             return
         }
 

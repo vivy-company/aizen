@@ -110,9 +110,7 @@ extension WorktreeSearchViewModel {
             }
 
             if includeChatSessions {
-                let chatSessions = ((worktree.chatSessions as? Set<ChatSession>) ?? [])
-                    .filter { !$0.isDeleted && !$0.archived }
-                    .sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
+                let chatSessions = Array(WorktreeSessionSnapshotBuilder.chatSessions(for: worktree).reversed())
                 for session in chatSessions {
                     guard let sessionId = session.id else { continue }
                     let title = session.title ?? session.agentName?.capitalized ?? "Chat Session"
@@ -147,9 +145,7 @@ extension WorktreeSearchViewModel {
             }
 
             if includeTerminalSessions {
-                let terminalSessions = ((worktree.terminalSessions as? Set<TerminalSession>) ?? [])
-                    .filter { !$0.isDeleted }
-                    .sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
+                let terminalSessions = Array(WorktreeSessionSnapshotBuilder.terminalSessions(for: worktree).reversed())
                 for session in terminalSessions {
                     guard let sessionId = session.id else { continue }
                     let title = session.title ?? "Terminal Session"
@@ -184,9 +180,7 @@ extension WorktreeSearchViewModel {
             }
 
             if includeBrowserSessions {
-                let browserSessions = ((worktree.browserSessions as? Set<BrowserSession>) ?? [])
-                    .filter { !$0.isDeleted }
-                    .sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
+                let browserSessions = Array(WorktreeSessionSnapshotBuilder.browserSessions(for: worktree).reversed())
                 for session in browserSessions {
                     guard let sessionId = session.id else { continue }
                     let title = session.title ?? session.url ?? "Browser Session"

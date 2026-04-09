@@ -30,53 +30,15 @@ extension ChatSessionStore {
         cancelPendingAutoScroll()
         scrollRequest = nil
 
-        streamingRebuildTask?.cancel()
-        streamingRebuildTask = nil
-        pendingStreamingRebuild = false
-        pendingStreamingRebuildRequiresToolCallSync = false
-
         skipNextMessagesEmission = false
         skipNextToolCallsEmission = false
     }
 
     func bootstrapTimelineState(from session: ChatAgentSession) {
-        previousMessageIds = Set(messages.map(\.id))
-        previousToolCallIds = Set(session.toolCalls.map(\.id))
-
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            rebuildTimelineWithGrouping(isStreaming: session.isStreaming)
+            syncTimeline(messages: session.messages, toolCalls: session.toolCalls)
         }
-    }
-
-    func scheduleStreamingRebuild() {
-        guard streamingRebuildTask == nil else { return }
-        streamingRebuildTask = Task { @MainActor in
-            defer { streamingRebuildTask = nil }
-            try? await Task.sleep(for: .milliseconds(16))
-            if Task.isCancelled {
-                return
-            }
-            performStreamingRebuildIfReady()
-        }
-    }
-
-    func performStreamingRebuildIfReady() {
-        guard pendingStreamingRebuild else { return }
-        guard !(currentAgentSession?.isStreaming ?? false) else { return }
-        if pendingStreamingRebuildRequiresToolCallSync {
-            let currentToolCallIds = Set(currentAgentSession?.toolCalls.map(\.id) ?? [])
-            if currentToolCallIds != previousToolCallIds {
-                return
-            }
-        }
-        rebuildTimelineWithGrouping(isStreaming: false)
-        previousMessageIds = Set(messages.map(\.id))
-        if let session = currentAgentSession {
-            previousToolCallIds = Set(session.toolCalls.map(\.id))
-        }
-        pendingStreamingRebuild = false
-        pendingStreamingRebuildRequiresToolCallSync = false
     }
 }

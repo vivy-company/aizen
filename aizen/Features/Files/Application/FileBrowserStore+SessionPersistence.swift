@@ -32,13 +32,15 @@ extension FileBrowserStore {
             if let openPathsArray = existingSession.value(forKey: "openFilesPaths") as? [String] {
                 Task {
                     for path in openPathsArray {
-                        await openFile(path: path)
+                        await openFile(path: path, persistSession: false)
                     }
 
                     if let selectedPath = existingSession.selectedFilePath,
                        let selectedFile = openFiles.first(where: { $0.path == selectedPath }) {
                         selectedFileId = selectedFile.id
                     }
+
+                    saveSession()
                 }
             }
         } else {
@@ -50,11 +52,26 @@ extension FileBrowserStore {
             newSession.worktree = worktree
             session = newSession
 
-            saveSession()
+            saveSession(immediately: true)
         }
     }
 
-    func saveSession() {
+    func saveSession(immediately: Bool = false) {
+        sessionSaveTask?.cancel()
+
+        if immediately {
+            persistSessionNow()
+            return
+        }
+
+        sessionSaveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: FileBrowserStore.sessionSaveDelay)
+            guard let self, !Task.isCancelled else { return }
+            self.persistSessionNow()
+        }
+    }
+
+    private func persistSessionNow() {
         guard let session = session else { return }
 
         session.currentPath = currentPath
@@ -63,7 +80,9 @@ extension FileBrowserStore {
         session.selectedFilePath = openFiles.first(where: { $0.id == selectedFileId })?.path
 
         do {
-            try viewContext.save()
+            if viewContext.hasChanges {
+                try viewContext.save()
+            }
         } catch {
             logger.error("Error saving FileBrowserSession: \(error)")
         }

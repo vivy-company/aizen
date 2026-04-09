@@ -8,6 +8,10 @@
 import SwiftUI
 
 extension WorktreeCreateSheet {
+    var repositoryWorktrees: [Worktree] {
+        workspaceGraphQueryController.worktrees(in: repository)
+    }
+
     var branchNameTemplates: [String] {
         (try? JSONDecoder().decode([String].self, from: branchNameTemplatesData)) ?? []
     }
@@ -18,8 +22,7 @@ extension WorktreeCreateSheet {
     }
 
     var sourcePath: String? {
-        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-        if let primary = worktrees.first(where: { $0.isPrimary }),
+        if let primary = repositoryWorktrees.first(where: { $0.isPrimary }),
            let path = primary.path {
             return path
         }
@@ -42,13 +45,11 @@ extension WorktreeCreateSheet {
     }
 
     var existingWorktreeNames: [String] {
-        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-        return worktrees.compactMap { $0.branch }
+        repositoryWorktrees.compactMap(\.branch)
     }
 
     var defaultBaseBranch: String {
-        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-        if let mainWorktree = worktrees.first(where: { $0.isPrimary }) {
+        if let mainWorktree = repositoryWorktrees.first(where: { $0.isPrimary }) {
             return mainWorktree.branch ?? "main"
         }
         return "main"

@@ -9,15 +9,15 @@ import CoreData
 
 extension ContentView {
     func navigateToWorktree(workspaceId: UUID, repoId: UUID, worktreeId: UUID) {
-        guard let workspace = workspaces.first(where: { $0.id == workspaceId }) else {
+        guard let workspace = workspaceGraphQueryController.workspace(id: workspaceId) else {
             return
         }
 
         selectWorkspace(workspace, preserveSelection: true)
 
-        let allRepositories = (workspace.repositories as? Set<Repository>) ?? []
-        let allWorkspaceWorktrees = allRepositories.flatMap { repository -> [Worktree] in
-            ((repository.worktrees as? Set<Worktree>) ?? []).filter { !$0.isDeleted }
+        let allRepositories = workspaceGraphQueryController.repositories(in: workspace)
+        let allWorkspaceWorktrees = allRepositories.flatMap { repository in
+            workspaceGraphQueryController.worktrees(in: repository)
         }
 
         if let targetWorktree = allWorkspaceWorktrees.first(where: { $0.id == worktreeId }),
@@ -33,8 +33,8 @@ extension ContentView {
         }
 
         if let crossProjectRepository = allRepositories.first(where: { $0.id == repoId && isCrossProjectRepository($0) }) {
-            let worktrees = (crossProjectRepository.worktrees as? Set<Worktree>) ?? []
-            if let worktree = worktrees.first(where: { $0.id == worktreeId && !$0.isDeleted }) {
+            let worktrees = workspaceGraphQueryController.worktrees(in: crossProjectRepository)
+            if let worktree = worktrees.first(where: { $0.id == worktreeId }) {
                 setCrossProjectSelected(true, preferredWorktree: worktree)
             } else {
                 setCrossProjectSelected(true)
@@ -45,7 +45,7 @@ extension ContentView {
         let repositories = visibleRepositories(in: workspace)
         if let repository = repositories.first(where: { $0.id == repoId }) {
             selectRepository(repository)
-            let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
+            let worktrees = workspaceGraphQueryController.worktrees(in: repository)
             if let worktree = worktrees.first(where: { $0.id == worktreeId }) {
                 selectWorktree(worktree)
             }
@@ -120,21 +120,21 @@ extension ContentView {
             }
         }
 
-        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
+        let worktrees = workspaceGraphQueryController.worktrees(in: repository)
         if let restoredWorktreeId = getStoredWorktreeId(for: repository),
-           let restoredWorktree = worktrees.first(where: { $0.id == restoredWorktreeId && !$0.isDeleted }) {
+           let restoredWorktree = worktrees.first(where: { $0.id == restoredWorktreeId }) {
             selectWorktree(restoredWorktree)
             return
         }
 
         if let worktreeId = selectedWorktreeId,
            let uuid = UUID(uuidString: worktreeId),
-           let restoredWorktree = worktrees.first(where: { $0.id == uuid && !$0.isDeleted }) {
+           let restoredWorktree = worktrees.first(where: { $0.id == uuid }) {
             selectWorktree(restoredWorktree)
             return
         }
 
-        let candidates = worktrees.filter { !$0.isDeleted }
+        let candidates = worktrees
         selectWorktree(candidates.first(where: { $0.isPrimary }) ?? candidates.first)
     }
 
@@ -143,8 +143,8 @@ extension ContentView {
             selectionStore.selectedWorktree = nil
             selectedWorktreeId = nil
             if let repository = selectionStore.selectedRepository {
-                let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
-                let fallback = worktrees.first(where: { $0.isPrimary && !$0.isDeleted })
+                let worktrees = workspaceGraphQueryController.worktrees(in: repository)
+                let fallback = worktrees.first(where: { $0.isPrimary })
                 if let fallback {
                     selectWorktree(fallback)
                 }

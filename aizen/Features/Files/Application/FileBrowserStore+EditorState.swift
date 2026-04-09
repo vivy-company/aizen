@@ -8,12 +8,14 @@
 import Foundation
 
 extension FileBrowserStore {
-    func openFile(path: String) async {
+    func openFile(path: String, persistSession: Bool = true) async {
         let fileURL = URL(fileURLWithPath: path)
 
         if isBrowsableDirectory(fileURL) {
             currentPath = path
-            saveSession()
+            if persistSession {
+                saveSession()
+            }
             return
         }
 
@@ -43,7 +45,9 @@ extension FileBrowserStore {
 
         openFiles.append(fileInfo)
         selectedFileId = fileInfo.id
-        saveSession()
+        if persistSession {
+            saveSession()
+        }
     }
 
     func closeFile(id: UUID) {

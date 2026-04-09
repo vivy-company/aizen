@@ -70,7 +70,6 @@ class WorktreeTabStateStore: ObservableObject {
         state.viewType = viewType
         tabStates[worktreeId.uuidString] = state
         saveAllStates()
-        objectWillChange.send()
     }
 
     func saveSessionId(_ sessionId: UUID?, for viewType: String, worktreeId: UUID) {
@@ -91,7 +90,6 @@ class WorktreeTabStateStore: ObservableObject {
 
         tabStates[worktreeId.uuidString] = state
         saveAllStates()
-        objectWillChange.send()
     }
 
     func getSessionId(for viewType: String, worktreeId: UUID) -> UUID? {

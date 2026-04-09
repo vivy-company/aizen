@@ -40,17 +40,17 @@ extension ChatTabView {
 
     var cachedSessions: [ChatSession] {
         if cachedSessionIds.isEmpty {
-            let fallbackId = selectedSessionId ?? sessions.last?.id
+            let fallbackId = selectedSessionId ?? chatSessions.last?.id
             if let fallbackId,
-               let fallback = sessions.first(where: { $0.id == fallbackId }) {
+               let fallback = chatSessions.first(where: { $0.id == fallbackId }) {
                 return [fallback]
             }
-            if let last = sessions.last {
+            if let last = chatSessions.last {
                 return [last]
             }
         }
         return cachedSessionIds.compactMap { id in
-            sessions.first(where: { $0.id == id })
+            chatSessions.first(where: { $0.id == id })
         }
     }
 

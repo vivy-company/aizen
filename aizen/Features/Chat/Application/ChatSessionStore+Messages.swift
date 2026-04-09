@@ -86,10 +86,6 @@ extension ChatSessionStore {
                     String(localized: "chat.error.prefix \(error.localizedDescription)")
                 )
 
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    self.rebuildTimeline()
-                }
-
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     self.attachments = messageAttachments
                     self.isProcessing = false

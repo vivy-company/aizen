@@ -14,16 +14,17 @@ extension ContentView {
     }
 
     func visibleRepositories(in workspace: Workspace) -> [Repository] {
-        let repositories = (workspace.repositories as? Set<Repository>) ?? []
-        return repositories
-            .filter { !$0.isDeleted && !isCrossProjectRepository($0) }
-            .sorted { ($0.name ?? "") < ($1.name ?? "") }
+        workspaceGraphQueryController.visibleRepositories(
+            in: workspace,
+            crossProjectMarker: crossProjectRepositoryMarker
+        )
     }
 
     func ensureCrossProjectWorktree(for workspace: Workspace) throws -> Worktree {
         try CrossProjectWorkspaceCoordinator(
             viewContext: viewContext,
-            repositoryMarker: crossProjectRepositoryMarker
+            repositoryMarker: crossProjectRepositoryMarker,
+            workspaceGraphQueryController: workspaceGraphQueryController
         )
         .ensureWorktree(
             for: workspace,

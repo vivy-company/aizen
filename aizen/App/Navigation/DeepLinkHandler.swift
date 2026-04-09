@@ -7,11 +7,13 @@
 
 import AppKit
 import Foundation
-import CoreData
 
 @MainActor
 final class DeepLinkHandler {
     static let shared = DeepLinkHandler()
+    private let workspaceGraphQueryController = WorkspaceGraphQueryController(
+        viewContext: PersistenceController.shared.container.viewContext
+    )
 
     private init() {}
 
@@ -63,8 +65,7 @@ final class DeepLinkHandler {
         let normalized = normalizedPath(path)
 
         Task { @MainActor in
-            let context = PersistenceController.shared.container.viewContext
-            guard let target = await resolveWorktreeTarget(for: normalized, in: context) else { return }
+            guard let target = resolveWorktreeTarget(for: normalized) else { return }
 
             NotificationCenter.default.post(
                 name: .navigateToWorktree,
@@ -89,9 +90,8 @@ final class DeepLinkHandler {
     }
 
     private func resolveWorktreeTarget(
-        for path: String,
-        in context: NSManagedObjectContext
-    ) async -> (workspaceId: UUID, repoId: UUID, worktreeId: UUID)? {
+        for path: String
+    ) -> (workspaceId: UUID, repoId: UUID, worktreeId: UUID)? {
         let discovered = GitUtils.discoverRepository(from: path)
         var repositoryPath = discovered ?? path
         if repositoryPath.hasSuffix("/.git") {
@@ -99,14 +99,11 @@ final class DeepLinkHandler {
         }
         let mainRepoPath = GitUtils.getMainRepositoryPath(at: repositoryPath)
 
-        let repoRequest: NSFetchRequest<Repository> = Repository.fetchRequest()
-        repoRequest.predicate = NSPredicate(format: "path == %@", mainRepoPath)
-        repoRequest.fetchLimit = 1
-        guard let repository = try? context.fetch(repoRequest).first else { return nil }
+        guard let repository = workspaceGraphQueryController.repository(path: mainRepoPath) else { return nil }
         guard let repoId = repository.id,
               let workspaceId = repository.workspace?.id else { return nil }
 
-        let worktrees = (repository.worktrees as? Set<Worktree>) ?? []
+        let worktrees = workspaceGraphQueryController.worktrees(in: repository)
 
         let matchingWorktree = worktrees
             .filter { worktree in

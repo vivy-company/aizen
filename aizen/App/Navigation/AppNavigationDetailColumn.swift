@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct AppNavigationDetailColumn: View {
+    @ObservedObject var selectionStore: AppNavigationSelectionStore
     let isCrossProjectSelected: Bool
     let crossProjectWorktree: Worktree?
     let selectedWorktree: Worktree?
@@ -23,6 +24,7 @@ struct AppNavigationDetailColumn: View {
             WorktreeDetailView(
                 worktree: worktree,
                 repositoryManager: repositoryManager,
+                navigationSelectionStore: selectionStore,
                 tabStateManager: tabStateManager,
                 gitChangesContext: $gitChangesContext,
                 onWorktreeDeleted: { _ in
@@ -41,6 +43,7 @@ struct AppNavigationDetailColumn: View {
             WorktreeDetailView(
                 worktree: worktree,
                 repositoryManager: repositoryManager,
+                navigationSelectionStore: selectionStore,
                 tabStateManager: tabStateManager,
                 gitChangesContext: $gitChangesContext,
                 onWorktreeDeleted: { nextWorktree in

@@ -149,7 +149,7 @@ extension WorktreeSearchViewModel {
         }
     }
 
-    func buildWorkspaceItems(query: String, workspaces: [Workspace]) -> [CommandPaletteItem] {
+    func buildWorkspaceItems(query: String, workspaces: [Workspace], worktrees: [Worktree]) -> [CommandPaletteItem] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowerQuery = trimmedQuery.lowercased()
 
@@ -158,7 +158,7 @@ extension WorktreeSearchViewModel {
         let ranked = base.compactMap { workspace -> CommandPaletteItem? in
             guard let workspaceId = workspace.id else { return nil }
             let workspaceName = workspace.name ?? "Workspace"
-            let fallbackWorktree = CommandPaletteWorkspaceSupport.bestWorktree(for: workspace)
+            let fallbackWorktree = CommandPaletteWorkspaceSupport.bestWorktree(for: workspace, worktrees: worktrees)
 
             guard let worktreeId = fallbackWorktree?.id,
                   let repoId = fallbackWorktree?.repository?.id else {

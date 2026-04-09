@@ -12,20 +12,9 @@ struct CommandPaletteContent: View {
     let onNavigate: (CommandPaletteNavigationAction) -> Void
     let onClose: () -> Void
     @ObservedObject var viewModel: WorktreeSearchViewModel
+    @ObservedObject var workspaceGraphQueryController: WorkspaceGraphQueryController
 
     @Environment(\.managedObjectContext) var viewContext
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Worktree.lastAccessed, ascending: false)],
-        animation: .default
-    )
-    var allWorktrees: FetchedResults<Worktree>
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)],
-        animation: .default
-    )
-    var allWorkspaces: FetchedResults<Workspace>
 
     @FocusState var isSearchFocused: Bool
     @EnvironmentObject var interaction: PaletteInteractionState

@@ -16,15 +16,15 @@ extension CommandPaletteContent {
 
     var snapshotSyncKey: SnapshotSyncKey {
         SnapshotSyncKey(
-            worktreeCount: allWorktrees.count,
-            workspaceCount: allWorkspaces.count,
+            worktreeCount: workspaceGraphQueryController.worktrees.count,
+            workspaceCount: workspaceGraphQueryController.workspaces.count,
             currentWorktreeId: currentWorktreeId
         )
     }
 
     func syncSnapshots() {
-        viewModel.updateSnapshot(Array(allWorktrees), currentWorktreeId: currentWorktreeId)
-        viewModel.updateWorkspaceSnapshot(Array(allWorkspaces))
+        viewModel.updateSnapshot(workspaceGraphQueryController.worktrees, currentWorktreeId: currentWorktreeId)
+        viewModel.updateWorkspaceSnapshot(workspaceGraphQueryController.workspaces)
     }
 
 }
@@ -40,14 +40,6 @@ struct CommandPaletteLifecycleModifier: ViewModifier {
                 }
             }
             .task(id: self.content.snapshotSyncKey) {
-                self.content.syncSnapshots()
-            }
-            .onReceive(
-                NotificationCenter.default.publisher(
-                    for: .NSManagedObjectContextObjectsDidChange,
-                    object: self.content.viewContext
-                )
-            ) { _ in
                 self.content.syncSnapshots()
             }
     }

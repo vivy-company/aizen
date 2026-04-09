@@ -27,23 +27,6 @@ extension ChatSessionView {
         return request
     }
 
-    var pendingPlanTimelineRequestIdentity: String {
-        guard let request = pendingPlanTimelineRequest else { return "none" }
-        let optionIds = (request.options ?? []).map(\.optionId).joined(separator: "|")
-        let toolId = request.toolCall?.toolCallId ?? "none"
-        return "req-\(toolId)-\(optionIds)-\(request.message ?? "")"
-    }
-
-    var timelineRenderKey: ChatTimelineRenderKey {
-        ChatTimelineRenderKey(
-            timelineRenderEpoch: viewModel.timelineRenderEpoch,
-            isSessionInitializing: viewModel.isSessionInitializing,
-            pendingPlanRequestIdentity: pendingPlanTimelineRequestIdentity,
-            selectedAgent: viewModel.selectedAgent,
-            scrollRequestId: viewModel.scrollRequest?.id
-        )
-    }
-
     var inlinePlan: Plan? {
         guard pendingPlanTimelineRequest == nil,
               let plan = viewModel.currentAgentPlan,

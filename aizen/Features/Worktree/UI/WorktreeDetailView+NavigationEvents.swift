@@ -1,8 +1,32 @@
 import ACP
-import CoreData
 import Foundation
 
 extension WorktreeDetailView {
+    func applyPendingNavigationDestinationIfNeeded() {
+        guard let worktreeId = worktree.id,
+              let destination = navigationSelectionStore.consumePendingWorktreeDestination(for: worktreeId) else {
+            return
+        }
+
+        switch destination {
+        case .tab(_, let tabId):
+            guard visibleTabIds.contains(tabId) else { return }
+            selectedTab = tabId
+        case .chatSession(_, let sessionId):
+            _ = activateLocalChatSession(sessionId)
+        case .terminalSession(_, let sessionId):
+            if containsTerminalSession(sessionId) {
+                selectedTab = "terminal"
+                viewModel.selectedTerminalSessionId = sessionId
+            }
+        case .browserSession(_, let sessionId):
+            if containsBrowserSession(sessionId) {
+                selectedTab = "browser"
+                viewModel.selectedBrowserSessionId = sessionId
+            }
+        }
+    }
+
     func navigateToChatSession(_ sessionId: UUID) {
         if activateLocalChatSession(sessionId) {
             return
@@ -38,7 +62,7 @@ extension WorktreeDetailView {
             return
         }
 
-        if containsTerminalSession(sessionId, worktreeId: targetWorktreeId) {
+        if containsTerminalSession(sessionId) {
             selectedTab = "terminal"
             viewModel.selectedTerminalSessionId = sessionId
         }
@@ -52,7 +76,7 @@ extension WorktreeDetailView {
             return
         }
 
-        if containsBrowserSession(sessionId, worktreeId: targetWorktreeId) {
+        if containsBrowserSession(sessionId) {
             selectedTab = "browser"
             viewModel.selectedBrowserSessionId = sessionId
         }

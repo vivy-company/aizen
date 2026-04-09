@@ -1,14 +1,6 @@
-import CoreData
 import Foundation
 
 extension TerminalTabView {
-    var sessions: [TerminalSession] {
-        let sessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
-        return sessions
-            .filter { !$0.isDeleted }
-            .sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
-    }
-
     var validatedSelectedSessionId: UUID? {
         if let currentId = selectedSessionId,
            sessions.contains(where: { $0.id == currentId }) {

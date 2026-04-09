@@ -12,6 +12,7 @@ struct WorktreeListView: View {
     @Binding var selectedWorktree: Worktree?
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
     @ObservedObject var tabStateManager: WorktreeTabStateStore
+    @ObservedObject var workspaceGraphQueryController: WorkspaceGraphQueryController
     @Environment(\.colorScheme) var colorScheme
 
     @State var showingCreateWorktree = false
@@ -25,6 +26,9 @@ struct WorktreeListView: View {
         repository: Repository(),
         selectedWorktree: .constant(nil),
         repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext),
-        tabStateManager: WorktreeTabStateStore()
+        tabStateManager: WorktreeTabStateStore(),
+        workspaceGraphQueryController: WorkspaceGraphQueryController(
+            viewContext: PersistenceController.preview.container.viewContext
+        )
     )
 }

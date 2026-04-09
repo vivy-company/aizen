@@ -38,29 +38,12 @@ class ChatSessionStore: ObservableObject {
     @Published var currentAgentSession: ChatAgentSession?
     @Published var currentPermissionRequest: RequestPermissionRequest?
     @Published var attachments: [ChatAttachment] = []
-    @Published var timelineRenderEpoch: UInt64 = 0
-
-    // Track previous IDs for incremental sync (avoids storing full duplicate arrays)
-    var previousMessageIds: Set<String> = []
-    var previousToolCallIds: Set<String> = []
+    @Published var messages: [MessageItem] = []
+    @Published var toolCalls: [ToolCall] = []
 
     // Historical messages loaded from Core Data (separate from live session)
     var historicalMessages: [MessageItem] = []
     var historicalToolCalls: [ToolCall] = []
-
-    var messages: [MessageItem] {
-        let source = currentAgentSession?.messages ?? historicalMessages
-        
-        return source.filter { message in
-            guard message.role == .agent else { return true }
-            return !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
-    }
-
-    /// Tool calls - derives from ChatAgentSession (no duplicate storage)
-    var toolCalls: [ToolCall] {
-        currentAgentSession?.toolCalls ?? []
-    }
 
     // MARK: - UI State Flags
 
@@ -94,9 +77,6 @@ class ChatSessionStore: ObservableObject {
     let logger = Logger.forCategory("ChatSession")
     var autoScrollTask: Task<Void, Never>?
     var suppressNextAutoScroll: Bool = false
-    var pendingStreamingRebuild: Bool = false
-    var pendingStreamingRebuildRequiresToolCallSync: Bool = false
-    var streamingRebuildTask: Task<Void, Never>?
     private var pendingNearBottomState: Bool?
     private var nearBottomStateTask: Task<Void, Never>?
     var draftPersistTask: Task<Void, Never>?

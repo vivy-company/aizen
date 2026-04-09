@@ -29,6 +29,7 @@ extension FileBrowserStore {
             ToastStore.shared.show("Created folder \(name)", type: .success)
             refreshTree()
             expandedPaths.insert(folderPath)
+            saveSession()
         } catch {
             ToastStore.shared.show(error.localizedDescription, type: .error)
         }
@@ -78,6 +79,7 @@ extension FileBrowserStore {
 
             expandedPaths.remove(path)
             refreshTree()
+            saveSession()
         } catch {
             ToastStore.shared.show(error.localizedDescription, type: .error)
         }

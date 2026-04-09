@@ -17,7 +17,7 @@ final class ActiveWorktreesWindowController {
     private init() {}
 
     func show(context: NSManagedObjectContext) {
-        let contentView = ActiveWorktreesView()
+        let contentView = ActiveWorktreesView(context: context)
             .environment(\.managedObjectContext, context)
             .modifier(AppearanceModifier())
 

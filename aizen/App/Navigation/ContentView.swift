@@ -15,11 +15,7 @@ struct ContentView: View {
     @StateObject var selectionStore = AppNavigationSelectionStore()
     @StateObject var tabStateManager = WorktreeTabStateStore()
     @StateObject var navigator = AppWorktreeNavigator()
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)],
-        animation: .default)
-    var workspaces: FetchedResults<Workspace>
+    @StateObject var workspaceGraphQueryController: WorkspaceGraphQueryController
 
     @State var searchText = ""
     @State var showingAddRepository = false
@@ -45,6 +41,9 @@ struct ContentView: View {
 
     init(context: NSManagedObjectContext, repositoryManager: WorkspaceRepositoryStore, gitChangesContext: Binding<GitChangesContext?>) {
         self.repositoryManager = repositoryManager
+        _workspaceGraphQueryController = StateObject(
+            wrappedValue: WorkspaceGraphQueryController(viewContext: context)
+        )
         _gitChangesContext = gitChangesContext
     }
 
@@ -54,14 +53,15 @@ struct ContentView: View {
                 NavigationSplitView(columnVisibility: $columnVisibility) {
                     // Left sidebar - workspaces and repositories
                     WorkspaceSidebarView(
-                        workspaces: Array(workspaces),
+                        workspaces: workspaceGraphQueryController.workspaces,
                         selectedWorkspace: selectedWorkspaceBinding,
                         isCrossProjectSelected: crossProjectSelectionBinding,
                         selectedRepository: selectedRepositoryBinding,
                         selectedWorktree: selectedWorktreeBinding,
                         searchText: $searchText,
                         showingAddRepository: $showingAddRepository,
-                        repositoryManager: repositoryManager
+                        repositoryManager: repositoryManager,
+                        workspaceGraphQueryController: workspaceGraphQueryController
                     )
                     .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
                 } content: {
@@ -71,10 +71,12 @@ struct ContentView: View {
                         selectedWorktree: selectedWorktreeBinding,
                         repositoryManager: repositoryManager,
                         tabStateManager: tabStateManager,
+                        workspaceGraphQueryController: workspaceGraphQueryController,
                         zenModeEnabled: zenModeEnabled
                     )
                 } detail: {
                     AppNavigationDetailColumn(
+                        selectionStore: selectionStore,
                         isCrossProjectSelected: selectionStore.isCrossProjectSelected,
                         crossProjectWorktree: selectionStore.crossProjectWorktree,
                         selectedWorktree: selectionStore.selectedWorktree,

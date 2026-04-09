@@ -17,10 +17,15 @@ extension ContentView {
 
         navigator.showCommandPalette(
             viewContext: viewContext,
+            workspaceGraphQueryController: workspaceGraphQueryController,
             currentRepositoryId: currentRepositoryId,
             currentWorkspaceId: currentWorkspaceId,
             onNavigate: { action in
-                navigator.handleCommandPaletteNavigation(action, navigateToWorktree: navigateToWorktree)
+                navigator.handleCommandPaletteNavigation(
+                    action,
+                    selectionStore: selectionStore,
+                    navigateToWorktree: navigateToWorktree
+                )
             }
         )
     }

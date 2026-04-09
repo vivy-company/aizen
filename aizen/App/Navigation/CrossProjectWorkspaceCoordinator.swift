@@ -11,19 +11,15 @@ import Foundation
 struct CrossProjectWorkspaceCoordinator {
     let viewContext: NSManagedObjectContext
     let repositoryMarker: String
+    let workspaceGraphQueryController: WorkspaceGraphQueryController
 
     func ensureWorktree(for workspace: Workspace, visibleRepositories: [Repository]) throws -> Worktree {
         let rootURL = try prepareCrossProjectDirectory(for: workspace, visibleRepositories: visibleRepositories)
 
-        let repositoryRequest: NSFetchRequest<Repository> = Repository.fetchRequest()
-        repositoryRequest.fetchLimit = 1
-        repositoryRequest.predicate = NSPredicate(
-            format: "workspace == %@ AND (isCrossProject == YES OR note == %@)",
-            workspace,
-            repositoryMarker
-        )
-
-        let repository = try viewContext.fetch(repositoryRequest).first ?? Repository(context: viewContext)
+        let repository = workspaceGraphQueryController
+            .repositories(in: workspace)
+            .first { $0.isCrossProject || $0.note == repositoryMarker }
+            ?? Repository(context: viewContext)
         if repository.id == nil {
             repository.id = UUID()
         }
@@ -35,7 +31,7 @@ struct CrossProjectWorkspaceCoordinator {
         repository.workspace = workspace
         repository.lastUpdated = Date()
 
-        let existingWorktrees = ((repository.worktrees as? Set<Worktree>) ?? []).filter { !$0.isDeleted }
+        let existingWorktrees = workspaceGraphQueryController.worktrees(in: repository)
         let worktree = existingWorktrees.first(where: { $0.isPrimary }) ?? existingWorktrees.first ?? Worktree(context: viewContext)
         if worktree.id == nil {
             worktree.id = UUID()
@@ -56,9 +52,7 @@ struct CrossProjectWorkspaceCoordinator {
             throw NSError(domain: "AizenCrossProject", code: 1, userInfo: [NSLocalizedDescriptionKey: "Workspace identifier is missing"])
         }
 
-        let workspaceRequest: NSFetchRequest<Workspace> = Workspace.fetchRequest()
-        let allWorkspaces = try viewContext.fetch(workspaceRequest)
-        let candidates = allWorkspaces.compactMap { candidate -> WorkspacePathCandidate? in
+        let candidates = workspaceGraphQueryController.workspaces.compactMap { candidate -> WorkspacePathCandidate? in
             guard let candidateID = candidate.id else {
                 return nil
             }

@@ -18,6 +18,8 @@ extension ChatTabView {
                         panel: panel,
                         worktree: worktree,
                         repositoryManager: repositoryManager,
+                        terminalSessions: terminalSessions,
+                        browserSessions: browserSessions,
                         side: .left,
                         onClose: {
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -83,6 +85,8 @@ extension ChatTabView {
                         panel: panel,
                         worktree: worktree,
                         repositoryManager: repositoryManager,
+                        terminalSessions: terminalSessions,
+                        browserSessions: browserSessions,
                         side: .right,
                         onClose: {
                             withAnimation(.easeInOut(duration: 0.2)) {

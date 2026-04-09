@@ -45,23 +45,19 @@ extension WorktreeListItemView {
     }
 
     var chatSessionCount: Int {
-        let sessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
-        return sessions.filter { !$0.isDeleted }.count
+        sessionCounts.chats
     }
 
     var terminalSessionCount: Int {
-        let sessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
-        return sessions.filter { !$0.isDeleted }.count
+        sessionCounts.terminals
     }
 
     var browserSessionCount: Int {
-        let sessions = (worktree.browserSessions as? Set<BrowserSession>) ?? []
-        return sessions.filter { !$0.isDeleted }.count
+        sessionCounts.browsers
     }
 
     var fileSessionCount: Int {
-        guard let session = worktree.fileBrowserSession, !session.isDeleted else { return 0 }
-        return 1
+        sessionCounts.files
     }
 
     var mergeSourceStatuses: [WorktreeStatusInfo] {

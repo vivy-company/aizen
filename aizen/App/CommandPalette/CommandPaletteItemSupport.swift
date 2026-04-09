@@ -29,11 +29,11 @@ enum CommandPaletteTabCatalog {
 }
 
 enum CommandPaletteWorkspaceSupport {
-    static func bestWorktree(for workspace: Workspace) -> Worktree? {
-        let repositories = (workspace.repositories as? Set<Repository>) ?? []
-        let worktrees = repositories
-            .flatMap { repository -> [Worktree] in
-                ((repository.worktrees as? Set<Worktree>) ?? []).filter { !$0.isDeleted }
+    static func bestWorktree(for workspace: Workspace, worktrees: [Worktree]) -> Worktree? {
+        let workspaceWorktrees = worktrees
+            .filter { worktree in
+                guard !worktree.isDeleted else { return false }
+                return worktree.repository?.workspace?.objectID == workspace.objectID
             }
             .sorted { left, right in
                 if left.isPrimary != right.isPrimary { return left.isPrimary }
@@ -43,7 +43,7 @@ enum CommandPaletteWorkspaceSupport {
                 return (left.branch ?? "") < (right.branch ?? "")
             }
 
-        return worktrees.first
+        return workspaceWorktrees.first
     }
 
     static func isCrossProjectWorktree(_ worktree: Worktree, marker: String) -> Bool {

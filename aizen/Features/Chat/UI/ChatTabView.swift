@@ -7,13 +7,16 @@
 
 import ACP
 import AppKit
-import CoreData
 import os.log
 import SwiftUI
 
 struct ChatTabView: View {
     let worktree: Worktree
     let repositoryManager: WorkspaceRepositoryStore
+    let chatSessions: [ChatSession]
+    let recentSessions: [ChatSession]
+    let terminalSessions: [TerminalSession]
+    let browserSessions: [BrowserSession]
     @Binding var selectedSessionId: UUID?
     @Binding var selectedTerminalSessionId: UUID?
     @Binding var selectedBrowserSessionId: UUID?
@@ -66,60 +69,37 @@ struct ChatTabView: View {
     }
 
     private var sessionIdentitySnapshot: [UUID] {
-        sessions.compactMap(\.id)
+        chatSessions.compactMap(\.id)
     }
-
-    @FetchRequest var sessions: FetchedResults<ChatSession>
-    @FetchRequest private var recentSessions: FetchedResults<ChatSession>
 
     init(
         worktree: Worktree,
         repositoryManager: WorkspaceRepositoryStore,
+        chatSessions: [ChatSession],
+        recentSessions: [ChatSession],
+        terminalSessions: [TerminalSession],
+        browserSessions: [BrowserSession],
         selectedSessionId: Binding<UUID?>,
         selectedTerminalSessionId: Binding<UUID?>,
         selectedBrowserSessionId: Binding<UUID?>
     ) {
         self.worktree = worktree
         self.repositoryManager = repositoryManager
+        self.chatSessions = chatSessions
+        self.recentSessions = recentSessions
+        self.terminalSessions = terminalSessions
+        self.browserSessions = browserSessions
         self._selectedSessionId = selectedSessionId
         self._selectedTerminalSessionId = selectedTerminalSessionId
         self._selectedBrowserSessionId = selectedBrowserSessionId
-
-        // Handle deleted worktree gracefully - use impossible predicate to return empty results
-        let predicate: NSPredicate
-        if let worktreeId = worktree.id {
-            predicate = NSPredicate(format: "worktree.id == %@ AND archived == NO", worktreeId as CVarArg)
-        } else {
-            predicate = NSPredicate(value: false)
-        }
-
-        self._sessions = FetchRequest(
-            sortDescriptors: [NSSortDescriptor(keyPath: \ChatSession.createdAt, ascending: true)],
-            predicate: predicate,
-            animation: nil
-        )
-
-        let recentRequest: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        if let worktreeId = worktree.id {
-            recentRequest.predicate = NSPredicate(
-                format: "worktree.id == %@ AND SUBQUERY(messages, $m, $m.role == 'user').@count > 0",
-                worktreeId as CVarArg
-            )
-        } else {
-            recentRequest.predicate = NSPredicate(value: false)
-        }
-        recentRequest.sortDescriptors = [NSSortDescriptor(key: "lastMessageAt", ascending: false)]
-        recentRequest.fetchLimit = recentSessionsLimit
-        recentRequest.relationshipKeyPathsForPrefetching = ["worktree"]
-        self._recentSessions = FetchRequest(fetchRequest: recentRequest, animation: nil)
     }
 
     var body: some View {
         Group {
-            if sessions.isEmpty {
+            if chatSessions.isEmpty {
                 ChatEmptyStateView(
                     enabledAgents: enabledAgents,
-                    recentSessions: Array(recentSessions),
+                    recentSessions: recentSessions,
                     recentSessionsLimit: recentSessionsLimit,
                     onAgentSelect: createNewSession(withAgent:),
                     onShowMore: {

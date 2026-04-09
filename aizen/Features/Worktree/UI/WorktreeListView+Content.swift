@@ -79,6 +79,7 @@ extension WorktreeListView {
                         ForEach(worktrees, id: \.id) { worktree in
                             WorktreeListItemView(
                                 worktree: worktree,
+                                sessionCounts: worktree.id.flatMap { worktreeSessionCounts[$0] } ?? .empty,
                                 isSelected: selectedWorktree?.id == worktree.id,
                                 repositoryManager: repositoryManager,
                                 allWorktrees: worktrees,
@@ -114,7 +115,8 @@ extension WorktreeListView {
         .sheet(isPresented: $showingCreateWorktree) {
             WorktreeCreateSheet(
                 repository: repository,
-                repositoryManager: repositoryManager
+                repositoryManager: repositoryManager,
+                workspaceGraphQueryController: workspaceGraphQueryController
             )
         }
     }

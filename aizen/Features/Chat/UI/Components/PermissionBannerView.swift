@@ -6,7 +6,6 @@
 //
 
 import ACP
-import CoreData
 import SwiftUI
 
 struct PermissionBannerView: View {
@@ -14,7 +13,6 @@ struct PermissionBannerView: View {
     let onNavigate: (UUID) -> Void
 
     @ObservedObject private var chatSessionManager = ChatSessionRegistry.shared
-    @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.colorScheme) private var colorScheme
 
     private var pendingSessionInfo: PendingPermissionInfo? {
@@ -32,19 +30,9 @@ struct PermissionBannerView: View {
             return nil
         }
 
-        let request2: NSFetchRequest<ChatSession> = ChatSession.fetchRequest()
-        request2.predicate = NSPredicate(format: "id == %@", chatSessionId as CVarArg)
-        request2.fetchLimit = 1
-
-        var worktreeName = "Chat"
-        if let session = try? viewContext.fetch(request2).first,
-           let worktree = session.worktree {
-            worktreeName = worktree.branch ?? "Chat"
-        }
-
         return PendingPermissionInfo(
             sessionId: chatSessionId,
-            worktreeName: worktreeName,
+            worktreeName: agentSession.permissionHandler.worktreeName ?? "Chat",
             prompt: request.promptDescription,
             options: request.options ?? [],
             handler: agentSession.permissionHandler

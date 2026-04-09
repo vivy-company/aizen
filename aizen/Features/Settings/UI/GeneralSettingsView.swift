@@ -8,18 +8,12 @@
 import SwiftUI
 import os.log
 import AppKit
-import CoreData
 
 struct GeneralSettingsView: View {
     let logger = Logger.settings
 
     @Binding var defaultEditor: String
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)],
-        animation: .default
-    )
-    var workspaces: FetchedResults<Workspace>
+    @StateObject var workspaceGraphQueryController: WorkspaceGraphQueryController
 
     // Appearance
     @AppStorage("appearanceMode") var appearanceMode: String = AppearanceMode.system.rawValue
@@ -54,6 +48,19 @@ struct GeneralSettingsView: View {
     @State var cliStatus = CLISymlinkService.status()
     @State var showingCLIAlert = false
     @State var cliAlertMessage = ""
+
+    init(defaultEditor: Binding<String>) {
+        _defaultEditor = defaultEditor
+        _workspaceGraphQueryController = StateObject(
+            wrappedValue: WorkspaceGraphQueryController(
+                viewContext: PersistenceController.shared.container.viewContext
+            )
+        )
+    }
+
+    var workspaces: [Workspace] {
+        workspaceGraphQueryController.workspaces
+    }
 
     var body: some View {
         Form {

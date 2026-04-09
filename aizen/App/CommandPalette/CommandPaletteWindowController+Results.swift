@@ -153,7 +153,7 @@ extension CommandPaletteContent {
              .chatSession(_, _, let worktreeId, _),
              .terminalSession(_, _, let worktreeId, _),
              .browserSession(_, _, let worktreeId, _):
-            if let worktree = allWorktrees.first(where: { $0.id == worktreeId }) {
+            if let worktree = workspaceGraphQueryController.worktree(id: worktreeId) {
                 worktree.lastAccessed = Date()
                 try? viewContext.save()
             }

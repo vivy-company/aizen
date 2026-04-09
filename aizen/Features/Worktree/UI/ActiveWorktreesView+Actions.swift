@@ -30,16 +30,16 @@ extension ActiveWorktreesView {
     }
 
     func terminateSessions(for worktree: Worktree) {
-        let chats = (worktree.chatSessions as? Set<ChatSession>) ?? []
-        for session in chats where !session.isDeleted {
+        let sessionLists = WorktreeSessionSnapshotBuilder.lists(for: worktree)
+
+        for session in sessionLists.chatSessions {
             if let id = session.id {
                 ChatSessionRegistry.shared.removeAgentSession(for: id)
             }
             viewContext.delete(session)
         }
 
-        let terminals = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
-        for session in terminals where !session.isDeleted {
+        for session in sessionLists.terminalSessions {
             if let id = session.id {
                 TerminalRuntimeStore.shared.removeAllTerminals(for: id)
             }
@@ -58,8 +58,7 @@ extension ActiveWorktreesView {
             viewContext.delete(session)
         }
 
-        let browsers = (worktree.browserSessions as? Set<BrowserSession>) ?? []
-        for session in browsers where !session.isDeleted {
+        for session in sessionLists.browserSessions {
             viewContext.delete(session)
         }
 

@@ -10,8 +10,7 @@ extension WorktreeDetailView {
     }
 
     var browserSessions: [BrowserSession] {
-        let sessions = (worktree.browserSessions as? Set<BrowserSession>) ?? []
-        return sessions.sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
+        viewModel.browserSessions
     }
 
     var hasActiveSessions: Bool {
@@ -31,6 +30,10 @@ extension WorktreeDetailView {
                 ChatTabView(
                     worktree: worktree,
                     repositoryManager: repositoryManager,
+                    chatSessions: viewModel.chatSessions,
+                    recentSessions: viewModel.recentChatSessions,
+                    terminalSessions: viewModel.terminalSessions,
+                    browserSessions: viewModel.browserSessions,
                     selectedSessionId: $viewModel.selectedChatSessionId,
                     selectedTerminalSessionId: $viewModel.selectedTerminalSessionId,
                     selectedBrowserSessionId: $viewModel.selectedBrowserSessionId
@@ -39,6 +42,7 @@ extension WorktreeDetailView {
                 AizenTerminalRootContainer {
                     TerminalTabView(
                         worktree: worktree,
+                        sessions: sessionManager.terminalSessions,
                         selectedSessionId: $viewModel.selectedTerminalSessionId,
                         repositoryManager: repositoryManager
                     )
@@ -105,6 +109,12 @@ extension WorktreeDetailView {
                 return
             }
             navigateToChatSession(chatSessionId)
+        }
+        .task {
+            applyPendingNavigationDestinationIfNeeded()
+        }
+        .onChange(of: navigationSelectionStore.pendingWorktreeDestination) { _, _ in
+            applyPendingNavigationDestinationIfNeeded()
         }
     }
 }

@@ -6,6 +6,10 @@ import os.log
 extension BrowserSessionStore {
     // MARK: - Session Management
 
+    private func publishSessionsState() {
+        sessions = sessions.sorted { $0.order < $1.order }
+    }
+
     func loadSessions() {
         let fetchRequest: NSFetchRequest<BrowserSession> = BrowserSession.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "worktree == %@", worktree)
@@ -107,7 +111,7 @@ extension BrowserSessionStore {
             currentURL = url
         }
 
-        objectWillChange.send()
+        publishSessionsState()
         debouncedSave()
     }
 
@@ -121,7 +125,7 @@ extension BrowserSessionStore {
             pageTitle = title
         }
 
-        objectWillChange.send()
+        publishSessionsState()
         debouncedSave()
     }
 }

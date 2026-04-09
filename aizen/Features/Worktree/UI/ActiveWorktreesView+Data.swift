@@ -3,7 +3,7 @@ import Foundation
 
 extension ActiveWorktreesView {
     var activeWorktrees: [Worktree] {
-        worktrees.filter { worktree in
+        workspaceGraphQueryController.worktrees.filter { worktree in
             guard !worktree.isDeleted else { return false }
             return isActive(worktree)
         }

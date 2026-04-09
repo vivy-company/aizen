@@ -65,6 +65,7 @@ extension CompanionPanelView {
             AizenTerminalRootContainer {
                 TerminalTabView(
                     worktree: worktree,
+                    sessions: terminalSessions,
                     selectedSessionId: $terminalSessionId,
                     repositoryManager: repositoryManager
                 )

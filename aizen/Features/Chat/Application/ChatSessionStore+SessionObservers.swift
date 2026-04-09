@@ -52,7 +52,6 @@ extension ChatSessionStore {
                     return
                 }
                 self.syncToolCalls(session.toolCalls)
-                self.performStreamingRebuildIfReady()
             }
             .store(in: &cancellables)
 
@@ -169,10 +168,6 @@ extension ChatSessionStore {
                        lastAgent.isComplete == false {
                         session.markLastMessageComplete()
                     }
-                    let currentToolCallIds = Set(session.toolCalls.map(\.id))
-                    self.pendingStreamingRebuild = true
-                    self.pendingStreamingRebuildRequiresToolCallSync = currentToolCallIds != self.previousToolCallIds
-                    self.scheduleStreamingRebuild()
                 }
             }
             .store(in: &cancellables)

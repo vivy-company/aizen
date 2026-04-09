@@ -13,6 +13,7 @@ import SwiftUI
 struct WorktreeDetailView: View {
     @ObservedObject var worktree: Worktree
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
+    @ObservedObject var navigationSelectionStore: AppNavigationSelectionStore
     @ObservedObject var appDetector = AppDetector.shared
     @Binding var gitChangesContext: GitChangesContext?
     var onWorktreeDeleted: ((Worktree?) -> Void)?
@@ -46,6 +47,7 @@ struct WorktreeDetailView: View {
     init(
         worktree: Worktree,
         repositoryManager: WorkspaceRepositoryStore,
+        navigationSelectionStore: AppNavigationSelectionStore,
         tabStateManager: WorktreeTabStateStore,
         gitChangesContext: Binding<GitChangesContext?>,
         onWorktreeDeleted: ((Worktree?) -> Void)? = nil,
@@ -53,6 +55,7 @@ struct WorktreeDetailView: View {
     ) {
         self.worktree = worktree
         self.repositoryManager = repositoryManager
+        self.navigationSelectionStore = navigationSelectionStore
         self.tabStateManager = tabStateManager
         _gitChangesContext = gitChangesContext
         self.onWorktreeDeleted = onWorktreeDeleted
@@ -89,6 +92,7 @@ struct WorktreeDetailView: View {
     WorktreeDetailView(
         worktree: Worktree(),
         repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext),
+        navigationSelectionStore: AppNavigationSelectionStore(),
         tabStateManager: WorktreeTabStateStore(),
         gitChangesContext: .constant(nil)
     )

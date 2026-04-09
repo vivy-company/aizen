@@ -86,7 +86,7 @@ extension WorktreeSearchViewModel {
             }
         }
 
-        let workspaceItems = buildWorkspaceItems(query: query, workspaces: workspaces)
+        let workspaceItems = buildWorkspaceItems(query: query, workspaces: workspaces, worktrees: worktrees)
         if !workspaceItems.isEmpty {
             sections.append(
                 CommandPaletteSection(
@@ -162,7 +162,7 @@ extension WorktreeSearchViewModel {
             }
         }
 
-        let workspaceItems = buildWorkspaceItems(query: query, workspaces: workspaces)
+        let workspaceItems = buildWorkspaceItems(query: query, workspaces: workspaces, worktrees: worktrees)
         guard !workspaceItems.isEmpty else { return [] }
         return [
             CommandPaletteSection(

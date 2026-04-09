@@ -3,7 +3,6 @@
 //  aizen
 //
 
-import CoreData
 import Foundation
 
 extension CompanionPanelView {
@@ -51,23 +50,9 @@ extension CompanionPanelView {
         return URL(fileURLWithPath: path).lastPathComponent
     }
 
-    var terminalSessions: [TerminalSession] {
-        let sessions = (worktree.terminalSessions as? Set<TerminalSession>) ?? []
-        return sessions
-            .filter { !$0.isDeleted }
-            .sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
-    }
-
     var selectedTerminalSession: TerminalSession? {
         guard let id = terminalSessionId else { return nil }
         return terminalSessions.first(where: { $0.id == id })
-    }
-
-    var browserSessions: [BrowserSession] {
-        let sessions = (worktree.browserSessions as? Set<BrowserSession>) ?? []
-        return sessions
-            .filter { !$0.isDeleted }
-            .sorted { ($0.createdAt ?? Date()) < ($1.createdAt ?? Date()) }
     }
 
     var selectedBrowserSession: BrowserSession? {

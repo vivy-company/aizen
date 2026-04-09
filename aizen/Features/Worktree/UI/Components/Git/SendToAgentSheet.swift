@@ -10,6 +10,7 @@ import SwiftUI
 struct SendToAgentSheet: View {
     let worktree: Worktree?
     let attachment: ChatAttachment
+    let chatSessions: [ChatSession]
     let onDismiss: () -> Void
     let onSend: () -> Void
 
@@ -17,6 +18,7 @@ struct SendToAgentSheet: View {
     init(worktree: Worktree?, commentsMarkdown: String, onDismiss: @escaping () -> Void, onSend: @escaping () -> Void) {
         self.worktree = worktree
         self.attachment = .reviewComments(commentsMarkdown)
+        self.chatSessions = Self.activeChatSessions(for: worktree)
         self.onDismiss = onDismiss
         self.onSend = onSend
     }
@@ -25,17 +27,12 @@ struct SendToAgentSheet: View {
     init(worktree: Worktree?, attachment: ChatAttachment, onDismiss: @escaping () -> Void, onSend: @escaping () -> Void) {
         self.worktree = worktree
         self.attachment = attachment
+        self.chatSessions = Self.activeChatSessions(for: worktree)
         self.onDismiss = onDismiss
         self.onSend = onSend
     }
 
     @State var selectedOption: SendOption?
-
-    var chatSessions: [ChatSession] {
-        guard let worktree = worktree else { return [] }
-        let sessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
-        return sessions.sorted { ($0.createdAt ?? Date()) > ($1.createdAt ?? Date()) }
-    }
 
     var availableAgents: [AgentMetadata] {
         AgentRegistry.shared.getEnabledAgents()
@@ -51,6 +48,11 @@ struct SendToAgentSheet: View {
             case .newChat(let agent): return "new-\(agent)"
             }
         }
+    }
+
+    static func activeChatSessions(for worktree: Worktree?) -> [ChatSession] {
+        guard let worktree else { return [] }
+        return Array(WorktreeSessionSnapshotBuilder.chatSessions(for: worktree).reversed())
     }
 
     var body: some View {

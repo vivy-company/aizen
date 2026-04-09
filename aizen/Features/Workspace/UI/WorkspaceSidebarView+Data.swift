@@ -18,11 +18,21 @@ extension WorkspaceSidebarView {
         repository.isCrossProject || repository.note == crossProjectRepositoryMarker
     }
 
+    var repositoryActiveSessionCounts: [UUID: Int] {
+        Dictionary(
+            uniqueKeysWithValues: filteredRepositories.compactMap { repository in
+                guard let repositoryId = repository.id else { return nil }
+                return (repositoryId, RepositorySessionSnapshotBuilder.activeSessionCount(for: repository))
+            }
+        )
+    }
+
     var filteredRepositories: [Repository] {
         guard let workspace = selectedWorkspace else { return [] }
-        let repos = (workspace.repositories as? Set<Repository>) ?? []
-
-        var validRepos = repos.filter { !$0.isDeleted && !isCrossProjectRepository($0) }
+        var validRepos = workspaceGraphQueryController.visibleRepositories(
+            in: workspace,
+            crossProjectMarker: crossProjectRepositoryMarker
+        )
 
         if !selectedStatusFilters.isEmpty && selectedStatusFilters.count < ItemStatus.allCases.count {
             validRepos = validRepos.filter { repo in
@@ -32,11 +42,10 @@ extension WorkspaceSidebarView {
         }
 
         if searchText.isEmpty {
-            return validRepos.sorted { ($0.name ?? "") < ($1.name ?? "") }
+            return validRepos
         } else {
             return validRepos
                 .filter { ($0.name ?? "").localizedCaseInsensitiveContains(searchText) }
-                .sorted { ($0.name ?? "") < ($1.name ?? "") }
         }
     }
 }

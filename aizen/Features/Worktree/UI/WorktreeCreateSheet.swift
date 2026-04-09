@@ -25,6 +25,7 @@ struct WorktreeCreateSheet: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var repository: Repository
     @ObservedObject var repositoryManager: WorkspaceRepositoryStore
+    @ObservedObject var workspaceGraphQueryController: WorkspaceGraphQueryController
 
     @State var mode: EnvironmentCreationMode = .linked
     @State var environmentName = ""
@@ -55,6 +56,9 @@ struct WorktreeCreateSheet: View {
 #Preview {
     WorktreeCreateSheet(
         repository: Repository(),
-        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext)
+        repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext),
+        workspaceGraphQueryController: WorkspaceGraphQueryController(
+            viewContext: PersistenceController.preview.container.viewContext
+        )
     )
 }
