@@ -20,6 +20,8 @@ extension ChatTabView {
                         repositoryManager: repositoryManager,
                         terminalSessions: terminalSessions,
                         browserSessions: browserSessions,
+                        fileBrowserStore: fileBrowserStore,
+                        browserSessionStore: browserSessionStore,
                         side: .left,
                         onClose: {
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -87,6 +89,8 @@ extension ChatTabView {
                         repositoryManager: repositoryManager,
                         terminalSessions: terminalSessions,
                         browserSessions: browserSessions,
+                        fileBrowserStore: fileBrowserStore,
+                        browserSessionStore: browserSessionStore,
                         side: .right,
                         onClose: {
                             withAnimation(.easeInOut(duration: 0.2)) {
