@@ -1,0 +1,83 @@
+---
+import "../styles/global.css";
+import { SITE } from "../lib/site";
+
+interface Props {
+  title?: string;
+  description?: string;
+  canonicalPath?: string;
+  ogType?: "website" | "article";
+  locale?: string;
+  robots?: string;
+  structuredData?: Array<Record<string, unknown>>;
+}
+
+const {
+  title = SITE.title,
+  description = SITE.description,
+  canonicalPath = "/",
+  ogType = "website",
+  locale = "en_US",
+  robots = "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
+  structuredData = [],
+} = Astro.props;
+
+const canonical = new URL(canonicalPath, SITE.siteUrl).toString();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="title" content={title} />
+    <meta name="description" content={description} />
+    <meta name="author" content="Vivy Technologies" />
+    <meta name="robots" content={robots} />
+    <meta name="keywords" content="parallel development, project environments, macos developer tools, developer workspace, agentic coding, acp, agent client protocol, mcp, model context protocol, libghostty, tmux terminal, github actions, gitlab ci, xcode build, git worktrees" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="canonical" href={canonical} />
+    <link rel="preconnect" href="https://aizen.win" />
+    <link rel="dns-prefetch" href="https://aizen.win" />
+    <link rel="preconnect" href="https://r2.aizen.win" />
+    <link rel="dns-prefetch" href="https://r2.aizen.win" />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content={locale} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={`${SITE.siteUrl}/og.png`} />
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content={canonical} />
+    <meta property="twitter:title" content={title} />
+    <meta property="twitter:description" content={description} />
+    <meta property="twitter:image" content={`${SITE.siteUrl}/og.png`} />
+    <script defer src="https://analytics.vivy.app/script.js" data-website-id="52cc0341-4315-4223-98f7-d948226dcc54"></script>
+    <script is:inline define:vars={{ themeStorageKey: SITE.themeStorageKey }}>
+      const savedTheme = localStorage.getItem(themeStorageKey);
+      const theme = savedTheme || "light";
+      document.documentElement.classList.toggle("dark", theme === "dark");
+    </script>
+    {structuredData.map((schema) => <script type="application/ld+json" set:html={JSON.stringify(schema)} />)}
+  </head>
+  <body class="min-h-screen bg-white text-slate-900 antialiased selection:bg-slate-300/70 dark:bg-[#0b0b0c] dark:text-slate-100 dark:selection:bg-slate-500/30">
+    <div class="relative isolate overflow-x-clip">
+      <div
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 -z-10 opacity-[0.12] dark:opacity-[0.18]"
+        style="background-image:
+          radial-gradient(circle at 20% 18%, rgba(15,23,42,0.08), transparent 22%),
+          radial-gradient(circle at 82% 34%, rgba(15,23,42,0.06), transparent 24%),
+          radial-gradient(circle at 50% 80%, rgba(15,23,42,0.05), transparent 28%);
+        "
+      ></div>
+      <div
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(255,255,255,0.58),rgba(255,255,255,0.82))] dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0.48),rgba(2,6,23,0.78))]"
+      ></div>
+      <slot />
+    </div>
+  </body>
+</html>

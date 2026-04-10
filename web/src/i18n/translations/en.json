@@ -1,111 +1,200 @@
 {
-  "hero": {
-    "title": "Aizen",
-    "subtitle": "Bring order to your projects, environments, and day-to-day work.",
-    "earlyAccess": "Early Access",
+  "header": {
     "download": "Download",
-    "viewOnGithub": "View on GitHub",
-    "requirements": "macOS 13.5+ on Apple Silicon only. Intel Macs have been intentionally unsupported since 1.0.71 for a better user experience. Signed and notarized builds available."
+    "githubCta": "View on GitHub"
   },
-  "showcase": {
-    "agents": "Agents",
-    "terminal": "Terminal",
-    "files": "Files",
-    "browser": "Browser"
+  "hero": {
+    "eyebrow": "Agentic. Parallel. Native.",
+    "eyebrowSequence": [
+      "Agentic-first development workspace",
+      "Parallel project environments",
+      "Run agents where the work happens",
+      "GPU terminal with split panes",
+      "Built-in file and web browser",
+      "Git worktree management",
+      "Native macOS experience",
+      "Fast, focused, and efficient"
+    ],
+    "title": "Aizen",
+    "subtitle": "A macOS workspace for parallel development. Run agents, terminals, and browsers side by side across every branch.",
+    "primaryCta": "Download",
+    "secondaryCta": "",
+    "meta": "Available now on <span class=\"font-medium text-slate-950 dark:text-white\">macOS</span>. Apple Silicon only."
+  },
+  "why": {
+    "title": "What makes it different",
+    "subtitle": "Agentic-first, parallel by default, native on macOS, and open source from the start.",
+    "native": {
+      "title": "Agentic-first",
+      "desc": "Run Claude, Codex, Gemini, and other ACP agents directly where the work happens. Add MCP servers from the built-in marketplace."
+    },
+    "modern": {
+      "title": "Parallel",
+      "desc": "Each project or branch gets its own environment with terminal panes, file tabs, browser tabs, and chat history."
+    },
+    "sync": {
+      "title": "Native",
+      "desc": "Built for macOS with GPU-accelerated terminal, Metal rendering, and native platform integration."
+    },
+    "pricing": {
+      "title": "Open source",
+      "desc": "The code is public under GPL-3.0, inspectable, and developed in the open."
+    }
+  },
+  "roadmap": {
+    "title": "Roadmap",
+    "subtitle": "Three steps, kept simple.",
+    "now": {
+      "title": "Core workspace",
+      "desc": "Ship the full parallel development workspace on macOS."
+    },
+    "next": {
+      "title": "Agent ecosystem",
+      "desc": "Deeper ACP integrations and agent workflow tooling."
+    },
+    "later": {
+      "title": "Platform expansion",
+      "desc": "Bring the workspace to more platforms."
+    }
   },
   "features": {
-    "title": "Parallel Environments, Agentic by Default",
-    "workspaces": {
-      "title": "Workspace Management",
-      "desc": "Group active projects into workspaces, then move between environments without losing your place."
+    "title": "What you can do with it",
+    "subtitle": "Manage projects, run agents, and keep every environment ready.",
+    "rendering": {
+      "title": "Workspace and project management",
+      "desc": "Group active projects into workspaces, then create environments for the branches or tasks that are active right now."
     },
-    "worktrees": {
-      "title": "Project Environments",
-      "desc": "Give each project or branch its own environment. Under the hood, Aizen can use worktrees, folders, or full copies."
+    "connect": {
+      "title": "Run agents where the work happens",
+      "desc": "Run Claude, Codex, OpenCode, Gemini, and other ACP agents. Add MCP servers per agent from inside the app."
     },
-    "agents": {
-      "title": "Agentic-First",
-      "desc": "Run Claude, Codex, OpenCode, Gemini, and other ACP agents where the work happens. Add MCP servers from the built-in marketplace."
-    },
-    "terminal": {
-      "title": "Persistent Terminal",
+    "pickup": {
+      "title": "GPU terminal with persistence",
       "desc": "GPU-accelerated terminal powered by libghostty with split panes, presets, themes, and optional tmux persistence."
     },
-    "git": {
-      "title": "Git, Review, and CI",
+    "organize": {
+      "title": "Git, review, and CI in one place",
       "desc": "Stage, commit, diff, review pull requests, and keep GitHub Actions or GitLab CI runs within reach."
-    },
-    "voice": {
-      "title": "Environment Context",
-      "desc": "Use voice input, file attachments, and per-environment chat history to keep agent context tied to the work."
-    },
-    "fileBrowser": {
-      "title": "File Browser",
-      "desc": "Browse, search, and inspect files with syntax highlighting, multi-tab editing, and inline diff support."
-    },
-    "webBrowser": {
-      "title": "Web Browser",
-      "desc": "Use the built-in browser for docs, previews, auth flows, and local apps. Tabs stay with each worktree session."
     }
   },
-  "howItWorks": {
-    "title": "How It Works",
-    "step1": {
-      "title": "Set up projects, not plumbing",
-      "desc": "Bring related projects into one workspace, then create environments for the branches or tasks that are active right now."
+  "useCases": {
+    "title": "Where it is useful",
+    "subtitle": "Useful for parallel development, agent workflows, code review, and project management.",
+    "solo": {
+      "title": "Parallel development",
+      "desc": "Work across multiple branches or projects without losing your place. Each environment keeps its own state."
     },
-    "step2": {
-      "title": "Keep every environment ready",
-      "desc": "Each environment keeps its own terminal panes, file tabs, browser tabs, chat history, and review context."
+    "homelab": {
+      "title": "Agent workflows",
+      "desc": "Run multiple agents in parallel across different environments. Watch them work while you review in another."
     },
-    "step3": {
-      "title": "Let agents work with you",
-      "desc": "Run agents, watch workflow runs, review diffs, or open the same project from the CLI without rebuilding your setup."
+    "apple": {
+      "title": "Code review",
+      "desc": "Review pull requests with inline diffs, file browser, and terminal access in the same environment."
+    },
+    "ai": {
+      "title": "Project management",
+      "desc": "Group projects into workspaces, track CI runs, and keep everything organized in one native app."
     }
   },
-  "faq": {
-    "title": "Frequently asked questions",
+  "pricing": {
+    "title": "Simple pricing",
+    "subtitle": "Free, Pro, and Lifetime. Use the full core app for free.",
+    "free": {
+      "name": "Free",
+      "description": "The full core workspace, free forever",
+      "price": "$0",
+      "period": "",
+      "features": [
+        "Unlimited workspaces & worktrees",
+        "ACP agents and MCP servers",
+        "GPU terminal with tmux persistence",
+        "File and web browser",
+        "Voice input and attachments",
+        "Visual Git diff and review",
+        "GitHub Actions & GitLab CI",
+        "Xcode integration",
+        "CLI companion"
+      ],
+      "cta": "Download free"
+    },
+    "pro": {
+      "name": "Pro",
+      "description": "Fund ongoing development",
+      "monthly": {
+        "price": "$5.99",
+        "period": "/mo"
+      },
+      "yearly": {
+        "price": "$59",
+        "period": "/yr",
+        "save": "Save 20%"
+      },
+      "features": [
+        "Everything in Free",
+        "Support continued development",
+        "Priority support",
+        "Future paid extras"
+      ],
+      "ctaMonthly": "Subscribe monthly",
+      "ctaYearly": "Subscribe yearly",
+      "note": "30-day money-back guarantee."
+    },
+    "lifetime": {
+      "name": "Lifetime",
+      "description": "One-time purchase, best value",
+      "price": "$179",
+      "badge": "Best Value",
+      "features": [
+        "Everything in Free",
+        "Support continued development",
+        "Priority support forever",
+        "Future paid extras"
+      ],
+      "cta": "Buy lifetime",
+      "guarantee": "Pro is $5.99/mo or $59/yr. Lifetime is $179."
+    }
+  },
+  "whyBuilt": {
+    "title": "Why I built it",
     "q1": {
-      "question": "What problem does Aizen solve?",
-      "answer": "Developers working across multiple projects or branches usually juggle terminals, editor windows, docs, CI dashboards, and agent chats. Aizen keeps that stack attached to each environment so the context moves with the work."
+      "question": "Too many windows",
+      "answer": "Developers working across multiple projects or branches usually juggle terminals, editor windows, docs, CI dashboards, and agent chats. Aizen keeps that stack attached to each environment."
     },
     "q2": {
-      "question": "What are Git worktrees?",
-      "answer": "Git worktrees let you check out multiple branches simultaneously in separate directories. Unlike stashing or switching branches, each worktree is independent. You can build one branch while editing another."
+      "question": "Agents need a workspace",
+      "answer": "Running agents in a terminal is fine for one task. But when you have multiple agents across branches, you need a workspace that keeps them organized."
     },
     "q3": {
-      "question": "How is this different from VS Code or other editors?",
-      "answer": "Editors focus on one project at a time. Aizen is built around parallel environments: persistent terminal panes, built-in browser tabs, agent sessions, diffs, and workflow visibility. It's a workspace for parallel development, not just a text editor."
+      "question": "Native matters",
+      "answer": "I do not want one heavy interface forced onto every platform. The app should feel right where it runs."
     },
     "q4": {
-      "question": "Which agents are supported?",
-      "answer": "Aizen is agentic-first and ACP-first. You can add registry-backed agents such as Claude, Codex, OpenCode, Gemini, and other ACP-compatible tools, or configure your own custom command. MCP servers can be added per agent from inside the app."
-    },
-    "q5": {
-      "question": "Is Aizen free?",
-      "answer": "Yes. The app is free to download and open source under the GPL-3.0 license. The current core experience — workspaces, project environments, agents, terminal, file browser, browser, CLI, and workflow views — is available without paying."
-    },
-    "q6": {
-      "question": "What's Aizen Pro?",
-      "answer": "Aizen Pro funds ongoing development. Pro subscribers get priority support and will receive paid extras as they ship, while the free app remains usable on its own. Available as monthly ($5.99/mo), yearly ($59/yr), or lifetime ($179)."
-    },
-    "q7": {
-      "question": "Can I use one license on multiple Macs?",
-      "answer": "Yes. Your Pro license can be activated on multiple Macs you own. Each device is registered to your license, and you can manage devices from the billing portal."
-    },
-    "q8": {
-      "question": "What's the refund policy?",
-      "answer": "We offer a 30-day money-back guarantee. If you're not satisfied, email dev@aizen.win within 30 days for a full refund, no questions asked."
-    },
-    "q9": {
-      "question": "What are the requirements?",
-      "answer": "macOS 13.5 or later on Apple Silicon only. Intel Macs have been intentionally unsupported since 1.0.71 for a better user experience."
+      "question": "Keep it useful",
+      "answer": "The goal is a tool that stays good at parallel development, agents, and project management instead of expanding into noise."
     }
   },
+  "closing": {
+    "title": "Available now on macOS.",
+    "subtitle": "An agentic-first workspace for parallel development. Open source and free to use.",
+    "cta": "Download"
+  },
   "footer": {
-    "copyright": "© 2026 Vivy Technologies Co., Limited",
+    "tagline": "Agentic-first workspace for parallel development",
+    "description": "Open source macOS workspace with project environments, terminal, files, browser, agents, workflows, and CLI.",
+    "productTitle": "Product",
+    "resourcesTitle": "Resources",
+    "navWhy": "What makes it different",
+    "navFeatures": "Features",
+    "navPricing": "Pricing",
+    "navWhyBuilt": "Why I built it",
+    "copyright": "Vivy Technologies Co., Limited",
+    "github": "GitHub",
     "discord": "Discord",
     "twitter": "Twitter",
-    "github": "GitHub"
+    "privacy": "Privacy",
+    "terms": "Terms of Use",
+    "refunds": "Refunds",
+    "support": ""
   }
 }

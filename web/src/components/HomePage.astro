@@ -1,0 +1,485 @@
+---
+import { Icon } from "astro-icon/components";
+import { SITE, translations } from "../lib/site";
+
+const whyItems = [
+  { key: "native", icon: "lucide:bot", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" },
+  { key: "modern", icon: "lucide:layers", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" },
+  { key: "sync", icon: "lucide:app-window", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" },
+  { key: "pricing", icon: "lucide:github", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" }
+];
+
+const featureItems = [
+  { key: "rendering", icon: "lucide:folder-kanban", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" },
+  { key: "connect", icon: "lucide:bot", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" },
+  { key: "pickup", icon: "lucide:terminal", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" },
+  { key: "organize", icon: "lucide:git-pull-request", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" }
+];
+
+const useCases = [
+  { key: "solo", icon: "lucide:git-branch", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" },
+  { key: "homelab", icon: "lucide:bot", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" },
+  { key: "apple", icon: "lucide:git-pull-request", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" },
+  { key: "ai", icon: "lucide:folder-kanban", color: "text-slate-950 dark:text-white", bg: "bg-slate-100 dark:bg-white/10" }
+];
+
+const whyBuiltItems = ["q1", "q2", "q3", "q4"];
+const currentYear = new Date().getFullYear();
+
+const highlightAnswer = (text: string) =>
+  text
+    .replace(/Aizen/g, '<span class="text-slate-950 dark:text-white">Aizen</span>')
+    .replace(/macOS/g, '<span class="text-slate-950 dark:text-white">macOS</span>')
+    .replace(/open source/gi, '<span class="text-slate-950 dark:text-white">$&</span>')
+    .replace(/ACP/g, '<span class="text-slate-950 dark:text-white">ACP</span>');
+---
+
+<main>
+  <section class="relative px-4 pb-10 pt-16 sm:px-6 sm:pt-24">
+    <div class="relative mx-auto flex max-w-5xl flex-col items-center text-center">
+      <div class="max-w-4xl">
+        <div class="mx-auto w-fit rounded-[2rem] bg-white/80 p-2 shadow-[0_24px_60px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/8 backdrop-blur dark:bg-white/8 dark:ring-white/10">
+          <img src="/logo.png" alt={SITE.name} width="96" height="96" class="size-24 rounded-[1.45rem] object-contain" />
+        </div>
+        <p class="mt-8 text-[0.72rem] font-semibold uppercase tracking-[0.32em] text-slate-500 dark:text-slate-400" data-i18n="hero.eyebrow">{translations.en.hero.eyebrow}</p>
+        <h1 class="mx-auto mt-4 max-w-[17ch] text-5xl font-semibold tracking-[-0.05em] text-slate-950 dark:text-slate-100 sm:text-6xl lg:max-w-[16ch] lg:text-[4.75rem] lg:leading-[0.98]" data-i18n="hero.title">{translations.en.hero.title}</h1>
+        <p class="mx-auto mt-6 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300 sm:text-xl" data-i18n="hero.subtitle">{translations.en.hero.subtitle}</p>
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
+          <a
+            class:list={[
+              "inline-flex min-h-13 items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition",
+              SITE.downloadUrl
+                ? "bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                : "cursor-default bg-slate-950 text-white opacity-90 dark:bg-white dark:text-slate-950"
+            ]}
+            href={SITE.downloadUrl || "#"}
+            aria-disabled={SITE.downloadUrl ? "false" : "true"}
+          >
+            <Icon class="size-4" name="lucide:download" />
+            <span data-i18n="hero.primaryCta">{translations.en.hero.primaryCta}</span>
+          </a>
+          <a
+            class="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-slate-900/10 bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition hover:border-slate-900/15 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+            href={SITE.githubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Icon class="size-4" name="lucide:github" />
+            <span>View on GitHub</span>
+          </a>
+        </div>
+        <p class="mt-4 text-sm text-slate-500 dark:text-slate-400" data-i18n-html="hero.meta" set:html={translations.en.hero.meta}></p>
+      </div>
+
+      <div class="mt-5 w-full sm:mt-6">
+        <div class="relative mx-auto w-full max-w-5xl">
+          <img
+            src="/demo.png"
+            alt={`${SITE.name} agents workspace`}
+            width="1792"
+            height="1120"
+            class="showcase-slide w-full rounded-2xl object-cover"
+            loading="eager"
+            fetchpriority="high"
+            data-showcase="agents"
+            data-showcase-active="true"
+          />
+          <img
+            src="/terminal.png"
+            alt={`${SITE.name} terminal workspace`}
+            width="1792"
+            height="1120"
+            class="showcase-slide pointer-events-none absolute inset-0 w-full rounded-2xl object-cover"
+            loading="eager"
+            data-showcase="terminal"
+            data-showcase-active="false"
+          />
+          <img
+            src="/files.png"
+            alt={`${SITE.name} file browser`}
+            width="1792"
+            height="1120"
+            class="showcase-slide pointer-events-none absolute inset-0 w-full rounded-2xl object-cover"
+            loading="eager"
+            data-showcase="files"
+            data-showcase-active="false"
+          />
+          <img
+            src="/browser.png"
+            alt={`${SITE.name} web browser`}
+            width="1792"
+            height="1120"
+            class="showcase-slide pointer-events-none absolute inset-0 w-full rounded-2xl object-cover"
+            loading="eager"
+            data-showcase="browser"
+            data-showcase-active="false"
+          />
+        </div>
+        <div class="mt-5 inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/88 p-1.5 shadow-[0_14px_34px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/6">
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition dark:bg-white dark:text-slate-950"
+            data-showcase-btn="agents"
+            data-showcase-btn-active="true"
+            aria-pressed="true"
+          >
+            <Icon class="size-4" name="lucide:bot" />
+            Agents
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
+            data-showcase-btn="terminal"
+            data-showcase-btn-active="false"
+            aria-pressed="false"
+          >
+            <Icon class="size-4" name="lucide:terminal" />
+            Terminal
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
+            data-showcase-btn="files"
+            data-showcase-btn-active="false"
+            aria-pressed="false"
+          >
+            <Icon class="size-4" name="lucide:folder-open" />
+            Files
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
+            data-showcase-btn="browser"
+            data-showcase-btn-active="false"
+            aria-pressed="false"
+          >
+            <Icon class="size-4" name="lucide:globe" />
+            Browser
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why" class="px-4 py-8 sm:px-6 sm:py-10">
+    <div class="mx-auto max-w-6xl">
+      <div>
+        <h2 class="text-3xl font-semibold tracking-[-0.05em] text-slate-950 dark:text-slate-100 sm:text-5xl" data-i18n="why.title">{translations.en.why.title}</h2>
+        <p class="mt-4 max-w-2xl text-base leading-8 text-slate-600 dark:text-slate-300 sm:text-lg" data-i18n="why.subtitle">{translations.en.why.subtitle}</p>
+      </div>
+      <div class="mt-8 grid overflow-hidden rounded-[1.5rem] border border-slate-900/8 bg-white/80 dark:border-white/10 dark:bg-white/10 md:grid-cols-2">
+        {whyItems.map((item) => (
+          <article class="border-b border-slate-900/8 bg-white/85 p-6 dark:border-white/10 dark:bg-[#121214] md:border-r [&:nth-child(2n)]:md:border-r-0 [&:nth-last-child(-n+2)]:border-b-0">
+            <div class:list={["mb-4 grid size-11 place-items-center rounded-xl", item.bg, item.color]}>
+              <Icon class="size-5" name={item.icon} />
+            </div>
+            <h3 class="text-xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-slate-100" data-i18n={`why.${item.key}.title`}>
+              {translations.en.why[item.key as keyof typeof translations.en.why].title}
+            </h3>
+            <p class="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300" data-i18n-html={`why.${item.key}.desc`} set:html={translations.en.why[item.key as keyof typeof translations.en.why].desc}></p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="px-4 py-12 sm:px-6">
+    <div class="mx-auto max-w-6xl">
+      <div>
+        <h2 class="text-3xl font-semibold tracking-[-0.05em] text-slate-950 dark:text-slate-100 sm:text-5xl" data-i18n="features.title">{translations.en.features.title}</h2>
+        <p class="mt-4 max-w-2xl text-base leading-8 text-slate-600 dark:text-slate-300 sm:text-lg" data-i18n="features.subtitle">{translations.en.features.subtitle}</p>
+      </div>
+      <div class="mt-8 grid gap-px overflow-hidden rounded-[1.5rem] border border-slate-900/8 bg-slate-900/8 dark:border-white/10 dark:bg-white/10 lg:grid-cols-2">
+        {featureItems.map((feature) => (
+          <article class="bg-white/90 p-7 dark:bg-[#121214]">
+            <div class:list={["mb-4 grid size-11 place-items-center rounded-xl", feature.bg, feature.color]}>
+              <Icon class="size-5" name={feature.icon} />
+            </div>
+            <h3 class="text-2xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-slate-100" data-i18n={`features.${feature.key}.title`}>
+              {translations.en.features[feature.key as keyof typeof translations.en.features].title}
+            </h3>
+            <p class="mt-3 text-base leading-8 text-slate-600 [text-wrap:pretty] dark:text-slate-300" data-i18n-html={`features.${feature.key}.desc`} set:html={translations.en.features[feature.key as keyof typeof translations.en.features].desc}></p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section id="use-cases" class="px-4 py-12 sm:px-6">
+    <div class="mx-auto max-w-6xl">
+      <div>
+        <h2 class="text-3xl font-semibold tracking-[-0.05em] text-slate-950 dark:text-slate-100 sm:text-5xl" data-i18n="useCases.title">{translations.en.useCases.title}</h2>
+        <p class="mt-4 max-w-2xl text-base leading-8 text-slate-600 dark:text-slate-300 sm:text-lg" data-i18n="useCases.subtitle">{translations.en.useCases.subtitle}</p>
+      </div>
+      <div class="mt-8 grid gap-px overflow-hidden rounded-[1.5rem] border border-slate-900/8 bg-slate-900/8 dark:border-white/10 dark:bg-white/10 md:grid-cols-2">
+        {useCases.map((item) => (
+          <article class="bg-white/90 p-6 dark:bg-[#121214]">
+            <div class="mb-4 flex items-center gap-3">
+              <div class:list={["grid size-10 place-items-center rounded-xl", item.bg, item.color]}>
+                <Icon class="size-5" name={item.icon} />
+              </div>
+              <h3 class="text-lg font-semibold tracking-[-0.04em] text-slate-950 dark:text-slate-100 sm:text-xl" data-i18n={`useCases.${item.key}.title`}>
+                {translations.en.useCases[item.key as keyof typeof translations.en.useCases].title}
+              </h3>
+            </div>
+            <p class="max-w-[36ch] text-sm leading-7 text-slate-600 dark:text-slate-300" data-i18n={`useCases.${item.key}.desc`}>
+              {translations.en.useCases[item.key as keyof typeof translations.en.useCases].desc}
+            </p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing" class="px-4 py-12 sm:px-6">
+    <div class="mx-auto max-w-6xl">
+      <div>
+        <h2 class="text-4xl font-semibold tracking-[-0.055em] text-slate-950 dark:text-slate-100 sm:text-6xl" data-i18n="pricing.title">{translations.en.pricing.title}</h2>
+        <p class="mt-4 max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300" data-i18n="pricing.subtitle">{translations.en.pricing.subtitle}</p>
+      </div>
+      <div class="mt-8 grid gap-4 lg:grid-cols-3">
+        <article class="flex flex-col rounded-[2rem] border border-slate-900/8 bg-white/95 p-8 shadow-[0_22px_60px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-[#121214] dark:shadow-none">
+          <h3 class="text-2xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-slate-100" data-i18n="pricing.free.name">{translations.en.pricing.free.name}</h3>
+          <p class="mt-2 min-h-[4rem] text-slate-600 dark:text-slate-300" data-i18n="pricing.free.description">{translations.en.pricing.free.description}</p>
+          <p class="mt-5">
+            <span>
+              <span class="text-5xl font-semibold tracking-[-0.06em] text-slate-950 dark:text-slate-100" data-i18n="pricing.free.price">{translations.en.pricing.free.price}</span>
+              <span class="ml-1 text-base text-slate-500 dark:text-slate-400" data-i18n="pricing.free.period">{translations.en.pricing.free.period}</span>
+            </span>
+          </p>
+          <ul class="mb-6 mt-6 flex flex-1 flex-col gap-3 text-slate-600 dark:text-slate-300" data-i18n-list="pricing.free.features">
+            {translations.en.pricing.free.features.map((item) => (
+              <li class="flex items-start gap-3"><span class="mt-0.5 text-slate-950 dark:text-white">&check;</span><span>{item}</span></li>
+            ))}
+          </ul>
+          <a class="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-semibold text-slate-950 dark:border-white/10 dark:bg-white/5 dark:text-slate-100" href={SITE.downloadUrl || "#"} aria-disabled={SITE.downloadUrl ? "false" : "true"}>
+            <span data-i18n="pricing.free.cta">{translations.en.pricing.free.cta}</span>
+          </a>
+        </article>
+
+        <article class="flex flex-col rounded-[2rem] border border-slate-900/8 bg-white/95 p-8 shadow-[0_22px_60px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-[#121214] dark:shadow-none">
+          <h3 class="text-2xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-slate-100" data-i18n="pricing.pro.name">{translations.en.pricing.pro.name}</h3>
+          <p class="mt-2 min-h-[4rem] text-slate-600 dark:text-slate-300" data-i18n="pricing.pro.description">{translations.en.pricing.pro.description}</p>
+          <div class="mt-4 flex rounded-full border border-slate-900/8 p-1 dark:border-white/10">
+            <button type="button" data-billing="monthly" class="flex-1 rounded-full py-2 px-4 text-sm font-medium text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">Monthly</button>
+            <button type="button" data-billing="yearly" class="flex-1 rounded-full bg-slate-950 py-2 px-4 text-sm font-medium text-white transition dark:bg-white dark:text-slate-950">Yearly</button>
+          </div>
+          <p class="mt-5">
+            <span>
+              <span class="text-5xl font-semibold tracking-[-0.06em] text-slate-950 dark:text-slate-100" data-pro-price>{translations.en.pricing.pro.yearly.price}</span>
+              <span class="ml-1 text-base text-slate-500 dark:text-slate-400" data-pro-period>{translations.en.pricing.pro.yearly.period}</span>
+              <span class="ml-2 text-sm font-semibold text-slate-950 dark:text-white" data-pro-save>{translations.en.pricing.pro.yearly.save}</span>
+            </span>
+          </p>
+          <ul class="mb-6 mt-6 flex flex-1 flex-col gap-3 text-slate-600 dark:text-slate-300" data-i18n-list="pricing.pro.features">
+            {translations.en.pricing.pro.features.map((item) => (
+              <li class="flex items-start gap-3"><span class="mt-0.5 text-slate-950 dark:text-white">&check;</span><span>{item}</span></li>
+            ))}
+          </ul>
+          <a
+            class="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+            data-pro-cta
+            href={SITE.stripeYearly}
+          >
+            <span data-pro-cta-text>{translations.en.pricing.pro.ctaYearly}</span>
+          </a>
+          <p class="mt-4 text-center text-sm text-slate-500 dark:text-slate-400" data-i18n="pricing.pro.note">{translations.en.pricing.pro.note}</p>
+        </article>
+
+        <article class="relative flex flex-col overflow-hidden rounded-[2rem] border border-slate-900/15 bg-white/95 p-8 shadow-[0_22px_60px_rgba(15,23,42,0.08)] dark:border-white/15 dark:bg-white/[0.06] dark:shadow-none">
+          <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(15,23,42,0.06),rgba(15,23,42,0))] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0))]"></div>
+          <div class="absolute right-8 top-8 z-10 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-300" data-i18n="pricing.lifetime.badge">{translations.en.pricing.lifetime.badge}</div>
+          <h3 class="text-2xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-slate-100" data-i18n="pricing.lifetime.name">{translations.en.pricing.lifetime.name}</h3>
+          <p class="mt-2 min-h-[4rem] text-slate-600 dark:text-slate-300" data-i18n="pricing.lifetime.description">{translations.en.pricing.lifetime.description}</p>
+          <p class="mt-5">
+            <span class="text-5xl font-semibold tracking-[-0.06em] text-slate-950 dark:text-slate-100" data-i18n="pricing.lifetime.price">{translations.en.pricing.lifetime.price}</span>
+          </p>
+          <ul class="mb-6 mt-6 flex flex-1 flex-col gap-3 text-slate-600 dark:text-slate-300" data-i18n-list="pricing.lifetime.features">
+            {translations.en.pricing.lifetime.features.map((item) => (
+              <li class="flex items-start gap-3"><span class="mt-0.5 text-slate-950 dark:text-white">&check;</span><span>{item}</span></li>
+            ))}
+          </ul>
+          <a class="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200" href={SITE.stripeLifetime || "#"}>
+            <span data-i18n="pricing.lifetime.cta">{translations.en.pricing.lifetime.cta}</span>
+          </a>
+          <p class="mt-4 text-center text-sm text-slate-500 dark:text-slate-400" data-i18n="pricing.lifetime.guarantee">{translations.en.pricing.lifetime.guarantee}</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="why-built" class="px-4 py-8 sm:px-6 sm:py-10">
+    <div class="mx-auto max-w-6xl">
+      <div>
+        <h2 class="text-3xl font-semibold tracking-[-0.05em] text-slate-950 dark:text-slate-100 sm:text-5xl" data-i18n="whyBuilt.title">{translations.en.whyBuilt.title}</h2>
+      </div>
+      <div class="mt-6 grid gap-4">
+        {whyBuiltItems.map((key) => (
+          <article class="border-b border-slate-900/8 pb-4 dark:border-white/10 last:border-b-0 last:pb-0">
+            <h3 class="text-lg font-semibold tracking-[-0.03em] text-slate-950 dark:text-slate-100" data-i18n={`whyBuilt.${key}.question`}>
+              {translations.en.whyBuilt[key as keyof typeof translations.en.whyBuilt].question}
+            </h3>
+            <p class="mt-2 text-[15px] leading-7 text-slate-600 dark:text-slate-300" data-i18n-html={`whyBuilt.${key}.answer`} set:html={highlightAnswer(translations.en.whyBuilt[key as keyof typeof translations.en.whyBuilt].answer)} />
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="px-4 py-12 sm:px-6 sm:py-16">
+    <div class="mx-auto flex max-w-4xl flex-col items-center text-center">
+      <div class="rounded-[1.75rem] bg-white/85 p-2 shadow-[0_20px_50px_rgba(15,23,42,0.10)] ring-1 ring-slate-900/8 backdrop-blur dark:bg-white/8 dark:ring-white/10">
+        <img src="/logo.png" alt={SITE.name} width="72" height="72" class="size-18 rounded-[1.2rem] object-contain" />
+      </div>
+      <h2 class="mt-6 text-3xl font-semibold tracking-[-0.05em] text-slate-950 dark:text-slate-100 sm:text-5xl" data-i18n="closing.title">{translations.en.closing.title}</h2>
+      <p class="mt-4 max-w-2xl text-base leading-8 text-slate-600 dark:text-slate-300 sm:text-lg" data-i18n="closing.subtitle">{translations.en.closing.subtitle}</p>
+      <a
+        class:list={[
+          "mt-8 inline-flex min-h-13 items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition",
+          SITE.downloadUrl
+            ? "bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+            : "cursor-default bg-slate-950 text-white opacity-90 dark:bg-white dark:text-slate-950"
+        ]}
+        href={SITE.downloadUrl || "#"}
+        aria-disabled={SITE.downloadUrl ? "false" : "true"}
+      >
+        <Icon class="size-4" name="lucide:download" />
+        <span data-i18n="closing.cta">{translations.en.closing.cta}</span>
+      </a>
+    </div>
+  </section>
+
+  <footer class="relative px-4 pb-12 pt-14 text-slate-900 [background-image:radial-gradient(ellipse_70%_38%_at_50%_100%,rgba(15,23,42,0.10)_0%,rgba(15,23,42,0.03)_34%,transparent_72%)] dark:text-slate-100 dark:[background-image:radial-gradient(ellipse_70%_38%_at_50%_100%,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.03)_34%,transparent_72%)] sm:px-6 sm:pb-16 sm:pt-18">
+    <div class="relative mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)_minmax(0,0.75fr)]">
+      <div class="max-w-xl">
+        <div class="flex items-center gap-3">
+          <div class="rounded-[1.1rem] bg-white/90 p-1.5 shadow-[0_14px_34px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/8 backdrop-blur dark:bg-white/8 dark:ring-white/10">
+            <img src="/logo.png" alt={SITE.name} width="48" height="48" class="size-12 rounded-[0.85rem] object-contain" />
+          </div>
+          <div>
+            <p class="text-xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-white">{SITE.name}</p>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" data-i18n="footer.tagline">{translations.en.footer.tagline}</p>
+          </div>
+        </div>
+        <p class="mt-6 max-w-lg text-sm leading-7 text-slate-600 dark:text-slate-400" data-i18n="footer.description">
+          {translations.en.footer.description}
+        </p>
+        <p class="mt-6 text-sm text-slate-500 dark:text-slate-500">&copy; {currentYear} <span data-i18n="footer.copyright">{translations.en.footer.copyright}</span></p>
+      </div>
+
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-500" data-i18n="footer.productTitle">{translations.en.footer.productTitle}</p>
+        <nav class="mt-5 grid gap-3 text-sm text-slate-700 dark:text-slate-300">
+          <a href="#why" class="transition hover:text-slate-950 dark:hover:text-white" data-i18n="footer.navWhy">{translations.en.footer.navWhy}</a>
+          <a href="#features" class="transition hover:text-slate-950 dark:hover:text-white" data-i18n="footer.navFeatures">{translations.en.footer.navFeatures}</a>
+          <a href="#pricing" class="transition hover:text-slate-950 dark:hover:text-white" data-i18n="footer.navPricing">{translations.en.footer.navPricing}</a>
+          <a href="#why-built" class="transition hover:text-slate-950 dark:hover:text-white" data-i18n="footer.navWhyBuilt">{translations.en.footer.navWhyBuilt}</a>
+          <a class="inline-flex items-center gap-2 transition hover:text-slate-950 dark:hover:text-white" href={SITE.githubUrl} target="_blank" rel="noopener noreferrer">
+            <Icon class="size-4" name="lucide:github" />
+            <span data-i18n="header.githubCta">{translations.en.header.githubCta}</span>
+          </a>
+        </nav>
+      </div>
+
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-500" data-i18n="footer.resourcesTitle">{translations.en.footer.resourcesTitle}</p>
+        <nav class="mt-5 grid gap-3 text-sm text-slate-700 dark:text-slate-300">
+          <a href={SITE.githubUrl} target="_blank" rel="noopener noreferrer" class="transition hover:text-slate-950 dark:hover:text-white" data-i18n="footer.github">
+            {translations.en.footer.github}
+          </a>
+          <a href={SITE.discordUrl} target="_blank" rel="noopener noreferrer" class="transition hover:text-slate-950 dark:hover:text-white" data-i18n="footer.discord">
+            {translations.en.footer.discord}
+          </a>
+          <a href={SITE.twitterUrl} target="_blank" rel="noopener noreferrer" class="transition hover:text-slate-950 dark:hover:text-white" data-i18n="footer.twitter">
+            {translations.en.footer.twitter}
+          </a>
+          <a href="/privacy" class="transition hover:text-slate-950 dark:hover:text-white" data-i18n="footer.privacy">{translations.en.footer.privacy}</a>
+          <a href="/terms" class="transition hover:text-slate-950 dark:hover:text-white" data-i18n="footer.terms">{translations.en.footer.terms}</a>
+          <a href="/refund" class="transition hover:text-slate-950 dark:hover:text-white" data-i18n="footer.refunds">{translations.en.footer.refunds}</a>
+        </nav>
+      </div>
+    </div>
+    <div class="relative mx-auto mt-10 flex max-w-6xl justify-center lg:justify-end">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button
+          type="button"
+          aria-label="Toggle theme"
+          data-theme-toggle
+          class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 transition hover:border-slate-900/15 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+        >
+          <Icon class="size-4 dark:hidden" name="lucide:moon" />
+          <Icon class="hidden size-4 dark:block" name="lucide:sun" />
+        </button>
+      </div>
+    </div>
+  </footer>
+</main>
+
+<script is:inline define:vars={{ themeStorageKey: SITE.themeStorageKey, stripeMonthly: SITE.stripeMonthly, stripeYearly: SITE.stripeYearly }}>
+  const showcaseImages = document.querySelectorAll("[data-showcase]");
+  const showcaseButtons = document.querySelectorAll("[data-showcase-btn]");
+  const themeToggle = document.querySelector("[data-theme-toggle]");
+  const billingButtons = document.querySelectorAll("[data-billing]");
+  const proPrice = document.querySelector("[data-pro-price]");
+  const proPeriod = document.querySelector("[data-pro-period]");
+  const proSave = document.querySelector("[data-pro-save]");
+  const proCta = document.querySelector("[data-pro-cta]");
+  const proCtaText = document.querySelector("[data-pro-cta-text]");
+
+  const applyShowcase = (tab) => {
+    showcaseImages.forEach((node) => {
+      const active = node.dataset.showcase === tab;
+      node.dataset.showcaseActive = active ? "true" : "false";
+      node.classList.toggle("pointer-events-none", !active);
+      node.classList.toggle("pointer-events-auto", active);
+    });
+
+    showcaseButtons.forEach((button) => {
+      const active = button.dataset.showcaseBtn === tab;
+      button.dataset.showcaseBtnActive = active ? "true" : "false";
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+      button.className = active
+        ? "inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition dark:bg-white dark:text-slate-950"
+        : "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white";
+    });
+  };
+
+  showcaseButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      applyShowcase(button.dataset.showcaseBtn);
+    });
+  });
+
+  const activeBtn = "flex-1 rounded-full bg-slate-950 py-2 px-4 text-sm font-medium text-white transition dark:bg-white dark:text-slate-950";
+  const inactiveBtn = "flex-1 rounded-full py-2 px-4 text-sm font-medium text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white";
+
+  const applyBilling = (cycle) => {
+    billingButtons.forEach((btn) => {
+      btn.className = btn.dataset.billing === cycle ? activeBtn : inactiveBtn;
+    });
+    if (cycle === "yearly") {
+      proPrice.textContent = "$59";
+      proPeriod.textContent = "/yr";
+      proSave.textContent = "Save 20%";
+      proCta.href = stripeYearly;
+      proCtaText.textContent = "Subscribe yearly";
+    } else {
+      proPrice.textContent = "$5.99";
+      proPeriod.textContent = "/mo";
+      proSave.textContent = "";
+      proCta.href = stripeMonthly;
+      proCtaText.textContent = "Subscribe monthly";
+    }
+  };
+
+  billingButtons.forEach((btn) => {
+    btn.addEventListener("click", () => applyBilling(btn.dataset.billing));
+  });
+
+  if (themeToggle) {
+    themeToggle.addEventListener("click", () => {
+      const isDark = document.documentElement.classList.toggle("dark");
+      localStorage.setItem(themeStorageKey, isDark ? "dark" : "light");
+    });
+  }
+</script>

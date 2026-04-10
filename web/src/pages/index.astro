@@ -1,0 +1,15 @@
+---
+import HomePage from "../components/HomePage.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { SITE, softwareSchema, websiteSchema } from "../lib/site";
+---
+
+<BaseLayout
+  title={SITE.title}
+  description={SITE.description}
+  canonicalPath="/"
+  locale="en_US"
+  structuredData={[softwareSchema, websiteSchema]}
+>
+  <HomePage />
+</BaseLayout>
