@@ -46,17 +46,12 @@ const highlightAnswer = (text: string) =>
         <p class="mx-auto mt-6 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300 sm:text-xl" data-i18n="hero.subtitle">{translations.en.hero.subtitle}</p>
         <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
           <a
-            class:list={[
-              "inline-flex min-h-13 items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition",
-              SITE.downloadUrl
-                ? "bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-                : "cursor-default bg-slate-950 text-white opacity-90 dark:bg-white dark:text-slate-950"
-            ]}
-            href={SITE.downloadUrl || "#"}
-            aria-disabled={SITE.downloadUrl ? "false" : "true"}
+            class="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+            href={SITE.downloadUrl}
+            data-download
           >
             <Icon class="size-4" name="lucide:download" />
-            <span data-i18n="hero.primaryCta">{translations.en.hero.primaryCta}</span>
+            <span data-i18n="hero.primaryCta" data-download-text>{translations.en.hero.primaryCta}</span>
           </a>
           <a
             class="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-slate-900/10 bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition hover:border-slate-900/15 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
@@ -252,7 +247,7 @@ const highlightAnswer = (text: string) =>
               <li class="flex items-start gap-3"><span class="mt-0.5 text-slate-950 dark:text-white">&check;</span><span>{item}</span></li>
             ))}
           </ul>
-          <a class="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-semibold text-slate-950 dark:border-white/10 dark:bg-white/5 dark:text-slate-100" href={SITE.downloadUrl || "#"} aria-disabled={SITE.downloadUrl ? "false" : "true"}>
+          <a class="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-semibold text-slate-950 dark:border-white/10 dark:bg-white/5 dark:text-slate-100" href={SITE.downloadUrl} data-download>
             <span data-i18n="pricing.free.cta">{translations.en.pricing.free.cta}</span>
           </a>
         </article>
@@ -334,14 +329,9 @@ const highlightAnswer = (text: string) =>
       <h2 class="mt-6 text-3xl font-semibold tracking-[-0.05em] text-slate-950 dark:text-slate-100 sm:text-5xl" data-i18n="closing.title">{translations.en.closing.title}</h2>
       <p class="mt-4 max-w-2xl text-base leading-8 text-slate-600 dark:text-slate-300 sm:text-lg" data-i18n="closing.subtitle">{translations.en.closing.subtitle}</p>
       <a
-        class:list={[
-          "mt-8 inline-flex min-h-13 items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition",
-          SITE.downloadUrl
-            ? "bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-            : "cursor-default bg-slate-950 text-white opacity-90 dark:bg-white dark:text-slate-950"
-        ]}
-        href={SITE.downloadUrl || "#"}
-        aria-disabled={SITE.downloadUrl ? "false" : "true"}
+        class="mt-8 inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+        href={SITE.downloadUrl}
+        data-download
       >
         <Icon class="size-4" name="lucide:download" />
         <span data-i18n="closing.cta">{translations.en.closing.cta}</span>
@@ -482,4 +472,29 @@ const highlightAnswer = (text: string) =>
       localStorage.setItem(themeStorageKey, isDark ? "dark" : "light");
     });
   }
+
+  // Fetch latest version from Sparkle appcast and update download links
+  (async () => {
+    try {
+      const res = await fetch("https://r2.aizen.win/appcast.xml");
+      const xml = new DOMParser().parseFromString(await res.text(), "text/xml");
+      const items = xml.querySelectorAll("channel > item");
+      let best = null;
+      for (const item of items) {
+        const enc = item.querySelector("enclosure");
+        if (!enc) continue;
+        const url = (enc.getAttribute("url") || "").trim();
+        if (!url) continue;
+        const ver = (enc.getAttribute("sparkle:shortVersionString") || enc.getAttribute("sparkle:version") || "").trim();
+        if (!best || ver.localeCompare(best.ver, undefined, { numeric: true }) > 0) {
+          best = { ver, url };
+        }
+      }
+      if (best) {
+        document.querySelectorAll("[data-download]").forEach((a) => { a.href = best.url; });
+        const textEl = document.querySelector("[data-download-text]");
+        if (textEl) textEl.textContent = "Download v" + best.ver;
+      }
+    } catch (_) {}
+  })();
 </script>
