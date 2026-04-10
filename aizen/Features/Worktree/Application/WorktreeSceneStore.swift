@@ -30,6 +30,14 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
     private var chatStoresById: [UUID: ChatSessionStore] = [:]
     private var chatStoreOrder: [UUID] = []
     private let maxWarmChatStores = 3
+    private var detailActivationTask: Task<Void, Never>?
+    private var tabPrewarmTask: Task<Void, Never>?
+    private var isSceneActive = false
+    private var detailAttached = false
+    private var activeVisibleTabIds: [String] = []
+    private var pendingShowXcode = false
+    private let detailActivationDelay = Duration.milliseconds(140)
+    private let tabPrewarmDelay = Duration.milliseconds(180)
 
     init(
         worktree: Worktree,
@@ -68,6 +76,7 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
         warmedTabIds.insert(tabId)
         warmStoreIfNeeded(for: tabId)
         selectedTab = tabId
+        syncFeatureVisibility()
     }
 
     func isTabWarm(_ tabId: String) -> Bool {
@@ -82,6 +91,31 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
         }
     }
 
+    func updatePresentation(isActive: Bool, visibleTabIds: [String], showXcode: Bool) {
+        pendingShowXcode = showXcode
+        activeVisibleTabIds = visibleTabIds
+
+        guard isActive else {
+            isSceneActive = false
+            cancelActivationTasks()
+            detailAttached = false
+            syncFeatureVisibility()
+            runtime.detachDetail()
+            return
+        }
+
+        isSceneActive = true
+        warmStoreIfNeeded(for: selectedTab)
+        syncFeatureVisibility()
+        scheduleTabPrewarm()
+
+        if detailAttached {
+            runtime.updateDetailOptions(showXcode: showXcode)
+        } else {
+            scheduleDetailActivation()
+        }
+    }
+
     func saveSelectedTabIfNeeded() {
         guard hasLoadedTabState, let worktreeId = worktree.id else { return }
         tabStateManager.saveViewType(selectedTab, for: worktreeId)
@@ -93,6 +127,10 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
     }
 
     func prepareForEviction() {
+        cancelActivationTasks()
+        isSceneActive = false
+        detailAttached = false
+        syncFeatureVisibility()
         runtime.detachDetail()
         browserSessionStore?.clearWarmWebViews()
         chatStoresById.removeAll()
@@ -139,6 +177,53 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
         default:
             break
         }
+    }
+
+    private func scheduleDetailActivation() {
+        detailActivationTask?.cancel()
+        let activationDelay = detailActivationDelay
+        detailActivationTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: activationDelay)
+            } catch {
+                return
+            }
+
+            guard let self, self.isSceneActive, !Task.isCancelled else { return }
+            self.runtime.attachDetail(showXcode: self.pendingShowXcode)
+            self.detailAttached = true
+            self.detailActivationTask = nil
+        }
+    }
+
+    private func scheduleTabPrewarm() {
+        tabPrewarmTask?.cancel()
+        let tabIdsToPrewarm = activeVisibleTabIds.filter { $0 != selectedTab }
+        guard !tabIdsToPrewarm.isEmpty else { return }
+        let prewarmDelay = tabPrewarmDelay
+
+        tabPrewarmTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: prewarmDelay)
+            } catch {
+                return
+            }
+
+            guard let self, self.isSceneActive, !Task.isCancelled else { return }
+            self.prewarmTabs(tabIdsToPrewarm)
+            self.tabPrewarmTask = nil
+        }
+    }
+
+    private func syncFeatureVisibility() {
+        fileBrowserStore?.setVisible(isSceneActive && selectedTab == "files")
+    }
+
+    private func cancelActivationTasks() {
+        detailActivationTask?.cancel()
+        detailActivationTask = nil
+        tabPrewarmTask?.cancel()
+        tabPrewarmTask = nil
     }
 
     private func touchChatStore(_ sessionId: UUID) {

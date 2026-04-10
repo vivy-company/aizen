@@ -87,6 +87,8 @@ class ChatSessionStore: ObservableObject {
     var hasLoadedWarmState = false
     var hasIndexedAutocompleteWorktree = false
     var indexedAutocompleteWorktreePath = ""
+    var delayedActivationTask: Task<Void, Never>?
+    let delayedActivationInterval = Duration.milliseconds(160)
 
     // MARK: - Computed Properties
 
@@ -157,6 +159,8 @@ class ChatSessionStore: ObservableObject {
     deinit {
         nearBottomStateTask?.cancel()
         nearBottomStateTask = nil
+        delayedActivationTask?.cancel()
+        delayedActivationTask = nil
         if gitPauseApplied, !worktreePathSnapshot.isEmpty {
             let path = worktreePathSnapshot
             Task { @MainActor in

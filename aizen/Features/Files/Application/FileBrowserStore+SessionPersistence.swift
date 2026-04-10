@@ -47,6 +47,8 @@ extension FileBrowserStore {
 
     func restoreOpenFiles(_ paths: [String], selectedPath: String?) {
         sessionRestoreTask?.cancel()
+        editorRuntimesByFileId.values.forEach { $0.clearGitDiff() }
+        editorRuntimesByFileId.removeAll()
 
         openFiles = paths.map { path in
             OpenFileInfo(

@@ -13,92 +13,105 @@ import SwiftUI
 @MainActor
 extension ChatSessionStore {
     func setupAgentSession() {
+        cancelScheduledAgentSessionActivation()
+        prepareAgentSession()
+        Task { [weak self] in
+            await self?.activatePreparedAgentSessionIfNeeded()
+        }
+    }
+
+    func prepareAgentSession() {
         guard let sessionId = session.id else { return }
-        guard settingUpSessionId != sessionId else { return }
-        settingUpSessionId = sessionId
 
         let worktreePath = worktree.path ?? ""
         prepareWarmState(worktreePath: worktreePath)
         autocompleteHandler.worktreePath = worktreePath
 
         if let existingSession = sessionManager.getAgentSession(for: sessionId) {
-            if existingSession.messages.isEmpty && !historicalMessages.isEmpty {
-                existingSession.messages = historicalMessages
-            }
-            if existingSession.toolCalls.isEmpty && !historicalToolCalls.isEmpty {
-                existingSession.loadPersistedToolCalls(historicalToolCalls)
-            }
-
-            currentAgentSession = existingSession
-            autocompleteHandler.agentSession = existingSession
-            updateDerivedState(from: existingSession)
-            bootstrapTimelineState(from: existingSession)
-            setupSessionObservers(session: existingSession)
-
-            scheduleAutocompleteIndexIfNeeded(for: worktreePath)
-
-            if !existingSession.isActive {
-                guard !worktreePath.isEmpty else {
-                    logger.error("Chat session missing worktree path; cannot start agent session.")
-                    settingUpSessionId = nil
-                    return
-                }
-
-                Task { [self] in
-                    defer { self.settingUpSessionId = nil }
-                    do {
-                        try await startOrResumeSession(existingSession, sessionId: sessionId, worktreePath: worktreePath)
-                        await sendPendingMessageIfNeeded()
-                    } catch {
-                        self.logger.error("Failed to start session for \(self.selectedAgent): \(error.localizedDescription)")
-                    }
-                }
-            } else {
-                Task {
-                    defer { self.settingUpSessionId = nil }
-                    await sendPendingMessageIfNeeded()
-                }
-            }
+            bindPreparedSession(existingSession)
             return
         }
 
         guard !worktreePath.isEmpty else {
             logger.error("Chat session missing worktree path; cannot start agent session.")
-            settingUpSessionId = nil
             return
         }
 
         let newSession = ChatAgentSession(agentName: selectedAgent, workingDirectory: worktreePath)
-        if !historicalMessages.isEmpty {
-            newSession.messages = historicalMessages
-        }
-        if !historicalToolCalls.isEmpty {
-            newSession.loadPersistedToolCalls(historicalToolCalls)
-        }
-
         let worktreeName = worktree.branch ?? "Chat"
         sessionManager.setAgentSession(newSession, for: sessionId, worktreeName: worktreeName)
-        currentAgentSession = newSession
-        autocompleteHandler.agentSession = newSession
-        updateDerivedState(from: newSession)
-        bootstrapTimelineState(from: newSession)
-        setupSessionObservers(session: newSession)
+        bindPreparedSession(newSession)
+    }
 
-        Task {
-            defer { self.settingUpSessionId = nil }
-            self.scheduleAutocompleteIndexIfNeeded(for: worktreePath)
+    func scheduleAgentSessionActivation() {
+        cancelScheduledAgentSessionActivation()
+        prepareAgentSession()
+        let activationDelay = delayedActivationInterval
 
-            if !newSession.isActive {
-                do {
-                    try await startOrResumeSession(newSession, sessionId: sessionId, worktreePath: worktreePath)
-                    await sendPendingMessageIfNeeded()
-                } catch {
-                    self.logger.error("Failed to start new session for \(self.selectedAgent): \(error.localizedDescription)")
-                }
-            } else {
-                await sendPendingMessageIfNeeded()
+        delayedActivationTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: activationDelay)
+            } catch {
+                return
             }
+
+            guard let self, !Task.isCancelled else { return }
+            self.delayedActivationTask = nil
+            await self.activatePreparedAgentSessionIfNeeded()
         }
+    }
+
+    func cancelScheduledAgentSessionActivation() {
+        delayedActivationTask?.cancel()
+        delayedActivationTask = nil
+    }
+
+    private func bindPreparedSession(_ agentSession: ChatAgentSession) {
+        if agentSession.messages.isEmpty && !historicalMessages.isEmpty {
+            agentSession.messages = historicalMessages
+        }
+        if agentSession.toolCalls.isEmpty && !historicalToolCalls.isEmpty {
+            agentSession.loadPersistedToolCalls(historicalToolCalls)
+        }
+
+        currentAgentSession = agentSession
+        autocompleteHandler.agentSession = agentSession
+        updateDerivedState(from: agentSession)
+        bootstrapTimelineState(from: agentSession)
+        setupSessionObservers(session: agentSession)
+    }
+
+    private func activatePreparedAgentSessionIfNeeded() async {
+        delayedActivationTask = nil
+        prepareAgentSession()
+
+        guard let sessionId = session.id else { return }
+        guard settingUpSessionId != sessionId else { return }
+
+        let worktreePath = worktree.path ?? ""
+        guard !worktreePath.isEmpty else {
+            logger.error("Chat session missing worktree path; cannot start agent session.")
+            return
+        }
+        guard let agentSession = currentAgentSession else { return }
+
+        scheduleAutocompleteIndexIfNeeded(for: worktreePath)
+
+        settingUpSessionId = sessionId
+
+        defer { settingUpSessionId = nil }
+
+        if !agentSession.isActive {
+            do {
+                try await startOrResumeSession(agentSession, sessionId: sessionId, worktreePath: worktreePath)
+                await sendPendingMessageIfNeeded()
+            } catch {
+                logger.error("Failed to start session for \(self.selectedAgent): \(error.localizedDescription)")
+            }
+            return
+        }
+
+        await sendPendingMessageIfNeeded()
     }
 
     func startOrResumeSession(

@@ -11,6 +11,7 @@ import SwiftUI
 struct FileContentView: View {
     let file: OpenFileInfo
     let repoPath: String?
+    let editorRuntime: CodeEditorRuntime?
     let onContentChange: (String) -> Void
     let onSave: () -> Void
     let onRevert: () -> Void
@@ -112,12 +113,11 @@ struct FileContentView: View {
                     filePath: file.path,
                     repoPath: repoPath,
                     hasUnsavedChanges: file.hasUnsavedChanges,
+                    runtime: editorRuntime,
                     onContentChange: onContentChange
                 )
-                .id(file.id)
             }
         }
-        .id(file.id)
     }
 
     private func detectLanguage(from path: String) -> String? {

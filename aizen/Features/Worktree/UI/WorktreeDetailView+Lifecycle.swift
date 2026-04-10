@@ -8,6 +8,11 @@
 import SwiftUI
 
 extension WorktreeDetailView {
+    var presentationSignature: String {
+        let visibleTabs = visibleTabIds.joined(separator: ",")
+        return "\(isActive)|\(showXcodeBuild)|\(visibleTabs)"
+    }
+
     var detailSurfaceColor: Color {
         if selectedTab == "terminal", let cachedTerminalBackgroundColor {
             return cachedTerminalBackgroundColor
@@ -70,18 +75,12 @@ extension WorktreeDetailView {
                 loadTabState()
                 validateSelectedTab()
             }
-            .task(id: visibleTabIds) {
-                guard isActive else { return }
-                try? await Task.sleep(for: .milliseconds(120))
-                guard !Task.isCancelled else { return }
-                scene.prewarmTabs(visibleTabIds)
-            }
-            .task(id: isActive) {
-                if isActive {
-                    worktreeRuntime.attachDetail(showXcode: showXcodeBuild)
-                } else {
-                    worktreeRuntime.detachDetail()
-                }
+            .task(id: presentationSignature) {
+                scene.updatePresentation(
+                    isActive: isActive,
+                    visibleTabIds: visibleTabIds,
+                    showXcode: showXcodeBuild
+                )
             }
     }
 
@@ -109,10 +108,11 @@ extension WorktreeDetailView {
                 scene.saveSessionId(viewModel.selectedFileSessionId, for: "files")
             }
             .onDisappear {
-                worktreeRuntime.detachDetail()
-            }
-            .task(id: showXcodeBuild) {
-                worktreeRuntime.updateDetailOptions(showXcode: showXcodeBuild)
+                scene.updatePresentation(
+                    isActive: false,
+                    visibleTabIds: [],
+                    showXcode: false
+                )
             }
     }
 }

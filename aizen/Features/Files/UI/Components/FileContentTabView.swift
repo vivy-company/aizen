@@ -33,15 +33,18 @@ struct FileContentTabView: View {
         viewModel.selectedFileId ?? viewModel.openFiles.last?.id
     }
 
-    /// Keep one persistent editor view per open tab so VVCode buffers/highlighting
-    /// are retained when switching tabs (prevents flicker on tab changes).
+    private var selectedFile: OpenFileInfo? {
+        guard let effectiveSelectedFileId else { return nil }
+        return viewModel.openFiles.first(where: { $0.id == effectiveSelectedFileId })
+    }
+
     private var contentStack: some View {
-        ZStack {
-            ForEach(viewModel.openFiles) { file in
-                let isSelected = effectiveSelectedFileId == file.id
+        Group {
+            if let file = selectedFile {
                 FileContentView(
                     file: file,
                     repoPath: viewModel.currentPath,
+                    editorRuntime: viewModel.editorRuntime(for: file),
                     onContentChange: { newContent in
                         viewModel.updateFileContent(id: file.id, content: newContent)
                     },
@@ -54,10 +57,7 @@ struct FileContentTabView: View {
                         }
                     }
                 )
-                .opacity(isSelected ? 1 : 0)
-                .allowsHitTesting(isSelected)
-                .accessibilityHidden(!isSelected)
-                .zIndex(isSelected ? 1 : 0)
+                .id(file.id)
             }
         }
     }

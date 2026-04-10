@@ -84,6 +84,7 @@ extension FileBrowserStore {
     }
 
     func closeFile(id: UUID) {
+        removeEditorRuntime(id: id)
         openFiles.removeAll { $0.id == id }
         if selectedFileId == id {
             selectedFileId = openFiles.last?.id

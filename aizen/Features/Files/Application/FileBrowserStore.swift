@@ -87,6 +87,10 @@ class FileBrowserStore: ObservableObject {
     var sessionRestoreTask: Task<Void, Never>?
     var directoryItemsCache: [String: [FileItem]] = [:]
     var directoryCacheShowHiddenFiles: Bool?
+    var gitStatusLoadTask: Task<Void, Never>?
+    var hasLoadedGitStatus = false
+    var isVisible = false
+    var editorRuntimesByFileId: [UUID: CodeEditorRuntime] = [:]
 
     init(worktree: Worktree, context: NSManagedObjectContext) {
         self.worktree = worktree
@@ -95,16 +99,12 @@ class FileBrowserStore: ObservableObject {
 
         // Load or create session
         loadSession()
-
-        // Load git status
-        Task {
-            await loadGitStatus()
-        }
     }
 
     deinit {
         sessionSaveTask?.cancel()
         sessionRestoreTask?.cancel()
+        gitStatusLoadTask?.cancel()
     }
 
     func toggleExpanded(path: String) {
@@ -132,6 +132,35 @@ class FileBrowserStore: ObservableObject {
 
     func revealInFinder(path: String) {
         NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: "")
+    }
+
+    func setVisible(_ visible: Bool) {
+        isVisible = visible
+
+        guard visible else {
+            gitStatusLoadTask?.cancel()
+            gitStatusLoadTask = nil
+            return
+        }
+
+        scheduleInitialGitStatusLoadIfNeeded()
+    }
+
+    private func scheduleInitialGitStatusLoadIfNeeded() {
+        guard !hasLoadedGitStatus else { return }
+        guard gitStatusLoadTask == nil else { return }
+
+        gitStatusLoadTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(120))
+            } catch {
+                return
+            }
+
+            guard let self, self.isVisible, !Task.isCancelled else { return }
+            await self.loadGitStatus()
+            self.gitStatusLoadTask = nil
+        }
     }
 
 }

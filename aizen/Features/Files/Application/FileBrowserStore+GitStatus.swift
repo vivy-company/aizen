@@ -10,6 +10,7 @@ import Foundation
 extension FileBrowserStore {
     func loadGitStatus() async {
         guard let worktreePath = worktree.path else { return }
+        hasLoadedGitStatus = true
         let expandedPathsSnapshot = expandedPaths
         let snapshot = await gitRuntime.loadGitSnapshot(
             basePath: worktreePath,

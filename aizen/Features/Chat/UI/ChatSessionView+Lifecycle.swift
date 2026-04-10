@@ -50,11 +50,13 @@ extension ChatSessionView {
     func handleSelectionChange() async {
         if isSelected {
             chatActions.configure(cycleModeForward: viewModel.cycleModeForward)
-            viewModel.setupAgentSession()
+            viewModel.prepareAgentSession()
+            viewModel.scheduleAgentSessionActivation()
             setupAutocompleteWindow()
             NotificationCenter.default.post(name: .chatViewDidAppear, object: nil)
             startKeyMonitorIfNeeded()
         } else {
+            viewModel.cancelScheduledAgentSessionActivation()
             viewModel.cancelPendingAutoScroll()
             viewModel.scrollRequest = nil
             autocompleteWindow?.dismiss()
