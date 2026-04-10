@@ -51,7 +51,7 @@ const highlightAnswer = (text: string) =>
             data-download
           >
             <Icon class="size-4" name="lucide:download" />
-            <span data-i18n="hero.primaryCta" data-download-text>{translations.en.hero.primaryCta}</span>
+            <span data-i18n="hero.primaryCta">{translations.en.hero.primaryCta}</span>
           </a>
           <a
             class="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-slate-900/10 bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition hover:border-slate-900/15 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
@@ -492,8 +492,6 @@ const highlightAnswer = (text: string) =>
       }
       if (best) {
         document.querySelectorAll("[data-download]").forEach((a) => { a.href = best.url; });
-        const textEl = document.querySelector("[data-download-text]");
-        if (textEl) textEl.textContent = "Download v" + best.ver;
       }
     } catch (_) {}
   })();
