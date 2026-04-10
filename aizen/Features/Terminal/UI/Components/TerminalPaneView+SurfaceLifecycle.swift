@@ -18,6 +18,8 @@ extension TerminalPaneView {
             return
         }
 
+        ghosttyApp.ensureRunning()
+
         guard let app = ghosttyApp.app,
               let worktreePath = surfaceAdapter.worktreePath else {
             return

@@ -31,6 +31,8 @@ extension ChatAgentSession {
         isActive = false
         isResumingSession = false
 
+        await terminalDelegate.cleanup()
+
         if let client = acpClient {
             await client.setDelegate(nil)
             await client.terminate()

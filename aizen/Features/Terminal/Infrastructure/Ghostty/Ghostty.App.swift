@@ -63,24 +63,36 @@ extension Ghostty {
             return AppearanceSettings.effectiveThemeName(appearanceMode: appearanceMode)
         }
 
+        /// Whether libghostty global state has been initialized
+        private static var libghosttyInitialized = false
+
         // MARK: - Initialization
 
+        /// Lightweight init — no threads or GPU resources are allocated.
+        /// Call `ensureRunning()` before creating the first terminal surface.
         init() {
-            // CRITICAL: Initialize libghostty first
-            let initResult = ghostty_init(0, nil)
-            if initResult != GHOSTTY_SUCCESS {
-                Ghostty.logger.critical("ghostty_init failed with code: \(initResult)")
-                readiness = .error
-                return
+            // Intentionally empty — heavy work deferred to ensureRunning()
+        }
+
+        /// Lazily bootstrap the ghostty_app_t the first time a terminal is needed.
+        /// Safe to call multiple times; only the first call does real work.
+        func ensureRunning() {
+            guard app == nil, readiness != .error else { return }
+
+            if !Self.libghosttyInitialized {
+                let initResult = ghostty_init(0, nil)
+                if initResult != GHOSTTY_SUCCESS {
+                    Ghostty.logger.critical("ghostty_init failed with code: \(initResult)")
+                    readiness = .error
+                    return
+                }
+                Self.libghosttyInitialized = true
             }
 
-            // Create runtime config with callbacks
             var runtime_cfg = makeRuntimeConfig()
 
-            // Create config and load Aizen terminal settings
             guard let config = makeInitialConfig() else { return }
 
-            // Create the ghostty app
             guard let app = ghostty_app_new(&runtime_cfg, config) else {
                 Ghostty.logger.critical("ghostty_app_new failed")
                 ghostty_config_free(config)
@@ -88,18 +100,13 @@ extension Ghostty {
                 return
             }
 
-            // Free config after app creation (app clones it)
             ghostty_config_free(config)
-
-            // CRITICAL: Unset XDG_CONFIG_HOME after app creation
-            // If left set, fish will look for config.fish in the temp directory instead of ~/.config
             unsetenv("XDG_CONFIG_HOME")
 
             self.app = app
             ghostty_app_set_focus(app, NSApp.isActive)
             self.readiness = .ready
 
-            // Store initial appearance and theme
             lastKnownAppearance = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
             lastKnownTheme = effectiveThemeName
 
