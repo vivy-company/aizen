@@ -101,7 +101,8 @@ extension ChatSessionView {
     }
 
     func preferredPermissionDismissOptionId(for request: RequestPermissionRequest) -> String? {
-        guard let options = request.options, !options.isEmpty else {
+        let options = request.options
+        guard !options.isEmpty else {
             return nil
         }
         if let dismissOption = options.first(where: { isPermissionDismissOptionKind($0.kind) }) {

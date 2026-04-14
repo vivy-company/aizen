@@ -11,8 +11,7 @@ import VVChatTimeline
 
 extension ChatSessionView {
     func isPlanRequest(_ request: RequestPermissionRequest) -> Bool {
-        guard let toolCall = request.toolCall,
-              let rawInput = toolCall.rawInput?.value as? [String: Any],
+        guard let rawInput = request.toolCall.rawInput?.value as? [String: Any],
               let _ = rawInput["plan"] as? String else {
             return false
         }

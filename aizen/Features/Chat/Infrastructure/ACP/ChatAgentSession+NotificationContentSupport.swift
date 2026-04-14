@@ -87,7 +87,7 @@ extension ToolCallUpdate {
             toolCallId: toolCallId,
             title: preferredTitle ?? fallbackTitle(kind),
             kind: kind,
-            status: status,
+            status: status ?? .pending,
             content: content,
             locations: locations,
             rawInput: rawInput,

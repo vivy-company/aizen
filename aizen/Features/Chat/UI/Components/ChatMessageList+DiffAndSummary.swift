@@ -10,20 +10,31 @@ extension ChatMessageList {
     func planRequestMarkdown(_ request: RequestPermissionRequest) -> String {
         var sections: [String] = ["**Plan approval requested**"]
 
-        if let message = request.message,
-           !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            sections.append(message)
+        if let title = request.toolCall.title?.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines),
+           !title.isEmpty {
+            sections.append(title)
         }
 
-        if let toolCall = request.toolCall,
-           let rawInput = toolCall.rawInput?.value as? [String: Any],
+        if let rawInput = request.toolCall.rawInput?.value as? [String: Any],
            let plan = rawInput["plan"] as? String,
            !plan.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             sections.append(plan)
         }
 
-        if let options = request.options, !options.isEmpty {
-            let optionLines = options.map { "- \($0.name)" }
+        let contentLines = request.toolCall.content.compactMap { content -> String? in
+            guard case .content(.text(let text)) = content else {
+                return nil
+            }
+
+            let trimmed = text.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        if !contentLines.isEmpty {
+            sections.append(contentLines.joined(separator: "\n\n"))
+        }
+
+        if !request.options.isEmpty {
+            let optionLines = request.options.map { "- \($0.name)" }
             sections.append(optionLines.joined(separator: "\n"))
         }
 

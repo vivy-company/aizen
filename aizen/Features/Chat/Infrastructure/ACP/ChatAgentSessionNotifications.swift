@@ -8,6 +8,7 @@
 import ACP
 import Foundation
 import Combine
+import os.log
 
 // MARK: - ChatAgentSession + Notifications
 
@@ -19,18 +20,15 @@ extension ChatAgentSession {
             for await notification in await client.notifications {
                 handleNotification(notification)
             }
+            guard !Task.isCancelled else {
+                return
+            }
             handleNotificationStreamEnded()
         }
     }
 
     /// Handle incoming session update notifications
     func handleNotification(_ notification: JSONRPCNotification) {
-        guard notification.method == "session/update" else {
-            return
-        }
-
-        let params = notification.params?.value as? [String: Any] ?? [:]
-
         let previousTask = notificationProcessingTask
 
         notificationProcessingTask = Task { @MainActor [weak self] in
@@ -38,16 +36,37 @@ extension ChatAgentSession {
                 await previousTask.value
             }
 
-            do {
-                let data = try JSONSerialization.data(withJSONObject: params)
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let updateNotification = try decoder.decode(SessionUpdateNotification.self, from: data)
+            guard !Task.isCancelled else {
+                return
+            }
 
+            do {
+                let updateNotification = try await Task.detached(priority: .userInitiated) { () throws -> SessionUpdateNotification? in
+                    try Self.decodeSessionUpdateNotification(from: notification)
+                }.value
+
+                guard let updateNotification else {
+                    return
+                }
                 self?.processUpdate(updateNotification.update)
             } catch {
+                Logger.acp.error("Failed to decode ACP session/update notification: \(error.localizedDescription, privacy: .public)")
             }
         }
+    }
+
+    nonisolated private static func decodeSessionUpdateNotification(
+        from notification: JSONRPCNotification
+    ) throws -> SessionUpdateNotification? {
+        guard notification.method == "session/update" else {
+            return nil
+        }
+
+        let params = notification.params?.value as? [String: Any] ?? [:]
+        let data = try JSONSerialization.data(withJSONObject: params)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(SessionUpdateNotification.self, from: data)
     }
 
     /// Process session update

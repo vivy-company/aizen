@@ -24,11 +24,14 @@ extension AgentTerminalDelegate {
             state.process.waitUntilExit()
         }
 
+        finalizeExitedProcessOutputIfNeeded(terminalId: terminalId.value)
+        state = terminals[terminalId.value] ?? state
+
         let exitCode = Int(state.process.terminationStatus)
         resumeExitWaiters(in: &state, exitCode: exitCode)
         terminals[terminalId.value] = state
 
-        return KillTerminalResponse(success: true, _meta: nil)
+        return KillTerminalResponse(_meta: nil)
     }
 
     /// Release a terminal process
@@ -42,13 +45,7 @@ extension AgentTerminalDelegate {
             state.process.waitUntilExit()
         }
 
-        AgentTerminalProcessIO.cleanupProcessPipes(
-            state.process,
-            terminalId: terminalId.value
-        ) { [weak self] drainedTerminalId, output in
-            await self?.appendOutput(terminalId: drainedTerminalId, output: output)
-        }
-
+        finalizeExitedProcessOutputIfNeeded(terminalId: terminalId.value)
         state = terminals[terminalId.value] ?? state
 
         let exitCode = Int(state.process.terminationStatus)
@@ -64,20 +61,28 @@ extension AgentTerminalDelegate {
         state.exitWaiters.removeAll()
         terminals.removeValue(forKey: terminalId.value)
 
-        return ReleaseTerminalResponse(success: true, _meta: nil)
+        return ReleaseTerminalResponse(_meta: nil)
     }
 
     /// Clean up all terminals
     func cleanup() async {
-        for (_, state) in terminals {
+        let terminalIds = Array(terminals.keys)
+
+        for terminalId in terminalIds {
+            guard var state = terminals[terminalId] else {
+                continue
+            }
+
             if state.process.isRunning {
                 state.process.terminate()
                 state.process.waitUntilExit()
             }
-            AgentTerminalProcessIO.cleanupProcessPipes(state.process)
+
+            finalizeExitedProcessOutputIfNeeded(terminalId: terminalId)
+            state = terminals[terminalId] ?? state
             let exitCode = Int(state.process.terminationStatus)
-            var currentState = state
-            resumeExitWaiters(in: &currentState, exitCode: exitCode)
+            resumeExitWaiters(in: &state, exitCode: exitCode)
+            terminals[terminalId] = state
         }
         terminals.removeAll()
         clearReleasedOutputs()

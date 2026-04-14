@@ -114,10 +114,8 @@ extension ChatAgentSession {
         isModeChanging = true
         defer { isModeChanging = false }
 
-        let response = try await client.setMode(sessionId: sessionId, modeId: modeId)
-        if response.success {
-            currentModeId = modeId
-        }
+        _ = try await client.setMode(sessionId: sessionId, modeId: modeId)
+        currentModeId = modeId
     }
 
     func setModel(_ modelId: String) async throws {
@@ -125,14 +123,12 @@ extension ChatAgentSession {
             throw AgentSessionError.sessionNotActive
         }
 
-        let response = try await client.setModel(sessionId: sessionId, modelId: modelId)
-        if response.success {
-            currentModelId = modelId
-            if let model = availableModels.first(where: { $0.modelId == modelId }) {
-                addSystemMessage("Model changed to \(model.name)")
-            } else {
-                addSystemMessage("Model changed to \(modelId)")
-            }
+        _ = try await client.setModel(sessionId: sessionId, modelId: modelId)
+        currentModelId = modelId
+        if let model = availableModels.first(where: { $0.modelId == modelId }) {
+            addSystemMessage("Model changed to \(model.name)")
+        } else {
+            addSystemMessage("Model changed to \(modelId)")
         }
     }
 

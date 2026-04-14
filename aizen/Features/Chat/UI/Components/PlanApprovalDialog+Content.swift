@@ -4,8 +4,7 @@ import SwiftUI
 
 extension PlanApprovalDialog {
     var planContent: String? {
-        guard let toolCall = request.toolCall,
-              let rawInput = toolCall.rawInput?.value as? [String: Any],
+        guard let rawInput = request.toolCall.rawInput?.value as? [String: Any],
               let plan = rawInput["plan"] as? String else {
             return nil
         }
@@ -85,27 +84,25 @@ extension PlanApprovalDialog {
 
     var actionsView: some View {
         HStack(spacing: 10) {
-            if let options = request.options {
-                ForEach(options, id: \.optionId) { option in
-                    Button {
-                        session?.respondToPermission(optionId: option.optionId)
-                        isPresented = false
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: buttonIcon(for: option))
-                                .font(.system(size: 12, weight: .semibold))
-                            Text(option.name)
-                                .font(.system(size: 13, weight: .medium))
-                        }
-                        .foregroundStyle(buttonForeground(for: option))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(buttonBackground(for: option))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+            ForEach(request.options, id: \.optionId) { option in
+                Button {
+                    session?.respondToPermission(optionId: option.optionId)
+                    isPresented = false
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: buttonIcon(for: option))
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(option.name)
+                            .font(.system(size: 13, weight: .medium))
                     }
-                    .buttonStyle(.plain)
-                    .disabled(session == nil)
+                    .foregroundStyle(buttonForeground(for: option))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(buttonBackground(for: option))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
+                .buttonStyle(.plain)
+                .disabled(session == nil)
             }
         }
         .padding(16)

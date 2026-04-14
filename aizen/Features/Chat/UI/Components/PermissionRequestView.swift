@@ -21,8 +21,7 @@ struct PermissionRequestView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
 
-                if let toolCall = request.toolCall,
-                   let rawInput = toolCall.rawInput?.value as? [String: Any],
+                if let rawInput = request.toolCall.rawInput?.value as? [String: Any],
                    let plan = PermissionRequestPromptExtractor.stringValue(rawInput["plan"]) {
                     PlanContentView(content: plan)
                         .font(.system(size: 12))
@@ -39,11 +38,9 @@ struct PermissionRequestView: View {
             }
 
             HStack(spacing: 6) {
-                if let options = request.options {
-                    ForEach(options, id: \.optionId) { option in
-                        PermissionOptionButton(option: option, style: .inline) {
-                            session.respondToPermission(optionId: option.optionId)
-                        }
+                ForEach(request.options, id: \.optionId) { option in
+                    PermissionOptionButton(option: option, style: .inline) {
+                        session.respondToPermission(optionId: option.optionId)
                     }
                 }
             }

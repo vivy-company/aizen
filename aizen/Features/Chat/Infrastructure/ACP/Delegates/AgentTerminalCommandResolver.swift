@@ -8,20 +8,21 @@ struct AgentTerminalCommandResolution {
 enum AgentTerminalCommandResolver {
     nonisolated private static let shellOperators = ["|", "&&", "||", ";", ">", ">>", "<", "$(", "`", "&"]
 
-    nonisolated static func resolve(command: String, args: [String]?) throws -> AgentTerminalCommandResolution {
+    nonisolated static func resolve(
+        command: String,
+        args: [String]?,
+        cwd: String?,
+        environment: [String: String]
+    ) throws -> AgentTerminalCommandResolution {
         let needsShell = shellOperators.contains { command.contains($0) }
 
         if needsShell {
-            let shellArguments: [String]
-            if let args, !args.isEmpty {
-                shellArguments = ["-c", ([command] + args).joined(separator: " ")]
-            } else {
-                shellArguments = ["-c", command]
-            }
+            let additionalArguments = args?.map(shellEscaped) ?? []
+            let shellCommand = ([command] + additionalArguments).joined(separator: " ")
 
             return AgentTerminalCommandResolution(
                 executablePath: "/bin/sh",
-                arguments: shellArguments
+                arguments: ["-c", shellCommand]
             )
         }
 
@@ -29,19 +30,19 @@ enum AgentTerminalCommandResolver {
             if command.contains(" ") || command.contains("\"") {
                 let parsedCommand = try parseCommandString(command)
                 return AgentTerminalCommandResolution(
-                    executablePath: try resolveExecutablePath(parsedCommand.executable),
+                    executablePath: try resolveExecutablePath(parsedCommand.executable, cwd: cwd, environment: environment),
                     arguments: parsedCommand.arguments
                 )
             }
 
             return AgentTerminalCommandResolution(
-                executablePath: try resolveExecutablePath(command),
+                executablePath: try resolveExecutablePath(command, cwd: cwd, environment: environment),
                 arguments: []
             )
         }
 
         return AgentTerminalCommandResolution(
-            executablePath: try resolveExecutablePath(command),
+            executablePath: try resolveExecutablePath(command, cwd: cwd, environment: environment),
             arguments: args ?? []
         )
     }
@@ -112,53 +113,69 @@ enum AgentTerminalCommandResolver {
         }
     }
 
-    nonisolated private static func resolveExecutablePath(_ command: String) throws -> String {
+    nonisolated private static func resolveExecutablePath(
+        _ command: String,
+        cwd: String?,
+        environment: [String: String]
+    ) throws -> String {
         let fileManager = FileManager.default
+        let expandedCommand = (command as NSString).expandingTildeInPath
 
-        if command.hasPrefix("/") {
-            guard fileManager.fileExists(atPath: command) else {
+        if expandedCommand.contains("/") {
+            let resolvedPath: String
+            if expandedCommand.hasPrefix("/") {
+                resolvedPath = expandedCommand
+            } else {
+                let baseDirectory = cwd.flatMap { URL(fileURLWithPath: $0, isDirectory: true) }
+                    ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+                resolvedPath = URL(fileURLWithPath: expandedCommand, relativeTo: baseDirectory)
+                    .standardizedFileURL
+                    .path
+            }
+
+            guard fileManager.fileExists(atPath: resolvedPath),
+                  fileManager.isExecutableFile(atPath: resolvedPath) else {
                 throw AgentTerminalDelegate.TerminalError.executableNotFound(command)
             }
-            return command
+
+            return resolvedPath
         }
 
         let commonPaths = [
-            "/usr/local/bin/\(command)",
-            "/usr/bin/\(command)",
-            "/bin/\(command)",
-            "/opt/homebrew/bin/\(command)",
-            "/opt/local/bin/\(command)",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/opt/homebrew/bin",
+            "/opt/local/bin",
         ]
 
-        for path in commonPaths where fileManager.fileExists(atPath: path) {
-            return path
-        }
+        let environmentPath = environment["PATH"]
+            ?? ProcessInfo.processInfo.environment["PATH"]
+            ?? ""
+        let candidateDirectories = environmentPath
+            .split(separator: ":")
+            .map(String.init)
+            + commonPaths
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = [command]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-
-        defer {
-            try? pipe.fileHandleForReading.close()
-        }
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            if let data = try? pipe.fileHandleForReading.read(upToCount: 4096),
-               let path = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-               !path.isEmpty,
-               fileManager.fileExists(atPath: path) {
-                return path
+        for directory in candidateDirectories {
+            let candidate = URL(fileURLWithPath: directory, isDirectory: true)
+                .appendingPathComponent(expandedCommand)
+                .path
+            if fileManager.fileExists(atPath: candidate),
+               fileManager.isExecutableFile(atPath: candidate) {
+                return candidate
             }
-        } catch {
-            // Ignore `which` failures and fall through to the explicit error.
         }
 
         throw AgentTerminalDelegate.TerminalError.executableNotFound(command)
+    }
+
+    nonisolated private static func shellEscaped(_ argument: String) -> String {
+        guard !argument.isEmpty else {
+            return "''"
+        }
+
+        let escaped = argument.replacingOccurrences(of: "'", with: "'\\''")
+        return "'\(escaped)'"
     }
 }

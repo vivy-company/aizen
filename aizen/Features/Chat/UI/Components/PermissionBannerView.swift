@@ -34,7 +34,7 @@ struct PermissionBannerView: View {
             sessionId: chatSessionId,
             worktreeName: agentSession.permissionHandler.worktreeName ?? "Chat",
             prompt: request.promptDescription,
-            options: request.options ?? [],
+            options: request.options,
             handler: agentSession.permissionHandler
         )
     }

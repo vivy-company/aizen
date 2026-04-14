@@ -77,7 +77,7 @@ class AgentPermissionHandler: ObservableObject {
             worktreeName: worktreeName ?? "Chat",
             title: prompt.title,
             detail: prompt.detail,
-            options: request.options ?? []
+            options: request.options
         )
 
         PermissionNotificationCoordinator.shared.notify(info: info)

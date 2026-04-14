@@ -56,9 +56,18 @@ actor AgentTerminalDelegate {
         env: [EnvVariable]?,
         outputByteLimit: Int?
     ) async throws -> CreateTerminalResponse {
+        var envDict = await ShellEnvironment.loadUserShellEnvironmentAsync()
+        if let envVars = env {
+            for envVar in envVars {
+                envDict[envVar.name] = envVar.value
+            }
+        }
+
         let commandResolution = try AgentTerminalCommandResolver.resolve(
             command: command,
-            args: args
+            args: args,
+            cwd: cwd,
+            environment: envDict
         )
 
         let process = Process()
@@ -69,13 +78,6 @@ actor AgentTerminalDelegate {
             process.currentDirectoryURL = URL(fileURLWithPath: cwd)
         }
 
-        // Always use user's shell environment as base, then merge agent-provided vars
-        var envDict = ShellEnvironment.loadUserShellEnvironment()
-        if let envVars = env {
-            for envVar in envVars {
-                envDict[envVar.name] = envVar.value
-            }
-        }
         process.environment = envDict
 
         let outputPipe = Pipe()
@@ -88,21 +90,32 @@ actor AgentTerminalDelegate {
 
         let state = TerminalState(process: process, outputByteLimit: outputByteLimit ?? defaultOutputByteLimit)
         terminals[terminalIdValue] = state
+        process.terminationHandler = { [weak self] _ in
+            Task {
+                await self?.handleProcessTermination(terminalId: terminalIdValue)
+            }
+        }
 
         AgentTerminalProcessIO.installReadabilityHandler(
             on: outputPipe,
             terminalId: terminalIdValue
         ) { [weak self] terminalId, output in
-            await self?.appendOutput(terminalId: terminalId, output: output)
+            await self?.appendOutput(terminalId: terminalId, data: output)
         }
         AgentTerminalProcessIO.installReadabilityHandler(
             on: errorPipe,
             terminalId: terminalIdValue
         ) { [weak self] terminalId, output in
-            await self?.appendOutput(terminalId: terminalId, output: output)
+            await self?.appendOutput(terminalId: terminalId, data: output)
         }
 
-        try process.run()
-        return CreateTerminalResponse(terminalId: terminalId, _meta: nil)
+        do {
+            try process.run()
+            return CreateTerminalResponse(terminalId: terminalId, _meta: nil)
+        } catch {
+            terminals.removeValue(forKey: terminalIdValue)
+            _ = AgentTerminalProcessIO.collectAndCloseProcessPipes(process)
+            throw error
+        }
     }
 }

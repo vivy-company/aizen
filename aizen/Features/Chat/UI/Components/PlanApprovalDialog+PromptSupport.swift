@@ -3,8 +3,7 @@ import Foundation
 
 extension RequestPermissionRequest {
     var promptDescription: PermissionRequestPrompt {
-        if let toolCall,
-           let rawInput = toolCall.rawInput?.value as? [String: Any],
+        if let rawInput = toolCall.rawInput?.value as? [String: Any],
            let plan = PermissionRequestPromptExtractor.stringValue(rawInput["plan"]),
            !plan.isEmpty {
             let title = normalizedMessage ?? "Implement this plan?"
@@ -39,7 +38,7 @@ extension RequestPermissionRequest {
     }
 
     private var normalizedMessage: String? {
-        guard let normalized = message?.trimmingCharacters(in: .whitespacesAndNewlines),
+        guard let normalized = toolCall.title?.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines),
               !normalized.isEmpty else {
             return nil
         }
@@ -47,8 +46,7 @@ extension RequestPermissionRequest {
     }
 
     private var promptCommand: String? {
-        guard let toolCall,
-              let rawInput = toolCall.rawInput?.value as? [String: Any] else {
+        guard let rawInput = toolCall.rawInput?.value as? [String: Any] else {
             return nil
         }
         return PermissionRequestPromptExtractor.commandValue(
@@ -58,8 +56,7 @@ extension RequestPermissionRequest {
     }
 
     private var promptFilePath: String? {
-        guard let toolCall,
-              let rawInput = toolCall.rawInput?.value as? [String: Any] else {
+        guard let rawInput = toolCall.rawInput?.value as? [String: Any] else {
             return nil
         }
         return PermissionRequestPromptExtractor.stringValue(
@@ -69,8 +66,7 @@ extension RequestPermissionRequest {
     }
 
     private var promptURL: String? {
-        guard let toolCall,
-              let rawInput = toolCall.rawInput?.value as? [String: Any] else {
+        guard let rawInput = toolCall.rawInput?.value as? [String: Any] else {
             return nil
         }
         return PermissionRequestPromptExtractor.stringValue(

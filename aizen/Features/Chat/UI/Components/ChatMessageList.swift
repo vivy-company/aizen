@@ -77,9 +77,10 @@ struct ChatMessageList: View {
 
     var planRequestIdentity: String {
         guard let request = pendingPlanRequest else { return "none" }
-        let optionIds = (request.options ?? []).map(\.optionId).joined(separator: "|")
-        let toolId = request.toolCall?.toolCallId ?? "none"
-        return "req-\(toolId)-\(optionIds)-\(request.message ?? "")"
+        let optionIds = request.options.map(\.optionId).joined(separator: "|")
+        let toolId = request.toolCall.toolCallId
+        let title = request.toolCall.title ?? ""
+        return "req-\(toolId)-\(optionIds)-\(title)"
     }
 
     var body: some View {

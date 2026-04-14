@@ -4,7 +4,7 @@ enum AgentTerminalProcessIO {
     nonisolated static func installReadabilityHandler(
         on pipe: Pipe,
         terminalId: String,
-        appendOutput: @escaping @Sendable (String, String) async -> Void
+        appendOutput: @escaping @Sendable (String, Data) async -> Void
     ) {
         pipe.fileHandleForReading.readabilityHandler = { handle in
             do {
@@ -18,10 +18,8 @@ enum AgentTerminalProcessIO {
                     try? handle.close()
                     return
                 }
-                if let output = String(data: data, encoding: .utf8) {
-                    Task {
-                        await appendOutput(terminalId, output)
-                    }
+                Task {
+                    await appendOutput(terminalId, data)
                 }
             } catch {
                 handle.readabilityHandler = nil
@@ -29,77 +27,40 @@ enum AgentTerminalProcessIO {
         }
     }
 
-    nonisolated static func cleanupProcessPipes(
-        _ process: Process,
-        terminalId: String? = nil,
-        appendOutput: (@Sendable (String, String) async -> Void)? = nil
-    ) {
+    nonisolated static func collectAndCloseProcessPipes(_ process: Process) -> [Data] {
+        var drainedChunks: [Data] = []
+
         if let outputPipe = process.standardOutput as? Pipe {
-            if let terminalId, let appendOutput {
-                drainPipe(
-                    outputPipe,
-                    terminalId: terminalId,
-                    appendOutput: appendOutput,
-                    closeHandle: false
-                )
-            } else {
-                outputPipe.fileHandleForReading.readabilityHandler = nil
+            if let drained = drainPipe(outputPipe, closeHandle: false), !drained.isEmpty {
+                drainedChunks.append(drained)
             }
             try? outputPipe.fileHandleForReading.close()
         }
 
         if let errorPipe = process.standardError as? Pipe {
-            if let terminalId, let appendOutput {
-                drainPipe(
-                    errorPipe,
-                    terminalId: terminalId,
-                    appendOutput: appendOutput,
-                    closeHandle: false
-                )
-            } else {
-                errorPipe.fileHandleForReading.readabilityHandler = nil
+            if let drained = drainPipe(errorPipe, closeHandle: false), !drained.isEmpty {
+                drainedChunks.append(drained)
             }
             try? errorPipe.fileHandleForReading.close()
         }
-    }
 
-    nonisolated static func drainAvailableOutput(
-        terminalId: String,
-        process: Process,
-        appendOutput: @escaping @Sendable (String, String) async -> Void
-    ) {
-        guard process.isRunning else {
-            return
-        }
-
-        if let outputPipe = process.standardOutput as? Pipe {
-            drainPipe(outputPipe, terminalId: terminalId, appendOutput: appendOutput, closeHandle: false)
-        }
-
-        if let errorPipe = process.standardError as? Pipe {
-            drainPipe(errorPipe, terminalId: terminalId, appendOutput: appendOutput, closeHandle: false)
-        }
+        return drainedChunks
     }
 
     nonisolated private static func drainPipe(
         _ pipe: Pipe,
-        terminalId: String,
-        appendOutput: @escaping @Sendable (String, String) async -> Void,
         closeHandle: Bool = true
-    ) {
+    ) -> Data? {
         let handle = pipe.fileHandleForReading
         handle.readabilityHandler = nil
+        var drained = Data()
 
         do {
             while true {
                 guard let data = try handle.read(upToCount: 65536), !data.isEmpty else {
                     break
                 }
-                if let output = String(data: data, encoding: .utf8) {
-                    Task {
-                        await appendOutput(terminalId, output)
-                    }
-                }
+                drained.append(data)
             }
         } catch {
             // The handle is already closed or otherwise unavailable.
@@ -108,5 +69,7 @@ enum AgentTerminalProcessIO {
         if closeHandle {
             try? handle.close()
         }
+
+        return drained.isEmpty ? nil : drained
     }
 }

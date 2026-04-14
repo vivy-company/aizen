@@ -18,7 +18,7 @@ struct PlanApprovalPickerView: View {
     @State var keyMonitor: Any?
 
     var options: [PermissionOption] {
-        request.options ?? []
+        request.options
     }
 
     private var prompt: PermissionRequestPrompt {
