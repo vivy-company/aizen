@@ -15,6 +15,16 @@ extension Ghostty.SurfaceView {
 
         let size = ghostty_surface_size(surface)
         DispatchQueue.main.async {
+            if let currentSize = self.surfaceSize,
+               currentSize.columns == size.columns,
+               currentSize.rows == size.rows,
+               currentSize.width_px == size.width_px,
+               currentSize.height_px == size.height_px,
+               currentSize.cell_width_px == size.cell_width_px,
+               currentSize.cell_height_px == size.cell_height_px {
+                return
+            }
+
             self.surfaceSize = size
         }
     }

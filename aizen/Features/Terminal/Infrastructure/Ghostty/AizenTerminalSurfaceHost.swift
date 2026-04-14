@@ -5,13 +5,18 @@ import SwiftUI
 final class AizenTerminalSurfaceHostCoordinator {
     let adapter: AizenTerminalSurfaceAdapter
     private var exitCheckTask: Task<Void, Never>?
+    private var monitoredSurfaceID: ObjectIdentifier?
 
     init(adapter: AizenTerminalSurfaceAdapter) {
         self.adapter = adapter
     }
 
     func startMonitoring(surface: AizenTerminalSurfaceView) {
+        let surfaceID = ObjectIdentifier(surface)
+        guard monitoredSurfaceID != surfaceID || exitCheckTask == nil else { return }
+
         stopMonitoring()
+        monitoredSurfaceID = surfaceID
         exitCheckTask = Task { @MainActor [weak self, weak surface] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(500))
@@ -27,6 +32,7 @@ final class AizenTerminalSurfaceHostCoordinator {
     func stopMonitoring() {
         exitCheckTask?.cancel()
         exitCheckTask = nil
+        monitoredSurfaceID = nil
     }
 
     deinit {

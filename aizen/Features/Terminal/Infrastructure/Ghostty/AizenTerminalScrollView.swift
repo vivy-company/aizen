@@ -78,11 +78,12 @@ class AizenTerminalScrollView: NSView {
 
     func updateContentSize(_ size: CGSize) {
         let currentSize = frame.size
-        if abs(currentSize.width - size.width) > 0.5 || abs(currentSize.height - size.height) > 0.5 {
-            var newFrame = frame
-            newFrame.size = size
-            frame = newFrame
-        }
+        let sizeChanged = abs(currentSize.width - size.width) > 0.5 || abs(currentSize.height - size.height) > 0.5
+        guard sizeChanged else { return }
+
+        var newFrame = frame
+        newFrame.size = size
+        frame = newFrame
 
         synchronizeForHostUpdate()
     }

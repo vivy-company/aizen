@@ -69,10 +69,10 @@ extension Ghostty {
         }
 
         // The currently active key sequence. The sequence is not active if this is empty.
-        @Published var keySequence: [KeyboardShortcut] = []
+        var keySequence: [KeyboardShortcut] = []
 
         // The currently active key tables. Empty if no tables are active.
-        @Published var keyTables: [String] = []
+        var keyTables: [String] = []
 
         // The current search state. When non-nil, the search overlay should be shown.
         @Published var searchState: SearchState? {
@@ -123,14 +123,14 @@ extension Ghostty {
         @Published var pointerStyle: CursorStyle = .horizontalText
 
         // Whether the mouse is currently over this surface
-        @Published var mouseOverSurface: Bool = false
+        var mouseOverSurface: Bool = false
 
         // The last known mouse location in the surface's local coordinate space,
         // used by overlays such as the split drag handle reveal region.
-        @Published var mouseLocationInSurface: CGPoint?
+        var mouseLocationInSurface: CGPoint?
 
         // Whether the cursor is currently visible (not hidden by typing, etc.)
-        @Published var cursorVisible: Bool = true
+        var cursorVisible: Bool = true
 
         /// The configuration derived from the Ghostty config so we don't need to rely on references.
         @Published var derivedConfig: DerivedConfig
