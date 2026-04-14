@@ -153,8 +153,6 @@ extension Ghostty.SurfaceView: NSTextInputClient {
         default:
             break
         }
-
-        print("SEL: \(selector)")
     }
 
     func syncPreedit(clearIfNeeded: Bool = true) {
