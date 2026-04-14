@@ -10,7 +10,16 @@ struct WorktreeTabPicker: View {
     let visibleTabs: [TabItem]
 
     var body: some View {
-        Picker(String(localized: "worktree.session.tab"), selection: $scene.selectedTab) {
+        let selection = Binding(
+            get: { scene.selectedTab },
+            set: { newValue in
+                guard scene.selectedTab != newValue else { return }
+                DispatchQueue.main.async {
+                    scene.selectTab(newValue)
+                }
+            }
+        )
+        return Picker(String(localized: "worktree.session.tab"), selection: selection) {
             ForEach(visibleTabs) { tab in
                 Label(LocalizedStringKey(tab.localizedKey), systemImage: tab.icon)
                     .tag(tab.id)
