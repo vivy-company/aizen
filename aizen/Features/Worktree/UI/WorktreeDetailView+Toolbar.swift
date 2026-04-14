@@ -5,20 +5,31 @@
 
 import SwiftUI
 
+struct WorktreeTabPicker: View {
+    @ObservedObject var scene: WorktreeSceneStore
+    let visibleTabs: [TabItem]
+
+    var body: some View {
+        Picker(String(localized: "worktree.session.tab"), selection: $scene.selectedTab) {
+            ForEach(visibleTabs) { tab in
+                Label(LocalizedStringKey(tab.localizedKey), systemImage: tab.icon)
+                    .tag(tab.id)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+}
+
 extension WorktreeDetailView {
     @ToolbarContentBuilder
     var tabPickerToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .automatic) {
-            Picker(String(localized: "worktree.session.tab"), selection: selectedTabBinding) {
-                ForEach(tabConfig.tabOrder) { tab in
-                    if isTabVisible(tab.id) {
-                        Label(LocalizedStringKey(tab.localizedKey), systemImage: tab.icon)
-                            .tag(tab.id)
-                    }
-                }
-            }
-            .pickerStyle(.segmented)
+            WorktreeTabPicker(scene: scene, visibleTabs: visibleTabs)
         }
+    }
+
+    var visibleTabs: [TabItem] {
+        tabConfig.tabOrder.filter { isTabVisible($0.id) }
     }
 
     @ToolbarContentBuilder
