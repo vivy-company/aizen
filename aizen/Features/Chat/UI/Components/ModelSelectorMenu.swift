@@ -8,8 +8,11 @@ import ACP
 import SwiftUI
 
 struct ModelSelectorMenu: View {
-    @ObservedObject var session: ChatAgentSession
+    let availableModels: [ModelInfo]
+    let currentModelId: String?
+    let isStreaming: Bool
     let selectedAgent: String
+    let onModelSelect: (String) -> Void
     let onAgentSelect: (String) -> Void
     var showsBackground: Bool = true
     var showsIcon: Bool = true
@@ -27,18 +30,16 @@ struct ModelSelectorMenu: View {
     var body: some View {
         Menu {
             // Current agent models section
-            if !session.availableModels.isEmpty {
+            if !availableModels.isEmpty {
                 Section {
-                    ForEach(session.availableModels, id: \.modelId) { modelInfo in
+                    ForEach(availableModels, id: \.modelId) { modelInfo in
                         Button {
-                            Task {
-                                try? await session.setModel(modelInfo.modelId)
-                            }
+                            onModelSelect(modelInfo.modelId)
                         } label: {
                             HStack {
                                 Text(modelInfo.name)
                                 Spacer()
-                                if modelInfo.modelId == session.currentModelId {
+                                if modelInfo.modelId == currentModelId {
                                     Image(systemName: "checkmark")
                                         .foregroundStyle(.blue)
                                 }
@@ -84,8 +85,8 @@ struct ModelSelectorMenu: View {
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
-        .disabled(session.isStreaming)  // Prevent model/agent changes during streaming
-        .opacity(session.isStreaming ? 0.5 : 1.0)
+        .disabled(isStreaming)  // Prevent model/agent changes during streaming
+        .opacity(isStreaming ? 0.5 : 1.0)
         .onAppear {
             enabledAgents = AgentRegistry.shared.getEnabledAgents()
         }
@@ -93,7 +94,7 @@ struct ModelSelectorMenu: View {
     }
 
     private var currentModelName: String {
-        if let currentModel = session.availableModels.first(where: { $0.modelId == session.currentModelId }) {
+        if let currentModel = availableModels.first(where: { $0.modelId == currentModelId }) {
             return currentModel.name
         }
         return selectedAgentMetadata?.name ?? selectedAgent.capitalized

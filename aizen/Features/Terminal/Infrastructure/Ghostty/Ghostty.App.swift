@@ -47,6 +47,9 @@ extension Ghostty {
         /// Observer for in-app appearance setting changes
         var appearanceSettingObserver: NSObjectProtocol?
 
+        /// Deferred cleanup for when the last terminal surface disappears.
+        var idleCleanupTask: Task<Void, Never>?
+
         // MARK: - Terminal Settings from AppStorage
 
         @AppStorage(AppearanceSettings.terminalFontFamilyKey) var terminalFontName = AppearanceSettings.defaultTerminalFontFamily
@@ -54,6 +57,8 @@ extension Ghostty {
         @AppStorage(AppearanceSettings.themeNameKey) var terminalThemeName = AppearanceSettings.defaultDarkTheme
         @AppStorage(AppearanceSettings.lightThemeNameKey) var terminalThemeNameLight = AppearanceSettings.defaultLightTheme
         @AppStorage(AppearanceSettings.usePerAppearanceThemeKey) var usePerAppearanceTheme = false
+        @AppStorage(TerminalPreferences.scrollbackLimitMBKey)
+        var terminalScrollbackLimitMB = TerminalPreferences.defaultScrollbackLimitMB
         @AppStorage("appearanceMode") private var appearanceMode = "system"
 
         var effectiveThemeName: String {
@@ -78,6 +83,9 @@ extension Ghostty {
         /// Safe to call multiple times; only the first call does real work.
         func ensureRunning() {
             guard app == nil, readiness != .error else { return }
+
+            idleCleanupTask?.cancel()
+            idleCleanupTask = nil
 
             if !Self.libghosttyInitialized {
                 let initResult = ghostty_init(0, nil)

@@ -7,6 +7,9 @@ import OSLog
 extension Ghostty.App {
     /// Clean up the ghostty app resources
     func cleanup() {
+        idleCleanupTask?.cancel()
+        idleCleanupTask = nil
+
         DistributedNotificationCenter.default().removeObserver(self)
         NotificationCenter.default.removeObserver(self)
 
@@ -15,10 +18,16 @@ extension Ghostty.App {
             appearanceSettingObserver = nil
         }
 
+        activeSurfaces.removeAll(keepingCapacity: false)
+        lastKnownAppearance = nil
+        lastKnownTheme = nil
+
         if let app = self.app {
             ghostty_app_free(app)
             self.app = nil
         }
+
+        readiness = .loading
     }
 
     func appTick() {
@@ -30,6 +39,9 @@ extension Ghostty.App {
     /// Returns the surface reference that should be stored by the view
     @discardableResult
     func registerSurface(_ surface: ghostty_surface_t) -> Ghostty.SurfaceReference {
+        idleCleanupTask?.cancel()
+        idleCleanupTask = nil
+
         let ref = Ghostty.SurfaceReference(surface)
         activeSurfaces.append(ref)
         activeSurfaces = activeSurfaces.filter { $0.isValid }
@@ -40,6 +52,7 @@ extension Ghostty.App {
     func unregisterSurface(_ ref: Ghostty.SurfaceReference) {
         ref.invalidate()
         activeSurfaces = activeSurfaces.filter { $0.isValid }
+        scheduleIdleCleanupIfNeeded()
     }
 
     /// Reload configuration (call when settings change)
@@ -63,5 +76,19 @@ extension Ghostty.App {
 
         ghostty_config_free(config)
         unsetenv("XDG_CONFIG_HOME")
+    }
+
+    private func scheduleIdleCleanupIfNeeded() {
+        idleCleanupTask?.cancel()
+        idleCleanupTask = nil
+
+        guard app != nil, activeSurfaces.isEmpty else { return }
+
+        idleCleanupTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+
+            guard let self, self.app != nil, self.activeSurfaces.isEmpty else { return }
+            cleanup()
+        }
     }
 }

@@ -26,7 +26,7 @@ extension ChatSessionStore {
             attachments = []
             isProcessing = true
             // Re-enable auto-scroll when user sends a message
-            isNearBottom = true
+            timelineStore.isNearBottom = true
         }
         // Force the timeline to pin to bottom so streaming follows immediately.
         scrollToBottom()

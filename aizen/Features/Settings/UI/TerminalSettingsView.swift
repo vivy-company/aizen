@@ -14,6 +14,8 @@ struct TerminalSettingsView: View {
     @AppStorage("terminalProgressEnabled") private var terminalProgressEnabled = true
     @AppStorage("terminalVoiceButtonEnabled") private var terminalVoiceButtonEnabled = true
     @AppStorage("terminalSessionPersistence") private var sessionPersistence = false
+    @AppStorage(TerminalPreferences.scrollbackLimitMBKey)
+    private var terminalScrollbackLimitMB = TerminalPreferences.defaultScrollbackLimitMB
 
     // Copy settings
     @AppStorage("terminalCopyTrimTrailingWhitespace") private var copyTrimTrailingWhitespace = true
@@ -31,10 +33,26 @@ struct TerminalSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Terminal Behavior") {
+            Section {
                 Toggle("Enable terminal notifications", isOn: $terminalNotificationsEnabled)
                 Toggle("Show progress overlays", isOn: $terminalProgressEnabled)
                 Toggle("Show voice input button", isOn: $terminalVoiceButtonEnabled)
+                LabeledContent("Scrollback limit") {
+                    Stepper(
+                        value: $terminalScrollbackLimitMB,
+                        in: TerminalPreferences.minScrollbackLimitMB...TerminalPreferences.maxScrollbackLimitMB
+                    ) {
+                        Text("\(terminalScrollbackLimitMB) MB")
+                            .monospacedDigit()
+                    }
+                    .labelsHidden()
+                }
+            } header: {
+                Text("Terminal Behavior")
+            } footer: {
+                Text("Scrollback is stored in memory per terminal surface. Lower values reclaim memory sooner but keep less history.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {

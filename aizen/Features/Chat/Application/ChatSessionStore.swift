@@ -31,6 +31,7 @@ class ChatSessionStore: ObservableObject {
     // MARK: - Services
 
     @Published var audioService = AudioService()
+    let timelineStore = ChatTimelineStore()
 
     // MARK: - State
 
@@ -38,8 +39,6 @@ class ChatSessionStore: ObservableObject {
     @Published var currentAgentSession: ChatAgentSession?
     @Published var currentPermissionRequest: RequestPermissionRequest?
     @Published var attachments: [ChatAttachment] = []
-    @Published var messages: [MessageItem] = []
-    @Published var toolCalls: [ToolCall] = []
 
     // Historical messages loaded from Core Data (separate from live session)
     var historicalMessages: [MessageItem] = []
@@ -57,28 +56,21 @@ class ChatSessionStore: ObservableObject {
     @Published var needsUpdate: Bool = false
     @Published var versionInfo: AgentVersionInfo?
     @Published var currentAgentPlan: Plan?
-    @Published var hasModes: Bool = false
+    @Published var availableModes: [ModeInfo] = []
+    @Published var availableModels: [ModelInfo] = []
+    @Published var availableConfigOptions: [SessionConfigOption] = []
     @Published var currentModeId: String?
+    @Published var currentModelId: String?
     @Published var sessionState: SessionState = .idle
     @Published var isResumingSession: Bool = false
 
     // MARK: - Internal State
 
-    @Published var scrollRequest: ScrollRequest?
-    @Published var isNearBottom: Bool = true
-    /// Tracks user intent: true when user has actively scrolled up away from bottom.
-    /// Unlike isNearBottom (which flips on every content change), this only changes
-    /// on explicit user scroll gestures or forced scroll-to-bottom actions.
-    var userScrolledUp: Bool = false
     var cancellables = Set<AnyCancellable>()
     var notificationCancellables = Set<AnyCancellable>()
     var wasStreaming: Bool = false
     var observedSessionId: UUID?
     let logger = Logger.forCategory("ChatSession")
-    var autoScrollTask: Task<Void, Never>?
-    var suppressNextAutoScroll: Bool = false
-    private var pendingNearBottomState: Bool?
-    private var nearBottomStateTask: Task<Void, Never>?
     var draftPersistTask: Task<Void, Never>?
     var skipNextMessagesEmission: Bool = false
     var skipNextToolCallsEmission: Bool = false
@@ -157,8 +149,6 @@ class ChatSessionStore: ObservableObject {
     // MARK: - Lifecycle
 
     deinit {
-        nearBottomStateTask?.cancel()
-        nearBottomStateTask = nil
         delayedActivationTask?.cancel()
         delayedActivationTask = nil
         if gitPauseApplied, !worktreePathSnapshot.isEmpty {
@@ -173,39 +163,6 @@ class ChatSessionStore: ObservableObject {
         notificationCancellables.removeAll()
         observedSessionId = nil
     }
-
-    /// Coalesce bottom-visibility updates to avoid state writes during SwiftUI layout transactions.
-    func enqueueScrollPositionChange(_ isNearBottom: Bool, isLayoutResizing: Bool) {
-        guard !isLayoutResizing else { return }
-
-        if pendingNearBottomState == isNearBottom, nearBottomStateTask != nil {
-            return
-        }
-        pendingNearBottomState = isNearBottom
-
-        guard nearBottomStateTask == nil else { return }
-        nearBottomStateTask = Task { @MainActor [weak self] in
-            await Task.yield()
-            guard let self else { return }
-            defer { self.nearBottomStateTask = nil }
-
-            guard let nextState = self.pendingNearBottomState else { return }
-            self.pendingNearBottomState = nil
-            self.applyScrollPositionChange(nextState)
-        }
-    }
-
-    private func applyScrollPositionChange(_ isNearBottom: Bool) {
-        if self.isNearBottom != isNearBottom {
-            self.isNearBottom = isNearBottom
-        }
-        // Mark userScrolledUp when user scrolls away from bottom.
-        // Do NOT auto-clear it when near bottom — only cleared explicitly
-        // by scrollToBottom() (button click or new turn start).
-        if !isNearBottom && !userScrolledUp {
-            userScrolledUp = true
-        }
-    }
     
     // MARK: - Derived State Updates
     func updateDerivedState(from session: ChatAgentSession) {
@@ -214,12 +171,37 @@ class ChatSessionStore: ObservableObject {
         needsUpdate = session.needsUpdate
         versionInfo = session.versionInfo
         currentAgentPlan = session.agentPlan
-        hasModes = !session.availableModes.isEmpty
+        availableModes = session.availableModes
+        availableModels = session.availableModels
+        availableConfigOptions = session.availableConfigOptions
         currentModeId = session.currentModeId
+        currentModelId = session.currentModelId
         sessionState = session.sessionState
         isResumingSession = session.isResumingSession
         showingPermissionAlert = session.permissionHandler.showingPermissionAlert
         currentPermissionRequest = session.permissionHandler.permissionRequest
+        timelineStore.isStreaming = session.isStreaming
+        timelineStore.isSessionInitializing = session.sessionState.isInitializing
+    }
+
+    func clearDerivedState() {
+        needsAuth = false
+        needsSetup = false
+        needsUpdate = false
+        versionInfo = nil
+        currentAgentPlan = nil
+        availableModes = []
+        availableModels = []
+        availableConfigOptions = []
+        currentModeId = nil
+        currentModelId = nil
+        sessionState = .idle
+        isResumingSession = false
+        showingPermissionAlert = false
+        currentPermissionRequest = nil
+        isProcessing = false
+        timelineStore.isStreaming = false
+        timelineStore.isSessionInitializing = false
     }
 
 }

@@ -21,7 +21,7 @@ struct ChatMessageList: View {
     let pendingPlanRequest: RequestPermissionRequest?
     let worktreePath: String?
     let selectedAgent: String
-    let scrollRequest: ChatSessionStore.ScrollRequest?
+    let scrollRequest: ChatTimelineStore.ScrollRequest?
     var isAutoScrollEnabled: () -> Bool = { true }
     let onAppear: () -> Void
     var onTimelineStateChange: (VVChatTimelineState) -> Void = { _ in }

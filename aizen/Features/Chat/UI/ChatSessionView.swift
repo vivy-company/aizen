@@ -8,12 +8,9 @@
 import ACP
 import CoreData
 import SwiftUI
-import VVChatTimeline
 
 struct ChatSessionView: View {
     let worktree: Worktree
-    @ObservedObject var session: ChatSession
-    let sessionManager: ChatSessionRegistry
     let isSelected: Bool
     let isCompanionResizing: Bool
 
@@ -31,7 +28,6 @@ struct ChatSessionView: View {
     @State var chatActions = ChatActions()
     @State private var isWindowResizing = false
     @State var wasNearBottomBeforeResize = true
-    @State var chatTimelineState = VVChatTimelineState()
 
     // Input state (local to avoid re-rendering entire view on keystroke)
     @State var inputText = ""
@@ -50,15 +46,11 @@ struct ChatSessionView: View {
 
     init(
         worktree: Worktree,
-        session: ChatSession,
-        sessionManager: ChatSessionRegistry,
         viewModel: ChatSessionStore,
         isSelected: Bool,
         isCompanionResizing: Bool = false
     ) {
         self.worktree = worktree
-        self.session = session
-        self.sessionManager = sessionManager
         self.isSelected = isSelected
         self.isCompanionResizing = isCompanionResizing
         _viewModel = ObservedObject(wrappedValue: viewModel)
@@ -73,36 +65,15 @@ struct ChatSessionView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                ZStack(alignment: .bottom) {
-                    ChatTimelineContainer(
-                        messages: viewModel.messages,
-                        toolCalls: viewModel.toolCalls,
-                        isStreaming: viewModel.currentAgentSession?.isStreaming ?? false,
-                        isSessionInitializing: viewModel.isSessionInitializing,
-                        pendingPlanRequest: pendingPlanTimelineRequest,
-                        worktreePath: worktree.path,
-                        selectedAgent: viewModel.selectedAgent,
-                        scrollRequest: viewModel.scrollRequest,
-                        isAutoScrollEnabled: { !viewModel.userScrolledUp },
-                        onAppear: viewModel.loadMessages,
-                        onTimelineStateChange: { state in
-                            chatTimelineState = state
-                            viewModel.enqueueScrollPositionChange(
-                                state.isLiveTail,
-                                isLayoutResizing: isLayoutResizing
-                            )
-                        }
-                    )
-                    .padding(.horizontal, 20)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .layoutPriority(1)
-
-                    scrollToBottomButton
-                        .padding(.bottom, 16)
-                        .opacity(shouldShowScrollToBottom ? 1 : 0)
-                        .allowsHitTesting(shouldShowScrollToBottom)
-                        .accessibilityHidden(!shouldShowScrollToBottom)
-                }
+                ChatTimelinePane(
+                    timelineStore: viewModel.timelineStore,
+                    pendingPlanRequest: pendingPlanTimelineRequest,
+                    worktreePath: worktree.path,
+                    selectedAgent: viewModel.selectedAgent,
+                    onAppear: viewModel.loadMessages,
+                    isLayoutResizing: isLayoutResizing
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 Spacer(minLength: 0)
 

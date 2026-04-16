@@ -38,9 +38,13 @@ extension ChatSessionStore {
         if let sessionId = session.id {
             sessionManager.removeAgentSession(for: sessionId)
         }
+        cancellables.removeAll()
+        observedSessionId = nil
         currentAgentSession = nil
-        messages = []
-        toolCalls = []
+        autocompleteHandler.agentSession = nil
+        clearDerivedState()
+        timelineStore.resetSyncState()
+        timelineStore.syncTimeline(messages: [], toolCalls: [])
 
         setupAgentSession()
         pendingAgentSwitch = nil
@@ -81,8 +85,10 @@ extension ChatSessionStore {
                 currentAgentSession = freshAgentSession
                 autocompleteHandler.agentSession = freshAgentSession
 
-                messages = []
-                toolCalls = []
+                timelineStore.resetSyncState()
+                timelineStore.syncTimeline(messages: [], toolCalls: [])
+                timelineStore.isStreaming = false
+                timelineStore.isSessionInitializing = false
 
                 setupSessionObservers(session: freshAgentSession)
 

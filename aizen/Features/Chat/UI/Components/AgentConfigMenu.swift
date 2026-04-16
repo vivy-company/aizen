@@ -9,13 +9,16 @@ import ACP
 import SwiftUI
 
 struct AgentConfigMenu: View {
-    @ObservedObject var session: ChatAgentSession
+    let configOptions: [SessionConfigOption]
+    let isStreaming: Bool
     var showsBackground: Bool = true
-    
+    let onSetConfigOption: (String, String) -> Void
+    let onToggleConfigOption: (String, Bool) -> Void
+
     var body: some View {
-        if !session.availableConfigOptions.isEmpty {
+        if !configOptions.isEmpty {
             HStack(spacing: 8) {
-                ForEach(session.availableConfigOptions, id: \.id.value) { option in
+                ForEach(configOptions, id: \.id.value) { option in
                     configMenu(for: option)
                 }
             }
@@ -43,9 +46,7 @@ struct AgentConfigMenu: View {
                 }
             case .boolean(let toggle):
                 Button {
-                    Task {
-                        try? await session.setConfigOption(configId: option.id.value, value: !toggle.currentValue)
-                    }
+                    onToggleConfigOption(option.id.value, !toggle.currentValue)
                 } label: {
                     HStack {
                         Text(toggle.currentValue ? "Disable" : "Enable")
@@ -77,15 +78,13 @@ struct AgentConfigMenu: View {
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
-        .disabled(session.isStreaming)
-        .opacity(session.isStreaming ? 0.5 : 1.0)
+        .disabled(isStreaming)
+        .opacity(isStreaming ? 0.5 : 1.0)
     }
     
     private func button(for item: SessionConfigSelectOption, configId: String, currentId: String) -> some View {
         Button {
-            Task {
-                try? await session.setConfigOption(configId: configId, value: item.value.value)
-            }
+            onSetConfigOption(configId, item.value.value)
         } label: {
             HStack {
                 Text(item.name)

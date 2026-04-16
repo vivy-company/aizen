@@ -17,7 +17,9 @@ extension aizenApp {
                 .task {
                     LicenseStateStore.shared.start()
                 }
-                .task(id: "\(terminalFontName)\(terminalFontSize)\(terminalThemeName)\(terminalThemeNameLight)\(terminalUsePerAppearanceTheme)") {
+                .task(
+                    id: "\(terminalFontName)\(terminalFontSize)\(terminalThemeName)\(terminalThemeNameLight)\(terminalUsePerAppearanceTheme)\(terminalScrollbackLimitMB)"
+                ) {
                     ghosttyApp.reloadConfig()
                     await TmuxSessionRuntime.shared.updateConfig()
                 }

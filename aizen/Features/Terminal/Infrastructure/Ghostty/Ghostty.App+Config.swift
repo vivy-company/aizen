@@ -14,6 +14,7 @@ extension Ghostty.App {
 
             let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
             let shellName = (shell as NSString).lastPathComponent
+            let scrollbackLimitBytes = TerminalPreferences.scrollbackLimitBytes(fromMB: terminalScrollbackLimitMB)
 
             let configContent = """
             font-family = \(terminalFontName)
@@ -32,6 +33,7 @@ extension Ghostty.App {
             cursor-style-blink = true
 
             theme = \(effectiveThemeName)
+            scrollback-limit = \(scrollbackLimitBytes)
 
             # Disable audible bell
             audible-bell = false

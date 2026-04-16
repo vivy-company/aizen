@@ -18,8 +18,13 @@ struct ChatControlsBar: View {
         static let horizontalPadding: CGFloat = 10
     }
 
-    let currentAgentSession: ChatAgentSession?
-    let hasModes: Bool
+    let configOptions: [SessionConfigOption]
+    let availableModes: [ModeInfo]
+    let currentModeId: String?
+    let isSessionStreaming: Bool
+    let onSelectMode: (String) -> Void
+    let onSetConfigOption: (String, String) -> Void
+    let onToggleConfigOption: (String, Bool) -> Void
     let onShowUsage: () -> Void
     let onShowHistory: () -> Void
     let showsUsage: Bool
@@ -28,12 +33,24 @@ struct ChatControlsBar: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: Layout.rowSpacing) {
-            if let agentSession = currentAgentSession, !agentSession.availableConfigOptions.isEmpty {
-                AgentConfigMenu(session: agentSession, showsBackground: false)
+            if !configOptions.isEmpty {
+                AgentConfigMenu(
+                    configOptions: configOptions,
+                    isStreaming: isSessionStreaming,
+                    showsBackground: false,
+                    onSetConfigOption: onSetConfigOption,
+                    onToggleConfigOption: onToggleConfigOption
+                )
             }
 
-            if hasModes, let agentSession = currentAgentSession, agentSession.availableConfigOptions.isEmpty {
-                ModeSelectorView(session: agentSession, showsBackground: false)
+            if !availableModes.isEmpty, configOptions.isEmpty {
+                ModeSelectorView(
+                    availableModes: availableModes,
+                    currentModeId: currentModeId,
+                    isStreaming: isSessionStreaming,
+                    showsBackground: false,
+                    onSelectMode: onSelectMode
+                )
             }
 
             Spacer(minLength: 8)

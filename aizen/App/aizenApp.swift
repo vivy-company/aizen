@@ -29,6 +29,8 @@ struct aizenApp: App {
     @AppStorage("terminalThemeName") var terminalThemeName = "Aizen Dark"
     @AppStorage("terminalThemeNameLight") var terminalThemeNameLight = "Aizen Light"
     @AppStorage("terminalUsePerAppearanceTheme") var terminalUsePerAppearanceTheme = false
+    @AppStorage(TerminalPreferences.scrollbackLimitMBKey)
+    var terminalScrollbackLimitMB = TerminalPreferences.defaultScrollbackLimitMB
     @AppStorage("terminalSessionPersistence") var sessionPersistence = false
 
     init() {

@@ -15,9 +15,9 @@
 		98D8F68E63ED4B66AB2B8651 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F05B3C5650AC493F9C8D24E4 /* AppIntents.framework */; };
 		A1D4A4A2B3C4D5E6F7A8B901 /* VVDevKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1D4A4A2B3C4D5E6F7A8B911 /* VVDevKit */; };
 		A1D4A4A2B3C4D5E6F7A8B902 /* VVDevKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1D4A4A2B3C4D5E6F7A8B912 /* VVDevKit */; };
-		CC1234572EA241B30007DBB1 /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* GhosttyKit.xcframework */; };
+		CC1234572EA241B30007DBB1 /* Vendor/libghostty/GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* Vendor/libghostty/GhosttyKit.xcframework */; };
 		CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC128B1A2EAF8DD600EA9A50 /* Sparkle */; };
-		CC2917D32EFBDAE300440062 /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* GhosttyKit.xcframework */; };
+		CC2917D32EFBDAE300440062 /* Vendor/libghostty/GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC1234562EA241B30007DBB1 /* Vendor/libghostty/GhosttyKit.xcframework */; };
 		CC2917D42EFBDAE300440062 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917B52EFBDAE300440062 /* Markdown */; };
 		CC2917D52EFBDAE300440062 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CC2917B72EFBDAE300440062 /* Sparkle */; };
 		CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = CCB04B732EA241B60007DBB1 /* Markdown */; };
@@ -88,7 +88,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		CC1234562EA241B30007DBB1 /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Vendor/libghostty/GhosttyKit.xcframework; sourceTree = "<group>"; };
+		CC1234562EA241B30007DBB1 /* Vendor/libghostty/GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Vendor/libghostty/GhosttyKit.xcframework; sourceTree = "<group>"; };
 		CC2917DB2EFBDAE300440062 /* Aizen Nightly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aizen Nightly.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC2917DD2EFBDAE400440062 /* aizen nightly-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "aizen nightly-Info.plist"; path = "/Users/uyakauleu/development/aizen/aizen nightly-Info.plist"; sourceTree = "<absolute>"; };
 		CCB04B422EA241B30007DBB1 /* Aizen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aizen.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -151,7 +151,7 @@
 				CCACP0001000000000000004 /* ACPRegistry in Frameworks */,
 				A1D4A4A2B3C4D5E6F7A8B902 /* VVDevKit in Frameworks */,
 				89C3A37FB37B4F8A8E0CE8B4 /* AppIntents.framework in Frameworks */,
-				CC2917D32EFBDAE300440062 /* GhosttyKit.xcframework in Frameworks */,
+				CC2917D32EFBDAE300440062 /* Vendor/libghostty/GhosttyKit.xcframework in Frameworks */,
 				CC2917D42EFBDAE300440062 /* Markdown in Frameworks */,
 				CC2917D52EFBDAE300440062 /* Sparkle in Frameworks */,
 				21DCDAD9BE07D782912A77AD /* MLX in Frameworks */,
@@ -168,7 +168,7 @@
 				CCACP0001000000000000003 /* ACPRegistry in Frameworks */,
 				A1D4A4A2B3C4D5E6F7A8B901 /* VVDevKit in Frameworks */,
 				98D8F68E63ED4B66AB2B8651 /* AppIntents.framework in Frameworks */,
-				CC1234572EA241B30007DBB1 /* GhosttyKit.xcframework in Frameworks */,
+				CC1234572EA241B30007DBB1 /* Vendor/libghostty/GhosttyKit.xcframework in Frameworks */,
 				CC6CA52C2EA25D9D001CADD7 /* Markdown in Frameworks */,
 				CC128B1B2EAF8DD600EA9A50 /* Sparkle in Frameworks */,
 				F023734E9DB882ACB5152A8C /* MLX in Frameworks */,
@@ -205,7 +205,7 @@
 			isa = PBXGroup;
 			children = (
 				F05B3C5650AC493F9C8D24E4 /* AppIntents.framework */,
-				CC1234562EA241B30007DBB1 /* GhosttyKit.xcframework */,
+				CC1234562EA241B30007DBB1 /* Vendor/libghostty/GhosttyKit.xcframework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -599,9 +599,7 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/include",
-				);
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
 				INFOPLIST_FILE = "aizen nightly-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Aizen Nightly";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -609,9 +607,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/lib",
-				);
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/lib";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
@@ -676,9 +672,7 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/include",
-				);
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
 				INFOPLIST_FILE = "aizen nightly-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Aizen Nightly";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -686,9 +680,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/lib",
-				);
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/lib";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
@@ -876,9 +868,7 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/include",
-				);
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
 				INFOPLIST_FILE = aizen/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Aizen;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -886,9 +876,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/lib",
-				);
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/lib";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
@@ -952,9 +940,7 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/include",
-				);
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/include";
 				INFOPLIST_FILE = aizen/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Aizen;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -962,9 +948,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/Vendor/libgit2/lib",
-				);
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/libgit2/lib";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
@@ -1221,6 +1205,14 @@
 				kind = branch;
 			};
 		};
+		A1D4A4A2B3C4D5E6F7A8B921 /* XCRemoteSwiftPackageReference "VVDevKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/vivy-company/VVDevKit";
+			requirement = {
+				kind = revision;
+				revision = ebacc72c5c96bda102b05d2c7b1016b557c9db44;
+			};
+		};
 		CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -1243,14 +1235,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.0.0;
-			};
-		};
-		A1D4A4A2B3C4D5E6F7A8B921 /* XCRemoteSwiftPackageReference "VVDevKit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/vivy-company/VVDevKit";
-			requirement = {
-				kind = revision;
-				revision = ebacc72c5c96bda102b05d2c7b1016b557c9db44;
 			};
 		};
 		CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */ = {

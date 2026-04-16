@@ -39,7 +39,7 @@ extension ChatSessionStore {
                     return
                 }
                 self.syncMessages(newMessages)
-                self.suppressNextAutoScroll = false
+                self.timelineStore.suppressNextAutoScroll = false
             }
             .store(in: &cancellables)
 
@@ -105,7 +105,21 @@ extension ChatSessionStore {
         session.$availableModes
             .receive(on: DispatchQueue.main)
             .sink { [weak self] modes in
-                self?.hasModes = !modes.isEmpty
+                self?.availableModes = modes
+            }
+            .store(in: &cancellables)
+
+        session.$availableModels
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] models in
+                self?.availableModels = models
+            }
+            .store(in: &cancellables)
+
+        session.$availableConfigOptions
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] options in
+                self?.availableConfigOptions = options
             }
             .store(in: &cancellables)
 
@@ -116,10 +130,18 @@ extension ChatSessionStore {
             }
             .store(in: &cancellables)
 
+        session.$currentModelId
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] modelId in
+                self?.currentModelId = modelId
+            }
+            .store(in: &cancellables)
+
         session.$sessionState
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state in
                 self?.sessionState = state
+                self?.timelineStore.isSessionInitializing = state.isInitializing
             }
             .store(in: &cancellables)
 
@@ -135,6 +157,7 @@ extension ChatSessionStore {
             .sink { [weak self] isStreaming in
                 guard let self else { return }
                 self.isProcessing = isStreaming
+                self.timelineStore.isStreaming = isStreaming
 
                 if let path = self.worktree.path, !path.isEmpty {
                     if isStreaming && !self.gitPauseApplied {

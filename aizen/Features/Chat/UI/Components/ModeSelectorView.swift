@@ -9,16 +9,17 @@ import ACP
 import SwiftUI
 
 struct ModeSelectorView: View {
-    @ObservedObject var session: ChatAgentSession
+    let availableModes: [ModeInfo]
+    let currentModeId: String?
+    let isStreaming: Bool
     var showsBackground: Bool = true
+    let onSelectMode: (String) -> Void
 
     var body: some View {
         Menu {
-            ForEach(session.availableModes, id: \.id) { modeInfo in
+            ForEach(availableModes, id: \.id) { modeInfo in
                 Button {
-                    Task {
-                        try? await session.setModeById(modeInfo.id)
-                    }
+                    onSelectMode(modeInfo.id)
                 } label: {
                     HStack {
                         if let mode = SessionMode(rawValue: modeInfo.id) {
@@ -26,7 +27,7 @@ struct ModeSelectorView: View {
                         }
                         Text(modeInfo.name)
                         Spacer()
-                        if modeInfo.id == session.currentModeId {
+                        if modeInfo.id == currentModeId {
                             Image(systemName: "checkmark")
                                 .foregroundStyle(.blue)
                         }
@@ -35,7 +36,7 @@ struct ModeSelectorView: View {
             }
         } label: {
             HStack(spacing: 6) {
-                if let currentModeId = session.currentModeId,
+                if let currentModeId,
                    let mode = SessionMode(rawValue: currentModeId) {
                     modeIcon(for: mode)
                 } else {
@@ -43,8 +44,8 @@ struct ModeSelectorView: View {
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
-                if let currentModeId = session.currentModeId,
-                   let currentMode = session.availableModes.first(where: { $0.id == currentModeId }) {
+                if let currentModeId,
+                   let currentMode = availableModes.first(where: { $0.id == currentModeId }) {
                     Text(currentMode.name)
                         .font(.system(size: showsBackground ? 12 : 13, weight: .medium))
                 }
@@ -63,9 +64,9 @@ struct ModeSelectorView: View {
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
-        .disabled(session.isStreaming)  // Prevent mode changes during agent turn
-        .opacity(session.isStreaming ? 0.5 : 1.0)
-        .id(session.currentModeId)  // Force view update on mode change
+        .disabled(isStreaming)  // Prevent mode changes during agent turn
+        .opacity(isStreaming ? 0.5 : 1.0)
+        .id(currentModeId)  // Force view update on mode change
     }
 
     private func modeIcon(for mode: SessionMode) -> some View {

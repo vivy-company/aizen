@@ -25,7 +25,6 @@ struct ChatTabView: View {
     let chatStoreProvider: (ChatSession) -> ChatSessionStore
 
     @Environment(\.managedObjectContext) var viewContext
-    let sessionManager = ChatSessionRegistry.shared
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen", category: "ChatTabView")
     @State var enabledAgents: [AgentMetadata] = []
     @State var cachedSessionIds: [UUID] = []

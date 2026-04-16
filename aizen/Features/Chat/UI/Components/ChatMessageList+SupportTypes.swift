@@ -23,7 +23,7 @@ struct ToolDiffPreviewLine {
 
 struct ChatTimelineHost: NSViewRepresentable {
     let controller: VVChatTimelineController
-    let scrollRequest: ChatSessionStore.ScrollRequest?
+    let scrollRequest: ChatTimelineStore.ScrollRequest?
     let onStateChange: (VVChatTimelineState) -> Void
     let onUserMessageCopyAction: (String) -> Void
     let onUserMessageCopyHoverChange: (String?) -> Void
@@ -66,7 +66,7 @@ struct ChatTimelineHost: NSViewRepresentable {
         var lastHandledScrollRequestID: UUID?
 
         func handleScrollRequest(
-            _ request: ChatSessionStore.ScrollRequest?,
+            _ request: ChatTimelineStore.ScrollRequest?,
             in view: VVChatTimelineView,
             controller: VVChatTimelineController
         ) {

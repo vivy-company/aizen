@@ -36,7 +36,7 @@ extension ChatSessionView {
     func handleOnDisappear() {
         viewModel.persistDraftState(inputText: inputText)
         viewModel.cancelPendingAutoScroll()
-        viewModel.scrollRequest = nil
+        viewModel.timelineStore.scrollRequest = nil
         autocompleteWindow?.dismiss()
         NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
         stopKeyMonitorIfNeeded()
@@ -58,7 +58,7 @@ extension ChatSessionView {
         } else {
             viewModel.cancelScheduledAgentSessionActivation()
             viewModel.cancelPendingAutoScroll()
-            viewModel.scrollRequest = nil
+            viewModel.timelineStore.scrollRequest = nil
             autocompleteWindow?.dismiss()
             NotificationCenter.default.post(name: .chatViewDidDisappear, object: nil)
             stopKeyMonitorIfNeeded()

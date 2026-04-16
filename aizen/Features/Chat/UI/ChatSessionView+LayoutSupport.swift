@@ -21,13 +21,13 @@ extension ChatSessionView {
 
     func handleLayoutResizingChange(_ resizing: Bool) {
         if resizing {
-            wasNearBottomBeforeResize = viewModel.isNearBottom
+            wasNearBottomBeforeResize = viewModel.timelineStore.isNearBottom
             viewModel.cancelPendingAutoScroll()
-            viewModel.suppressNextAutoScroll = true
-            viewModel.scrollRequest = nil
-            viewModel.isNearBottom = false
+            viewModel.timelineStore.suppressNextAutoScroll = true
+            viewModel.timelineStore.scrollRequest = nil
+            viewModel.timelineStore.isNearBottom = false
         } else {
-            viewModel.isNearBottom = wasNearBottomBeforeResize
+            viewModel.timelineStore.isNearBottom = wasNearBottomBeforeResize
         }
     }
 }

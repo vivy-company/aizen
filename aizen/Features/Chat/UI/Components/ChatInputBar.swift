@@ -5,6 +5,7 @@
 //  Chat input bar with attachments, voice, and model selection
 //
 
+import ACP
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -37,16 +38,19 @@ struct ChatInputBar: View {
     @Binding var permissionErrorMessage: String
 
     let worktreePath: String
-    let session: ChatAgentSession?
     let currentModeId: String?
     let selectedAgent: String
     let isSessionReady: Bool
     let isRestoringSession: Bool
+    let availableModels: [ModelInfo]
+    let currentModelId: String?
+    let isSessionStreaming: Bool
     let audioService: AudioService
     @ObservedObject var autocompleteHandler: UnifiedAutocompleteHandler
 
     let onSend: () -> Void
     let onCancel: () -> Void
+    let onModelSelect: (String) -> Void
     let onAutocompleteSelect: () -> Void
     let onImagePaste: (Data, String) -> Void
     let onFilePaste: (URL) -> Void

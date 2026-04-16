@@ -27,8 +27,7 @@ extension ChatSessionStore {
     }
 
     func resetTimelineSyncState() {
-        cancelPendingAutoScroll()
-        scrollRequest = nil
+        timelineStore.resetSyncState()
 
         skipNextMessagesEmission = false
         skipNextToolCallsEmission = false
@@ -38,7 +37,7 @@ extension ChatSessionStore {
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            syncTimeline(messages: session.messages, toolCalls: session.toolCalls)
+            timelineStore.bootstrap(from: session)
         }
     }
 }

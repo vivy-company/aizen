@@ -24,8 +24,6 @@ extension ChatTabView {
                 let isSelected = selectedSessionId == session.id
                 ChatSessionView(
                     worktree: worktree,
-                    session: session,
-                    sessionManager: sessionManager,
                     viewModel: chatStoreProvider(session),
                     isSelected: isSelected,
                     isCompanionResizing: isResizingCompanion

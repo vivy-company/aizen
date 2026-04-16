@@ -11,10 +11,13 @@ extension ChatInputBar {
         HStack(spacing: Layout.rowSpacing) {
             attachmentButton
 
-            if let agentSession = session, !agentSession.availableModels.isEmpty {
+            if !availableModels.isEmpty {
                 ModelSelectorMenu(
-                    session: agentSession,
+                    availableModels: availableModels,
+                    currentModelId: currentModelId,
+                    isStreaming: isSessionStreaming,
                     selectedAgent: selectedAgent,
+                    onModelSelect: onModelSelect,
                     onAgentSelect: onAgentSelect,
                     showsBackground: false
                 )

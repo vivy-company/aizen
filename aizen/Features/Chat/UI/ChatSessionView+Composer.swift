@@ -29,15 +29,23 @@ extension ChatSessionView {
                 showingPermissionError: $showingPermissionError,
                 permissionErrorMessage: $permissionErrorMessage,
                 worktreePath: viewModel.worktree.path ?? "",
-                session: viewModel.currentAgentSession,
                 currentModeId: viewModel.currentModeId,
                 selectedAgent: viewModel.selectedAgent,
                 isSessionReady: viewModel.isSessionReady,
                 isRestoringSession: viewModel.isResumingSession,
+                availableModels: viewModel.availableModels,
+                currentModelId: viewModel.currentModelId,
+                isSessionStreaming: viewModel.isProcessing,
                 audioService: viewModel.audioService,
                 autocompleteHandler: viewModel.autocompleteHandler,
                 onSend: { sendMessage() },
                 onCancel: viewModel.cancelCurrentPrompt,
+                onModelSelect: { modelId in
+                    guard let agentSession = viewModel.currentAgentSession else { return }
+                    Task {
+                        try? await agentSession.setModel(modelId)
+                    }
+                },
                 onAutocompleteSelect: { handleAutocompleteSelection() },
                 onImagePaste: { data, mimeType in
                     let maxImageSizeBytes = 10 * 1024 * 1024
@@ -69,8 +77,28 @@ extension ChatSessionView {
             .padding(.horizontal, 20)
 
             ChatControlsBar(
-                currentAgentSession: viewModel.currentAgentSession,
-                hasModes: viewModel.hasModes,
+                configOptions: viewModel.availableConfigOptions,
+                availableModes: viewModel.availableModes,
+                currentModeId: viewModel.currentModeId,
+                isSessionStreaming: viewModel.isProcessing,
+                onSelectMode: { modeId in
+                    guard let agentSession = viewModel.currentAgentSession else { return }
+                    Task {
+                        try? await agentSession.setModeById(modeId)
+                    }
+                },
+                onSetConfigOption: { configId, value in
+                    guard let agentSession = viewModel.currentAgentSession else { return }
+                    Task {
+                        try? await agentSession.setConfigOption(configId: configId, value: value)
+                    }
+                },
+                onToggleConfigOption: { configId, value in
+                    guard let agentSession = viewModel.currentAgentSession else { return }
+                    Task {
+                        try? await agentSession.setConfigOption(configId: configId, value: value)
+                    }
+                },
                 onShowUsage: { showingUsageSheet = true },
                 onShowHistory: {
                     SessionsWindowController.shared.show(context: viewContext, worktreeId: worktree.id)
