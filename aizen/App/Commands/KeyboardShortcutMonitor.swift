@@ -13,6 +13,7 @@ import Foundation
 enum KeyCode {
     static let tab: UInt16 = 48
     static let escape: UInt16 = 53
+    static let f: UInt16 = 3
     static let p: UInt16 = 35
     static let k: UInt16 = 40
 }
@@ -57,9 +58,27 @@ final class KeyboardShortcutMonitor {
                 return event
             }
 
-            // Command+P: File search (global shortcut)
-            if event.keyCode == KeyCode.p && event.modifierFlags.contains(.command) {
-                NotificationCenter.default.post(name: .fileSearchShortcut, object: nil)
+            // Command+Shift+F: Project content search
+            if event.keyCode == KeyCode.f &&
+                event.modifierFlags.contains(.command) &&
+                event.modifierFlags.contains(.shift) {
+                NotificationCenter.default.post(
+                    name: .projectSearchShortcut,
+                    object: nil,
+                    userInfo: [ProjectSearchShortcutUserInfoKey.mode: ProjectSearchMode.content.rawValue]
+                )
+                return nil
+            }
+
+            // Command+P: Project file search
+            if event.keyCode == KeyCode.p &&
+                event.modifierFlags.contains(.command) &&
+                !event.modifierFlags.contains(.shift) {
+                NotificationCenter.default.post(
+                    name: .projectSearchShortcut,
+                    object: nil,
+                    userInfo: [ProjectSearchShortcutUserInfoKey.mode: ProjectSearchMode.files.rawValue]
+                )
                 return nil
             }
 

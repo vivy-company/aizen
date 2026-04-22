@@ -1,29 +1,44 @@
-//
-//  FileSearchWindowController.swift
-//  aizen
-//
-//  Created on 2025-11-19.
-//
-
 import AppKit
-import SwiftUI
 
-class FileSearchWindowController: NSWindowController {
+final class ProjectSearchWindowController: NSWindowController {
+    let store: ProjectSearchStore
+
     private var eventMonitor: Any?
     private var appDeactivationObserver: NSObjectProtocol?
     private var windowResignKeyObserver: NSObjectProtocol?
 
-    convenience init(worktreePath: String, onFileSelected: @escaping (String) -> Void) {
-        let panel = FileSearchPanel(worktreePath: worktreePath, onFileSelected: onFileSelected)
-        self.init(window: panel)
+    init(
+        worktreePath: String,
+        initialMode: ProjectSearchMode,
+        onSelection: @escaping (SearchOpenRequest) -> Void
+    ) {
+        let store = ProjectSearchStore(worktreePath: worktreePath, initialMode: initialMode)
+        self.store = store
+        let panel = ProjectSearchPanel(store: store, onSelection: onSelection)
+        super.init(window: panel)
         panel.requestClose = { [weak self] in
             self?.closeWindow()
         }
         setupAppObservers()
     }
 
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     deinit {
         cleanup()
+    }
+
+    var currentMode: ProjectSearchMode {
+        store.mode
+    }
+
+    func setMode(_ mode: ProjectSearchMode) {
+        store.activate(mode: mode)
+        window?.makeKeyAndOrderFront(nil)
+        window?.makeKey()
     }
 
     private func setupAppObservers() {
@@ -62,7 +77,7 @@ class FileSearchWindowController: NSWindowController {
     }
 
     override func showWindow(_ sender: Any?) {
-        guard let panel = window as? FileSearchPanel else { return }
+        guard let panel = window as? ProjectSearchPanel else { return }
 
         // Position on active screen
         positionPanel(panel)
@@ -77,7 +92,7 @@ class FileSearchWindowController: NSWindowController {
         }
     }
 
-    private func setupEventMonitor(for panel: FileSearchPanel) {
+    private func setupEventMonitor(for panel: ProjectSearchPanel) {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
@@ -102,7 +117,7 @@ class FileSearchWindowController: NSWindowController {
         }
     }
 
-    private func positionPanel(_ panel: FileSearchPanel) {
+    private func positionPanel(_ panel: ProjectSearchPanel) {
         // Use screen with mouse cursor for better UX
         let mouseLocation = NSEvent.mouseLocation
         let targetScreen = NSScreen.screens.first { screen in

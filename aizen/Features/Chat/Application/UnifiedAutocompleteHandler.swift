@@ -15,10 +15,8 @@ class UnifiedAutocompleteHandler: ObservableObject {
     @Published var state = AutocompleteState()
 
     let logger = Logger.forCategory("Autocomplete")
-    let fileSearchService = FileSearchService.shared
-    var fileIndex: [FileSearchIndexResult] = []
+    let projectSearchService = ProjectSearchService.shared
     var searchTask: Task<Void, Never>?
-    var isIndexing = false
 
     // Dependencies
     weak var agentSession: ChatAgentSession?

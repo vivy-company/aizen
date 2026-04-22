@@ -77,8 +77,8 @@ class ChatSessionStore: ObservableObject {
     var gitPauseApplied: Bool = false
     var settingUpSessionId: UUID? = nil
     var hasLoadedWarmState = false
-    var hasIndexedAutocompleteWorktree = false
-    var indexedAutocompleteWorktreePath = ""
+    var hasWarmedAutocompleteWorktree = false
+    var warmedAutocompleteWorktreePath = ""
     var delayedActivationTask: Task<Void, Never>?
     let delayedActivationInterval = Duration.milliseconds(160)
 

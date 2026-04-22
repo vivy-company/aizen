@@ -12,21 +12,15 @@ import SwiftUI
 
 @MainActor
 extension UnifiedAutocompleteHandler {
-    // MARK: - Index Management
+    // MARK: - Search Warmup
 
-    func indexWorktree(forceRefresh: Bool = false) async {
-        guard !worktreePath.isEmpty, !isIndexing else { return }
-        isIndexing = true
-        defer { isIndexing = false }
-
+    func warmWorktreeSearch() async {
+        guard !worktreePath.isEmpty else { return }
+        await projectSearchService.refreshGitStatus(worktreePath: worktreePath)
         do {
-            if forceRefresh || fileIndex.isEmpty {
-                await fileSearchService.clearCache(for: worktreePath)
-            }
-            fileIndex = try await fileSearchService.indexDirectory(worktreePath)
+            _ = try await projectSearchService.scanProgress(worktreePath: worktreePath)
         } catch {
-            logger.error("Failed to index worktree: \(error.localizedDescription)")
-            fileIndex = []
+            logger.error("Failed to warm project search: \(error.localizedDescription)")
         }
     }
 
@@ -136,11 +130,22 @@ extension UnifiedAutocompleteHandler {
 
         switch trigger {
         case .file(let query):
-            if fileIndex.isEmpty && !worktreePath.isEmpty {
-                await indexWorktree(forceRefresh: true)
+            guard !worktreePath.isEmpty else {
+                newItems = []
+                break
             }
-            let results = await fileSearchService.search(query: query, in: fileIndex, worktreePath: worktreePath, limit: 20)
-            newItems = results.prefix(10).map { .file($0) }
+
+            do {
+                let response = try await projectSearchService.searchFiles(
+                    query: query,
+                    worktreePath: worktreePath,
+                    limit: 20
+                )
+                newItems = response.results.prefix(10).map { .file($0) }
+            } catch {
+                logger.error("Failed to search files for autocomplete: \(error.localizedDescription)")
+                newItems = []
+            }
 
         case .command(let query):
             let clientSideCommands = ClientCommandHandler.shared.availableCommands

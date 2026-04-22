@@ -95,7 +95,7 @@ extension ChatSessionStore {
         }
         guard let agentSession = currentAgentSession else { return }
 
-        scheduleAutocompleteIndexIfNeeded(for: worktreePath)
+        scheduleAutocompleteWarmupIfNeeded(for: worktreePath)
 
         settingUpSessionId = sessionId
 
@@ -213,20 +213,20 @@ extension ChatSessionStore {
             hasLoadedWarmState = true
         }
 
-        if indexedAutocompleteWorktreePath != worktreePath {
-            hasIndexedAutocompleteWorktree = false
-            indexedAutocompleteWorktreePath = worktreePath
+        if warmedAutocompleteWorktreePath != worktreePath {
+            hasWarmedAutocompleteWorktree = false
+            warmedAutocompleteWorktreePath = worktreePath
         }
     }
 
-    private func scheduleAutocompleteIndexIfNeeded(for worktreePath: String) {
+    private func scheduleAutocompleteWarmupIfNeeded(for worktreePath: String) {
         guard !worktreePath.isEmpty else { return }
-        guard !hasIndexedAutocompleteWorktree else { return }
+        guard !hasWarmedAutocompleteWorktree else { return }
 
-        hasIndexedAutocompleteWorktree = true
+        hasWarmedAutocompleteWorktree = true
         Task { [weak self] in
             guard let self else { return }
-            await self.autocompleteHandler.indexWorktree()
+            await self.autocompleteHandler.warmWorktreeSearch()
         }
     }
 }

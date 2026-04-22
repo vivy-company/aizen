@@ -186,10 +186,6 @@ nonisolated final class FFFClient: @unchecked Sendable {
     }
 
     nonisolated func trackQuery(_ query: String, selectedPath: String) throws {
-        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return
-        }
-
         try queue.sync {
             _ = try Self.withCString(query) { queryCString in
                 try Self.withCString(selectedPath) { pathCString in

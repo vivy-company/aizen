@@ -26,7 +26,7 @@ enum AutocompleteTrigger: Equatable {
 // MARK: - Autocomplete Item
 
 enum AutocompleteItem: Identifiable, Equatable {
-    case file(FileSearchIndexResult)
+    case file(ProjectSearchFileResult)
     case command(AvailableCommand)
 
     var id: String {

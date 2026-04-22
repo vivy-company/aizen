@@ -62,8 +62,10 @@ extension WorktreeDetailView {
                 }
             )
         }
-        .onReceive(NotificationCenter.default.publisher(for: .fileSearchShortcut)) { _ in
-            showFileSearch()
+        .onReceive(NotificationCenter.default.publisher(for: .projectSearchShortcut)) { notification in
+            let rawValue = notification.userInfo?[ProjectSearchShortcutUserInfoKey.mode] as? String
+            let mode = rawValue.flatMap(ProjectSearchMode.init(rawValue:)) ?? .files
+            showProjectSearch(mode: mode)
         }
         .onReceive(NotificationCenter.default.publisher(for: .openFileInEditor)) { notification in
             if let path = notification.userInfo?["path"] as? String {

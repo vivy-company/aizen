@@ -1,20 +1,16 @@
-//
-//  FileSearchPanel.swift
-//  aizen
-//
-//  Created by OpenAI Codex on 05.04.26.
-//
-
 import AppKit
 import SwiftUI
 
-class FileSearchPanel: NSPanel {
+final class ProjectSearchPanel: NSPanel {
     let interaction = PaletteInteractionState()
     var requestClose: (() -> Void)?
 
-    init(worktreePath: String, onFileSelected: @escaping (String) -> Void) {
+    init(
+        store: ProjectSearchStore,
+        onSelection: @escaping (SearchOpenRequest) -> Void
+    ) {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 980, height: 620),
             styleMask: [.nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -33,9 +29,9 @@ class FileSearchPanel: NSPanel {
         self.isFloatingPanel = true
 
         let hostingView = NSHostingView(
-            rootView: FileSearchWindowContent(
-                worktreePath: worktreePath,
-                onFileSelected: onFileSelected,
+            rootView: ProjectSearchWindowContent(
+                viewModel: store,
+                onOpen: onSelection,
                 onClose: { [weak self] in
                     if let close = self?.requestClose {
                         close()
