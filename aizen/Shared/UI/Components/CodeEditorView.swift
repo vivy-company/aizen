@@ -8,6 +8,7 @@
 import AppKit
 import SwiftUI
 import VVCode
+import VVGit
 
 struct CodeEditorView: View {
     let content: String
@@ -16,6 +17,8 @@ struct CodeEditorView: View {
     var filePath: String? = nil
     var repoPath: String? = nil
     var hasUnsavedChanges: Bool = false
+    var selectionRequest: SearchOpenRequest? = nil
+    var shouldFocusOnAppear: Bool = true
     var onContentChange: ((String) -> Void)?
 
     @StateObject private var runtime: CodeEditorRuntime
@@ -66,6 +69,15 @@ struct CodeEditorView: View {
         )
     }
 
+    private struct SelectionSyncKey: Hashable {
+        let filePath: String?
+        let selectionRequest: SearchOpenRequest?
+    }
+
+    private var selectionSyncKey: SelectionSyncKey {
+        SelectionSyncKey(filePath: filePath, selectionRequest: selectionRequest)
+    }
+
     init(
         content: String,
         language: String?,
@@ -73,6 +85,8 @@ struct CodeEditorView: View {
         filePath: String? = nil,
         repoPath: String? = nil,
         hasUnsavedChanges: Bool = false,
+        selectionRequest: SearchOpenRequest? = nil,
+        shouldFocusOnAppear: Bool = true,
         runtime: CodeEditorRuntime? = nil,
         onContentChange: ((String) -> Void)? = nil
     ) {
@@ -82,6 +96,8 @@ struct CodeEditorView: View {
         self.filePath = filePath
         self.repoPath = repoPath
         self.hasUnsavedChanges = hasUnsavedChanges
+        self.selectionRequest = selectionRequest
+        self.shouldFocusOnAppear = shouldFocusOnAppear
         self.onContentChange = onContentChange
         _runtime = StateObject(
             wrappedValue: runtime ?? CodeEditorRuntime(content: content, language: language)
@@ -89,17 +105,21 @@ struct CodeEditorView: View {
     }
 
     var body: some View {
-        VVCodeView(document: documentBinding)
-            .language(detectedLanguage)
-            .theme(editorThemeValue)
-            .configuration(editorConfiguration)
-            .gitDiff(runtime.gitDiffText)
-            .lspDisabled(true)
-            .onTextChange { newValue in
+        AizenCodeEditorRepresentable(
+            document: documentBinding,
+            runtime: runtime,
+            language: detectedLanguage,
+            theme: editorThemeValue,
+            configuration: editorConfiguration,
+            gitDiff: runtime.gitDiffText,
+            filePath: filePath,
+            shouldFocusOnAppear: shouldFocusOnAppear,
+            onTextChange: { newValue in
                 if isEditable, newValue != content {
                     onContentChange?(newValue)
                 }
             }
+        )
             .disabled(!isEditable)
             .clipped()
             .task(id: documentSyncKey) {
@@ -113,6 +133,10 @@ struct CodeEditorView: View {
                     hasUnsavedChanges: hasUnsavedChanges
                 )
             }
+            .task(id: selectionSyncKey) {
+                guard let selectionRequest else { return }
+                runtime.queueSelectionRequest(selectionRequest)
+            }
     }
 
     private var documentBinding: Binding<VVDocument> {
@@ -120,5 +144,102 @@ struct CodeEditorView: View {
             get: { runtime.document },
             set: { runtime.document = $0 }
         )
+    }
+}
+
+private struct AizenCodeEditorRepresentable: NSViewRepresentable {
+    @Binding var document: VVDocument
+    let runtime: CodeEditorRuntime
+    let language: VVLanguage?
+    let theme: VVTheme
+    let configuration: VVConfiguration
+    let gitDiff: String?
+    let filePath: String?
+    let shouldFocusOnAppear: Bool
+    let onTextChange: ((String) -> Void)?
+
+    func makeNSView(context: Context) -> VVMetalEditorContainerView {
+        let containerView = VVMetalEditorContainerView(
+            frame: .zero,
+            configuration: configuration,
+            theme: theme
+        )
+
+        containerView.delegate = context.coordinator
+        containerView.setText(document.text)
+
+        if let language {
+            containerView.setLanguage(language)
+        }
+
+        if let gitDiff {
+            containerView.setGitHunks(VVDiffParser.parse(unifiedDiff: gitDiff))
+        }
+
+        if shouldFocusOnAppear {
+            DispatchQueue.main.async {
+                containerView.focusTextView()
+            }
+        }
+
+        return containerView
+    }
+
+    func updateNSView(_ nsView: VVMetalEditorContainerView, context: Context) {
+        if nsView.text != document.text {
+            nsView.setText(document.text)
+        }
+
+        if let language {
+            nsView.setLanguage(language)
+        }
+
+        if context.coordinator.lastTheme != theme {
+            nsView.setTheme(theme)
+            context.coordinator.lastTheme = theme
+        }
+
+        if context.coordinator.lastConfiguration != configuration {
+            nsView.setConfiguration(configuration)
+            context.coordinator.lastConfiguration = configuration
+        }
+
+        if context.coordinator.lastGitDiff != gitDiff {
+            context.coordinator.lastGitDiff = gitDiff
+            let hunks: [VVDiffHunk] = gitDiff.map { VVDiffParser.parse(unifiedDiff: $0) } ?? []
+            nsView.setGitHunks(hunks)
+        }
+
+        if let range = runtime.consumePendingSelectionRange(for: filePath, content: document.text) {
+            nsView.selectRange(range)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(document: $document, onTextChange: onTextChange)
+    }
+
+    final class Coordinator: NSObject, VVEditorDelegate {
+        let document: Binding<VVDocument>
+        let onTextChange: ((String) -> Void)?
+        var lastTheme: VVTheme?
+        var lastConfiguration: VVConfiguration?
+        var lastGitDiff: String?
+
+        init(document: Binding<VVDocument>, onTextChange: ((String) -> Void)?) {
+            self.document = document
+            self.onTextChange = onTextChange
+        }
+
+        func editorDidChangeText(_ text: String) {
+            DispatchQueue.main.async { [weak self] in
+                self?.document.wrappedValue.text = text
+                self?.onTextChange?(text)
+            }
+        }
+
+        func editorDidChangeSelection(_ range: NSRange) {}
+
+        func editorDidChangeCursorPosition(_ position: VVTextPosition) {}
     }
 }

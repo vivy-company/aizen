@@ -82,7 +82,7 @@ extension CompanionPanelView {
         case .files:
             FileTabView(
                 worktree: worktree,
-                fileToOpenFromSearch: $fileToOpen,
+                searchOpenRequest: $fileToOpen,
                 showPathHeader: false,
                 store: fileBrowserStore
             )

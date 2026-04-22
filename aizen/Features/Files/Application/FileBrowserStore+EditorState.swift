@@ -8,6 +8,16 @@
 import Foundation
 
 extension FileBrowserStore {
+    func openFile(request: SearchOpenRequest, persistSession: Bool = true) async {
+        await openFile(path: request.path, persistSession: persistSession)
+
+        guard let file = openFiles.first(where: { $0.path == request.path }) else {
+            return
+        }
+
+        editorRuntime(for: file).queueSelectionRequest(request)
+    }
+
     func openFile(path: String, persistSession: Bool = true) async {
         let fileURL = URL(fileURLWithPath: path)
 

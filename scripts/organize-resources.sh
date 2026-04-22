@@ -28,6 +28,11 @@ fi
 
 echo "Organizing Ghostty resources in ${RESOURCES_DIR}"
 
+# Build and bundle fff search engine dylib.
+if [ -x "${SRCROOT}/scripts/build-fff-c.sh" ]; then
+    "${SRCROOT}/scripts/build-fff-c.sh"
+fi
+
 # Move terminfo files FIRST (before creating any directories)
 # The 'ghostty' file must be moved before we can create a 'ghostty' directory
 mkdir -p "${RESOURCES_DIR}/terminfo/67" "${RESOURCES_DIR}/terminfo/78"

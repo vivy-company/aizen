@@ -10,19 +10,19 @@ import CoreData
 
 struct FileTabView: View {
     let worktree: Worktree
-    @Binding var fileToOpenFromSearch: String?
+    @Binding var searchOpenRequest: SearchOpenRequest?
     var showPathHeader: Bool = true
     let store: FileBrowserStore?
     @Environment(\.managedObjectContext) private var viewContext
 
     init(
         worktree: Worktree,
-        fileToOpenFromSearch: Binding<String?>,
+        searchOpenRequest: Binding<SearchOpenRequest?>,
         showPathHeader: Bool = true,
         store: FileBrowserStore? = nil
     ) {
         self.worktree = worktree
-        self._fileToOpenFromSearch = fileToOpenFromSearch
+        self._searchOpenRequest = searchOpenRequest
         self.showPathHeader = showPathHeader
         self.store = store
     }
@@ -32,7 +32,7 @@ struct FileTabView: View {
             if let store {
                 FileBrowserSessionView(
                     viewModel: store,
-                    fileToOpenFromSearch: $fileToOpenFromSearch,
+                    searchOpenRequest: $searchOpenRequest,
                     showPathHeader: showPathHeader
                 )
                 .id(ObjectIdentifier(store))
@@ -40,7 +40,7 @@ struct FileTabView: View {
                 FileBrowserSessionView(
                     worktree: worktree,
                     context: viewContext,
-                    fileToOpenFromSearch: $fileToOpenFromSearch,
+                    searchOpenRequest: $searchOpenRequest,
                     showPathHeader: showPathHeader
                 )
                 .id(worktree.objectID)

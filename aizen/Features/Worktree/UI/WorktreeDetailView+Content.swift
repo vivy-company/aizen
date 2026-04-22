@@ -136,7 +136,7 @@ extension WorktreeDetailView {
         case "files":
             FileTabView(
                 worktree: worktree,
-                fileToOpenFromSearch: $fileToOpenFromSearch,
+                searchOpenRequest: $searchOpenRequest,
                 store: scene.fileBrowserStore
             )
         case "browser":

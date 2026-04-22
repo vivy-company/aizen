@@ -22,6 +22,6 @@ struct CompanionPanelView: View {
 
     @Binding var terminalSessionId: UUID?
     @Binding var browserSessionId: UUID?
-    @State var fileToOpen: String?
+    @State var fileToOpen: SearchOpenRequest?
     @State var gitDiffSubtitle: String = ""
 }

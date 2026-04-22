@@ -10,28 +10,28 @@ import CoreData
 
 struct FileBrowserSessionView: View {
     @StateObject private var viewModel: FileBrowserStore
-    @Binding private var fileToOpenFromSearch: String?
+    @Binding private var searchOpenRequest: SearchOpenRequest?
     let showPathHeader: Bool
     @AppStorage("fileBrowserShowTree") private var showTree = true
 
     init(
         worktree: Worktree,
         context: NSManagedObjectContext,
-        fileToOpenFromSearch: Binding<String?>,
+        searchOpenRequest: Binding<SearchOpenRequest?>,
         showPathHeader: Bool = true
     ) {
         _viewModel = StateObject(wrappedValue: FileBrowserStore(worktree: worktree, context: context))
-        _fileToOpenFromSearch = fileToOpenFromSearch
+        _searchOpenRequest = searchOpenRequest
         self.showPathHeader = showPathHeader
     }
 
     init(
         viewModel: FileBrowserStore,
-        fileToOpenFromSearch: Binding<String?>,
+        searchOpenRequest: Binding<SearchOpenRequest?>,
         showPathHeader: Bool = true
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
-        _fileToOpenFromSearch = fileToOpenFromSearch
+        _searchOpenRequest = searchOpenRequest
         self.showPathHeader = showPathHeader
     }
 
@@ -80,7 +80,7 @@ struct FileBrowserSessionView: View {
                     .frame(minWidth: 300)
             }
         }
-        .task(id: fileToOpenFromSearch) {
+        .task(id: searchOpenRequest) {
             await openPendingFileIfNeeded()
         }
     }
@@ -108,8 +108,8 @@ struct FileBrowserSessionView: View {
 
     @MainActor
     private func openPendingFileIfNeeded() async {
-        guard let path = fileToOpenFromSearch else { return }
-        await viewModel.openFile(path: path)
-        fileToOpenFromSearch = nil
+        guard let searchOpenRequest else { return }
+        await viewModel.openFile(request: searchOpenRequest)
+        self.searchOpenRequest = nil
     }
 }

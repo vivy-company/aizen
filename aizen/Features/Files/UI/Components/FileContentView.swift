@@ -118,6 +118,10 @@ struct FileContentView: View {
                 )
             }
         }
+        .task(id: editorRuntime?.hasPendingLocationSelection ?? false) {
+            guard editorRuntime?.hasPendingLocationSelection == true else { return }
+            showPreview = false
+        }
     }
 
     private func detectLanguage(from path: String) -> String? {

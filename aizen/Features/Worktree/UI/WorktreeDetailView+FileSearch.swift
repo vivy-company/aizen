@@ -3,7 +3,11 @@ import SwiftUI
 
 extension WorktreeDetailView {
     func openFile(_ filePath: String) {
-        fileToOpenFromSearch = filePath
+        openFile(SearchOpenRequest(path: filePath))
+    }
+
+    func openFile(_ request: SearchOpenRequest) {
+        searchOpenRequest = request
         selectedTab = "files"
     }
 
