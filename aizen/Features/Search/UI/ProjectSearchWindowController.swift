@@ -5,7 +5,6 @@ final class ProjectSearchWindowController: NSWindowController {
 
     private var eventMonitor: Any?
     private var appDeactivationObserver: NSObjectProtocol?
-    private var windowResignKeyObserver: NSObjectProtocol?
 
     init(
         worktreePath: String,
@@ -37,6 +36,9 @@ final class ProjectSearchWindowController: NSWindowController {
 
     func setMode(_ mode: ProjectSearchMode) {
         store.activate(mode: mode)
+        if let panel = window as? ProjectSearchPanel {
+            panel.resizeForMode(mode)
+        }
         window?.makeKeyAndOrderFront(nil)
         window?.makeKey()
     }
@@ -51,24 +53,12 @@ final class ProjectSearchWindowController: NSWindowController {
             self?.closeWindow()
         }
 
-        // Close when panel loses key status (focus)
-        windowResignKeyObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didResignKeyNotification,
-            object: window,
-            queue: .main
-        ) { [weak self] _ in
-            self?.closeWindow()
-        }
     }
 
     private func cleanup() {
         if let observer = appDeactivationObserver {
             NotificationCenter.default.removeObserver(observer)
             appDeactivationObserver = nil
-        }
-        if let observer = windowResignKeyObserver {
-            NotificationCenter.default.removeObserver(observer)
-            windowResignKeyObserver = nil
         }
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)

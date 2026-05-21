@@ -4,19 +4,27 @@ struct ProjectSearchWindowContent: View {
     @ObservedObject var viewModel: ProjectSearchStore
     let onOpen: (SearchOpenRequest) -> Void
     let onClose: () -> Void
+    let onResizeRequest: ((ProjectSearchMode) -> Void)?
 
     @FocusState private var isSearchFocused: Bool
     @EnvironmentObject private var interaction: PaletteInteractionState
     @State private var hoveredIndex: Int?
 
+    static let filesWidth: CGFloat = 700
+    static let filesHeight: CGFloat = 480
+    static let contentWidth: CGFloat = 1060
+    static let contentHeight: CGFloat = 620
+
     init(
         viewModel: ProjectSearchStore,
         onOpen: @escaping (SearchOpenRequest) -> Void,
-        onClose: @escaping () -> Void
+        onClose: @escaping () -> Void,
+        onResizeRequest: ((ProjectSearchMode) -> Void)? = nil
     ) {
         self.viewModel = viewModel
         self.onOpen = onOpen
         self.onClose = onClose
+        self.onResizeRequest = onResizeRequest
     }
 
     var body: some View {
@@ -27,7 +35,6 @@ struct ProjectSearchWindowContent: View {
         ) {
             VStack(spacing: 0) {
                 header
-                controls
 
                 Divider().opacity(0.25)
 
@@ -36,15 +43,20 @@ struct ProjectSearchWindowContent: View {
                 footer
             }
         }
-        .frame(width: 980, height: 620)
+        .frame(
+            width: viewModel.mode == .files ? Self.filesWidth : Self.contentWidth,
+            height: viewModel.mode == .files ? Self.filesHeight : Self.contentHeight
+        )
+        .animation(.easeInOut(duration: 0.2), value: viewModel.mode)
         .onAppear {
             viewModel.onAppear()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isSearchFocused = true
             }
         }
-        .onChange(of: viewModel.mode) { _, _ in
+        .onChange(of: viewModel.mode) { _, newMode in
             hoveredIndex = nil
+            onResizeRequest?(newMode)
             DispatchQueue.main.async {
                 isSearchFocused = true
             }
@@ -82,26 +94,18 @@ struct ProjectSearchWindowContent: View {
         }
     }
 
+    // MARK: - Header
+
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             SpotlightSearchField(
                 placeholder: LocalizedStringKey(viewModel.mode.placeholder),
                 text: $viewModel.searchQuery,
                 isFocused: $isSearchFocused,
                 onSubmit: openSelectedResult,
                 onEscape: onClose,
-                trailing: {
-                    EmptyView()
-                }
+                trailing: { searchFieldTrailing }
             )
-
-            Picker("", selection: $viewModel.mode) {
-                ForEach(ProjectSearchMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 220)
 
             Button(action: onClose) {
                 KeyCap(text: "esc")
@@ -114,92 +118,101 @@ struct ProjectSearchWindowContent: View {
         .padding(.bottom, 10)
     }
 
-    private var controls: some View {
-        HStack(spacing: 12) {
+    @ViewBuilder
+    private var searchFieldTrailing: some View {
+        HStack(spacing: 8) {
             if viewModel.mode == .content {
-                Picker("", selection: $viewModel.grepMode) {
-                    ForEach(ProjectSearchGrepMode.allCases) { grepMode in
-                        Text(grepMode.title).tag(grepMode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 240)
+                regexToggle
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.resultsSummaryText)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                if let statusText = viewModel.statusText {
-                    Text(statusText)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-
-            Spacer()
+            summaryBadge
 
             if let regexFallbackError = viewModel.regexFallbackError {
-                Label("Regex fallback", systemImage: "exclamationmark.triangle")
-                    .font(.system(size: 11, weight: .medium))
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.orange)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(Color.orange.opacity(0.12))
-                    )
                     .help(regexFallbackError)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.bottom, 12)
     }
 
+    private var regexToggle: some View {
+        Button {
+            viewModel.grepMode = viewModel.grepMode == .regex ? .plain : .regex
+        } label: {
+            Text(".*")
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundStyle(viewModel.grepMode == .regex ? .white : .secondary)
+                .frame(width: 28, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(viewModel.grepMode == .regex ? Color.accentColor : Color.white.opacity(0.06))
+                )
+        }
+        .buttonStyle(.plain)
+        .help(viewModel.grepMode == .regex ? "Plain text search" : "Regex search")
+    }
+
+    @ViewBuilder
+    private var summaryBadge: some View {
+        if viewModel.totalMatched > 0 || viewModel.isSearching {
+            Text(viewModel.isSearching && viewModel.results.isEmpty ? "…" : "\(viewModel.totalMatched)")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                )
+        }
+    }
+
+    // MARK: - Body
+
     private var searchBody: some View {
+        Group {
+            if viewModel.mode == .files {
+                filesBody
+            } else {
+                contentBody
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var filesBody: some View {
+        resultsListOrPlaceholder
+    }
+
+    private var contentBody: some View {
         HStack(spacing: 0) {
-            resultsPane
-                .frame(width: 420)
+            VStack(spacing: 0) {
+                resultsListOrPlaceholder
+
+                if viewModel.canLoadMore {
+                    Divider().opacity(0.25)
+                    loadMoreButton
+                }
+            }
+            .frame(width: 440)
 
             Divider().opacity(0.25)
 
             previewPane
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var resultsPane: some View {
-        VStack(spacing: 0) {
-            if viewModel.isSearching && viewModel.results.isEmpty {
-                loadingView
-            } else if viewModel.results.isEmpty {
-                emptyResultsView
-            } else {
-                resultsListView
-            }
+    // MARK: - Results
 
-            if viewModel.canLoadMore {
-                Divider().opacity(0.25)
-
-                Button(action: viewModel.loadMore) {
-                    HStack(spacing: 8) {
-                        if viewModel.isLoadingMore {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        Text(viewModel.isLoadingMore ? "Loading more…" : "Load more matches")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                }
-                .buttonStyle(.plain)
-            }
+    @ViewBuilder
+    private var resultsListOrPlaceholder: some View {
+        if viewModel.isSearching && viewModel.results.isEmpty {
+            loadingView
+        } else if viewModel.results.isEmpty {
+            emptyResultsView
+        } else {
+            resultsListView
         }
     }
 
@@ -207,7 +220,7 @@ struct ProjectSearchWindowContent: View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.small)
-            Text(viewModel.mode == .files ? "Searching files…" : "Searching file contents…")
+            Text(viewModel.mode == .files ? "Searching files…" : "Searching contents…")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
@@ -216,19 +229,19 @@ struct ProjectSearchWindowContent: View {
     }
 
     private var emptyResultsView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             Image(systemName: viewModel.emptyStateSymbolName)
-                .font(.system(size: 30))
-                .foregroundStyle(.secondary.opacity(0.5))
+                .font(.system(size: 26))
+                .foregroundStyle(.secondary.opacity(0.4))
 
             Text(viewModel.emptyStateTitle)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
 
             Text(viewModel.emptyStateMessage)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 280)
+                .frame(maxWidth: 260)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 24)
@@ -248,8 +261,8 @@ struct ProjectSearchWindowContent: View {
                         .id(index)
                     }
                 }
-                .padding(.vertical, 10)
-                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
             }
             .scrollContentBackground(.hidden)
             .background(Color.clear)
@@ -271,33 +284,24 @@ struct ProjectSearchWindowContent: View {
             result: result,
             isSelected: isSelected,
             isHovered: isHovered,
-            iconSize: 20,
-            spacing: 14,
-            titleFont: .system(size: 14, weight: .semibold),
-            subtitleFont: .system(size: 12),
-            horizontalPadding: 14,
-            verticalPadding: 11
+            iconSize: 18,
+            spacing: 12,
+            titleFont: .system(size: 13, weight: .semibold),
+            subtitleFont: .system(size: 11),
+            horizontalPadding: 12,
+            verticalPadding: 9
         ) {
-            Group {
-                if isSelected {
-                    HStack(spacing: 6) {
-                        KeyCap(text: "↩")
-                        Text("Open")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
+            EmptyView()
         } background: { isSelected, isHovered in
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(
-                    isSelected ? Color.white.opacity(0.12) :
-                        (isHovered ? Color.white.opacity(0.06) : Color.clear)
+                    isSelected ? Color.white.opacity(0.10) :
+                        (isHovered ? Color.white.opacity(0.05) : Color.clear)
                 )
                 .overlay {
                     if isSelected {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
                     }
                 }
         }
@@ -314,48 +318,60 @@ struct ProjectSearchWindowContent: View {
         }
     }
 
+    private var loadMoreButton: some View {
+        Button(action: viewModel.loadMore) {
+            HStack(spacing: 6) {
+                if viewModel.isLoadingMore {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                Text(viewModel.isLoadingMore ? "Loading…" : "More results")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+    }
+
+    // MARK: - Preview (content mode only)
+
     private var previewPane: some View {
         VStack(spacing: 0) {
             previewHeader
-
             Divider().opacity(0.25)
-
             previewContent
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var previewHeader: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(previewTitle)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-
-                if let previewSubtitle {
-                    Text(previewSubtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
+        HStack(spacing: 8) {
+            Text(previewTitle)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
 
             Spacer()
 
             if let locationLabel = selectedLocationLabel {
                 Text(locationLabel)
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
                     .background(
                         Capsule(style: .continuous)
                             .fill(Color.white.opacity(0.06))
                     )
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder
@@ -364,19 +380,13 @@ struct ProjectSearchWindowContent: View {
         case .idle(let message):
             previewPlaceholder(
                 symbolName: "doc.text.magnifyingglass",
-                title: "Preview",
                 message: message
             )
 
         case .loading:
-            VStack(spacing: 12) {
-                ProgressView()
-                    .controlSize(.small)
-                Text("Loading preview…")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ProgressView()
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .loaded(let preview):
             CodeEditorView(
@@ -386,12 +396,12 @@ struct ProjectSearchWindowContent: View {
                 selectionRequest: preview.openRequest,
                 shouldFocusOnAppear: false
             )
+            .allowsHitTesting(false)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .unavailable(let message):
             previewPlaceholder(
                 symbolName: "eye.slash",
-                title: "Preview unavailable",
                 message: message
             )
         }
@@ -399,26 +409,60 @@ struct ProjectSearchWindowContent: View {
 
     private func previewPlaceholder(
         symbolName: String,
-        title: String,
         message: String
     ) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             Image(systemName: symbolName)
-                .font(.system(size: 28))
-                .foregroundStyle(.secondary.opacity(0.5))
-
-            Text(title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 24))
+                .foregroundStyle(.secondary.opacity(0.3))
 
             Text(message)
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 260)
+                .frame(maxWidth: 220)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 24)
     }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 4) {
+                KeyCap(text: "↑")
+                KeyCap(text: "↓")
+            }
+
+            Text("navigate")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.tertiary)
+
+            Spacer()
+
+            if let statusText = viewModel.statusText {
+                Text(statusText)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+
+            KeyCap(text: "⇥")
+            Text(viewModel.mode == .files ? "content" : "files")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.tertiary)
+
+            KeyCap(text: "↩")
+            Text("open")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    // MARK: - Helpers
 
     private func openSelectedResult() {
         guard let request = viewModel.activateSelection() else { return }
@@ -435,51 +479,9 @@ struct ProjectSearchWindowContent: View {
         }
     }
 
-    private var previewSubtitle: String? {
-        guard let selectedResult = viewModel.selectedResult else { return nil }
-
-        switch selectedResult {
-        case .file:
-            return selectedResult.path
-        case .content(let result):
-            return result.lineContent.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-    }
-
     private var selectedLocationLabel: String? {
         guard case .content(let result)? = viewModel.selectedResult else { return nil }
         return "L\(result.lineNumber):\(result.column)"
-    }
-
-    private var footer: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                KeyCap(text: "↑")
-                KeyCap(text: "↓")
-                Text("Navigate")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            HStack(spacing: 6) {
-                KeyCap(text: "⇥")
-                Text("Switch")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 6) {
-                KeyCap(text: "↩")
-                Text("Open")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color.clear)
     }
 
     private func detectLanguage(from path: String) -> String? {

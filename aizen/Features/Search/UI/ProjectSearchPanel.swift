@@ -9,15 +9,16 @@ final class ProjectSearchPanel: NSPanel {
         store: ProjectSearchStore,
         onSelection: @escaping (SearchOpenRequest) -> Void
     ) {
+        let initialSize = Self.panelSize(for: store.mode)
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 980, height: 620),
+            contentRect: NSRect(origin: .zero, size: initialSize),
             styleMask: [.nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
 
         self.isOpaque = false
-        self.backgroundColor = NSColor.clear
+        self.backgroundColor = NSColor.black.withAlphaComponent(0.001)
         self.hasShadow = true
         self.level = .floating
         self.isMovableByWindowBackground = false
@@ -38,6 +39,9 @@ final class ProjectSearchPanel: NSPanel {
                     } else {
                         self?.close()
                     }
+                },
+                onResizeRequest: { [weak self] mode in
+                    self?.resizeForMode(mode)
                 }
             )
             .environmentObject(interaction)
@@ -48,6 +52,39 @@ final class ProjectSearchPanel: NSPanel {
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
 
         self.contentView = hostingView
+    }
+
+    static func panelSize(for mode: ProjectSearchMode) -> NSSize {
+        switch mode {
+        case .files:
+            return NSSize(
+                width: ProjectSearchWindowContent.filesWidth,
+                height: ProjectSearchWindowContent.filesHeight
+            )
+        case .content:
+            return NSSize(
+                width: ProjectSearchWindowContent.contentWidth,
+                height: ProjectSearchWindowContent.contentHeight
+            )
+        }
+    }
+
+    func resizeForMode(_ mode: ProjectSearchMode) {
+        let newSize = Self.panelSize(for: mode)
+        let currentFrame = frame
+
+        // Keep top-center anchor
+        let newX = currentFrame.midX - newSize.width / 2
+        let newY = currentFrame.maxY - newSize.height
+
+        let newFrame = NSRect(
+            x: newX,
+            y: newY,
+            width: newSize.width,
+            height: newSize.height
+        )
+
+        setFrame(newFrame, display: true, animate: true)
     }
 
     override var canBecomeKey: Bool {

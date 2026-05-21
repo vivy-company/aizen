@@ -28,7 +28,7 @@ class CommandPalettePanel: NSPanel {
         )
 
         isOpaque = false
-        backgroundColor = NSColor.clear
+        backgroundColor = NSColor.black.withAlphaComponent(0.001)
         hasShadow = true
         level = .floating
         isMovableByWindowBackground = false
