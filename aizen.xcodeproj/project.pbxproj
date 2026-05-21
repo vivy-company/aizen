@@ -471,6 +471,7 @@
 			);
 			inputPaths = (
 				"$(SRCROOT)/scripts/organize-resources.sh",
+				"$(SRCROOT)/scripts/build-fff-c.sh",
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources",
 			);
 			name = "Organize Ghostty Resources";
@@ -480,6 +481,7 @@
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/ghostty/themes",
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/terminfo/67",
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/libTreeSitterSwift.dylib",
+				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Frameworks/libfff_c.dylib",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
@@ -494,6 +496,7 @@
 			);
 			inputPaths = (
 				"$(SRCROOT)/scripts/organize-resources.sh",
+				"$(SRCROOT)/scripts/build-fff-c.sh",
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources",
 			);
 			name = "Organize Ghostty Resources";
@@ -503,6 +506,7 @@
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/ghostty/themes",
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/terminfo/67",
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/libTreeSitterSwift.dylib",
+				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Frameworks/libfff_c.dylib",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;

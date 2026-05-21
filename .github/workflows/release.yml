@@ -36,21 +36,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Verify vendored GhosttyKit
+      - name: Verify vendored native dependencies
         run: |
           for required_path in \
             Vendor/libghostty/VERSION \
             Vendor/libghostty/GhosttyKit.xcframework \
-            Vendor/libghostty/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a
+            Vendor/libghostty/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a \
+            Vendor/fff-c/lib/libfff_c.dylib
           do
             if [ ! -e "$required_path" ]; then
-              echo "Error: Missing vendored GhosttyKit payload file: $required_path"
+              echo "Error: Missing vendored native dependency: $required_path"
               exit 1
             fi
           done
 
           echo "Using vendored libghostty version $(cat Vendor/libghostty/VERSION)"
           ls -lh Vendor/libghostty/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a
+          ls -lh Vendor/fff-c/lib/libfff_c.dylib
 
       - name: Show Xcode version
         id: xcode-version
