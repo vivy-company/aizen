@@ -369,6 +369,21 @@ struct ProjectSearchWindowContent: View {
                             .fill(Color.white.opacity(0.06))
                     )
             }
+
+            if viewModel.selectedResult != nil {
+                Button(action: openSelectedResult) {
+                    Image(systemName: "arrow.up.forward.square")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Color.white.opacity(0.06))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Open in Files")
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -389,15 +404,7 @@ struct ProjectSearchWindowContent: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .loaded(let preview):
-            CodeEditorView(
-                content: preview.content,
-                language: detectLanguage(from: preview.path),
-                filePath: preview.path,
-                selectionRequest: preview.openRequest,
-                shouldFocusOnAppear: false
-            )
-            .allowsHitTesting(false)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ProjectSearchPreviewView(preview: preview)
 
         case .unavailable(let message):
             previewPlaceholder(
@@ -482,10 +489,5 @@ struct ProjectSearchWindowContent: View {
     private var selectedLocationLabel: String? {
         guard case .content(let result)? = viewModel.selectedResult else { return nil }
         return "L\(result.lineNumber):\(result.column)"
-    }
-
-    private func detectLanguage(from path: String) -> String? {
-        let ext = (path as NSString).pathExtension.lowercased()
-        return ext.isEmpty ? nil : ext
     }
 }
