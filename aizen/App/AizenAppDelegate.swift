@@ -9,10 +9,12 @@ import AppKit
 
 // App delegate to handle window restoration cleanup
 class AizenAppDelegate: NSObject, NSApplicationDelegate {
+    private var activityToken: NSObjectProtocol?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Disable App Nap to prevent activation delays when clicking dock icon
         ProcessInfo.processInfo.disableAutomaticTermination("Aizen needs responsive activation")
-        ProcessInfo.processInfo.beginActivity(
+        activityToken = ProcessInfo.processInfo.beginActivity(
             options: [.userInitiatedAllowingIdleSystemSleep, .latencyCritical],
             reason: "Prevent App Nap for responsive dock activation"
         )
