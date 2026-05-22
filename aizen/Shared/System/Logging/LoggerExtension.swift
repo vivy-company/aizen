@@ -28,4 +28,5 @@ extension Logger {
     nonisolated static let audio = Logger.forCategory("Audio")
     nonisolated static let acp = Logger.forCategory("ACP")
     nonisolated static let crash = Logger.forCategory("CrashReporter")
+    nonisolated static let analytics = Logger.forCategory("Analytics")
 }

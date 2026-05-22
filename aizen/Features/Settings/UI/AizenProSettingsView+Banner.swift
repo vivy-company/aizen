@@ -3,6 +3,7 @@ import SwiftUI
 extension AizenProSettingsView {
     var upgradeBanner: some View {
         Button {
+            Analytics.shared.track(.upgradeClicked(source: .settings))
             showingPlans = true
         } label: {
             HStack(spacing: 14) {

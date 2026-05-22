@@ -35,6 +35,7 @@ extension LicenseStateStore {
                 licenseToken = trimmedToken
                 lastMessage = "License activated"
                 await validateNow()
+                Analytics.shared.track(.licenseActivated(tier: analyticsLicenseTier))
                 return true
             } else {
                 let message = response.error ?? "Activation failed"
@@ -46,6 +47,19 @@ extension LicenseStateStore {
             status = .error(message: error.localizedDescription)
             lastMessage = error.localizedDescription
             return false
+        }
+    }
+
+    private var analyticsLicenseTier: AnalyticsLicenseTier {
+        switch licenseType?.lowercased() {
+        case "pro":
+            return .pro
+        case "lifetime":
+            return .lifetime
+        case .some:
+            return .unknown
+        case .none:
+            return .unknown
         }
     }
 

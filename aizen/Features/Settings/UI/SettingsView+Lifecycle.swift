@@ -50,6 +50,7 @@ private struct SettingsViewLifecycleModifier: ViewModifier {
             .navigationSplitViewStyle(.balanced)
             .frame(minWidth: 860, minHeight: 500)
             .onAppear {
+                Analytics.shared.recordSettingsOpened()
                 loadAgents()
             }
             .onReceive(NotificationCenter.default.publisher(for: .agentMetadataDidChange)) { _ in

@@ -168,7 +168,14 @@ struct CustomAgentFormView: View {
                     launchArgs: launchArgs,
                     environmentVariables: persistedEnvironmentVariables
                 )
+                let customAgentCount = AgentRegistry.shared.getAllAgents().filter(\.isCustom).count
                 await MainActor.run {
+                    Analytics.shared.track(
+                        .customAgentCreated(
+                            distribution: .localCommand,
+                            customAgentCount: customAgentCount
+                        )
+                    )
                     onSave(metadata)
                     dismiss()
                 }

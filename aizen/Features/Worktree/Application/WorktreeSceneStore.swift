@@ -36,6 +36,7 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
     private var detailAttached = false
     private var activeVisibleTabIds: [String] = []
     private var pendingShowXcode = false
+    private var trackedOpenedTabIds: Set<String> = []
     private let detailActivationDelay = Duration.milliseconds(140)
     private let tabPrewarmDelay = Duration.milliseconds(180)
 
@@ -76,6 +77,7 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
         warmedTabIds.insert(tabId)
         warmStoreIfNeeded(for: tabId)
         selectedTab = tabId
+        trackOpenedSurfaceIfNeeded(tabId)
         syncFeatureVisibility()
     }
 
@@ -174,6 +176,21 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
             if browserSessionStore == nil {
                 browserSessionStore = BrowserSessionStore(viewContext: viewContext, worktree: worktree)
             }
+        default:
+            break
+        }
+    }
+
+    private func trackOpenedSurfaceIfNeeded(_ tabId: String) {
+        guard !trackedOpenedTabIds.contains(tabId) else { return }
+
+        switch tabId {
+        case "files":
+            trackedOpenedTabIds.insert(tabId)
+            Analytics.shared.track(.fileBrowserOpened(entryPoint: .worktree))
+        case "browser":
+            trackedOpenedTabIds.insert(tabId)
+            Analytics.shared.track(.browserOpened(entryPoint: .worktree))
         default:
             break
         }

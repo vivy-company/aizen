@@ -37,6 +37,7 @@ final class CheckForUpdatesStore: ObservableObject {
     }
 
     func checkForUpdates() {
+        Analytics.shared.track(.updateCheckStarted(source: .menu))
         updater.checkForUpdates()
     }
 }

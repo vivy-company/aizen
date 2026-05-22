@@ -5,6 +5,7 @@
 //  Created by Uladzislau Yakauleu on 17.10.25.
 //
 
+import CoreData
 import SwiftUI
 
 struct WorkspaceCreateSheet: View {
@@ -63,10 +64,16 @@ struct WorkspaceCreateSheet: View {
         do {
             let colorHex = selectedColor.toHex()
             _ = try repositoryManager.createWorkspace(name: workspaceName, colorHex: colorHex)
+            Analytics.shared.track(.workspaceCreated(workspaceCount: workspaceCount()))
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func workspaceCount() -> Int {
+        let request: NSFetchRequest<Workspace> = Workspace.fetchRequest()
+        return (try? repositoryManager.viewContext.count(for: request)) ?? 1
     }
 }
 

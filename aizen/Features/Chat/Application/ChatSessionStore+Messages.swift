@@ -60,6 +60,7 @@ extension ChatSessionStore {
                         workingDir: worktreePath,
                         chatSessionId: self.session.id
                     )
+                    self.trackAgentSessionStarted(hasAttachments: !messageAttachments.isEmpty)
                 }
 
                 // Wait for session to be ready (not just active) - handles initialization delay

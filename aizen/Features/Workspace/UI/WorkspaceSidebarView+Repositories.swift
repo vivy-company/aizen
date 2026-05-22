@@ -100,6 +100,7 @@ extension WorkspaceSidebarView {
 
     var supportAizenButton: some View {
         Button {
+            Analytics.shared.track(.upgradeClicked(source: .settings))
             SettingsWindowController.shared.show()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 NotificationCenter.default.post(name: .openSettingsPro, object: nil)

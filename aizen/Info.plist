@@ -42,6 +42,10 @@
 	<string>Aizen's built-in browser needs access to your microphone for websites that use audio features and for voice message transcription.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Aizen needs access to speech recognition to transcribe your voice messages to text.</string>
+	<key>AizenUmamiBaseURL</key>
+	<string>https://analytics.vivy.app</string>
+	<key>AizenUmamiWebsiteID</key>
+	<string>52cc0341-4315-4223-98f7-d948226dcc54</string>
 	<key>SUFeedURL</key>
 	<string>https://r2.aizen.win/appcast.xml</string>
 	<key>SUPublicEDKey</key>

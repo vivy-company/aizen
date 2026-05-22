@@ -156,6 +156,7 @@ struct WorktreeSessionCoordinator {
         do {
             try context.save()
             logger.info("Created new terminal session with ID: \(session.id?.uuidString ?? "nil")")
+            Analytics.shared.track(.terminalOpened(entryPoint: .worktree, splitCount: 1))
             DispatchQueue.main.async {
                 viewModel.selectedTerminalSessionId = session.id
                 logger.info("Set selectedTerminalSessionId to: \(session.id?.uuidString ?? "nil")")

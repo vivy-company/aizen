@@ -94,6 +94,13 @@ extension RepositoryAddSheet {
                 }
 
                 await MainActor.run {
+                    Analytics.shared.track(
+                        .repositoryAdded(
+                            source: analyticsRepositorySource,
+                            provider: analyticsRepositoryProvider,
+                            repositoryCount: analyticsRepositoryCount()
+                        )
+                    )
                     onRepositoryAdded?(repository)
                     dismiss()
                 }
@@ -104,5 +111,18 @@ extension RepositoryAddSheet {
                 }
             }
         }
+    }
+
+    private var analyticsRepositorySource: AnalyticsRepositorySource {
+        mode == .clone ? .clone : .local
+    }
+
+    private var analyticsRepositoryProvider: AnalyticsRepositoryProvider {
+        mode == .clone ? .provider(forCloneURL: cloneURL) : .unknown
+    }
+
+    private func analyticsRepositoryCount() -> Int {
+        let repositories = workspace.repositories as? Set<Repository>
+        return repositories?.filter { !$0.isDeleted }.count ?? 1
     }
 }

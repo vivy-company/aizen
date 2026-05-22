@@ -26,6 +26,12 @@ extension MCPManagementStore {
 
         try await serverStore.saveDefaultServer(serverDefinition, named: serverName, agentId: agentId)
         await syncInstalled(agentId: agentId)
+        Analytics.shared.track(
+            .mcpServerAdded(
+                source: .registry,
+                serverCount: installedServers[agentId]?.count ?? 1
+            )
+        )
     }
 
     // MARK: - Install Remote
@@ -54,6 +60,12 @@ extension MCPManagementStore {
 
         try await serverStore.saveDefaultServer(serverDefinition, named: serverName, agentId: agentId)
         await syncInstalled(agentId: agentId)
+        Analytics.shared.track(
+            .mcpServerAdded(
+                source: .registry,
+                serverCount: installedServers[agentId]?.count ?? 1
+            )
+        )
     }
 
     // MARK: - Remove

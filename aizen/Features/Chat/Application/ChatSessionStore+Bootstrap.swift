@@ -195,6 +195,7 @@ extension ChatSessionStore {
                 workingDir: worktreePath,
                 chatSessionId: sessionId
             )
+            trackAgentSessionStarted(hasAttachments: !attachments.isEmpty)
         } catch {
             if let sessionError = error as? AgentSessionError,
                case .sessionAlreadyActive = sessionError {

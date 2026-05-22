@@ -38,6 +38,7 @@ extension WorktreeCreateSheet {
 
         Task {
             do {
+                let createdWorktree: Worktree
                 switch mode {
                 case .linked:
                     let submoduleOptions: WorkspaceRepositoryStore.LinkedEnvironmentSubmoduleOptions
@@ -55,7 +56,7 @@ extension WorktreeCreateSheet {
                         submoduleOptions = .disabled
                     }
 
-                    _ = try await repositoryManager.addLinkedEnvironment(
+                    createdWorktree = try await repositoryManager.addLinkedEnvironment(
                         to: repository,
                         path: destinationPath,
                         branch: branchName,
@@ -69,7 +70,7 @@ extension WorktreeCreateSheet {
                         throw Libgit2Error.invalidPath("Source path is unavailable")
                     }
                     let method: WorkspaceRepositoryStore.IndependentEnvironmentMethod = isGitProject ? independentMethod : .copy
-                    _ = try await repositoryManager.addIndependentEnvironment(
+                    createdWorktree = try await repositoryManager.addIndependentEnvironment(
                         to: repository,
                         path: destinationPath,
                         sourcePath: source,
@@ -79,6 +80,12 @@ extension WorktreeCreateSheet {
                 }
 
                 await MainActor.run {
+                    Analytics.shared.track(
+                        .worktreeCreated(
+                            source: analyticsWorktreeSource,
+                            worktreeCount: analyticsWorktreeCount(afterCreating: createdWorktree)
+                        )
+                    )
                     dismiss()
                 }
             } catch {
@@ -92,5 +99,19 @@ extension WorktreeCreateSheet {
                 }
             }
         }
+    }
+
+    private var analyticsWorktreeSource: AnalyticsWorktreeSource {
+        switch mode {
+        case .linked:
+            return .newBranch
+        case .independent:
+            return .unknown
+        }
+    }
+
+    private func analyticsWorktreeCount(afterCreating createdWorktree: Worktree) -> Int {
+        let worktrees = createdWorktree.repository?.worktrees as? Set<Worktree>
+        return worktrees?.filter { !$0.isDeleted }.count ?? 1
     }
 }

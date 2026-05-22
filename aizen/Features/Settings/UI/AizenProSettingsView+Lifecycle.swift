@@ -25,6 +25,7 @@ extension AizenProSettingsView {
                 .disabled(!licenseManagerHasDevice)
             } else {
                 Button {
+                    Analytics.shared.track(.upgradeClicked(source: .settings))
                     showingPlans = true
                 } label: {
                     Label("Upgrade", systemImage: "sparkles")

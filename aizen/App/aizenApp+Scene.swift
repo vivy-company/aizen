@@ -15,6 +15,9 @@ extension aizenApp {
                 .environmentObject(ghosttyApp)
                 .modifier(AppearanceModifier())
                 .task {
+                    Analytics.shared.recordAppLaunch()
+                }
+                .task {
                     LicenseStateStore.shared.start()
                 }
                 .task(

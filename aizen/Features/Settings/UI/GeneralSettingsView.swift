@@ -41,6 +41,9 @@ struct GeneralSettingsView: View {
     @AppStorage("showGitStatus") var showGitStatus = true
     @AppStorage("showXcodeBuild") var showXcodeBuild = true
 
+    // Privacy
+    @AppStorage(AnalyticsSettings.isEnabledKey) var analyticsEnabled = AnalyticsSettings.defaultIsEnabled
+
     @ObservedObject var appDetector = AppDetector.shared
     @StateObject var tabConfig = TabConfigurationStore.shared
 
@@ -77,6 +80,8 @@ struct GeneralSettingsView: View {
             toolbarSection
 
             cliSection
+
+            analyticsSection
 
             resetSection
         }
