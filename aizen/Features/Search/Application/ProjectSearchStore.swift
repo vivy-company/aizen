@@ -9,6 +9,7 @@ final class ProjectSearchStore: ObservableObject {
     @Published var grepMode: ProjectSearchGrepMode
     @Published private(set) var results: [ProjectSearchResult] = []
     @Published private(set) var selectedIndex = 0
+    @Published private(set) var selectedResultID: String?
     @Published private(set) var isSearching = false
     @Published private(set) var isLoadingMore = false
     @Published private(set) var status: ProjectSearchStatus = .idle
@@ -27,6 +28,7 @@ final class ProjectSearchStore: ObservableObject {
     private var previewTask: Task<Void, Never>?
     private var statusTask: Task<Void, Never>?
     private var hasAppeared = false
+    private var searchRevision = 0
 
     init(worktreePath: String, initialMode: ProjectSearchMode = .files) {
         self.worktreePath = worktreePath
@@ -44,6 +46,11 @@ final class ProjectSearchStore: ObservableObject {
     }
 
     var selectedResult: ProjectSearchResult? {
+        if let selectedResultID,
+           let result = results.first(where: { $0.id == selectedResultID }) {
+            return result
+        }
+
         guard results.indices.contains(selectedIndex) else { return nil }
         return results[selectedIndex]
     }
@@ -155,21 +162,23 @@ final class ProjectSearchStore: ObservableObject {
 
     func moveSelectionUp() {
         guard selectedIndex > 0 else { return }
-        selectedIndex -= 1
-        updatePreviewForSelection()
+        setSelection(index: selectedIndex - 1)
     }
 
     func moveSelectionDown() {
         guard selectedIndex < results.count - 1 else { return }
-        selectedIndex += 1
-        updatePreviewForSelection()
+        setSelection(index: selectedIndex + 1)
     }
 
     func selectResult(at index: Int) {
         guard results.indices.contains(index) else { return }
-        guard selectedIndex != index else { return }
-        selectedIndex = index
-        updatePreviewForSelection()
+        guard selectedIndex != index || selectedResultID != results[index].id else { return }
+        setSelection(index: index)
+    }
+
+    func selectResult(id: String) {
+        guard let index = results.firstIndex(where: { $0.id == id }) else { return }
+        selectResult(at: index)
     }
 
     func activateSelection() -> SearchOpenRequest? {
@@ -209,7 +218,9 @@ final class ProjectSearchStore: ObservableObject {
                     fileOffset: fileOffset
                 )
 
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled,
+                      self.isCurrentContentLoad(query: query, grepMode: grepMode)
+                else { return }
 
                 let additionalResults = response.results.map(ProjectSearchResult.content)
                 self.appendSearchResults(
@@ -221,7 +232,9 @@ final class ProjectSearchStore: ObservableObject {
                     selectedResultID: selectedResultID
                 )
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled,
+                      self.isCurrentContentLoad(query: query, grepMode: grepMode)
+                else { return }
                 self.isLoadingMore = false
                 self.lastErrorMessage = error.localizedDescription
             }
@@ -256,7 +269,9 @@ final class ProjectSearchStore: ObservableObject {
         previewTask?.cancel()
         isLoadingMore = false
         lastErrorMessage = nil
+        searchRevision += 1
 
+        let revision = searchRevision
         let query = searchQueryTrimmed
         let mode = mode
         let grepMode = grepMode
@@ -264,7 +279,7 @@ final class ProjectSearchStore: ObservableObject {
         if mode == .content && query.isEmpty {
             isSearching = false
             results = []
-            selectedIndex = 0
+            setSelection(index: nil, updatePreview: false)
             totalMatched = 0
             regexFallbackError = nil
             nextFileOffset = nil
@@ -292,7 +307,14 @@ final class ProjectSearchStore: ObservableObject {
                         limit: 80
                     )
 
-                    guard !Task.isCancelled else { return }
+                    guard !Task.isCancelled,
+                          self.isCurrentSearch(
+                              revision: revision,
+                              query: query,
+                              mode: mode,
+                              grepMode: grepMode
+                          )
+                    else { return }
 
                     self.applySearchResults(
                         response.results.map(ProjectSearchResult.file),
@@ -310,7 +332,14 @@ final class ProjectSearchStore: ObservableObject {
                         limit: 60
                     )
 
-                    guard !Task.isCancelled else { return }
+                    guard !Task.isCancelled,
+                          self.isCurrentSearch(
+                              revision: revision,
+                              query: query,
+                              mode: mode,
+                              grepMode: grepMode
+                          )
+                    else { return }
 
                     self.applySearchResults(
                         response.results.map(ProjectSearchResult.content),
@@ -321,10 +350,17 @@ final class ProjectSearchStore: ObservableObject {
                     )
                 }
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled,
+                      self.isCurrentSearch(
+                          revision: revision,
+                          query: query,
+                          mode: mode,
+                          grepMode: grepMode
+                      )
+                else { return }
                 self.isSearching = false
                 self.results = []
-                self.selectedIndex = 0
+                self.setSelection(index: nil, updatePreview: false)
                 self.totalMatched = 0
                 self.regexFallbackError = nil
                 self.nextFileOffset = nil
@@ -342,7 +378,7 @@ final class ProjectSearchStore: ObservableObject {
         regexFallbackError: String?,
         status: ProjectSearchStatus
     ) {
-        let selectedResultID = selectedResult?.id
+        let previousSelectedResultID = selectedResultID ?? selectedResult?.id
 
         results = newResults
         self.totalMatched = totalMatched
@@ -353,11 +389,13 @@ final class ProjectSearchStore: ObservableObject {
         self.isSearching = false
         self.isLoadingMore = false
 
-        if let selectedResultID,
-           let newIndex = newResults.firstIndex(where: { $0.id == selectedResultID }) {
-            selectedIndex = newIndex
+        if let previousSelectedResultID,
+           let newIndex = newResults.firstIndex(where: { $0.id == previousSelectedResultID }) {
+            setSelection(index: newIndex, updatePreview: false)
+        } else if newResults.isEmpty {
+            setSelection(index: nil, updatePreview: false)
         } else {
-            selectedIndex = 0
+            setSelection(index: 0, updatePreview: false)
         }
 
         updatePreviewForSelection()
@@ -381,9 +419,13 @@ final class ProjectSearchStore: ObservableObject {
 
         if let selectedResultID,
            let newIndex = results.firstIndex(where: { $0.id == selectedResultID }) {
-            selectedIndex = newIndex
+            setSelection(index: newIndex, updatePreview: false)
+        } else if results.isEmpty {
+            setSelection(index: nil, updatePreview: false)
         } else if !results.indices.contains(selectedIndex) {
-            selectedIndex = 0
+            setSelection(index: 0, updatePreview: false)
+        } else {
+            setSelection(index: selectedIndex, updatePreview: false)
         }
 
         updatePreviewForSelection()
@@ -402,6 +444,38 @@ final class ProjectSearchStore: ObservableObject {
         }
 
         return merged
+    }
+
+    private func setSelection(index: Int?, updatePreview: Bool = true) {
+        if let index, results.indices.contains(index) {
+            selectedIndex = index
+            selectedResultID = results[index].id
+        } else {
+            selectedIndex = 0
+            selectedResultID = nil
+        }
+
+        if updatePreview {
+            updatePreviewForSelection()
+        }
+    }
+
+    private func isCurrentSearch(
+        revision: Int,
+        query: String,
+        mode: ProjectSearchMode,
+        grepMode: ProjectSearchGrepMode
+    ) -> Bool {
+        revision == searchRevision &&
+        query == searchQueryTrimmed &&
+        mode == self.mode &&
+        grepMode == self.grepMode
+    }
+
+    private func isCurrentContentLoad(query: String, grepMode: ProjectSearchGrepMode) -> Bool {
+        mode == .content &&
+        query == searchQueryTrimmed &&
+        grepMode == self.grepMode
     }
 
     private func refreshStatus() {

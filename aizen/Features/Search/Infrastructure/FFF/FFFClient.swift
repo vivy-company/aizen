@@ -60,9 +60,12 @@ nonisolated final class FFFClient: @unchecked Sendable {
             let items = Self.buffer(from: searchResult.items, count: Int(searchResult.count))
             let scores = Self.buffer(from: searchResult.scores, count: Int(searchResult.count))
 
-            let results = zip(items, scores).map { item, score in
+            let results = zip(items, scores).compactMap { item, score -> ProjectSearchFileResult? in
                 let relativePath = Self.string(from: item.relativePath) ?? ""
-                let fullPath = (basePath as NSString).appendingPathComponent(relativePath)
+                guard let fullPath = Self.existingFilePath(basePath: basePath, relativePath: relativePath) else {
+                    return nil
+                }
+
                 return ProjectSearchFileResult(
                     path: fullPath,
                     relativePath: relativePath,
@@ -77,7 +80,11 @@ nonisolated final class FFFClient: @unchecked Sendable {
 
             return ProjectFileSearchResponse(
                 results: results,
-                totalMatched: Int(searchResult.totalMatched),
+                totalMatched: Self.adjustedTotalMatched(
+                    searchResult.totalMatched,
+                    rawCount: items.count,
+                    resultCount: results.count
+                ),
                 totalFiles: Int(searchResult.totalFiles),
                 status: try scanProgressLocked()
             )
@@ -120,9 +127,12 @@ nonisolated final class FFFClient: @unchecked Sendable {
 
             let grepResult = payload.pointee
             let matches = Self.buffer(from: grepResult.items, count: Int(grepResult.count))
-            let results = matches.map { match in
+            let results = matches.compactMap { match -> ProjectSearchContentResult? in
                 let relativePath = Self.string(from: match.relativePath) ?? ""
-                let fullPath = (basePath as NSString).appendingPathComponent(relativePath)
+                guard let fullPath = Self.existingFilePath(basePath: basePath, relativePath: relativePath) else {
+                    return nil
+                }
+
                 let highlight = Self.firstMatchRange(from: match)
                 let startColumn = Int(match.col) + 1
                 let endColumn = highlight.map { Int($0.end) + 1 } ?? (startColumn + 1)
@@ -149,7 +159,11 @@ nonisolated final class FFFClient: @unchecked Sendable {
 
             return ProjectContentSearchResponse(
                 results: results,
-                totalMatched: Int(grepResult.totalMatched),
+                totalMatched: Self.adjustedTotalMatched(
+                    grepResult.totalMatched,
+                    rawCount: matches.count,
+                    resultCount: results.count
+                ),
                 totalFiles: Int(grepResult.totalFiles),
                 nextFileOffset: grepResult.nextFileOffset == 0 ? nil : Int(grepResult.nextFileOffset),
                 regexFallbackError: Self.optionalString(from: grepResult.regexFallbackError),
@@ -313,6 +327,25 @@ nonisolated final class FFFClient: @unchecked Sendable {
             return nil
         }
         return pointer[0]
+    }
+
+    private static func existingFilePath(basePath: String, relativePath: String) -> String? {
+        guard !relativePath.isEmpty else { return nil }
+
+        let fullPath = (basePath as NSString).appendingPathComponent(relativePath)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: fullPath, isDirectory: &isDirectory),
+              !isDirectory.boolValue
+        else {
+            return nil
+        }
+
+        return fullPath
+    }
+
+    private static func adjustedTotalMatched(_ totalMatched: UInt32, rawCount: Int, resultCount: Int) -> Int {
+        let filteredCount = max(0, rawCount - resultCount)
+        return max(resultCount, Int(totalMatched) - filteredCount)
     }
 
     private static func buffer<T>(from pointer: UnsafeMutablePointer<T>?, count: Int) -> [T] {

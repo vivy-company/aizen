@@ -25,18 +25,9 @@ class UnifiedAutocompleteHandler: ObservableObject {
     var isNavigating = false  // Prevents search from resetting selection during navigation
 
     func selectCurrent() -> (replacement: String, range: NSRange)? {
-        guard state.isActive else {
-            logger.debug("selectCurrent: autocomplete not active")
-            return nil
-        }
-        guard let item = state.selectedItem else {
-            logger.debug("selectCurrent: no selected item (index=\(self.state.selectedIndex), items=\(self.state.items.count))")
-            return nil
-        }
-        guard let range = state.triggerRange else {
-            logger.debug("selectCurrent: no trigger range")
-            return nil
-        }
+        guard state.isActive else { return nil }
+        guard let item = state.selectedItem else { return nil }
+        guard let range = state.triggerRange else { return nil }
 
         let replacement: String
         switch item {
@@ -46,7 +37,6 @@ class UnifiedAutocompleteHandler: ObservableObject {
             replacement = "/\(command.name) "
         }
 
-        logger.debug("selectCurrent: selecting '\(replacement)' at range \(range.location)-\(range.location + range.length)")
         dismissAutocomplete()
         return (replacement, range)
     }

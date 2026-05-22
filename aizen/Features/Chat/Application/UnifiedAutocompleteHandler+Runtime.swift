@@ -165,7 +165,6 @@ extension UnifiedAutocompleteHandler {
         }
 
         guard !isNavigating else {
-            logger.debug("Skipping search update - user is navigating")
             return
         }
 
@@ -190,10 +189,8 @@ extension UnifiedAutocompleteHandler {
         guard state.isActive, !state.items.isEmpty else { return false }
         searchTask?.cancel()
         isNavigating = true
-        let oldIndex = state.selectedIndex
         objectWillChange.send()
         state.selectPrevious()
-        logger.debug("navigateUp: \(oldIndex) -> \(self.state.selectedIndex) (items=\(self.state.items.count))")
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 100_000_000)
             self.isNavigating = false
@@ -205,10 +202,8 @@ extension UnifiedAutocompleteHandler {
         guard state.isActive, !state.items.isEmpty else { return false }
         searchTask?.cancel()
         isNavigating = true
-        let oldIndex = state.selectedIndex
         objectWillChange.send()
         state.selectNext()
-        logger.debug("navigateDown: \(oldIndex) -> \(self.state.selectedIndex) (items=\(self.state.items.count))")
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 100_000_000)
             self.isNavigating = false

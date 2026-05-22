@@ -8,7 +8,7 @@ struct ProjectSearchWindowContent: View {
 
     @FocusState private var isSearchFocused: Bool
     @EnvironmentObject private var interaction: PaletteInteractionState
-    @State private var hoveredIndex: Int?
+    @State private var hoveredResultID: String?
 
     static let filesWidth: CGFloat = 700
     static let filesHeight: CGFloat = 480
@@ -55,7 +55,7 @@ struct ProjectSearchWindowContent: View {
             }
         }
         .onChange(of: viewModel.mode) { _, newMode in
-            hoveredIndex = nil
+            hoveredResultID = nil
             onResizeRequest?(newMode)
             DispatchQueue.main.async {
                 isSearchFocused = true
@@ -251,14 +251,13 @@ struct ProjectSearchWindowContent: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(viewModel.results.enumerated()), id: \.element.id) { index, result in
+                    ForEach(viewModel.results) { result in
                         resultRow(
                             result: result,
-                            index: index,
-                            isSelected: index == viewModel.selectedIndex,
-                            isHovered: hoveredIndex == index
+                            isSelected: result.id == viewModel.selectedResultID,
+                            isHovered: hoveredResultID == result.id
                         )
-                        .id(index)
+                        .id(result.id)
                     }
                 }
                 .padding(.vertical, 8)
@@ -268,15 +267,15 @@ struct ProjectSearchWindowContent: View {
             .background(Color.clear)
             .scrollIndicators(.hidden)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .task(id: viewModel.selectedIndex) {
-                proxy.scrollTo(viewModel.selectedIndex, anchor: .center)
+            .task(id: viewModel.selectedResultID) {
+                guard let selectedResultID = viewModel.selectedResultID else { return }
+                proxy.scrollTo(selectedResultID, anchor: .center)
             }
         }
     }
 
     private func resultRow(
         result: ProjectSearchResult,
-        index: Int,
         isSelected: Bool,
         isHovered: Bool
     ) -> some View {
@@ -306,15 +305,19 @@ struct ProjectSearchWindowContent: View {
                 }
         }
         .onTapGesture {
-            viewModel.selectResult(at: index)
+            viewModel.selectResult(id: result.id)
         }
         .onTapGesture(count: 2) {
-            viewModel.selectResult(at: index)
+            viewModel.selectResult(id: result.id)
             openSelectedResult()
         }
         .onHover { hovering in
             guard interaction.allowHoverSelection else { return }
-            hoveredIndex = hovering ? index : nil
+            if hovering {
+                hoveredResultID = result.id
+            } else if hoveredResultID == result.id {
+                hoveredResultID = nil
+            }
         }
     }
 
