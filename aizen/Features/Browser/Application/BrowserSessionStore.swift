@@ -61,10 +61,10 @@ class BrowserSessionStore: ObservableObject {
         }
 
         // Clear any previous errors
-        loadError = nil
+        updateIfChanged(&loadError, nil)
 
         // Update the published property (will trigger WebView to load)
-        currentURL = url
+        updateIfChanged(&currentURL, url)
 
         // Update Core Data
         session.url = url
@@ -76,8 +76,8 @@ class BrowserSessionStore: ObservableObject {
     }
 
     func handleLoadError(_ error: String) {
-        loadError = error
-        isLoading = false
+        updateIfChanged(&loadError, error)
+        updateIfChanged(&isLoading, false)
     }
 
     func goBack() {
@@ -95,16 +95,18 @@ class BrowserSessionStore: ObservableObject {
     func registerActiveWebView(_ webView: WKWebView, for sessionId: UUID) {
         guard activeSessionId == sessionId else { return }
         cacheWebView(webView, for: sessionId)
-        activeWebView = webView
+        if activeWebView !== webView {
+            activeWebView = webView
+        }
         syncNavigationState(from: webView)
     }
 
     func releaseActiveWebView() {
         activeWebView = nil
-        canGoBack = false
-        canGoForward = false
-        isLoading = false
-        loadingProgress = 0
+        updateIfChanged(&canGoBack, false)
+        updateIfChanged(&canGoForward, false)
+        updateIfChanged(&isLoading, false)
+        updateIfChanged(&loadingProgress, 0)
     }
 
     func cachedWebView(for sessionId: UUID) -> WKWebView? {
@@ -137,12 +139,17 @@ class BrowserSessionStore: ObservableObject {
     }
 
     func syncNavigationState(from webView: WKWebView) {
-        canGoBack = webView.canGoBack
-        canGoForward = webView.canGoForward
-        isLoading = webView.isLoading
-        loadingProgress = webView.estimatedProgress
-        currentURL = webView.url?.absoluteString ?? currentURL
-        pageTitle = webView.title ?? pageTitle
+        updateIfChanged(&canGoBack, webView.canGoBack)
+        updateIfChanged(&canGoForward, webView.canGoForward)
+        updateIfChanged(&isLoading, webView.isLoading)
+        updateIfChanged(&loadingProgress, webView.estimatedProgress)
+
+        if let url = webView.url?.absoluteString {
+            updateIfChanged(&currentURL, url)
+        }
+        if let title = webView.title {
+            updateIfChanged(&pageTitle, title)
+        }
     }
 
     // MARK: - Computed Properties
@@ -173,5 +180,10 @@ class BrowserSessionStore: ObservableObject {
             }
             removeWarmWebView(for: oldestSessionId)
         }
+    }
+
+    func updateIfChanged<Value: Equatable>(_ value: inout Value, _ newValue: Value) {
+        guard value != newValue else { return }
+        value = newValue
     }
 }

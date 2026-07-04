@@ -106,7 +106,9 @@ struct BrowserTabView: View {
         }
         .task(id: manager.activeSessionId) {
             // Keep binding synced with manager state
-            selectedSessionId = manager.activeSessionId
+            if selectedSessionId != manager.activeSessionId {
+                selectedSessionId = manager.activeSessionId
+            }
         }
     }
 

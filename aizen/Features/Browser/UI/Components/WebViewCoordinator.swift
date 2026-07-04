@@ -5,6 +5,7 @@ import os.log
 class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     var parent: WebViewWrapper
     var lastFailedURL: String?
+    var lastRequestedURL: String?
     weak var webView: WKWebView?
     private var observersAttached = false
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "WebView")
@@ -45,10 +46,12 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         if let url = navigationAction.request.url {
-            if parent.onNewTab != nil {
-                parent.onNewTab?(url.absoluteString)
-            } else {
-                webView.load(URLRequest(url: url))
+            DispatchQueue.main.async { [parent] in
+                if parent.onNewTab != nil {
+                    parent.onNewTab?(url.absoluteString)
+                } else {
+                    webView.load(URLRequest(url: url))
+                }
             }
         }
 
@@ -57,8 +60,9 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         Task { @MainActor in
-            parent.canGoBack = webView.canGoBack
-            parent.canGoForward = webView.canGoForward
+            parent.setNavigationState(from: webView)
+            parent.isLoading = false
+            lastRequestedURL = nil
 
             if let url = webView.url?.absoluteString {
                 parent.onURLChange(url)
@@ -72,19 +76,25 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         Task { @MainActor in
-            parent.isLoading = true
+            if parent.isLoading != true {
+                parent.isLoading = true
+            }
         }
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         Task { @MainActor in
+            parent.setNavigationState(from: webView)
             parent.isLoading = false
         }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         Task { @MainActor in
-            parent.isLoading = false
+            lastRequestedURL = nil
+            if parent.isLoading != false {
+                parent.isLoading = false
+            }
         }
     }
 
@@ -113,7 +123,10 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
 
         Task { @MainActor in
-            parent.isLoading = false
+            lastRequestedURL = nil
+            if parent.isLoading != false {
+                parent.isLoading = false
+            }
             parent.onLoadError?(errorMessage)
         }
     }
@@ -145,10 +158,18 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         guard let webView = object as? WKWebView, webView === self.webView else { return }
 
         if keyPath == "estimatedProgress" {
-            parent.loadingProgress = webView.estimatedProgress
+            let progress = webView.estimatedProgress
+            Task { @MainActor in
+                if parent.loadingProgress != progress {
+                    parent.loadingProgress = progress
+                }
+            }
         } else if keyPath == "URL" {
             if let url = webView.url?.absoluteString {
                 Task { @MainActor in
+                    if lastRequestedURL == url {
+                        lastRequestedURL = nil
+                    }
                     parent.onURLChange(url)
                 }
             }
@@ -158,6 +179,20 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
                     parent.onTitleChange(title)
                 }
             }
+        }
+    }
+}
+
+private extension WebViewWrapper {
+    func setNavigationState(from webView: WKWebView) {
+        if canGoBack != webView.canGoBack {
+            canGoBack = webView.canGoBack
+        }
+        if canGoForward != webView.canGoForward {
+            canGoForward = webView.canGoForward
+        }
+        if loadingProgress != webView.estimatedProgress {
+            loadingProgress = webView.estimatedProgress
         }
     }
 }

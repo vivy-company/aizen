@@ -61,7 +61,14 @@ struct WebViewWrapper: NSViewRepresentable {
         if existingWebView == nil,
            !url.isEmpty,
            let initialURL = URL(string: url) {
+            context.coordinator.lastRequestedURL = url
+            let coordinator = context.coordinator
             DispatchQueue.main.async {
+                guard coordinator.lastRequestedURL == url,
+                      webView.url?.absoluteString != url,
+                      !webView.isLoading else {
+                    return
+                }
                 webView.load(URLRequest(url: initialURL))
             }
         }
@@ -88,6 +95,10 @@ struct WebViewWrapper: NSViewRepresentable {
         // Don't reload if the URL is the same (prevents infinite loops)
         guard currentURL != url else { return }
 
+        // Don't issue the same load repeatedly while WebKit is still creating
+        // its content process and the visible URL has not changed yet.
+        guard context.coordinator.lastRequestedURL != url else { return }
+
         // Don't retry if this URL previously failed to load
         if url == context.coordinator.lastFailedURL {
             return
@@ -98,6 +109,7 @@ struct WebViewWrapper: NSViewRepresentable {
 
         // Clear failed URL on new navigation attempt
         context.coordinator.lastFailedURL = nil
+        context.coordinator.lastRequestedURL = url
 
         // Validate and load URL with error handling
         guard let newURL = URL(string: url) else {
@@ -111,8 +123,15 @@ struct WebViewWrapper: NSViewRepresentable {
             return
         }
 
-        // Load the URL
-        desiredWebView.load(URLRequest(url: newURL))
+        let coordinator = context.coordinator
+        DispatchQueue.main.async {
+            guard coordinator.lastRequestedURL == url,
+                  desiredWebView.url?.absoluteString != url,
+                  !desiredWebView.isLoading else {
+                return
+            }
+            desiredWebView.load(URLRequest(url: newURL))
+        }
     }
 
     private func resolvedWebView(for context: Context) -> WKWebView {
@@ -122,10 +141,15 @@ struct WebViewWrapper: NSViewRepresentable {
             existingWebView.allowsBackForwardNavigationGestures = true
             existingWebView.allowsMagnification = true
             context.coordinator.attach(to: existingWebView)
-            DispatchQueue.main.async {
-                onWebViewCreated?(existingWebView)
-            }
             return existingWebView
+        }
+
+        if let coordinatorWebView = context.coordinator.webView {
+            coordinatorWebView.navigationDelegate = context.coordinator
+            coordinatorWebView.uiDelegate = context.coordinator
+            coordinatorWebView.allowsBackForwardNavigationGestures = true
+            coordinatorWebView.allowsMagnification = true
+            return coordinatorWebView
         }
 
         let preferences = WKWebpagePreferences()

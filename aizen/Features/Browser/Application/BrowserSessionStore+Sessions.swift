@@ -20,8 +20,8 @@ extension BrowserSessionStore {
 
             if activeSessionId == nil, let firstSession = sessions.first {
                 activeSessionId = firstSession.id
-                currentURL = firstSession.url ?? ""
-                pageTitle = firstSession.title ?? ""
+                updateIfChanged(&currentURL, firstSession.url ?? "")
+                updateIfChanged(&pageTitle, firstSession.title ?? "")
             }
         } catch {
             logger.error("Failed to load browser sessions: \(error)")
@@ -89,9 +89,9 @@ extension BrowserSessionStore {
     func selectSession(_ sessionId: UUID) {
         guard let session = sessions.first(where: { $0.id == sessionId }) else { return }
 
-        activeSessionId = sessionId
-        currentURL = session.url ?? ""
-        pageTitle = session.title ?? ""
+        updateIfChanged(&activeSessionId, Optional(sessionId))
+        updateIfChanged(&currentURL, session.url ?? "")
+        updateIfChanged(&pageTitle, session.title ?? "")
 
         if let webView = cachedWebView(for: sessionId) {
             activeWebView = webView
@@ -108,7 +108,7 @@ extension BrowserSessionStore {
         session.url = url
 
         if activeSessionId == sessionId {
-            currentURL = url
+            updateIfChanged(&currentURL, url)
         }
 
         publishSessionsState()
@@ -122,7 +122,7 @@ extension BrowserSessionStore {
         session.title = title
 
         if activeSessionId == sessionId {
-            pageTitle = title
+            updateIfChanged(&pageTitle, title)
         }
 
         publishSessionsState()
