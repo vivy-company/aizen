@@ -26,17 +26,6 @@ extension ChatSessionStore {
         }
     }
 
-    func requestAgentSwitch(to newAgent: String) {
-        guard newAgent != selectedAgent else { return }
-        pendingAgentSwitch = newAgent
-        showingAgentSwitchWarning = true
-    }
-
-    func performAgentSwitch(to newAgent: String) {
-        pendingAgentSwitch = nil
-        createFreshSession(agentName: newAgent)
-    }
-
     func restartSession() {
         createFreshSession(agentName: selectedAgent)
     }

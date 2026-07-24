@@ -46,6 +46,26 @@ extension WorkspaceStore {
         focusRequestVersion += 1
     }
 
+    /// Replaces the pane with a fresh chat session owned by the selected
+    /// agent. This also handles chat-to-chat replacement, where the pane kind
+    /// itself does not change.
+    func replacePane(_ paneId: String, withChatAgent agentId: String) {
+        guard AgentCatalogStore.shared.enabledAgents.contains(where: { $0.id == agentId }),
+              let existing = tree.pane(withId: paneId),
+              currentChatAgentId(for: existing) != agentId,
+              let session = createChatSession(agentId: agentId) else {
+            return
+        }
+
+        teardownPaneRuntime(existing)
+        setTree(tree.updatingPane(paneId) { pane in
+            pane.kind = .chat
+            pane.sessionId = session.id
+        })
+        focusPane(paneId)
+        focusRequestVersion += 1
+    }
+
     // MARK: - Close
 
     func requestCloseFocusedPane() {
@@ -138,7 +158,7 @@ extension WorkspaceStore {
             return WorkspacePane(id: id, kind: .terminal, sessionId: sessionId)
 
         case .chat:
-            return WorkspacePane(id: id, kind: .chat, sessionId: createChatSession()?.id)
+            return WorkspacePane(id: id, kind: .chat, sessionId: createChatSession(agentId: defaultAgentId())?.id)
 
         case .files, .browser, .gitDiff, .empty:
             return WorkspacePane(id: id, kind: kind)
@@ -171,17 +191,24 @@ extension WorkspaceStore {
         return session
     }
 
-    private func createChatSession() -> ChatSession? {
+    private func createChatSession(agentId: String) -> ChatSession? {
         let session = ChatSession(context: viewContext)
         session.id = UUID()
-        let agent = defaultAgentId()
-        session.agentName = agent
-        session.title = AgentRegistry.shared.getMetadata(for: agent)?.name ?? agent.capitalized
+        session.agentName = agentId
+        session.title = AgentRegistry.shared.getMetadata(for: agentId)?.name ?? agentId.capitalized
         session.archived = false
         session.createdAt = Date()
         session.worktree = worktree
         saveContext()
         return session
+    }
+
+    private func currentChatAgentId(for pane: WorkspacePane) -> String? {
+        guard pane.kind == .chat,
+              let sessionId = pane.sessionId else {
+            return nil
+        }
+        return chatSession(withId: sessionId)?.agentName
     }
 
     private func defaultAgentId() -> String {

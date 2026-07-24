@@ -46,9 +46,6 @@ class ChatSessionStore: ObservableObject {
     // MARK: - UI State Flags
 
     @Published var showingPermissionAlert: Bool = false
-    @Published var showingAgentSwitchWarning = false
-    @Published var pendingAgentSwitch: String?
-
     // MARK: - Derived State (bridges nested ChatAgentSession properties for reliable observation)
     @Published var needsAuth: Bool = false
     @Published var needsSetup: Bool = false

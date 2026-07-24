@@ -13,22 +13,13 @@ struct ModelSelectorMenu: View {
     let isStreaming: Bool
     let selectedAgent: String
     let onModelSelect: (String) -> Void
-    let onAgentSelect: (String) -> Void
     var showsBackground: Bool = true
     var showsIcon: Bool = true
 
     @ObservedObject private var agentCatalog = AgentCatalogStore.shared
 
-    private var enabledAgents: [AgentMetadata] {
-        agentCatalog.enabledAgents
-    }
-
     private var selectedAgentMetadata: AgentMetadata? {
-        AgentRegistry.shared.getMetadata(for: selectedAgent)
-    }
-
-    private var otherAgents: [AgentMetadata] {
-        enabledAgents.filter { $0.id != selectedAgent }
+        agentCatalog.metadata(for: selectedAgent)
     }
 
     var body: some View {
@@ -59,23 +50,6 @@ struct ModelSelectorMenu: View {
                 }
             }
 
-            // Other agents section
-            if !otherAgents.isEmpty {
-                Section {
-                    ForEach(otherAgents, id: \.id) { agentMetadata in
-                        Button {
-                            onAgentSelect(agentMetadata.id)
-                        } label: {
-                            HStack {
-                                AgentIconView(metadata: agentMetadata, size: 14)
-                                Text(agentMetadata.name)
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Change Agent")
-                }
-            }
         } label: {
             AgentMenuLabel(
                 agentId: selectedAgent,

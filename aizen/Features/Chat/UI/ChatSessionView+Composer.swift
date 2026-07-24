@@ -63,8 +63,7 @@ extension ChatSessionView {
                 },
                 onFilePaste: { url in
                     viewModel.attachments.append(.file(url))
-                },
-                onAgentSelect: viewModel.requestAgentSwitch
+                }
             )
             .background {
                 GeometryReader { geometry in

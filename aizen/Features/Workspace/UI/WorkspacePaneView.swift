@@ -140,26 +140,82 @@ struct WorkspacePaneHeaderView: View {
     let isFocused: Bool
     let isSplit: Bool
 
+    @ObservedObject private var agentCatalog = AgentCatalogStore.shared
     @State private var isHovering = false
+
+    private var enabledAgents: [AgentMetadata] {
+        agentCatalog.enabledAgents
+    }
+
+    private var currentChatAgentId: String? {
+        guard pane.kind == .chat,
+              let sessionId = pane.sessionId else {
+            return nil
+        }
+        return workspace.chatSession(withId: sessionId)?.agentName
+    }
+
+    private var currentChatAgent: AgentMetadata? {
+        currentChatAgentId.flatMap(agentCatalog.metadata(for:))
+    }
+
+    private var paneTitle: String {
+        if pane.kind == .chat, let agentId = currentChatAgentId {
+            return currentChatAgent?.name ?? agentId.capitalized
+        }
+        return PaneKindPresentation.title(for: pane.kind)
+    }
 
     var body: some View {
         HStack(spacing: 6) {
             Menu {
                 Section(String(localized: "workspace.pane.replaceWith", defaultValue: "Replace With")) {
-                    ForEach(PaneKindPresentation.selectableKinds, id: \.self) { kind in
-                        Button {
-                            workspace.replacePane(pane.id, with: kind)
-                        } label: {
-                            Label(PaneKindPresentation.title(for: kind), systemImage: PaneKindPresentation.icon(for: kind))
+                    paneKindButton(.terminal)
+                }
+
+                Section(String(localized: "workspace.pane.chat", defaultValue: "Chat")) {
+                    if enabledAgents.isEmpty {
+                        Text(String(
+                            localized: "workspace.pane.noAgents",
+                            defaultValue: "No enabled agents"
+                        ))
+                    } else {
+                        ForEach(enabledAgents, id: \.id) { agent in
+                            Button {
+                                workspace.replacePane(pane.id, withChatAgent: agent.id)
+                            } label: {
+                                HStack {
+                                    AgentIconView(metadata: agent, size: 14)
+                                    Text(agent.name)
+                                    if currentChatAgentId == agent.id {
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                            .disabled(currentChatAgentId == agent.id)
                         }
-                        .disabled(kind == pane.kind)
+                    }
+                }
+
+                Section {
+                    ForEach([PaneKind.files, .browser, .gitDiff], id: \.self) { kind in
+                        paneKindButton(kind)
                     }
                 }
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: PaneKindPresentation.icon(for: pane.kind))
-                        .foregroundStyle(isFocused && isSplit ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
-                    Text(PaneKindPresentation.title(for: pane.kind))
+                    if let currentChatAgent {
+                        AgentIconView(metadata: currentChatAgent, size: 14)
+                    } else {
+                        Image(systemName: PaneKindPresentation.icon(for: pane.kind))
+                            .foregroundStyle(
+                                isFocused && isSplit
+                                    ? AnyShapeStyle(Color.accentColor)
+                                    : AnyShapeStyle(.secondary)
+                            )
+                    }
+                    Text(paneTitle)
                         .foregroundStyle(isFocused ? .primary : .secondary)
                 }
                 .font(.caption)
@@ -208,6 +264,15 @@ struct WorkspacePaneHeaderView: View {
         .onHover { hovering in
             isHovering = hovering
         }
+    }
+
+    private func paneKindButton(_ kind: PaneKind) -> some View {
+        Button {
+            workspace.replacePane(pane.id, with: kind)
+        } label: {
+            Label(PaneKindPresentation.title(for: kind), systemImage: PaneKindPresentation.icon(for: kind))
+        }
+        .disabled(kind == pane.kind)
     }
 }
 

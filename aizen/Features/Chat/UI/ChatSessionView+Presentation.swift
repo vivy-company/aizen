@@ -35,18 +35,6 @@ extension ChatSessionView {
                     agentName: viewModel.selectedAgentDisplayName
                 )
             }
-            .alert(String(localized: "chat.agent.switch.title"), isPresented: $viewModel.showingAgentSwitchWarning) {
-                Button(String(localized: "chat.button.cancel"), role: .cancel) {
-                    viewModel.pendingAgentSwitch = nil
-                }
-                Button(String(localized: "chat.button.switch")) {
-                    if let newAgent = viewModel.pendingAgentSwitch {
-                        viewModel.performAgentSwitch(to: newAgent)
-                    }
-                }
-            } message: {
-                Text("chat.agent.switch.message", bundle: .main)
-            }
             .alert(String(localized: "chat.permission.title"), isPresented: $showingPermissionError) {
                 Button(String(localized: "chat.permission.openSettings")) {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {

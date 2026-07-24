@@ -15358,6 +15358,23 @@
         }
       }
     },
+    "workspace.pane.noAgents" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No enabled agents"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有已启用的代理"
+          }
+        }
+      }
+    },
     "workspace.pane.replaceWith" : {
       "comment" : "The title of a context menu that appears when the user right-clicks a pane.",
       "extractionState" : "extracted_with_value",

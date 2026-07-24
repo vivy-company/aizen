@@ -54,7 +54,6 @@ struct ChatInputBar: View {
     let onAutocompleteSelect: () -> Void
     let onImagePaste: (Data, String) -> Void
     let onFilePaste: (URL) -> Void
-    let onAgentSelect: (String) -> Void
 
     @State var measuredTextHeight: CGFloat = 0
     @State var isTextEditorFocused = false
