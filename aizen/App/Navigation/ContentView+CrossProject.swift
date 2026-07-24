@@ -62,8 +62,7 @@ extension ContentView {
         }
         sceneRegistry.activate(
             worktree: worktree,
-            repositoryManager: repositoryManager,
-            tabStateManager: tabStateManager
+            repositoryManager: repositoryManager
         )
         recordWorktreeInMRU(worktree)
     }

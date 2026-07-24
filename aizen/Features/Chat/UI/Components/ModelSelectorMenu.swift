@@ -17,7 +17,11 @@ struct ModelSelectorMenu: View {
     var showsBackground: Bool = true
     var showsIcon: Bool = true
 
-    @State private var enabledAgents: [AgentMetadata] = []
+    @ObservedObject private var agentCatalog = AgentCatalogStore.shared
+
+    private var enabledAgents: [AgentMetadata] {
+        agentCatalog.enabledAgents
+    }
 
     private var selectedAgentMetadata: AgentMetadata? {
         AgentRegistry.shared.getMetadata(for: selectedAgent)
@@ -87,10 +91,6 @@ struct ModelSelectorMenu: View {
         .buttonStyle(.plain)
         .disabled(isStreaming)  // Prevent model/agent changes during streaming
         .opacity(isStreaming ? 0.5 : 1.0)
-        .onAppear {
-            enabledAgents = AgentRegistry.shared.getEnabledAgents()
-        }
-        .id(selectedAgent)
     }
 
     private var currentModelName: String {

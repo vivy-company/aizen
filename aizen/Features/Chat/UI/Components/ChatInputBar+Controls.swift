@@ -11,18 +11,16 @@ extension ChatInputBar {
         HStack(spacing: Layout.rowSpacing) {
             attachmentButton
 
-            if !availableModels.isEmpty {
-                ModelSelectorMenu(
-                    availableModels: availableModels,
-                    currentModelId: currentModelId,
-                    isStreaming: isSessionStreaming,
-                    selectedAgent: selectedAgent,
-                    onModelSelect: onModelSelect,
-                    onAgentSelect: onAgentSelect,
-                    showsBackground: false
-                )
-                .transition(.opacity)
-            }
+            ModelSelectorMenu(
+                availableModels: availableModels,
+                currentModelId: currentModelId,
+                isStreaming: isSessionStreaming,
+                selectedAgent: selectedAgent,
+                onModelSelect: onModelSelect,
+                onAgentSelect: onAgentSelect,
+                showsBackground: false
+            )
+            .transition(.opacity)
 
             if currentModeId == "plan" {
                 Label("Plan", systemImage: "checklist")

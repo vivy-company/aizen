@@ -11,7 +11,11 @@ struct AgentSelectorMenu: View {
     let selectedAgent: String
     let onAgentSelect: (String) -> Void
 
-    @State private var enabledAgents: [AgentMetadata] = []
+    @ObservedObject private var agentCatalog = AgentCatalogStore.shared
+
+    private var enabledAgents: [AgentMetadata] {
+        agentCatalog.enabledAgents
+    }
 
     // Use computed property directly instead of state
     private var selectedAgentMetadata: AgentMetadata? {
@@ -43,9 +47,5 @@ struct AgentSelectorMenu: View {
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
-        .onAppear {
-            enabledAgents = AgentRegistry.shared.getEnabledAgents()
-        }
-        .id(selectedAgent) // Force view recreation when selectedAgent changes
     }
 }

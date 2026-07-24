@@ -2,7 +2,8 @@
 //  WorktreeSceneStore.swift
 //  aizen
 //
-//  Warm scene ownership for a single worktree detail surface.
+//  Store ownership for a single worktree detail surface: the workspace
+//  layout store plus per-feature stores panes bind to.
 //
 
 import Combine
@@ -14,129 +15,58 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
     let id: NSManagedObjectID
     let worktree: Worktree
     let repositoryManager: WorkspaceRepositoryStore
-    let tabStateManager: WorktreeTabStateStore
     let detailStore: WorktreeDetailStore
     let runtime: WorktreeRuntime
+    let workspace: WorkspaceStore
 
     @Published private(set) var fileBrowserStore: FileBrowserStore?
     @Published private(set) var browserSessionStore: BrowserSessionStore?
-    @Published private(set) var warmedTabIds: Set<String> = []
-    @Published var selectedTab = "chat"
     @Published var lastOpenedApp: DetectedApp?
-
-    var hasLoadedTabState = false
 
     private let viewContext: NSManagedObjectContext
     private var chatStoresById: [UUID: ChatSessionStore] = [:]
     private var chatStoreOrder: [UUID] = []
     private let maxWarmChatStores = 3
     private var detailActivationTask: Task<Void, Never>?
-    private var tabPrewarmTask: Task<Void, Never>?
     private var isSceneActive = false
     private var detailAttached = false
-    private var activeVisibleTabIds: [String] = []
     private var pendingShowXcode = false
-    private var trackedOpenedTabIds: Set<String> = []
+    private var trackedOpenedPaneKinds: Set<PaneKind> = []
     private let detailActivationDelay = Duration.milliseconds(140)
-    private let tabPrewarmDelay = Duration.milliseconds(180)
 
     init(
         worktree: Worktree,
         repositoryManager: WorkspaceRepositoryStore,
-        tabStateManager: WorktreeTabStateStore,
         viewContext: NSManagedObjectContext
     ) {
         self.id = worktree.objectID
         self.worktree = worktree
         self.repositoryManager = repositoryManager
-        self.tabStateManager = tabStateManager
         self.detailStore = WorktreeDetailStore(worktree: worktree, repositoryManager: repositoryManager)
         self.runtime = WorktreeRuntimeCoordinator.shared.runtime(for: worktree.path ?? "")
         self.viewContext = viewContext
+        self.workspace = WorkspaceStore(worktree: worktree, viewContext: viewContext)
     }
 
-    func restorePersistedStateIfNeeded(defaultTab: String) {
-        guard !hasLoadedTabState else { return }
+    // MARK: - Feature stores
 
-        if let worktreeId = worktree.id,
-           tabStateManager.hasStoredState(for: worktreeId) {
-            let state = tabStateManager.getState(for: worktreeId)
-            selectTab(state.viewType)
-            detailStore.selectedChatSessionId = state.chatSessionId
-            detailStore.selectedTerminalSessionId = state.terminalSessionId
-            detailStore.selectedBrowserSessionId = state.browserSessionId
-            detailStore.selectedFileSessionId = state.fileSessionId
-        } else {
-            selectTab(defaultTab)
+    /// Lazily creates the store a pane kind depends on. Called when a pane of
+    /// that kind enters the visible layout.
+    func ensureStore(for kind: PaneKind) {
+        switch kind {
+        case .files:
+            if fileBrowserStore == nil, worktree.path != nil {
+                fileBrowserStore = FileBrowserStore(worktree: worktree, context: viewContext)
+            }
+            syncFileBrowserVisibility()
+        case .browser:
+            if browserSessionStore == nil {
+                browserSessionStore = BrowserSessionStore(viewContext: viewContext, worktree: worktree)
+            }
+        case .terminal, .chat, .gitDiff, .empty:
+            break
         }
-
-        hasLoadedTabState = true
-    }
-
-    func selectTab(_ tabId: String) {
-        warmedTabIds.insert(tabId)
-        warmStoreIfNeeded(for: tabId)
-        selectedTab = tabId
-        trackOpenedSurfaceIfNeeded(tabId)
-        syncFeatureVisibility()
-    }
-
-    func isTabWarm(_ tabId: String) -> Bool {
-        warmedTabIds.contains(tabId)
-    }
-
-    func prewarmTabs(_ tabIds: [String]) {
-        for tabId in tabIds {
-            guard !tabId.isEmpty else { continue }
-            warmedTabIds.insert(tabId)
-            warmStoreIfNeeded(for: tabId)
-        }
-    }
-
-    func updatePresentation(isActive: Bool, visibleTabIds: [String], showXcode: Bool) {
-        pendingShowXcode = showXcode
-        activeVisibleTabIds = visibleTabIds
-
-        guard isActive else {
-            isSceneActive = false
-            cancelActivationTasks()
-            detailAttached = false
-            syncFeatureVisibility()
-            runtime.detachDetail()
-            return
-        }
-
-        isSceneActive = true
-        warmStoreIfNeeded(for: selectedTab)
-        syncFeatureVisibility()
-        scheduleTabPrewarm()
-
-        if detailAttached {
-            runtime.updateDetailOptions(showXcode: showXcode)
-        } else {
-            scheduleDetailActivation()
-        }
-    }
-
-    func saveSelectedTabIfNeeded() {
-        guard hasLoadedTabState, let worktreeId = worktree.id else { return }
-        tabStateManager.saveViewType(selectedTab, for: worktreeId)
-    }
-
-    func saveSessionId(_ sessionId: UUID?, for tabId: String) {
-        guard let worktreeId = worktree.id else { return }
-        tabStateManager.saveSessionId(sessionId, for: tabId, worktreeId: worktreeId)
-    }
-
-    func prepareForEviction() {
-        cancelActivationTasks()
-        isSceneActive = false
-        detailAttached = false
-        syncFeatureVisibility()
-        runtime.detachDetail()
-        browserSessionStore?.clearWarmWebViews()
-        chatStoresById.removeAll()
-        chatStoreOrder.removeAll()
+        trackOpenedSurfaceIfNeeded(kind)
     }
 
     func chatStore(for session: ChatSession) -> ChatSessionStore {
@@ -166,30 +96,52 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
         return newStore
     }
 
-    private func warmStoreIfNeeded(for tabId: String) {
-        switch tabId {
-        case "files":
-            if fileBrowserStore == nil, worktree.path != nil {
-                fileBrowserStore = FileBrowserStore(worktree: worktree, context: viewContext)
-            }
-        case "browser":
-            if browserSessionStore == nil {
-                browserSessionStore = BrowserSessionStore(viewContext: viewContext, worktree: worktree)
-            }
-        default:
-            break
+    // MARK: - Presentation lifecycle
+
+    func updatePresentation(isActive: Bool, showXcode: Bool) {
+        pendingShowXcode = showXcode
+
+        guard isActive else {
+            isSceneActive = false
+            cancelActivationTasks()
+            detailAttached = false
+            fileBrowserStore?.setVisible(false)
+            runtime.detachDetail()
+            return
+        }
+
+        isSceneActive = true
+        syncFileBrowserVisibility()
+
+        if detailAttached {
+            runtime.updateDetailOptions(showXcode: showXcode)
+        } else {
+            scheduleDetailActivation()
         }
     }
 
-    private func trackOpenedSurfaceIfNeeded(_ tabId: String) {
-        guard !trackedOpenedTabIds.contains(tabId) else { return }
+    func prepareForEviction() {
+        cancelActivationTasks()
+        isSceneActive = false
+        detailAttached = false
+        fileBrowserStore?.setVisible(false)
+        runtime.detachDetail()
+        workspace.persistTreeNow()
+        workspace.handleDisappear()
+        browserSessionStore?.clearWarmWebViews()
+        chatStoresById.removeAll()
+        chatStoreOrder.removeAll()
+    }
 
-        switch tabId {
-        case "files":
-            trackedOpenedTabIds.insert(tabId)
+    private func trackOpenedSurfaceIfNeeded(_ kind: PaneKind) {
+        guard !trackedOpenedPaneKinds.contains(kind) else { return }
+
+        switch kind {
+        case .files:
+            trackedOpenedPaneKinds.insert(kind)
             Analytics.shared.track(.fileBrowserOpened(entryPoint: .worktree))
-        case "browser":
-            trackedOpenedTabIds.insert(tabId)
+        case .browser:
+            trackedOpenedPaneKinds.insert(kind)
             Analytics.shared.track(.browserOpened(entryPoint: .worktree))
         default:
             break
@@ -213,34 +165,14 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
         }
     }
 
-    private func scheduleTabPrewarm() {
-        tabPrewarmTask?.cancel()
-        let tabIdsToPrewarm = activeVisibleTabIds.filter { $0 != selectedTab }
-        guard !tabIdsToPrewarm.isEmpty else { return }
-        let prewarmDelay = tabPrewarmDelay
-
-        tabPrewarmTask = Task { @MainActor [weak self] in
-            do {
-                try await Task.sleep(for: prewarmDelay)
-            } catch {
-                return
-            }
-
-            guard let self, self.isSceneActive, !Task.isCancelled else { return }
-            self.prewarmTabs(tabIdsToPrewarm)
-            self.tabPrewarmTask = nil
-        }
-    }
-
-    private func syncFeatureVisibility() {
-        fileBrowserStore?.setVisible(isSceneActive && selectedTab == "files")
-    }
-
     private func cancelActivationTasks() {
         detailActivationTask?.cancel()
         detailActivationTask = nil
-        tabPrewarmTask?.cancel()
-        tabPrewarmTask = nil
+    }
+
+    private func syncFileBrowserVisibility() {
+        let hasVisibleFilePane = workspace.tree.allPanes().contains { $0.kind == .files }
+        fileBrowserStore?.setVisible(isSceneActive && hasVisibleFilePane)
     }
 
     private func touchChatStore(_ sessionId: UUID) {

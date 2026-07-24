@@ -152,6 +152,8 @@ extension ChatAgentSession {
                 if agentPlan != plan {
                     agentPlan = plan
                 }
+            case .planUpdate, .planRemoved:
+                break
             case .availableCommandsUpdate(let commands):
                 availableCommands = commands
             case .currentModeUpdate(let mode):

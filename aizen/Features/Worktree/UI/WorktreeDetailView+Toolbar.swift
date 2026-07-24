@@ -5,64 +5,11 @@
 
 import SwiftUI
 
-struct WorktreeTabPicker: View {
-    @ObservedObject var scene: WorktreeSceneStore
-    let visibleTabs: [TabItem]
-
-    var body: some View {
-        let selection = Binding(
-            get: { scene.selectedTab },
-            set: { newValue in
-                guard scene.selectedTab != newValue else { return }
-                DispatchQueue.main.async {
-                    scene.selectTab(newValue)
-                }
-            }
-        )
-        return Picker(String(localized: "worktree.session.tab"), selection: selection) {
-            ForEach(visibleTabs) { tab in
-                Label(LocalizedStringKey(tab.localizedKey), systemImage: tab.icon)
-                    .tag(tab.id)
-            }
-        }
-        .pickerStyle(.segmented)
-    }
-}
-
 extension WorktreeDetailView {
     @ToolbarContentBuilder
-    var tabPickerToolbarItem: some ToolbarContent {
+    var workspaceTabsToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .automatic) {
-            WorktreeTabPicker(scene: scene, visibleTabs: visibleTabs)
-        }
-    }
-
-    var visibleTabs: [TabItem] {
-        tabConfig.tabOrder.filter { isTabVisible($0.id) }
-    }
-
-    @ToolbarContentBuilder
-    var sessionToolbarItems: some ToolbarContent {
-        ToolbarItem(placement: .automatic) {
-            if shouldShowSessionToolbar {
-                SessionTabsScrollView(
-                    selectedTab: selectedTab,
-                    chatSessions: sessionManager.chatSessions,
-                    terminalSessions: sessionManager.terminalSessions,
-                    selectedChatSessionId: $viewModel.selectedChatSessionId,
-                    selectedTerminalSessionId: $viewModel.selectedTerminalSessionId,
-                    onCloseChatSession: sessionManager.closeChatSession,
-                    onCloseTerminalSession: sessionManager.closeTerminalSession,
-                    onCreateChatSession: sessionManager.createNewChatSession,
-                    onCreateTerminalSession: sessionManager.createNewTerminalSession,
-                    onCreateChatWithAgent: { agentId in
-                        sessionManager.createNewChatSession(withAgent: agentId)
-                    },
-                    onCreateTerminalWithPreset: { preset in
-                        sessionManager.createNewTerminalSession(withPreset: preset)
-                    }
-                )
-            }
+            WorkspaceTabStripView(workspace: scene.workspace)
         }
     }
 

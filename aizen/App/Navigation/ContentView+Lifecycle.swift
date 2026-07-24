@@ -48,6 +48,12 @@ extension ContentView {
         if selectionStore.isCrossProjectSelected && !zenModeEnabled {
             zenModeEnabled = true
         }
+
+        // The width-0 hack on the content column can't fully collapse a
+        // NavigationSplitView column; only visibility can.
+        withAnimation(.easeInOut(duration: 0.25)) {
+            columnVisibility = zenModeEnabled ? .detailOnly : .all
+        }
     }
 
     func handleNavigateToWorktree(_ notification: Notification) {

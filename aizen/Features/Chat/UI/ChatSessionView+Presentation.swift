@@ -39,7 +39,7 @@ extension ChatSessionView {
                 Button(String(localized: "chat.button.cancel"), role: .cancel) {
                     viewModel.pendingAgentSwitch = nil
                 }
-                Button(String(localized: "chat.button.switch"), role: .destructive) {
+                Button(String(localized: "chat.button.switch")) {
                     if let newAgent = viewModel.pendingAgentSwitch {
                         viewModel.performAgentSwitch(to: newAgent)
                     }

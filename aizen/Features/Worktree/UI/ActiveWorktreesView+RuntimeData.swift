@@ -106,7 +106,7 @@ extension ActiveWorktreesView {
 
     private func paneIDs(for session: TerminalSession) -> [String] {
         if let layoutJSON = session.splitLayout,
-           let layout = SplitLayoutHelper.decode(layoutJSON) {
+           let layout = WorkspaceLayoutCodec.decode(layoutJSON) {
             return layout.allPaneIds()
         }
 

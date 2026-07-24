@@ -33,79 +33,42 @@ extension ChatSessionStore {
     }
 
     func performAgentSwitch(to newAgent: String) {
-        agentSwitcher.performAgentSwitch(to: newAgent)
-
-        if let sessionId = session.id {
-            sessionManager.removeAgentSession(for: sessionId)
-        }
-        cancellables.removeAll()
-        observedSessionId = nil
-        currentAgentSession = nil
-        autocompleteHandler.agentSession = nil
-        clearDerivedState()
-        timelineStore.resetSyncState()
-        timelineStore.syncTimeline(messages: [], toolCalls: [])
-
-        setupAgentSession()
         pendingAgentSwitch = nil
+        createFreshSession(agentName: newAgent)
     }
 
     func restartSession() {
-        guard let agentSession = currentAgentSession else { return }
+        createFreshSession(agentName: selectedAgent)
+    }
 
+    private func createFreshSession(agentName: String) {
         let context = viewContext
         let newChatSession = ChatSession(context: context)
         newChatSession.id = UUID()
-        newChatSession.agentName = selectedAgent
+        newChatSession.agentName = agentName
         newChatSession.createdAt = Date()
         newChatSession.worktree = worktree
 
-        Task {
-            let displayName = AgentRegistry.shared.getMetadata(for: selectedAgent)?.name ?? selectedAgent.capitalized
-            newChatSession.title = displayName
+        let displayName = AgentRegistry.shared.getMetadata(for: agentName)?.name ?? agentName.capitalized
+        newChatSession.title = displayName
 
-            do {
-                try context.save()
+        do {
+            try context.save()
 
-                await agentSession.close()
+            if let oldSessionId = session.id {
+                sessionManager.removeAgentSession(for: oldSessionId)
+            }
 
-                if let oldSessionId = session.id {
-                    sessionManager.removeAgentSession(for: oldSessionId)
-                }
-
+            if let newSessionId = newChatSession.id {
                 NotificationCenter.default.post(
                     name: .switchToChatSession,
                     object: nil,
-                    userInfo: ["chatSessionId": newChatSession.id!]
+                    userInfo: ["chatSessionId": newSessionId]
                 )
-
-                let worktreePath = worktree.path ?? ""
-                let freshAgentSession = ChatAgentSession(agentName: selectedAgent, workingDirectory: worktreePath)
-                sessionManager.setAgentSession(freshAgentSession, for: newChatSession.id!, worktreeName: worktree.branch)
-                currentAgentSession = freshAgentSession
-                autocompleteHandler.agentSession = freshAgentSession
-
-                timelineStore.resetSyncState()
-                timelineStore.syncTimeline(messages: [], toolCalls: [])
-                timelineStore.isStreaming = false
-                timelineStore.isSessionInitializing = false
-
-                setupSessionObservers(session: freshAgentSession)
-
-                try await freshAgentSession.start(
-                    agentName: selectedAgent,
-                    workingDir: worktreePath,
-                    chatSessionId: self.session.id
-                )
-            } catch {
-                context.delete(newChatSession)
-                do {
-                    try context.save()
-                } catch {
-                    logger.error("Failed to rollback new session creation: \(error.localizedDescription)")
-                }
-                logger.error("Failed to create/start new session: \(error.localizedDescription)")
             }
+        } catch {
+            context.delete(newChatSession)
+            logger.error("Failed to create new session: \(error.localizedDescription)")
         }
     }
 }

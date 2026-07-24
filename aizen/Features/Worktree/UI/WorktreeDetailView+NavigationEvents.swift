@@ -10,18 +10,18 @@ extension WorktreeDetailView {
 
         switch destination {
         case .tab(_, let tabId):
-            guard visibleTabIds.contains(tabId) else { return }
-            selectedTab = tabId
+            if let kind = PaneKind(rawValue: tabId) {
+                scene.workspace.revealKind(kind)
+            }
         case .chatSession(_, let sessionId):
             _ = activateLocalChatSession(sessionId)
         case .terminalSession(_, let sessionId):
             if containsTerminalSession(sessionId) {
-                selectedTab = "terminal"
-                viewModel.selectedTerminalSessionId = sessionId
+                scene.workspace.revealTerminalSession(sessionId)
             }
         case .browserSession(_, let sessionId):
             if containsBrowserSession(sessionId) {
-                selectedTab = "browser"
+                scene.workspace.revealKind(.browser)
                 viewModel.selectedBrowserSessionId = sessionId
             }
         }
@@ -50,8 +50,9 @@ extension WorktreeDetailView {
             return
         }
 
-        guard visibleTabIds.contains(tabId) else { return }
-        selectedTab = tabId
+        if let kind = PaneKind(rawValue: tabId) {
+            scene.workspace.revealKind(kind)
+        }
     }
 
     func handleSwitchToTerminalSession(_ notification: Notification) {
@@ -63,8 +64,7 @@ extension WorktreeDetailView {
         }
 
         if containsTerminalSession(sessionId) {
-            selectedTab = "terminal"
-            viewModel.selectedTerminalSessionId = sessionId
+            scene.workspace.revealTerminalSession(sessionId)
         }
     }
 
@@ -77,7 +77,7 @@ extension WorktreeDetailView {
         }
 
         if containsBrowserSession(sessionId) {
-            selectedTab = "browser"
+            scene.workspace.revealKind(.browser)
             viewModel.selectedBrowserSessionId = sessionId
         }
     }

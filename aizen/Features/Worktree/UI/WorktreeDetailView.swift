@@ -25,10 +25,6 @@ struct WorktreeDetailView: View {
 
     @ObservedObject var viewModel: WorktreeDetailStore
 
-    @AppStorage("showChatTab") var showChatTab = true
-    @AppStorage("showTerminalTab") var showTerminalTab = true
-    @AppStorage("showFilesTab") var showFilesTab = true
-    @AppStorage("showBrowserTab") var showBrowserTab = true
     @AppStorage("showOpenInApp") var showOpenInApp = true
     @AppStorage("showGitStatus") var showGitStatus = true
     @AppStorage("showXcodeBuild") var showXcodeBuild = true
@@ -36,10 +32,8 @@ struct WorktreeDetailView: View {
     let worktreeRuntime: WorktreeRuntime
     @ObservedObject var gitSummaryStore: GitSummaryStore
     @ObservedObject var xcodeBuildManager: XcodeBuildStore
-    @StateObject var tabConfig = TabConfigurationStore.shared
     @State var projectSearchWindowController: ProjectSearchWindowController?
     @State var searchOpenRequest: SearchOpenRequest?
-    @State var cachedTerminalBackgroundColor: Color?
     @Environment(\.colorScheme) var colorScheme
 
     init(
@@ -65,39 +59,9 @@ struct WorktreeDetailView: View {
         _xcodeBuildManager = ObservedObject(wrappedValue: runtime.xcodeBuildManager)
     }
 
-    var selectedTab: String {
-        get { scene.selectedTab }
-        nonmutating set { scene.selectTab(newValue) }
-    }
-
-    var selectedTabBinding: Binding<String> {
-        Binding(
-            get: { selectedTab },
-            set: { selectedTab = $0 }
-        )
-    }
-
     var lastOpenedApp: DetectedApp? {
         get { scene.lastOpenedApp }
         nonmutating set { scene.lastOpenedApp = newValue }
-    }
-
-    var hasLoadedTabState: Bool {
-        get { scene.hasLoadedTabState }
-        nonmutating set { scene.hasLoadedTabState = newValue }
-    }
-
-    var visibleTabIds: [String] {
-        tabConfig.tabOrder
-            .map(\.id)
-            .filter { isTabVisible($0) }
-    }
-
-    func validateSelectedTab() {
-        let visibleTabs = tabConfig.tabOrder.filter { isTabVisible($0.id) }
-        if !visibleTabs.contains(where: { $0.id == selectedTab }) {
-            selectedTab = visibleTabs.first?.id ?? "files"
-        }
     }
 
     var body: some View {
@@ -113,7 +77,6 @@ struct WorktreeDetailView: View {
         scene: WorktreeSceneStore(
             worktree: Worktree(),
             repositoryManager: WorkspaceRepositoryStore(viewContext: PersistenceController.preview.container.viewContext),
-            tabStateManager: WorktreeTabStateStore(),
             viewContext: PersistenceController.preview.container.viewContext
         ),
         navigationSelectionStore: AppNavigationSelectionStore(),

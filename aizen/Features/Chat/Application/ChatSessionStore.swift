@@ -25,7 +25,6 @@ class ChatSessionStore: ObservableObject {
 
     // MARK: - Handlers
 
-    let agentSwitcher: AgentSwitcher
     let autocompleteHandler = UnifiedAutocompleteHandler()
 
     // MARK: - Services
@@ -140,8 +139,6 @@ class ChatSessionStore: ObservableObject {
         self.sessionManager = sessionManager
         self.viewContext = viewContext
         self.worktreePathSnapshot = worktree.path ?? ""
-
-        self.agentSwitcher = AgentSwitcher(viewContext: viewContext, session: session)
 
         setupNotificationObservers()
     }

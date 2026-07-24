@@ -16,9 +16,7 @@ extension WorktreeDetailView {
             return false
         }
 
-        selectedTab = "chat"
-        viewModel.selectedChatSessionId = sessionId
-        return true
+        return scene.workspace.revealChatSession(sessionId)
     }
 
     func postNavigateToChatSession(_ sessionId: UUID) {

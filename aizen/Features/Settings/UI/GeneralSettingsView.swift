@@ -30,12 +30,6 @@ struct GeneralSettingsView: View {
     @AppStorage("defaultCloneLocation") var defaultCloneLocation = "~/.aizen/repos"
     @AppStorage("defaultWorkspaceId") var defaultWorkspaceId = ""
 
-    // Layout
-    @AppStorage("showChatTab") var showChatTab = true
-    @AppStorage("showTerminalTab") var showTerminalTab = true
-    @AppStorage("showFilesTab") var showFilesTab = true
-    @AppStorage("showBrowserTab") var showBrowserTab = true
-
     // Toolbar
     @AppStorage("showOpenInApp") var showOpenInApp = true
     @AppStorage("showGitStatus") var showGitStatus = true
@@ -45,7 +39,6 @@ struct GeneralSettingsView: View {
     @AppStorage(AnalyticsSettings.isEnabledKey) var analyticsEnabled = AnalyticsSettings.defaultIsEnabled
 
     @ObservedObject var appDetector = AppDetector.shared
-    @StateObject var tabConfig = TabConfigurationStore.shared
 
     @State var showingResetConfirmation = false
     @State var cliStatus = CLISymlinkService.status()
@@ -74,8 +67,6 @@ struct GeneralSettingsView: View {
             defaultAppsSection
 
             projectsSection
-
-            layoutSection
 
             toolbarSection
 

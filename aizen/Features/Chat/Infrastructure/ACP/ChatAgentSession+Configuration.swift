@@ -95,7 +95,7 @@ extension ChatAgentSession {
             switch config {
             case .http, .sse:
                 return true
-            case .stdio:
+            case .stdio, .acp:
                 return false
             }
         }

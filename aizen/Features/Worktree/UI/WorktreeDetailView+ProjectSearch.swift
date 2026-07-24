@@ -8,7 +8,7 @@ extension WorktreeDetailView {
 
     func openFile(_ request: SearchOpenRequest) {
         searchOpenRequest = request
-        selectedTab = "files"
+        scene.workspace.revealKind(.files)
     }
 
     func showProjectSearch(mode: ProjectSearchMode) {

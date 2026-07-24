@@ -7,20 +7,19 @@
 
 import SwiftUI
 
-@ViewBuilder
 func placeholderView(
     titleKey: LocalizedStringKey,
     systemImage: String,
     descriptionKey: LocalizedStringKey
-) -> some View {
+) -> AnyView {
     if #available(macOS 14.0, *) {
-        ContentUnavailableView(
+        AnyView(ContentUnavailableView(
             titleKey,
             systemImage: systemImage,
             description: Text(descriptionKey)
-        )
+        ))
     } else {
-        VStack(spacing: 12) {
+        AnyView(VStack(spacing: 12) {
             Image(systemName: systemImage)
                 .font(.system(size: 50))
                 .foregroundStyle(.secondary)
@@ -37,6 +36,6 @@ func placeholderView(
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        .padding())
     }
 }

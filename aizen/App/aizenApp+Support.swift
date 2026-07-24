@@ -47,12 +47,20 @@ extension aizenApp {
         var validPaneIds = Set<String>()
 
         await context.perform {
-            let request: NSFetchRequest<TerminalSession> = TerminalSession.fetchRequest()
             do {
-                let sessions = try context.fetch(request)
-                for session in sessions {
+                let layoutRequest: NSFetchRequest<WorktreeLayout> = WorktreeLayout.fetchRequest()
+                for layout in try context.fetch(layoutRequest) {
+                    if let treeJSON = layout.treeJSON,
+                       let tree = WorkspaceLayoutCodec.decode(treeJSON) {
+                        validPaneIds.formUnion(tree.allPaneIds())
+                    }
+                }
+
+                // Terminal sessions of worktrees not yet migrated to workspace layouts.
+                let sessionRequest: NSFetchRequest<TerminalSession> = TerminalSession.fetchRequest()
+                for session in try context.fetch(sessionRequest) {
                     if let layoutJSON = session.splitLayout,
-                       let layout = SplitLayoutHelper.decode(layoutJSON) {
+                       let layout = WorkspaceLayoutCodec.decode(layoutJSON) {
                         validPaneIds.formUnion(layout.allPaneIds())
                     }
                 }

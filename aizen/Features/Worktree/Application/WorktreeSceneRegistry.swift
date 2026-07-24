@@ -35,13 +35,11 @@ final class WorktreeSceneRegistry: ObservableObject {
     @discardableResult
     func activate(
         worktree: Worktree,
-        repositoryManager: WorkspaceRepositoryStore,
-        tabStateManager: WorktreeTabStateStore
+        repositoryManager: WorkspaceRepositoryStore
     ) -> WorktreeSceneStore {
         let scene = scene(
             for: worktree,
-            repositoryManager: repositoryManager,
-            tabStateManager: tabStateManager
+            repositoryManager: repositoryManager
         )
         activeSceneId = scene.id
         touchScene(scene.id)
@@ -63,8 +61,7 @@ final class WorktreeSceneRegistry: ObservableObject {
 
     private func scene(
         for worktree: Worktree,
-        repositoryManager: WorkspaceRepositoryStore,
-        tabStateManager: WorktreeTabStateStore
+        repositoryManager: WorkspaceRepositoryStore
     ) -> WorktreeSceneStore {
         if let existingScene = scenesById[worktree.objectID] {
             return existingScene
@@ -73,7 +70,6 @@ final class WorktreeSceneRegistry: ObservableObject {
         let newScene = WorktreeSceneStore(
             worktree: worktree,
             repositoryManager: repositoryManager,
-            tabStateManager: tabStateManager,
             viewContext: viewContext
         )
         scenesById[worktree.objectID] = newScene

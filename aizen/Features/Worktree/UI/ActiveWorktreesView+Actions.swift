@@ -46,7 +46,7 @@ extension ActiveWorktreesView {
 
             if sessionPersistence,
                let layoutJSON = session.splitLayout,
-               let layout = SplitLayoutHelper.decode(layoutJSON) {
+               let layout = WorkspaceLayoutCodec.decode(layoutJSON) {
                 let paneIds = layout.allPaneIds()
                 Task {
                     for paneId in paneIds {
