@@ -147,6 +147,7 @@ jobs:
             -skipPackagePluginValidation \
             -skipMacroValidation \
             COMPILER_INDEX_STORE_ENABLE=NO \
+            SWIFT_COMPILATION_MODE=incremental \
             OTHER_METAL_FLAGS='-Wno-c++17-extensions' \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO
@@ -156,6 +157,8 @@ jobs:
         run: |
           if [ -d build/aizen-archive.xcresult ]; then
             xcrun xcresulttool get --legacy --path build/aizen-archive.xcresult --format json > build/aizen-archive.json || true
+            jq -r '.. | objects | select(.issueType?._value == "Error") | .message._value' \
+              build/aizen-archive.json || true
             tail -n 200 build/aizen-archive.json || true
           fi
 
