@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package aizen.wire.v1;
+
+option swift_prefix = "AizenWireV1_";
+
+message ProtocolEnvelope {
+  uint32 protocol_generation = 1;
+  string message_id = 2;
+  string connection_id = 3;
+  uint64 connection_sequence = 4;
+  MessageKind kind = 5;
+  LogicalChannel channel = 6;
+  string correlation_id = 7;
+  Acknowledgement acknowledgement = 8;
+  TypedPayload payload = 9;
+}
+
+enum MessageKind {
+  MESSAGE_KIND_UNSPECIFIED = 0;
+  MESSAGE_KIND_HELLO = 1;
+  MESSAGE_KIND_AUTHENTICATION = 2;
+  MESSAGE_KIND_CAPABILITIES = 3;
+  MESSAGE_KIND_COMMAND = 4;
+  MESSAGE_KIND_COMMAND_RECEIPT = 5;
+  MESSAGE_KIND_COMMAND_RESULT = 6;
+  MESSAGE_KIND_QUERY = 7;
+  MESSAGE_KIND_QUERY_RESPONSE = 8;
+  MESSAGE_KIND_SNAPSHOT = 9;
+  MESSAGE_KIND_EVENT = 10;
+  MESSAGE_KIND_EVENT_ACKNOWLEDGEMENT = 11;
+  MESSAGE_KIND_PING = 12;
+  MESSAGE_KIND_PONG = 13;
+  MESSAGE_KIND_CLOSE = 14;
+  MESSAGE_KIND_BLOB = 15;
+  MESSAGE_KIND_ERROR = 16;
+}
+
+enum LogicalChannel {
+  LOGICAL_CHANNEL_UNSPECIFIED = 0;
+  LOGICAL_CHANNEL_CONTROL = 1;
+  LOGICAL_CHANNEL_STATE = 2;
+  LOGICAL_CHANNEL_RUN_STREAM = 3;
+  LOGICAL_CHANNEL_TERMINAL = 4;
+  LOGICAL_CHANNEL_BLOB = 5;
+}
+
+enum PayloadEncoding {
+  PAYLOAD_ENCODING_UNSPECIFIED = 0;
+  PAYLOAD_ENCODING_PROTOBUF = 1;
+}
+
+message Acknowledgement {
+  uint64 sequence = 1;
+  string message_id = 2;
+}
+
+message TypedPayload {
+  string type = 1;
+  uint32 schema_version = 2;
+  PayloadEncoding encoding = 3;
+  bytes bytes = 4;
+  bool state_affecting = 5;
+}
+
+message Hello {
+  uint32 minimum_protocol_generation = 1;
+  uint32 maximum_protocol_generation = 2;
+  string product_version = 3;
+}
+
+message Capabilities {
+  repeated string identifiers = 1;
+}
+
+message CommandReceipt {
+  string command_id = 1;
+  string operation_id = 2;
+}
+
+message CommandResult {
+  string command_id = 1;
+  bool succeeded = 2;
+  string error_code = 3;
+}
+
+message SnapshotRequest {
+  string scope = 1;
+  uint64 after_cursor = 2;
+}
+
+message SnapshotResponse {
+  string scope = 1;
+  uint64 cursor = 2;
+  bytes snapshot = 3;
+}
+
+message Event {
+  uint64 cursor = 1;
+  string event_id = 2;
+}
+
+message Ping {
+  uint64 nonce = 1;
+}
+
+message Close {
+  string code = 1;
+  string reason = 2;
+}
+
+message BlobDescriptor {
+  string blob_id = 1;
+  uint64 byte_count = 2;
+  bytes sha256 = 3;
+}
+
+message BlobChunk {
+  string blob_id = 1;
+  uint64 offset = 2;
+  bytes bytes = 3;
+  bool final_chunk = 4;
+}
