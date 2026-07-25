@@ -109,12 +109,6 @@ jobs:
 
       - name: Build VVHighlighting grammar dylibs
         run: |
-          CACHED_COUNT=$(find "${{ env.VVDEVKIT_SWIFTPM_SCRATCH_PATH }}" -type f -name 'libTreeSitter*.dylib' -not -path '*.dSYM/*' 2>/dev/null | wc -l | tr -d ' ')
-          if [ "$CACHED_COUNT" -gt 0 ]; then
-            echo "Skipping build — $CACHED_COUNT cached VVHighlighting grammar dylibs found"
-            exit 0
-          fi
-
           VVDEVKIT_DIR=$(find "${{ env.DERIVED_DATA_PATH }}/SourcePackages/checkouts" -maxdepth 1 -type d \( -name 'VVDevKit' -o -name 'vvdevkit' \) | head -1)
 
           if [ -z "$VVDEVKIT_DIR" ]; then
@@ -122,13 +116,36 @@ jobs:
             exit 1
           fi
 
-          swift build -c release \
-            --package-path "$VVDEVKIT_DIR" \
-            --scratch-path "${{ env.VVDEVKIT_SWIFTPM_SCRATCH_PATH }}"
+          GRAMMAR_PRODUCTS_FILE="$(mktemp)"
+          swift package --package-path "$VVDEVKIT_DIR" dump-package |
+            jq -r '.products[].name | select(startswith("TreeSitter"))' > "$GRAMMAR_PRODUCTS_FILE"
+          EXPECTED_GRAMMAR_COUNT=$(wc -l < "$GRAMMAR_PRODUCTS_FILE" | tr -d ' ')
+
+          if [ "$EXPECTED_GRAMMAR_COUNT" -eq 0 ]; then
+            rm -f "$GRAMMAR_PRODUCTS_FILE"
+            echo "Error: VVDevKit does not declare any dynamic grammar products"
+            exit 1
+          fi
+
+          CACHED_COUNT=$(find "${{ env.VVDEVKIT_SWIFTPM_SCRATCH_PATH }}" -type f -name 'libTreeSitter*.dylib' -not -path '*.dSYM/*' 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$CACHED_COUNT" -eq "$EXPECTED_GRAMMAR_COUNT" ]; then
+            rm -f "$GRAMMAR_PRODUCTS_FILE"
+            echo "Skipping build — all $CACHED_COUNT VVHighlighting grammar dylibs restored from cache"
+            exit 0
+          fi
+
+          while IFS= read -r grammar_product; do
+            echo "Building $grammar_product"
+            swift build -c release \
+              --package-path "$VVDEVKIT_DIR" \
+              --scratch-path "${{ env.VVDEVKIT_SWIFTPM_SCRATCH_PATH }}" \
+              --product "$grammar_product"
+          done < "$GRAMMAR_PRODUCTS_FILE"
+          rm -f "$GRAMMAR_PRODUCTS_FILE"
 
           GRAMMAR_COUNT=$(find "${{ env.VVDEVKIT_SWIFTPM_SCRATCH_PATH }}" -type f -name 'libTreeSitter*.dylib' -not -path '*.dSYM/*' | wc -l | tr -d ' ')
-          if [ "$GRAMMAR_COUNT" -eq 0 ]; then
-            echo "Error: VVDevKit build did not produce any grammar dylibs"
+          if [ "$GRAMMAR_COUNT" -ne "$EXPECTED_GRAMMAR_COUNT" ]; then
+            echo "Error: VVDevKit built $GRAMMAR_COUNT of $EXPECTED_GRAMMAR_COUNT grammar dylibs"
             exit 1
           fi
 
