@@ -54,6 +54,9 @@ jobs:
           ls -lh Vendor/libghostty/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a
           ls -lh Vendor/fff-c/lib/libfff_c.dylib
 
+      - name: Select Xcode 26.6
+        run: sudo xcode-select --switch /Applications/Xcode_26.6.app/Contents/Developer
+
       - name: Show Xcode version
         id: xcode-version
         run: |
@@ -157,7 +160,7 @@ jobs:
         run: |
           if [ -d build/aizen-archive.xcresult ]; then
             xcrun xcresulttool get --legacy --path build/aizen-archive.xcresult --format json > build/aizen-archive.json || true
-            jq -r '.. | objects | select(.issueType?._value == "Error") | .message._value' \
+            jq -r '.. | objects | select((.issueType?._value // "") | test("error"; "i")) | .message._value' \
               build/aizen-archive.json || true
             tail -n 200 build/aizen-archive.json || true
           fi
