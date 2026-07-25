@@ -60,6 +60,9 @@ jobs:
           xcodebuild -version
           echo "cache_key=$(xcodebuild -version | shasum -a 256 | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
+      - name: Install Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
       - name: Bump version
         run: |
           chmod +x scripts/bump-version.sh
