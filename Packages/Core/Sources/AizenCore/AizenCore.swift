@@ -1,6 +1,410 @@
-/// Platform-neutral domain types and policies shared by every Aizen product.
+import Foundation
+
 public enum AizenCoreModule {
     public static let productVersion = "2.0.0"
     public static let protocolGeneration = 1
     public static let storageSchemaVersion = 2
+}
+
+// MARK: - Nominal identities
+
+public protocol DomainIDKind: Sendable {}
+
+public struct DomainID<Kind: DomainIDKind>: RawRepresentable, Codable, Sendable, Hashable, CustomStringConvertible {
+    public let rawValue: UUID
+
+    public init(rawValue: UUID) {
+        self.rawValue = rawValue
+    }
+
+    public init() {
+        self.init(rawValue: UUID())
+    }
+
+    public var description: String { rawValue.uuidString }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.rawValue == rhs.rawValue
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(rawValue)
+    }
+}
+
+public enum AccountIdentity: DomainIDKind {}
+public enum HostIdentity: DomainIDKind {}
+public enum DeviceIdentity: DomainIDKind {}
+public enum SpaceIdentity: DomainIDKind {}
+public enum SessionIdentity: DomainIDKind {}
+public enum ResourceIdentity: DomainIDKind {}
+public enum ExecutionContextIdentity: DomainIDKind {}
+public enum RunIdentity: DomainIDKind {}
+public enum OperationIdentity: DomainIDKind {}
+public enum ArtifactIdentity: DomainIDKind {}
+
+public typealias AccountID = DomainID<AccountIdentity>
+public typealias HostID = DomainID<HostIdentity>
+public typealias DeviceID = DomainID<DeviceIdentity>
+public typealias SpaceID = DomainID<SpaceIdentity>
+public typealias SessionID = DomainID<SessionIdentity>
+public typealias ResourceID = DomainID<ResourceIdentity>
+public typealias ExecutionContextID = DomainID<ExecutionContextIdentity>
+public typealias RunID = DomainID<RunIdentity>
+public typealias OperationID = DomainID<OperationIdentity>
+public typealias ArtifactID = DomainID<ArtifactIdentity>
+
+/// An opaque identifier to a secret or platform credential held outside Core and Storage snapshots.
+public struct SecureReferenceID: RawRepresentable, Codable, Sendable, Hashable {
+    public let rawValue: String
+
+    public init(rawValue: String) {
+        precondition(!rawValue.isEmpty, "Secure references require an identifier")
+        self.rawValue = rawValue
+    }
+}
+
+// MARK: - Extensible classifications
+
+public protocol ExtensibleKind: RawRepresentable, Codable, Sendable, Hashable where RawValue == String {
+    init(rawValue: String)
+}
+
+public struct SessionKind: ExtensibleKind {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+
+    public static let conversation = Self(rawValue: "conversation")
+    public static let research = Self(rawValue: "research")
+    public static let coding = Self(rawValue: "coding")
+    public static let planning = Self(rawValue: "planning")
+}
+
+public struct ResourceKind: ExtensibleKind {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+
+    public static let repository = Self(rawValue: "repository")
+    public static let folder = Self(rawValue: "folder")
+    public static let document = Self(rawValue: "document")
+    public static let file = Self(rawValue: "file")
+    public static let webSource = Self(rawValue: "web-source")
+    public static let dataset = Self(rawValue: "dataset")
+    public static let database = Self(rawValue: "database")
+    public static let server = Self(rawValue: "server")
+    public static let artifact = Self(rawValue: "artifact")
+}
+
+public struct ExecutionContextKind: ExtensibleKind {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+
+    public static let virtual = Self(rawValue: "virtual")
+    public static let managedTemporarySandbox = Self(rawValue: "managed-temporary-sandbox")
+    public static let managedPersistentSandbox = Self(rawValue: "managed-persistent-sandbox")
+    public static let localFolder = Self(rawValue: "local-folder")
+    public static let repositoryCheckout = Self(rawValue: "repository-checkout")
+    public static let gitWorktree = Self(rawValue: "git-worktree")
+    public static let copiedEnvironment = Self(rawValue: "copied-environment")
+    public static let remoteEnvironment = Self(rawValue: "remote-environment")
+    public static let container = Self(rawValue: "container")
+    public static let virtualMachine = Self(rawValue: "virtual-machine")
+}
+
+// MARK: - Space
+
+public struct SpaceConfiguration: Codable, Sendable, Hashable {
+    public var accountReferences: Set<SecureReferenceID>
+    public var providerReferences: Set<SecureReferenceID>
+    public var agentConfigurationReferences: Set<SecureReferenceID>
+    public var mcpConfigurationReferences: Set<SecureReferenceID>
+    public var memoryConfigurationReferences: Set<SecureReferenceID>
+    public var searchConfigurationReferences: Set<SecureReferenceID>
+    public var settingsReference: SecureReferenceID?
+    public var appearanceReference: SecureReferenceID?
+
+    public init(
+        accountReferences: Set<SecureReferenceID> = [],
+        providerReferences: Set<SecureReferenceID> = [],
+        agentConfigurationReferences: Set<SecureReferenceID> = [],
+        mcpConfigurationReferences: Set<SecureReferenceID> = [],
+        memoryConfigurationReferences: Set<SecureReferenceID> = [],
+        searchConfigurationReferences: Set<SecureReferenceID> = [],
+        settingsReference: SecureReferenceID? = nil,
+        appearanceReference: SecureReferenceID? = nil
+    ) {
+        self.accountReferences = accountReferences
+        self.providerReferences = providerReferences
+        self.agentConfigurationReferences = agentConfigurationReferences
+        self.mcpConfigurationReferences = mcpConfigurationReferences
+        self.memoryConfigurationReferences = memoryConfigurationReferences
+        self.searchConfigurationReferences = searchConfigurationReferences
+        self.settingsReference = settingsReference
+        self.appearanceReference = appearanceReference
+    }
+}
+
+public struct Space: Codable, Sendable, Hashable, Identifiable {
+    public let id: SpaceID
+    public var name: String
+    public var icon: String?
+    public var summary: String?
+    public var ownerAccountID: AccountID?
+    public var configuration: SpaceConfiguration
+
+    public init(
+        id: SpaceID = SpaceID(),
+        name: String,
+        icon: String? = nil,
+        summary: String? = nil,
+        ownerAccountID: AccountID? = nil,
+        configuration: SpaceConfiguration = .init()
+    ) {
+        precondition(!name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "A Space needs a name")
+        self.id = id
+        self.name = name
+        self.icon = icon
+        self.summary = summary
+        self.ownerAccountID = ownerAccountID
+        self.configuration = configuration
+    }
+}
+
+// MARK: - Sessions, resources, and execution contexts
+
+public enum SessionLifecycle: String, Codable, Sendable, Hashable {
+    case active
+    case archived
+}
+
+public struct Session: Codable, Sendable, Hashable, Identifiable {
+    public let id: SessionID
+    public let spaceID: SpaceID
+    public var kind: SessionKind
+    public var title: String
+    public var lifecycle: SessionLifecycle
+    public var resourceIDs: Set<ResourceID>
+    public var executionContextID: ExecutionContextID?
+
+    public init(
+        id: SessionID = SessionID(),
+        spaceID: SpaceID,
+        kind: SessionKind,
+        title: String,
+        lifecycle: SessionLifecycle = .active,
+        resourceIDs: Set<ResourceID> = [],
+        executionContextID: ExecutionContextID? = nil
+    ) {
+        precondition(!title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "A Session needs a title")
+        self.id = id
+        self.spaceID = spaceID
+        self.kind = kind
+        self.title = title
+        self.lifecycle = lifecycle
+        self.resourceIDs = resourceIDs
+        self.executionContextID = executionContextID
+    }
+}
+
+/// A Host-private reference to platform details such as a bookmark, path, token, or credential.
+public struct HostPrivateReference: RawRepresentable, Codable, Sendable, Hashable {
+    public let rawValue: String
+    public init(rawValue: String) {
+        precondition(!rawValue.isEmpty, "Host references require an identifier")
+        self.rawValue = rawValue
+    }
+}
+
+public struct RepositoryResourceDetails: Codable, Sendable, Hashable {
+    public let hostReference: HostPrivateReference
+    public let defaultBranch: String?
+
+    public init(hostReference: HostPrivateReference, defaultBranch: String? = nil) {
+        self.hostReference = hostReference
+        self.defaultBranch = defaultBranch
+    }
+}
+
+public struct WebResourceDetails: Codable, Sendable, Hashable {
+    public let url: URL
+    public init(url: URL) { self.url = url }
+}
+
+public enum ResourceDetails: Codable, Sendable, Hashable {
+    case repository(RepositoryResourceDetails)
+    case web(WebResourceDetails)
+    case hostPrivate(HostPrivateReference)
+    case none
+}
+
+public struct Resource: Codable, Sendable, Hashable, Identifiable {
+    public let id: ResourceID
+    public let spaceID: SpaceID
+    public var kind: ResourceKind
+    public var title: String
+    public var details: ResourceDetails
+
+    public init(id: ResourceID = ResourceID(), spaceID: SpaceID, kind: ResourceKind, title: String, details: ResourceDetails = .none) {
+        precondition(!title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "A Resource needs a title")
+        self.id = id
+        self.spaceID = spaceID
+        self.kind = kind
+        self.title = title
+        self.details = details
+    }
+}
+
+public struct ExecutionContext: Codable, Sendable, Hashable, Identifiable {
+    public let id: ExecutionContextID
+    public let spaceID: SpaceID
+    public var kind: ExecutionContextKind
+    public var resourceID: ResourceID?
+    public var hostReference: HostPrivateReference?
+
+    public init(
+        id: ExecutionContextID = ExecutionContextID(),
+        spaceID: SpaceID,
+        kind: ExecutionContextKind,
+        resourceID: ResourceID? = nil,
+        hostReference: HostPrivateReference? = nil
+    ) {
+        self.id = id
+        self.spaceID = spaceID
+        self.kind = kind
+        self.resourceID = resourceID
+        self.hostReference = hostReference
+    }
+}
+
+// MARK: - Host work
+
+public enum RunLifecycle: String, Codable, Sendable, Hashable {
+    case queued
+    case running
+    case completed
+    case failed
+    case cancelled
+}
+
+public struct Run: Codable, Sendable, Hashable, Identifiable {
+    public let id: RunID
+    public let spaceID: SpaceID
+    public let sessionID: SessionID
+    public var executionContextID: ExecutionContextID?
+    public var lifecycle: RunLifecycle
+
+    public init(id: RunID = RunID(), spaceID: SpaceID, sessionID: SessionID, executionContextID: ExecutionContextID? = nil, lifecycle: RunLifecycle = .queued) {
+        self.id = id
+        self.spaceID = spaceID
+        self.sessionID = sessionID
+        self.executionContextID = executionContextID
+        self.lifecycle = lifecycle
+    }
+}
+
+public enum OperationLifecycle: String, Codable, Sendable, Hashable {
+    case queued
+    case running
+    case completed
+    case failed
+    case cancelled
+
+    public func canTransition(to next: Self) -> Bool {
+        switch (self, next) {
+        case (.queued, .running), (.queued, .cancelled),
+             (.running, .completed), (.running, .failed), (.running, .cancelled):
+            true
+        default:
+            false
+        }
+    }
+}
+
+public struct Operation: Codable, Sendable, Hashable, Identifiable {
+    public let id: OperationID
+    public let spaceID: SpaceID
+    public let sessionID: SessionID?
+    public var lifecycle: OperationLifecycle
+    public var progress: Double?
+    public var failureDescription: String?
+
+    public init(
+        id: OperationID = OperationID(),
+        spaceID: SpaceID,
+        sessionID: SessionID? = nil,
+        lifecycle: OperationLifecycle = .queued,
+        progress: Double? = nil,
+        failureDescription: String? = nil
+    ) {
+        if let progress { precondition((0...1).contains(progress), "Operation progress must be between zero and one") }
+        precondition(lifecycle != .failed || failureDescription != nil, "Failed operations need a failure description")
+        self.id = id
+        self.spaceID = spaceID
+        self.sessionID = sessionID
+        self.lifecycle = lifecycle
+        self.progress = progress
+        self.failureDescription = failureDescription
+    }
+}
+
+public struct Artifact: Codable, Sendable, Hashable, Identifiable {
+    public let id: ArtifactID
+    public let spaceID: SpaceID
+    public let sessionID: SessionID?
+    public let runID: RunID?
+    public let resourceID: ResourceID?
+    public let producerReference: HostPrivateReference
+    public var title: String
+
+    public init(
+        id: ArtifactID = ArtifactID(),
+        spaceID: SpaceID,
+        sessionID: SessionID? = nil,
+        runID: RunID? = nil,
+        resourceID: ResourceID? = nil,
+        producerReference: HostPrivateReference,
+        title: String
+    ) {
+        precondition(!title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "An Artifact needs a title")
+        self.id = id
+        self.spaceID = spaceID
+        self.sessionID = sessionID
+        self.runID = runID
+        self.resourceID = resourceID
+        self.producerReference = producerReference
+        self.title = title
+    }
+}
+
+// MARK: - 1.x concept mapping
+
+public enum Aizen1Concept: String, CaseIterable, Codable, Sendable, Hashable {
+    case workspace
+    case repository
+    case worktreeOrFolder
+    case chatSession
+    case chatAgentSession
+    case terminalSession
+}
+
+public enum ReignitionConcept: String, Codable, Sendable, Hashable {
+    case space
+    case resource
+    case executionContext
+    case session
+    case hostRuntimeForRun
+    case sessionSurfaceOrContextRuntimeDescriptor
+}
+
+public enum Aizen1MigrationMapping {
+    public static func target(for source: Aizen1Concept) -> ReignitionConcept {
+        switch source {
+        case .workspace: .space
+        case .repository: .resource
+        case .worktreeOrFolder: .executionContext
+        case .chatSession: .session
+        case .chatAgentSession: .hostRuntimeForRun
+        case .terminalSession: .sessionSurfaceOrContextRuntimeDescriptor
+        }
+    }
 }
