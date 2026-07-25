@@ -30,8 +30,8 @@ struct WorkspaceView: View {
         return AppearanceSettings.effectiveThemeName(colorScheme: colorScheme)
     }
 
-    private var paneKindsSignature: String {
-        workspace.tree.allPanes().map { $0.kind.rawValue }.sorted().joined(separator: ",")
+    private var paneSessionSignature: String {
+        WorkspaceLayoutCodec.encode(workspace.tree) ?? ""
     }
 
     var body: some View {
@@ -57,10 +57,8 @@ struct WorkspaceView: View {
         .onDisappear {
             workspace.handleDisappear()
         }
-        .task(id: paneKindsSignature) {
-            for pane in workspace.tree.allPanes() {
-                scene.ensureStore(for: pane.kind)
-            }
+        .task(id: paneSessionSignature) {
+            scene.synchronizePaneStores(with: workspace.tree.allPanes())
         }
         .background {
             keyboardShortcutButtons

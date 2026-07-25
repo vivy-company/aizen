@@ -65,6 +65,10 @@ extension ActiveWorktreesView {
         if let session = worktree.fileBrowserSession, !session.isDeleted {
             viewContext.delete(session)
         }
+        let filePaneSessions = (worktree.filePaneSessions as? Set<FilePaneSession>) ?? []
+        for session in filePaneSessions where !session.isDeleted {
+            viewContext.delete(session)
+        }
 
         do {
             try viewContext.save()

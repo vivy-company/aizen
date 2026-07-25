@@ -12,7 +12,11 @@ extension BrowserSessionStore {
 
     func loadSessions() {
         let fetchRequest: NSFetchRequest<BrowserSession> = BrowserSession.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "worktree == %@", worktree)
+        fetchRequest.predicate = NSPredicate(
+            format: "worktree == %@ AND workspaceSessionId == %@",
+            worktree,
+            workspaceSessionId as CVarArg
+        )
         fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \BrowserSession.order, ascending: true)]
 
         do {
@@ -35,7 +39,8 @@ extension BrowserSessionStore {
         newSession.url = url
         newSession.title = nil
         newSession.createdAt = Date()
-        newSession.order = Int16(sessions.count)
+        newSession.order = nextSessionOrder()
+        newSession.workspaceSessionId = workspaceSessionId
         newSession.worktree = worktree
 
         do {
@@ -127,5 +132,16 @@ extension BrowserSessionStore {
 
         publishSessionsState()
         debouncedSave()
+    }
+
+    private func nextSessionOrder() -> Int64 {
+        guard let highestOrder = sessions.map(\.order).max() else { return 0 }
+        guard highestOrder < Int64.max else {
+            for (index, session) in sessions.enumerated() {
+                session.order = Int64(index)
+            }
+            return Int64(sessions.count)
+        }
+        return highestOrder + 1
     }
 }

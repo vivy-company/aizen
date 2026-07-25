@@ -22,15 +22,17 @@ class BrowserSessionStore: ObservableObject {
 
     let viewContext: NSManagedObjectContext
     let worktree: Worktree
+    let workspaceSessionId: UUID
     private var saveTask: Task<Void, Never>?
     var activeWebView: WKWebView?
     private var warmWebViewsBySessionId: [UUID: WKWebView] = [:]
     private var warmWebViewOrder: [UUID] = []
     private let maxWarmWebViews = 3
 
-    init(viewContext: NSManagedObjectContext, worktree: Worktree) {
+    init(viewContext: NSManagedObjectContext, worktree: Worktree, workspaceSessionId: UUID) {
         self.viewContext = viewContext
         self.worktree = worktree
+        self.workspaceSessionId = workspaceSessionId
         loadSessions()
     }
 
@@ -43,12 +45,19 @@ class BrowserSessionStore: ObservableObject {
         saveTask = Task {
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             guard !Task.isCancelled else { return }
+            flushPendingSave()
+        }
+    }
 
-            do {
-                try viewContext.save()
-            } catch {
-                logger.error("Failed to save browser session: \(error)")
-            }
+    func flushPendingSave() {
+        saveTask?.cancel()
+        saveTask = nil
+        guard viewContext.hasChanges else { return }
+
+        do {
+            try viewContext.save()
+        } catch {
+            logger.error("Failed to save browser session: \(error)")
         }
     }
 

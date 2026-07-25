@@ -19,8 +19,8 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
     let runtime: WorktreeRuntime
     let workspace: WorkspaceStore
 
-    @Published private(set) var fileBrowserStore: FileBrowserStore?
-    @Published private(set) var browserSessionStore: BrowserSessionStore?
+    @Published private var fileBrowserStoresById: [UUID: FileBrowserStore] = [:]
+    @Published private var browserSessionStoresById: [UUID: BrowserSessionStore] = [:]
     @Published var lastOpenedApp: DetectedApp?
 
     private let viewContext: NSManagedObjectContext
@@ -50,23 +50,83 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
 
     // MARK: - Feature stores
 
-    /// Lazily creates the store a pane kind depends on. Called when a pane of
-    /// that kind enters the visible layout.
-    func ensureStore(for kind: PaneKind) {
-        switch kind {
+    /// Lazily creates the store a pane depends on. File and browser stores are
+    /// keyed by the pane's persisted session identity, never by worktree.
+    func ensureStore(for pane: WorkspacePane) {
+        switch pane.kind {
         case .files:
-            if fileBrowserStore == nil, worktree.path != nil {
-                fileBrowserStore = FileBrowserStore(worktree: worktree, context: viewContext)
+            if let sessionId = pane.sessionId,
+               fileBrowserStoresById[sessionId] == nil,
+               let session = workspace.filePaneSession(withId: sessionId) {
+                fileBrowserStoresById[sessionId] = FileBrowserStore(
+                    worktree: worktree,
+                    context: viewContext,
+                    session: session
+                )
             }
             syncFileBrowserVisibility()
         case .browser:
-            if browserSessionStore == nil {
-                browserSessionStore = BrowserSessionStore(viewContext: viewContext, worktree: worktree)
+            if let sessionId = pane.sessionId,
+               browserSessionStoresById[sessionId] == nil {
+                browserSessionStoresById[sessionId] = BrowserSessionStore(
+                    viewContext: viewContext,
+                    worktree: worktree,
+                    workspaceSessionId: sessionId
+                )
             }
         case .terminal, .chat, .gitDiff, .empty:
             break
         }
-        trackOpenedSurfaceIfNeeded(kind)
+        trackOpenedSurfaceIfNeeded(pane.kind)
+    }
+
+    func synchronizePaneStores(with panes: [WorkspacePane]) {
+        for pane in panes {
+            ensureStore(for: pane)
+        }
+
+        let visibleFileSessionIds = Set(panes.compactMap { $0.kind == .files ? $0.sessionId : nil })
+        for (sessionId, store) in fileBrowserStoresById {
+            store.setVisible(isSceneActive && visibleFileSessionIds.contains(sessionId))
+            if !visibleFileSessionIds.contains(sessionId) {
+                store.flushSessionSave()
+            }
+        }
+        fileBrowserStoresById = fileBrowserStoresById.filter {
+            visibleFileSessionIds.contains($0.key)
+        }
+
+        let visibleBrowserSessionIds = Set(panes.compactMap { $0.kind == .browser ? $0.sessionId : nil })
+        for (sessionId, store) in browserSessionStoresById where !visibleBrowserSessionIds.contains(sessionId) {
+            store.flushPendingSave()
+            store.clearWarmWebViews()
+        }
+        browserSessionStoresById = browserSessionStoresById.filter {
+            visibleBrowserSessionIds.contains($0.key)
+        }
+    }
+
+    func fileBrowserStore(for pane: WorkspacePane) -> FileBrowserStore? {
+        guard pane.kind == .files, let sessionId = pane.sessionId else { return nil }
+        return fileBrowserStoresById[sessionId]
+    }
+
+    func browserSessionStore(for pane: WorkspacePane) -> BrowserSessionStore? {
+        guard pane.kind == .browser, let sessionId = pane.sessionId else { return nil }
+        return browserSessionStoresById[sessionId]
+    }
+
+    @discardableResult
+    func revealBrowserSession(_ sessionId: UUID) -> Bool {
+        guard workspace.revealBrowserSession(sessionId),
+              let pane = workspace.focusedPane,
+              pane.kind == .browser else {
+            return false
+        }
+
+        ensureStore(for: pane)
+        browserSessionStore(for: pane)?.selectSession(sessionId)
+        return true
     }
 
     func chatStore(for session: ChatSession) -> ChatSessionStore {
@@ -105,7 +165,7 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
             isSceneActive = false
             cancelActivationTasks()
             detailAttached = false
-            fileBrowserStore?.setVisible(false)
+            fileBrowserStoresById.values.forEach { $0.setVisible(false) }
             runtime.detachDetail()
             return
         }
@@ -124,11 +184,17 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
         cancelActivationTasks()
         isSceneActive = false
         detailAttached = false
-        fileBrowserStore?.setVisible(false)
+        fileBrowserStoresById.values.forEach { $0.setVisible(false) }
         runtime.detachDetail()
         workspace.persistTreeNow()
         workspace.handleDisappear()
-        browserSessionStore?.clearWarmWebViews()
+        fileBrowserStoresById.values.forEach { $0.flushSessionSave() }
+        browserSessionStoresById.values.forEach {
+            $0.flushPendingSave()
+            $0.clearWarmWebViews()
+        }
+        fileBrowserStoresById.removeAll()
+        browserSessionStoresById.removeAll()
         chatStoresById.removeAll()
         chatStoreOrder.removeAll()
     }
@@ -171,8 +237,12 @@ final class WorktreeSceneStore: ObservableObject, Identifiable {
     }
 
     private func syncFileBrowserVisibility() {
-        let hasVisibleFilePane = workspace.tree.allPanes().contains { $0.kind == .files }
-        fileBrowserStore?.setVisible(isSceneActive && hasVisibleFilePane)
+        let visibleSessionIds = Set(workspace.tree.allPanes().compactMap {
+            $0.kind == .files ? $0.sessionId : nil
+        })
+        for (sessionId, store) in fileBrowserStoresById {
+            store.setVisible(isSceneActive && visibleSessionIds.contains(sessionId))
+        }
     }
 
     private func touchChatStore(_ sessionId: UUID) {

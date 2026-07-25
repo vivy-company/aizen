@@ -10,16 +10,6 @@ struct BrowserTabView: View {
 
     @StateObject private var manager: BrowserSessionStore
 
-    init(worktree: Worktree, selectedSessionId: Binding<UUID?>, isSelected: Bool = true) {
-        self.worktree = worktree
-        self.isSelected = isSelected
-        self._selectedSessionId = selectedSessionId
-
-        // Initialize manager with worktree and viewContext
-        let context = PersistenceController.shared.container.viewContext
-        _manager = StateObject(wrappedValue: BrowserSessionStore(viewContext: context, worktree: worktree))
-    }
-
     init(manager: BrowserSessionStore, selectedSessionId: Binding<UUID?>, isSelected: Bool = true) {
         self.worktree = manager.worktree
         self.isSelected = isSelected

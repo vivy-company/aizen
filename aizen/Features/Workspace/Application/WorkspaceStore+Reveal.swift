@@ -32,6 +32,23 @@ extension WorkspaceStore {
         }
     }
 
+    /// Focuses the browser pane that owns the requested browser tab.
+    /// Browser tab identifiers are scoped by the pane's workspace session.
+    @discardableResult
+    func revealBrowserSession(_ sessionId: UUID) -> Bool {
+        let sessions = (worktree.browserSessions as? Set<BrowserSession>) ?? []
+        guard let workspaceSessionId = sessions.first(where: { $0.id == sessionId })?.workspaceSessionId else {
+            return false
+        }
+
+        revealPane(matching: {
+            $0.kind == .browser && $0.sessionId == workspaceSessionId
+        }) {
+            .leaf(WorkspacePane(kind: .browser, sessionId: workspaceSessionId))
+        }
+        return true
+    }
+
     /// Focuses any pane of the given kind, or creates a layout hosting one.
     func revealKind(_ kind: PaneKind) {
         revealPane(matching: { $0.kind == kind }) { [weak self] in

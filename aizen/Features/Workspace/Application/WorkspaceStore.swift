@@ -99,10 +99,11 @@ final class WorkspaceStore: ObservableObject {
     private func activateLayout(_ layout: WorktreeLayout) {
         activeLayoutId = layout.id
         if let json = layout.treeJSON, let decoded = WorkspaceLayoutCodec.decode(json) {
-            tree = decoded
+            tree = provisioningMissingSessionBindings(in: decoded)
         } else {
             tree = .leaf(WorkspacePane(kind: .empty))
         }
+        layout.treeJSON = WorkspaceLayoutCodec.encode(tree)
         let paneIds = tree.allPaneIds()
         if let stored = layout.focusedPaneId, paneIds.contains(stored) {
             focusedPaneId = stored

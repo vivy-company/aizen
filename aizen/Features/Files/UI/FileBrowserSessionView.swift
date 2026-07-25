@@ -6,24 +6,12 @@
 //
 
 import SwiftUI
-import CoreData
 
 struct FileBrowserSessionView: View {
     @StateObject private var viewModel: FileBrowserStore
     @Binding private var searchOpenRequest: SearchOpenRequest?
     let showPathHeader: Bool
     @AppStorage("fileBrowserShowTree") private var showTree = true
-
-    init(
-        worktree: Worktree,
-        context: NSManagedObjectContext,
-        searchOpenRequest: Binding<SearchOpenRequest?>,
-        showPathHeader: Bool = true
-    ) {
-        _viewModel = StateObject(wrappedValue: FileBrowserStore(worktree: worktree, context: context))
-        _searchOpenRequest = searchOpenRequest
-        self.showPathHeader = showPathHeader
-    }
 
     init(
         viewModel: FileBrowserStore,

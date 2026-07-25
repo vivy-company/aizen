@@ -134,7 +134,9 @@ extension WorkspaceStore {
             pane = WorkspacePane(kind: .terminal, sessionId: session.id)
         case .chat:
             pane = makePane(kind: .chat, inheritingFrom: nil)
-        case .files, .browser, .gitDiff, .empty:
+        case .files, .browser:
+            pane = makePane(kind: kind, inheritingFrom: nil)
+        case .gitDiff, .empty:
             pane = WorkspacePane(kind: kind)
         }
         addLayout(tree: .leaf(pane))
@@ -160,7 +162,13 @@ extension WorkspaceStore {
         case .chat:
             return WorkspacePane(id: id, kind: .chat, sessionId: createChatSession(agentId: defaultAgentId())?.id)
 
-        case .files, .browser, .gitDiff, .empty:
+        case .files:
+            return WorkspacePane(id: id, kind: .files, sessionId: createFilePaneSession()?.id)
+
+        case .browser:
+            return WorkspacePane(id: id, kind: .browser, sessionId: createBrowserWorkspaceSessionId())
+
+        case .gitDiff, .empty:
             return WorkspacePane(id: id, kind: kind)
         }
     }
@@ -172,6 +180,11 @@ extension WorkspaceStore {
 
     func chatSession(withId id: UUID) -> ChatSession? {
         let sessions = (worktree.chatSessions as? Set<ChatSession>) ?? []
+        return sessions.first { $0.id == id }
+    }
+
+    func filePaneSession(withId id: UUID) -> FilePaneSession? {
+        let sessions = (worktree.filePaneSessions as? Set<FilePaneSession>) ?? []
         return sessions.first { $0.id == id }
     }
 
@@ -211,6 +224,78 @@ extension WorkspaceStore {
         return chatSession(withId: sessionId)?.agentName
     }
 
+    private func createFilePaneSession() -> FilePaneSession? {
+        let existingSessions = (worktree.filePaneSessions as? Set<FilePaneSession>) ?? []
+        let session = FilePaneSession(context: viewContext)
+        session.id = UUID()
+        session.currentPath = worktree.path
+        session.setValue([], forKey: "expandedPaths")
+        session.setValue([], forKey: "openFilesPaths")
+        session.worktree = worktree
+
+        if let legacy = worktree.fileBrowserSession {
+            if existingSessions.isEmpty {
+                session.currentPath = legacy.currentPath ?? worktree.path
+                session.expandedPaths = legacy.expandedPaths
+                session.openFilesPaths = legacy.openFilesPaths
+                session.selectedFilePath = legacy.selectedFilePath
+            }
+            viewContext.delete(legacy)
+        }
+
+        saveContext()
+        return session
+    }
+
+    private func createBrowserWorkspaceSessionId(claimingLegacySessions: Bool = false) -> UUID {
+        let workspaceSessionId = UUID()
+        guard claimingLegacySessions else { return workspaceSessionId }
+
+        let sessions = (worktree.browserSessions as? Set<BrowserSession>) ?? []
+        for session in sessions where session.workspaceSessionId == nil {
+            session.workspaceSessionId = workspaceSessionId
+        }
+        saveContext()
+        return workspaceSessionId
+    }
+
+    func provisioningMissingSessionBindings(in node: WorkspaceSplitNode) -> WorkspaceSplitNode {
+        var result = node
+        var canClaimLegacyBrowserSessions = !allPersistedPanes().contains {
+            $0.kind == .browser && $0.sessionId != nil
+        }
+
+        for pane in node.allPanes() {
+            switch pane.kind {
+            case .files:
+                if let sessionId = pane.sessionId,
+                   filePaneSession(withId: sessionId) != nil {
+                    continue
+                }
+                let sessionId = createFilePaneSession()?.id
+                result = result.updatingPane(pane.id) { $0.sessionId = sessionId }
+
+            case .browser:
+                guard pane.sessionId == nil else { continue }
+                let sessionId = createBrowserWorkspaceSessionId(
+                    claimingLegacySessions: canClaimLegacyBrowserSessions
+                )
+                canClaimLegacyBrowserSessions = false
+                result = result.updatingPane(pane.id) { $0.sessionId = sessionId }
+
+            case .terminal, .chat, .gitDiff, .empty:
+                break
+            }
+        }
+        return result
+    }
+
+    private func allPersistedPanes() -> [WorkspacePane] {
+        layouts.flatMap { layout in
+            return layout.treeJSON.flatMap(WorkspaceLayoutCodec.decode)?.allPanes() ?? []
+        }
+    }
+
     private func defaultAgentId() -> String {
         if let stored = UserDefaults.standard.string(forKey: "defaultACPAgent"),
            AgentRegistry.shared.getEnabledAgents().contains(where: { $0.id == stored }) {
@@ -248,7 +333,25 @@ extension WorkspaceStore {
                 }
             }
 
-        case .files, .browser, .gitDiff, .empty:
+        case .files:
+            guard let sessionId = pane.sessionId else { return }
+            if !sessionReferencedByAnyPane(sessionId, excludingPaneId: pane.id),
+               let session = filePaneSession(withId: sessionId) {
+                viewContext.delete(session)
+                saveContext()
+            }
+
+        case .browser:
+            guard let workspaceSessionId = pane.sessionId else { return }
+            if !sessionReferencedByAnyPane(workspaceSessionId, excludingPaneId: pane.id) {
+                let sessions = (worktree.browserSessions as? Set<BrowserSession>) ?? []
+                for session in sessions where session.workspaceSessionId == workspaceSessionId {
+                    viewContext.delete(session)
+                }
+                saveContext()
+            }
+
+        case .gitDiff, .empty:
             break
         }
     }
@@ -325,7 +428,12 @@ extension WorkspaceStore {
         }
 
         if let browserSessions = worktree.browserSessions, browserSessions.count > 0 {
-            insertLayout(name: nil, tree: .leaf(WorkspacePane(kind: .browser)), focusedPaneId: nil)
+            let sessionId = createBrowserWorkspaceSessionId(claimingLegacySessions: true)
+            insertLayout(
+                name: nil,
+                tree: .leaf(WorkspacePane(kind: .browser, sessionId: sessionId)),
+                focusedPaneId: nil
+            )
         }
 
         if order == 0 {

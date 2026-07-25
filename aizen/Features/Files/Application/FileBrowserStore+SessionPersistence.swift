@@ -11,37 +11,16 @@ import os
 
 extension FileBrowserStore {
     func loadSession() {
-        if let existingSession = worktree.fileBrowserSession {
-            session = existingSession
+        if let currentPath = session.currentPath {
+            self.currentPath = currentPath
+        }
 
-            if let currentPath = existingSession.currentPath {
-                self.currentPath = currentPath
-            }
+        if let expandedPathsArray = session.value(forKey: "expandedPaths") as? [String] {
+            expandedPaths = Set(expandedPathsArray)
+        }
 
-            if let expandedPathsArray = existingSession.value(forKey: "expandedPaths") as? [String] {
-                expandedPaths = Set(expandedPathsArray)
-            }
-
-            if let selectedPath = existingSession.selectedFilePath {
-                if let openPathsArray = existingSession.value(forKey: "openFilesPaths") as? [String],
-                   openPathsArray.contains(selectedPath) {
-                    // Selection is restored after selected file hydration completes.
-                }
-            }
-
-            if let openPathsArray = existingSession.value(forKey: "openFilesPaths") as? [String] {
-                restoreOpenFiles(openPathsArray, selectedPath: existingSession.selectedFilePath)
-            }
-        } else {
-            let newSession = FileBrowserSession(context: viewContext)
-            newSession.id = UUID()
-            newSession.currentPath = currentPath
-            newSession.setValue([], forKey: "expandedPaths")
-            newSession.setValue([], forKey: "openFilesPaths")
-            newSession.worktree = worktree
-            session = newSession
-
-            saveSession(immediately: true)
+        if let openPathsArray = session.value(forKey: "openFilesPaths") as? [String] {
+            restoreOpenFiles(openPathsArray, selectedPath: session.selectedFilePath)
         }
     }
 
@@ -96,9 +75,14 @@ extension FileBrowserStore {
         }
     }
 
-    private func persistSessionNow() {
-        guard let session = session else { return }
+    func flushSessionSave() {
+        sessionSaveTask?.cancel()
+        sessionSaveTask = nil
+        guard !session.isDeleted else { return }
+        persistSessionNow()
+    }
 
+    private func persistSessionNow() {
         session.currentPath = currentPath
         session.setValue(Array(expandedPaths), forKey: "expandedPaths")
         session.setValue(openFiles.map { $0.path }, forKey: "openFilesPaths")

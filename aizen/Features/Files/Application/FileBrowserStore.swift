@@ -79,7 +79,7 @@ class FileBrowserStore: ObservableObject {
 
     let worktree: Worktree
     let viewContext: NSManagedObjectContext
-    var session: FileBrowserSession?
+    let session: FilePaneSession
     let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.aizen.app", category: "FileBrowser")
     let fileService = FileService()
     let gitRuntime = FileBrowserGitRuntime()
@@ -92,12 +92,12 @@ class FileBrowserStore: ObservableObject {
     var isVisible = false
     var editorRuntimesByFileId: [UUID: CodeEditorRuntime] = [:]
 
-    init(worktree: Worktree, context: NSManagedObjectContext) {
+    init(worktree: Worktree, context: NSManagedObjectContext, session: FilePaneSession) {
         self.worktree = worktree
         self.viewContext = context
+        self.session = session
         self.currentPath = worktree.path ?? ""
 
-        // Load or create session
         loadSession()
     }
 

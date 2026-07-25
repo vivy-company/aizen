@@ -21,8 +21,7 @@ extension WorktreeDetailView {
             }
         case .browserSession(_, let sessionId):
             if containsBrowserSession(sessionId) {
-                scene.workspace.revealKind(.browser)
-                viewModel.selectedBrowserSessionId = sessionId
+                scene.revealBrowserSession(sessionId)
             }
         }
     }
@@ -77,8 +76,7 @@ extension WorktreeDetailView {
         }
 
         if containsBrowserSession(sessionId) {
-            scene.workspace.revealKind(.browser)
-            viewModel.selectedBrowserSessionId = sessionId
+            scene.revealBrowserSession(sessionId)
         }
     }
 

@@ -6,20 +6,18 @@
 //
 
 import SwiftUI
-import CoreData
 
 struct FileTabView: View {
     let worktree: Worktree
     @Binding var searchOpenRequest: SearchOpenRequest?
     var showPathHeader: Bool = true
-    let store: FileBrowserStore?
-    @Environment(\.managedObjectContext) private var viewContext
+    let store: FileBrowserStore
 
     init(
         worktree: Worktree,
         searchOpenRequest: Binding<SearchOpenRequest?>,
         showPathHeader: Bool = true,
-        store: FileBrowserStore? = nil
+        store: FileBrowserStore
     ) {
         self.worktree = worktree
         self._searchOpenRequest = searchOpenRequest
@@ -29,22 +27,12 @@ struct FileTabView: View {
 
     var body: some View {
         if worktree.path != nil {
-            if let store {
-                FileBrowserSessionView(
-                    viewModel: store,
-                    searchOpenRequest: $searchOpenRequest,
-                    showPathHeader: showPathHeader
-                )
-                .id(ObjectIdentifier(store))
-            } else {
-                FileBrowserSessionView(
-                    worktree: worktree,
-                    context: viewContext,
-                    searchOpenRequest: $searchOpenRequest,
-                    showPathHeader: showPathHeader
-                )
-                .id(worktree.objectID)
-            }
+            FileBrowserSessionView(
+                viewModel: store,
+                searchOpenRequest: $searchOpenRequest,
+                showPathHeader: showPathHeader
+            )
+            .id(ObjectIdentifier(store))
         } else {
             VStack {
                 Image(systemName: "exclamationmark.triangle")

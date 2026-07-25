@@ -16,7 +16,6 @@ class WorktreeDetailStore: ObservableObject {
     @Published var selectedChatSessionId: UUID?
     @Published var selectedTerminalSessionId: UUID?
     @Published var selectedFileSessionId: UUID?
-    @Published var selectedBrowserSessionId: UUID?
     @Published private(set) var chatSessions: [ChatSession] = []
     @Published private(set) var recentChatSessions: [ChatSession] = []
     @Published private(set) var terminalSessions: [TerminalSession] = []
@@ -92,7 +91,11 @@ class WorktreeDetailStore: ObservableObject {
             return changedWorktree.objectID == worktree.objectID
         }
 
-        if object is ChatSession || object is TerminalSession || object is BrowserSession || object is FileBrowserSession {
+        if object is ChatSession
+            || object is TerminalSession
+            || object is BrowserSession
+            || object is FileBrowserSession
+            || object is FilePaneSession {
             return belongsToCurrentWorktree(object)
         }
 

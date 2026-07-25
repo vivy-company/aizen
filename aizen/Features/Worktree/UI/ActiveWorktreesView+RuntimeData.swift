@@ -58,7 +58,9 @@ extension ActiveWorktreesView {
             chats: sessionLists.chatSessions.count,
             terminals: sessionLists.terminalSessions.count,
             browsers: sessionLists.browserSessions.count,
-            files: (worktree.fileBrowserSession?.isDeleted == false) ? 1 : 0
+            files: ((worktree.filePaneSessions as? Set<FilePaneSession>) ?? [])
+                .filter { !$0.isDeleted }
+                .count
         )
 
         return ActiveWorktreesSessionCounts(

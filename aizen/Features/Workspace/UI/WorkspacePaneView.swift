@@ -36,8 +36,8 @@ struct WorkspacePaneView: View {
                 workspace.focusPane(pane.id)
             }
         )
-        .task(id: pane.kind) {
-            scene.ensureStore(for: pane.kind)
+        .task(id: pane) {
+            scene.ensureStore(for: pane)
         }
     }
 
@@ -60,15 +60,19 @@ struct WorkspacePaneView: View {
             }
 
         case .files:
-            FileTabView(
-                worktree: worktree,
-                searchOpenRequest: $searchOpenRequest,
-                showPathHeader: false,
-                store: scene.fileBrowserStore
-            )
+            if let store = scene.fileBrowserStore(for: pane) {
+                FileTabView(
+                    worktree: worktree,
+                    searchOpenRequest: focusedSearchOpenRequest,
+                    showPathHeader: false,
+                    store: store
+                )
+            } else {
+                ProgressView()
+            }
 
         case .browser:
-            if let browserSessionStore = scene.browserSessionStore {
+            if let browserSessionStore = scene.browserSessionStore(for: pane) {
                 BrowserTabView(
                     manager: browserSessionStore,
                     selectedSessionId: $browserSelectionId,
@@ -76,12 +80,7 @@ struct WorkspacePaneView: View {
                 )
                 .id(ObjectIdentifier(browserSessionStore))
             } else {
-                BrowserTabView(
-                    worktree: worktree,
-                    selectedSessionId: $browserSelectionId,
-                    isSelected: isFocused
-                )
-                .id(worktree.objectID)
+                ProgressView()
             }
 
         case .gitDiff:
@@ -129,6 +128,17 @@ struct WorkspacePaneView: View {
         WorkspaceEmptyPaneView { kind in
             workspace.replacePane(pane.id, with: kind)
         }
+    }
+
+    private var focusedSearchOpenRequest: Binding<SearchOpenRequest?> {
+        Binding(
+            get: { isFocused ? searchOpenRequest : nil },
+            set: { newValue in
+                if isFocused {
+                    searchOpenRequest = newValue
+                }
+            }
+        )
     }
 }
 

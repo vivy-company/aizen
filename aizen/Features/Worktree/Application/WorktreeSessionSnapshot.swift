@@ -30,7 +30,9 @@ struct WorktreeSessionLists {
 enum WorktreeSessionSnapshotBuilder {
     static func counts(for worktree: Worktree) -> WorktreeSessionCounts {
         let lists = lists(for: worktree)
-        let fileCount = (worktree.fileBrowserSession?.isDeleted == false) ? 1 : 0
+        let fileCount = ((worktree.filePaneSessions as? Set<FilePaneSession>) ?? [])
+            .filter { !$0.isDeleted }
+            .count
 
         return WorktreeSessionCounts(
             chats: lists.chatSessions.count,
