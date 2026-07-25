@@ -28,7 +28,7 @@ env:
 
 jobs:
   build-and-release:
-    runs-on: macos-26
+    runs-on: xcode-27
     permissions:
       contents: write
 
@@ -53,9 +53,6 @@ jobs:
           echo "Using vendored libghostty version $(cat Vendor/libghostty/VERSION)"
           ls -lh Vendor/libghostty/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a
           ls -lh Vendor/fff-c/lib/libfff_c.dylib
-
-      - name: Select Xcode 26.6
-        run: sudo xcode-select --switch /Applications/Xcode_26.6.app/Contents/Developer
 
       - name: Show Xcode version
         id: xcode-version
@@ -160,10 +157,22 @@ jobs:
         run: |
           if [ -d build/aizen-archive.xcresult ]; then
             xcrun xcresulttool get --legacy --path build/aizen-archive.xcresult --format json > build/aizen-archive.json || true
-            jq -r '.. | objects | select((.issueType?._value // "") | test("error"; "i")) | .message._value' \
+            jq -r '.. | objects | select(.issueType?._value != null and .message?._value != null) |
+              "[\(.issueType._value)] \(.message._value)"' \
               build/aizen-archive.json || true
             tail -n 200 build/aizen-archive.json || true
           fi
+
+      - name: Upload archive diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: aizen-archive-diagnostics
+          path: |
+            build/aizen-archive.xcresult
+            build/aizen-archive.json
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Export app bundle
         run: |
