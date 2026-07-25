@@ -11,6 +11,8 @@
 
 > **Early Access** — Aizen is under active development with near-daily updates. Expect breaking changes and new features frequently.
 
+> **Roadmap** — 1.0.83 is the final release in the 1.0.x series. Aizen is entering a major reimagining and repositioning. The next release will be 2.0.0 and will not be backward-compatible with 1.0.x.
+
 Aizen is a macOS workspace for parallel development.
 
 Bring order to your projects, environments, and day-to-day work.
@@ -50,7 +52,7 @@ Aizen is an agentic-first developer workspace for macOS. It helps you run projec
 
 ### Files and Browser
 - **File browser** — Tree view, search, syntax highlighting, inline diffs, and multiple tabs
-- **Built-in browser** — Per-worktree tabs for docs, previews, auth flows, and local apps
+- **Built-in browser** — Per-pane tabs for docs, previews, auth flows, and local apps
 
 ## Requirements
 
