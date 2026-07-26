@@ -26,17 +26,14 @@ final class ReignitionConversationStore: ObservableObject {
     @Published private(set) var isSynchronizing = false
     @Published private(set) var lastError: String?
 
-    private let host: ReignitionHostComposition
+    private let host: any ReignitionConversationClient
     private let journalSynchronizer: JournalEventSynchronizer
     private var sessionIDByRun: [RunID: SessionID] = [:]
     private var eventTask: Task<Void, Never>?
 
-    init(host: ReignitionHostComposition) {
+    init(host: any ReignitionConversationClient, journalCursorStore: any JournalCursorStore) {
         self.host = host
-        let cursorURL = ReignitionHostComposition.defaultStorageURL()
-            .deletingLastPathComponent()
-            .appendingPathComponent("reignition-journal-cursor.json")
-        journalSynchronizer = JournalEventSynchronizer(cursorStore: FileJournalCursorStore(url: cursorURL))
+        journalSynchronizer = JournalEventSynchronizer(cursorStore: journalCursorStore)
         eventTask = Task { [weak self, host] in
             for await event in await host.events() {
                 guard !Task.isCancelled else { return }
@@ -265,7 +262,8 @@ final class ReignitionConversationStore: ObservableObject {
             terminal = try await self.host.createTerminalSession(
                 spaceID: session.spaceID,
                 executionContextID: executionContextID,
-                title: session.title
+                title: session.title,
+                initialCommand: nil
             )
             try await self.refreshProjection(spaceID: session.spaceID)
         }
@@ -283,7 +281,8 @@ final class ReignitionConversationStore: ObservableObject {
         await perform {
             self.contextFiles = try await self.host.contextFiles(
                 executionContextID: contextID,
-                relativePath: relativePath
+                relativePath: relativePath,
+                includeHidden: false
             )
         }
     }

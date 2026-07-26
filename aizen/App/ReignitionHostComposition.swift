@@ -5,7 +5,7 @@ import AizenWire
 import Foundation
 
 /// The app's v2 Host client composition. Views receive Client projections; they never own Host state.
-actor ReignitionHostComposition {
+actor ReignitionHostComposition: ReignitionConversationClient {
     /// Host storage belongs to the persistent service, not to the launching app variant.
     private static let hostStorageOwnerIdentifier = "win.aizen.app"
 

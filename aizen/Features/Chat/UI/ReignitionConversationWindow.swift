@@ -19,7 +19,15 @@ struct ReignitionConversationWindow: View {
     @State private var showingLicenseDeepLinkSheet = false
 
     init(host: ReignitionHostComposition) {
-        _store = StateObject(wrappedValue: ReignitionConversationStore(host: host))
+        let cursorURL = ReignitionHostComposition.defaultStorageURL()
+            .deletingLastPathComponent()
+            .appendingPathComponent("reignition-journal-cursor.json")
+        _store = StateObject(
+            wrappedValue: ReignitionConversationStore(
+                host: host,
+                journalCursorStore: FileJournalCursorStore(url: cursorURL)
+            )
+        )
     }
 
     var body: some View {
