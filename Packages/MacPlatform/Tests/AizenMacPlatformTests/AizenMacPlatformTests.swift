@@ -38,6 +38,30 @@ import Testing
     #expect(UUID(uuidString: try CreateSpaceResultPayload(protobufBytes: response.payload.protobufBytes).spaceID) != nil)
 }
 
+@Test func hostAgentLaunchConfigurationKeepsEnvironmentOutOfTheConfigurationFile() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let secrets = RecordingEnvironmentStore()
+    let store = HostAgentLaunchConfigurationStore(
+        configurationURL: root.appendingPathComponent("host-agent-launch.json"),
+        secrets: secrets
+    )
+    let command = ConfigureAgentLaunchCommandPayload(
+        executablePath: "/usr/bin/env",
+        arguments: ["codex-acp"],
+        environment: ["TOKEN": "secret"]
+    )
+
+    try await store.updateAgentLaunchConfiguration(command)
+
+    #expect(try await store.launchConfiguration() == ACPAgentLaunchConfiguration(
+        executablePath: "/usr/bin/env",
+        arguments: ["codex-acp"],
+        environment: ["TOKEN": "secret"]
+    ))
+    #expect(String(decoding: try Data(contentsOf: root.appendingPathComponent("host-agent-launch.json")), as: UTF8.self).contains("secret") == false)
+}
+
 @Test func xpcWireServiceRoundTripsTheWireEnvelope() async throws {
     let request = ProtocolEnvelope(
         messageID: "xpc-round-trip",
@@ -182,6 +206,18 @@ private struct StaticConfigurationResolver: ACPRunConfigurationResolving {
 private struct EchoWireEndpoint: WireEndpoint {
     func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
         envelope
+    }
+}
+
+private final class RecordingEnvironmentStore: @unchecked Sendable, HostAgentEnvironmentStoring {
+    private var value: [String: String] = [:]
+
+    func store(environment: [String: String]) throws {
+        value = environment
+    }
+
+    func environment() throws -> [String: String] {
+        value
     }
 }
 
