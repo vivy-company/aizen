@@ -11,8 +11,11 @@ public final class LocalHostRuntime: @unchecked Sendable {
     private let storage: StorageRepository
     private let migrationGate: HostMigrationGate
     private let pairing: PairingRequestRegistry
+    private let connectionRegistry = HostConnectionRegistry()
+    private let storageURL: URL
 
     public init(storageURL: URL, credentials providedCredentials: HostIdentityCredentials? = nil) {
+        self.storageURL = storageURL
         let storage = StorageRepository(url: storageURL)
         self.storage = storage
         let credentials: HostIdentityCredentials
@@ -63,7 +66,45 @@ public final class LocalHostRuntime: @unchecked Sendable {
     }
 
     public func makeMachListener(configuration: HostMachServiceConfiguration) throws -> MachWireHostListener {
-        try MachWireHostListener(configuration: configuration, endpoint: migrationGate)
+        try MachWireHostListener(
+            configuration: configuration,
+            endpoint: HostDiagnosticsEndpoint(endpoint: migrationGate) { [weak self] in
+                await self?.diagnostics() ?? .init(
+                    storageState: .unavailable,
+                    migrationState: .idle,
+                    activeConnectionCount: 0,
+                    activeRunCount: 0,
+                    activeOperationCount: 0,
+                    lastStartupError: "Aizen Host runtime is unavailable."
+                )
+            },
+            connectionRegistry: connectionRegistry
+        )
+    }
+
+    public func diagnostics() async -> HostDiagnosticsSnapshot {
+        let migrationState: HostDiagnosticsSnapshot.MigrationState = FileManager.default.fileExists(
+            atPath: HostLegacyMigrationRequestStore.requestURL(for: storageURL).path
+        ) ? .pending : .idle
+        do {
+            let snapshot = try await storage.load()
+            return .init(
+                storageState: .ready,
+                migrationState: migrationState,
+                activeConnectionCount: connectionRegistry.count,
+                activeRunCount: snapshot.runs.filter { $0.lifecycle.isActive }.count,
+                activeOperationCount: snapshot.operations.filter { $0.lifecycle == .running }.count
+            )
+        } catch {
+            return .init(
+                storageState: .unavailable,
+                migrationState: migrationState,
+                activeConnectionCount: connectionRegistry.count,
+                activeRunCount: 0,
+                activeOperationCount: 0,
+                lastStartupError: error.localizedDescription
+            )
+        }
     }
 
     /// A process-owned operation cannot survive a Host restart. Persist that fact before clients resume polling.
@@ -89,5 +130,16 @@ public final class LocalHostRuntime: @unchecked Sendable {
             endpoint: migrationGate,
             pairing: pairing
         )
+    }
+}
+
+private extension RunLifecycle {
+    var isActive: Bool {
+        switch self {
+        case .queued, .preparingContext, .startingAgent, .running, .waitingForPermission, .cancelling, .interrupted:
+            true
+        case .completed, .succeeded, .failed, .cancelled:
+            false
+        }
     }
 }

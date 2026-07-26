@@ -68,6 +68,36 @@ import Testing
     #expect(recovered.failureDescription == "Aizen Host restarted before this operation completed.")
 }
 
+@Test func hostDiagnosticsAreDerivedFromHostRuntimeState() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storageURL = root.appendingPathComponent("storage-v2.json")
+    let storage = StorageRepository(url: storageURL)
+    let space = Space(name: "Diagnostics")
+    _ = try await storage.transact { snapshot in
+        snapshot.spaces.append(space)
+        snapshot.runs.append(.init(spaceID: space.id, sessionID: SessionID(), lifecycle: .running))
+        snapshot.operations.append(.init(spaceID: space.id, lifecycle: .running, progress: 0.5))
+    }
+
+    let diagnostics = await LocalHostRuntime(storageURL: storageURL).diagnostics()
+    #expect(diagnostics.storageState == .ready)
+    #expect(diagnostics.migrationState == .idle)
+    #expect(diagnostics.activeRunCount == 1)
+    #expect(diagnostics.activeOperationCount == 1)
+    #expect(diagnostics.lastStartupError == nil)
+}
+
+@Test func connectionRegistryTracksOnlyLivePeers() {
+    let registry = HostConnectionRegistry()
+    let first = registry.connect()
+    let second = registry.connect()
+    #expect(registry.count == 2)
+    registry.disconnect(first)
+    registry.disconnect(second)
+    #expect(registry.count == 0)
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")

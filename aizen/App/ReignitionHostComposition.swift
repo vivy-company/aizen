@@ -60,6 +60,10 @@ actor ReignitionHostComposition: ReignitionConversationClient {
         try await client.projectionSnapshot()
     }
 
+    func hostDiagnostics() async throws -> HostDiagnosticsSnapshot {
+        try await client.hostDiagnostics()
+    }
+
     func journalEvents(after cursor: UInt64) async throws -> ReadJournalEventsResponsePayload {
         try await client.journalEvents(after: cursor)
     }

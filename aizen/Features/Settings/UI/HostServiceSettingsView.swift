@@ -1,3 +1,4 @@
+import AizenCore
 import AizenWire
 import SwiftUI
 
@@ -6,6 +7,7 @@ struct HostServiceSettingsView: View {
     @State private var isReachable = false
     @State private var productVersion: String?
     @State private var protocolRange: String?
+    @State private var diagnostics: HostDiagnosticsSnapshot?
     @State private var error: String?
     @State private var isRepairing = false
     @State private var pendingPairings: [PendingPairingRequestRecordPayload] = []
@@ -24,6 +26,18 @@ struct HostServiceSettingsView: View {
                 }
                 if let protocolRange {
                     LabeledContent("Protocol generation", value: protocolRange)
+                }
+                if let diagnostics {
+                    LabeledContent("Storage", value: diagnostics.storageState.rawValue.capitalized)
+                    LabeledContent("Migration", value: diagnostics.migrationState.rawValue.capitalized)
+                    LabeledContent("Active connections", value: String(diagnostics.activeConnectionCount))
+                    LabeledContent("Active runs", value: String(diagnostics.activeRunCount))
+                    LabeledContent("Active operations", value: String(diagnostics.activeOperationCount))
+                    if let lastStartupError = diagnostics.lastStartupError {
+                        Text(lastStartupError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
                 }
             }
 
@@ -86,11 +100,13 @@ struct HostServiceSettingsView: View {
             isReachable = true
             productVersion = capabilities.productVersion
             protocolRange = "\(capabilities.minimumProtocolGeneration)…\(capabilities.maximumProtocolGeneration)"
+            diagnostics = try await host.hostDiagnostics()
             pendingPairings = try await host.pendingPairingRequests()
         } catch {
             isReachable = false
             productVersion = nil
             protocolRange = nil
+            diagnostics = nil
             pendingPairings = []
             self.error = error.localizedDescription
         }

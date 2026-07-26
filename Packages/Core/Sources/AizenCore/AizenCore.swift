@@ -369,6 +369,44 @@ public struct HostProjectionSnapshot: Codable, Sendable, Hashable {
     }
 }
 
+/// Client-safe health information owned and reported by the persistent Host.
+/// It intentionally contains counts and state only: never paths, user content, credentials, or logs.
+public struct HostDiagnosticsSnapshot: Codable, Sendable, Hashable {
+    public enum StorageState: String, Codable, Sendable, Hashable {
+        case ready
+        case unavailable
+    }
+
+    public enum MigrationState: String, Codable, Sendable, Hashable {
+        case idle
+        case pending
+    }
+
+    public let storageState: StorageState
+    public let migrationState: MigrationState
+    public let activeConnectionCount: Int
+    public let activeRunCount: Int
+    public let activeOperationCount: Int
+    public let lastStartupError: String?
+
+    public init(
+        storageState: StorageState,
+        migrationState: MigrationState,
+        activeConnectionCount: Int,
+        activeRunCount: Int,
+        activeOperationCount: Int,
+        lastStartupError: String? = nil
+    ) {
+        precondition(activeConnectionCount >= 0 && activeRunCount >= 0 && activeOperationCount >= 0, "Diagnostics counts cannot be negative")
+        self.storageState = storageState
+        self.migrationState = migrationState
+        self.activeConnectionCount = activeConnectionCount
+        self.activeRunCount = activeRunCount
+        self.activeOperationCount = activeOperationCount
+        self.lastStartupError = lastStartupError
+    }
+}
+
 /// A path-relative entry returned by a Host-owned execution-context filesystem.
 public struct ContextFileEntry: Codable, Sendable, Hashable, Identifiable {
     public let relativePath: String

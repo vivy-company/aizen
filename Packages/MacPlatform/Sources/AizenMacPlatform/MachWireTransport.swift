@@ -154,7 +154,8 @@ public final class MachWireHostListener: @unchecked Sendable {
 
     public init(
         configuration: HostMachServiceConfiguration,
-        endpoint: any WireEndpoint
+        endpoint: any WireEndpoint,
+        connectionRegistry: HostConnectionRegistry = .init()
     ) throws {
         listener = xpc_connection_create_mach_service(
             configuration.machServiceName,
@@ -165,7 +166,7 @@ public final class MachWireHostListener: @unchecked Sendable {
         guard status == 0 else {
             throw MachWireTransportError.invalidCodeSigningRequirement(status)
         }
-        service = MachWireService(endpoint: endpoint)
+        service = MachWireService(endpoint: endpoint, connectionRegistry: connectionRegistry)
         xpc_connection_set_event_handler(listener) { [service] event in
             guard xpc_get_type(event) == XPC_TYPE_CONNECTION else { return }
             service.accept(event)
@@ -178,15 +179,49 @@ public final class MachWireHostListener: @unchecked Sendable {
     }
 }
 
+/// Tracks only live local XPC peers for Host diagnostics. Peer identities remain enforced by XPC.
+public final class HostConnectionRegistry: @unchecked Sendable {
+    private let lock = NSLock()
+    private var identifiers: Set<UUID> = []
+
+    public init() {}
+
+    @discardableResult
+    func connect() -> UUID {
+        let identifier = UUID()
+        lock.lock()
+        identifiers.insert(identifier)
+        lock.unlock()
+        return identifier
+    }
+
+    func disconnect(_ identifier: UUID) {
+        lock.lock()
+        identifiers.remove(identifier)
+        lock.unlock()
+    }
+
+    public var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return identifiers.count
+    }
+}
+
 private final class MachWireService: @unchecked Sendable {
     private let endpoint: any WireEndpoint
+    private let connectionRegistry: HostConnectionRegistry
 
-    init(endpoint: any WireEndpoint) {
+    init(endpoint: any WireEndpoint, connectionRegistry: HostConnectionRegistry) {
         self.endpoint = endpoint
+        self.connectionRegistry = connectionRegistry
     }
 
     func accept(_ connection: xpc_object_t) {
-        let peer = MachConnection(connection)
+        let connectionID = connectionRegistry.connect()
+        let peer = MachConnection(connection) { [connectionRegistry] in
+            connectionRegistry.disconnect(connectionID)
+        }
         if let eventEndpoint = endpoint as? any RunEventEndpoint {
             peer.startEventForwarding(Task { [peer] in
                 let stream = await eventEndpoint.runEvents()
@@ -205,7 +240,7 @@ private final class MachWireService: @unchecked Sendable {
         }
         xpc_connection_set_event_handler(connection) { [endpoint, peer] message in
             guard xpc_get_type(message) != XPC_TYPE_ERROR else {
-                peer.stopEventForwarding()
+                peer.stop()
                 return
             }
             guard xpc_get_type(message) == XPC_TYPE_DICTIONARY,
@@ -255,9 +290,13 @@ private final class MachConnection: @unchecked Sendable {
     let value: xpc_connection_t
     private let eventTaskLock = NSLock()
     private var eventTask: Task<Void, Never>?
+    private let terminationLock = NSLock()
+    private var isTerminated = false
+    private let onTermination: @Sendable () -> Void
 
-    init(_ value: xpc_connection_t) {
+    init(_ value: xpc_connection_t, onTermination: @escaping @Sendable () -> Void = {}) {
         self.value = value
+        self.onTermination = onTermination
     }
 
     func send(_ message: MachMessage) {
@@ -286,9 +325,16 @@ private final class MachConnection: @unchecked Sendable {
         eventTask = nil
     }
 
-    deinit {
+    func stop() {
         stopEventForwarding()
+        terminationLock.lock()
+        let shouldNotify = !isTerminated
+        isTerminated = true
+        terminationLock.unlock()
+        if shouldNotify { onTermination() }
     }
+
+    deinit { stop() }
 }
 
 actor MachRunEventHub {

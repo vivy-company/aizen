@@ -293,6 +293,12 @@ public actor HostClient {
         return try .init(cursor: response.cursor, snapshot: JSONDecoder().decode(HostProjectionSnapshot.self, from: response.snapshot))
     }
 
+    /// Reads client-safe runtime health from the Host; this never opens Host Storage in the Client.
+    public func hostDiagnostics() async throws -> HostDiagnosticsSnapshot {
+        let response = try await snapshot(scope: "diagnostics")
+        return try JSONDecoder().decode(HostDiagnosticsSnapshot.self, from: response.snapshot)
+    }
+
     /// Returns the Host projection bytes for compatibility with clients that own their decoding.
     public func snapshotData(scope: String = "host") async throws -> Data {
         try await snapshot(scope: scope).snapshot
