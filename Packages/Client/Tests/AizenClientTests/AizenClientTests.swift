@@ -181,6 +181,10 @@ import AizenWire
     await #expect(throws: HostProtocolError.resourceInUse(resourceID)) {
         try await client.removeResource(id: resourceID)
     }
+    try await client.detachExecutionContext(sessionID: sessionID)
+    #expect(try await storage.load().sessions.first(where: { $0.id == sessionID })?.executionContextID == nil)
+    try await client.removeExecutionContext(id: contextID)
+    try await client.removeResource(id: resourceID)
 }
 
 @Test func clientCancelsRunsThroughHostCommands() async throws {
