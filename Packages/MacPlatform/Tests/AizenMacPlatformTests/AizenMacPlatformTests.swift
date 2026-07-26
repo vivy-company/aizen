@@ -20,6 +20,16 @@ import Testing
     }
 }
 
+@Test func hostIdentityIsStableAcrossHostRestarts() async throws {
+    let persistence = MemoryHostIdentityPersistence()
+    let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")
+    let second = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Renamed Mac")
+
+    #expect(first.hostID == second.hostID)
+    #expect(first.cryptographicIdentity.fingerprint == second.cryptographicIdentity.fingerprint)
+    #expect(second.displayName == "Renamed Mac")
+}
+
 @Test func localHostRuntimeOwnsTheStorageBackedHost() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -206,6 +216,23 @@ private struct StaticConfigurationResolver: ACPRunConfigurationResolving {
 private struct EchoWireEndpoint: WireEndpoint {
     func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
         envelope
+    }
+}
+
+private final class MemoryHostIdentityPersistence: @unchecked Sendable, HostIdentityPersisting {
+    private let lock = NSLock()
+    private var data: Data?
+
+    func load() throws -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        return data
+    }
+
+    func save(_ data: Data) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        self.data = data
     }
 }
 
