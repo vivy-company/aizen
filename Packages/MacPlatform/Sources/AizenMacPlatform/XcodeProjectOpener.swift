@@ -17,6 +17,14 @@ public struct MacXcodeProjectInspector: XcodeProjectInspecting {
     public init() {}
 
     public func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] {
+        try projectDetails(for: projectURL, kind: kind).schemes
+    }
+
+    public func configurations(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] {
+        try projectDetails(for: projectURL, kind: kind).configurations
+    }
+
+    private func projectDetails(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) throws -> (schemes: [String], configurations: [String]) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
         process.arguments = ["-list", "-json", kind == .workspace ? "-workspace" : "-project", projectURL.path]
@@ -25,11 +33,12 @@ public struct MacXcodeProjectInspector: XcodeProjectInspecting {
         process.standardError = Pipe()
         try process.run()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return [] }
+        guard process.terminationStatus == 0 else { return ([], []) }
         let data = try output.fileHandleForReading.readToEnd() ?? Data()
         let document = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let key = kind == .workspace ? "workspace" : "project"
-        return (document?[key] as? [String: Any])?["schemes"] as? [String] ?? []
+        let details = document?[key] as? [String: Any]
+        return (details?["schemes"] as? [String] ?? [], details?["configurations"] as? [String] ?? [])
     }
 }
 
