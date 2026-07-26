@@ -9,9 +9,16 @@ import Foundation
 public actor LocalHostClient {
     private let client: HostClient
 
-    public init(storageURL: URL) {
+    public init(storageURL: URL, commandOutboxURL: URL? = nil) {
         let storage = StorageRepository(url: storageURL)
-        client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+        client = HostClient(
+            transport: InProcessTransport(endpoint: LocalHost(storage: storage)),
+            commandOutbox: commandOutboxURL.map(FileCommandOutbox.init(url:))
+        )
+    }
+
+    public func recoverPendingCommands() async throws {
+        _ = try await client.retryPendingCommands()
     }
 
     public func spaces() async throws -> [Space] {
