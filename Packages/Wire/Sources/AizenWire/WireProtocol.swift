@@ -1036,41 +1036,106 @@ public struct ListTerminalSessionsResponsePayload: WirePayload, Sendable, Hashab
     public init(sessions: [TerminalSession]) { self.sessions = sessions }
     public init(protobufBytes: Data) throws {
         let message = try AizenWireV1_ListTerminalSessionsResponse(serializedBytes: protobufBytes)
-        sessions = try message.sessions.map { record in
-            guard let sessionUUID = UUID(uuidString: record.sessionID),
-                  let spaceUUID = UUID(uuidString: record.spaceID) else {
-                throw WireCodecError.invalidIdentity(record.sessionID)
-            }
-            let contextID = record.executionContextID.isEmpty ? nil : UUID(uuidString: record.executionContextID).map(ExecutionContextID.init(rawValue:))
-            guard record.executionContextID.isEmpty || contextID != nil else { throw WireCodecError.invalidIdentity(record.executionContextID) }
-            return TerminalSession(
-                id: SessionID(rawValue: sessionUUID),
-                spaceID: SpaceID(rawValue: spaceUUID),
-                executionContextID: contextID,
-                title: record.title.isEmpty ? nil : record.title,
-                tmuxSessionName: record.tmuxSessionName,
-                paneID: record.paneID,
-                initialCommand: record.initialCommand.isEmpty ? nil : record.initialCommand,
-                createdAt: Date(timeIntervalSince1970: TimeInterval(record.createdAtMillis) / 1_000)
-            )
-        }
+        sessions = try message.sessions.map(terminalSession)
     }
     public func protobufBytes() throws -> Data {
         var message = AizenWireV1_ListTerminalSessionsResponse()
-        message.sessions = sessions.map { session in
-            var record = AizenWireV1_TerminalSessionRecord()
-            record.sessionID = session.id.description
-            record.spaceID = session.spaceID.description
-            record.executionContextID = session.executionContextID?.description ?? ""
-            record.title = session.title ?? ""
-            record.tmuxSessionName = session.tmuxSessionName
-            record.paneID = session.paneID
-            record.initialCommand = session.initialCommand ?? ""
-            record.createdAtMillis = Int64((session.createdAt.timeIntervalSince1970 * 1_000).rounded())
-            return record
-        }
+        message.sessions = sessions.map(terminalSessionRecord)
         return try message.serializedData()
     }
+}
+
+public struct CreateTerminalSessionCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.terminal-session.create@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let terminalSessionID: String
+    public let spaceID: String
+    public let executionContextID: String
+    public let title: String?
+    public let initialCommand: String?
+
+    public init(terminalSessionID: String, spaceID: String, executionContextID: String, title: String? = nil, initialCommand: String? = nil) {
+        self.terminalSessionID = terminalSessionID
+        self.spaceID = spaceID
+        self.executionContextID = executionContextID
+        self.title = title
+        self.initialCommand = initialCommand
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_CreateTerminalSessionCommand(serializedBytes: protobufBytes)
+        self.init(
+            terminalSessionID: message.terminalSessionID,
+            spaceID: message.spaceID,
+            executionContextID: message.executionContextID,
+            title: message.title.isEmpty ? nil : message.title,
+            initialCommand: message.initialCommand.isEmpty ? nil : message.initialCommand
+        )
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_CreateTerminalSessionCommand()
+        message.terminalSessionID = terminalSessionID
+        message.spaceID = spaceID
+        message.executionContextID = executionContextID
+        message.title = title ?? ""
+        message.initialCommand = initialCommand ?? ""
+        return try message.serializedData()
+    }
+}
+
+public struct CreateTerminalSessionResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.terminal-session.create@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let session: TerminalSession
+
+    public init(session: TerminalSession) { self.session = session }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_CreateTerminalSessionResult(serializedBytes: protobufBytes)
+        guard message.hasSession else { throw WireCodecError.invalidIdentity("terminal session") }
+        self.init(session: try terminalSession(from: message.session))
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_CreateTerminalSessionResult()
+        message.session = terminalSessionRecord(session)
+        return try message.serializedData()
+    }
+}
+
+private func terminalSession(from record: AizenWireV1_TerminalSessionRecord) throws -> TerminalSession {
+    guard let sessionUUID = UUID(uuidString: record.sessionID),
+          let spaceUUID = UUID(uuidString: record.spaceID) else {
+        throw WireCodecError.invalidIdentity(record.sessionID)
+    }
+    let contextID = record.executionContextID.isEmpty ? nil : UUID(uuidString: record.executionContextID).map(ExecutionContextID.init(rawValue:))
+    guard record.executionContextID.isEmpty || contextID != nil else { throw WireCodecError.invalidIdentity(record.executionContextID) }
+    return TerminalSession(
+        id: SessionID(rawValue: sessionUUID),
+        spaceID: SpaceID(rawValue: spaceUUID),
+        executionContextID: contextID,
+        title: record.title.isEmpty ? nil : record.title,
+        tmuxSessionName: record.tmuxSessionName,
+        paneID: record.paneID,
+        initialCommand: record.initialCommand.isEmpty ? nil : record.initialCommand,
+        createdAt: Date(timeIntervalSince1970: TimeInterval(record.createdAtMillis) / 1_000)
+    )
+}
+
+private func terminalSessionRecord(_ session: TerminalSession) -> AizenWireV1_TerminalSessionRecord {
+    var record = AizenWireV1_TerminalSessionRecord()
+    record.sessionID = session.id.description
+    record.spaceID = session.spaceID.description
+    record.executionContextID = session.executionContextID?.description ?? ""
+    record.title = session.title ?? ""
+    record.tmuxSessionName = session.tmuxSessionName
+    record.paneID = session.paneID
+    record.initialCommand = session.initialCommand ?? ""
+    record.createdAtMillis = Int64((session.createdAt.timeIntervalSince1970 * 1_000).rounded())
+    return record
 }
 
 public struct CreateLocalFolderContextCommandPayload: WirePayload, Sendable, Hashable {

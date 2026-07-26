@@ -78,6 +78,28 @@ import Testing
     #expect(try ListResourcesResponsePayload(protobufBytes: payload.protobufBytes()).resources == [resource])
 }
 
+@Test func terminalCreationPayloadsRoundTrip() throws {
+    let session = TerminalSession(
+        spaceID: SpaceID(),
+        executionContextID: ExecutionContextID(),
+        title: "Server",
+        tmuxSessionName: "aizen-server",
+        paneID: "%1",
+        initialCommand: "npm run dev",
+        createdAt: Date(timeIntervalSince1970: 1_234)
+    )
+    let command = CreateTerminalSessionCommandPayload(
+        terminalSessionID: session.id.description,
+        spaceID: session.spaceID.description,
+        executionContextID: session.executionContextID!.description,
+        title: session.title,
+        initialCommand: session.initialCommand
+    )
+
+    #expect(try CreateTerminalSessionCommandPayload(protobufBytes: command.protobufBytes()) == command)
+    #expect(try CreateTerminalSessionResultPayload(protobufBytes: CreateTerminalSessionResultPayload(session: session).protobufBytes()).session == session)
+}
+
 @Test func journalReplayPayloadRoundTripsTypedEvents() throws {
     let space = SpaceID()
     let event = JournalEvent(

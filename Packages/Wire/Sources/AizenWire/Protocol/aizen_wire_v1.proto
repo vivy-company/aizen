@@ -281,6 +281,18 @@ message ListTerminalSessionsResponse {
   repeated TerminalSessionRecord sessions = 1;
 }
 
+message CreateTerminalSessionCommand {
+  string terminal_session_id = 1;
+  string space_id = 2;
+  string execution_context_id = 3;
+  string title = 4;
+  string initial_command = 5;
+}
+
+message CreateTerminalSessionResult {
+  TerminalSessionRecord session = 1;
+}
+
 message CreateLocalFolderContextCommand {
   string space_id = 1;
   string resource_id = 2;
