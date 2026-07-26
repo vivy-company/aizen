@@ -294,6 +294,13 @@ final class ReignitionConversationStore: ObservableObject {
         }
     }
 
+    func buildXcodeProject(resourceID: ResourceID) async {
+        await perform {
+            guard let project = try await self.host.discoverXcodeProject(resourceID: resourceID), let scheme = project.schemes.first else { return }
+            _ = try await self.host.buildXcodeProject(resourceID: resourceID, projectID: project.id, scheme: scheme)
+        }
+    }
+
     func loadContextFiles(contextID: ExecutionContextID, relativePath: String = "") async {
         await perform {
             self.contextFiles = try await self.host.contextFiles(

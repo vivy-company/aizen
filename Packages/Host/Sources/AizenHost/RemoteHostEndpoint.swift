@@ -97,6 +97,10 @@ public struct RemoteHostEndpoint: WireEndpoint {
             let request = try OpenXcodeProjectCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let resource = try await requiredResource(request.resourceID)
             return .init(capability: .xcodeBuild, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil)
+        case BuildXcodeProjectCommandPayload.identifier:
+            let request = try BuildXcodeProjectCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resource = try await requiredResource(request.resourceID)
+            return .init(capability: .xcodeBuild, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil)
         case ListExecutionContextsQueryPayload.identifier:
             let request = try ListExecutionContextsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             if let rawResourceID = request.resourceID {

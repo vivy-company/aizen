@@ -52,7 +52,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
             linkedWorktrees: worktrees,
             independentContexts: worktrees,
             xcodeProjectOpener: MacXcodeProjectOpener(),
-            xcodeProjectInspector: MacXcodeProjectInspector()
+            xcodeProjectInspector: MacXcodeProjectInspector(),
+            xcodeProjectBuilder: MacXcodeProjectBuilder()
         )
         self.host = host
         migrationGate = HostMigrationGate(

@@ -154,6 +154,10 @@ struct ReignitionConversationWindow: View {
                                 Task { await store.openXcodeProject(resourceID: resource.id) }
                             }
                             .disabled(store.isSynchronizing)
+                            Button("Build in Xcode", systemImage: "hammer.fill") {
+                                Task { await store.buildXcodeProject(resourceID: resource.id) }
+                            }
+                            .disabled(store.isSynchronizing)
                         }
                     } else {
                         Label("No folder attached", systemImage: "folder")

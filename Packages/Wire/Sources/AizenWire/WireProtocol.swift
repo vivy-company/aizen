@@ -1391,6 +1391,29 @@ public struct OpenXcodeProjectResultPayload: WirePayload, Sendable, Hashable {
     public func protobufBytes() throws -> Data { try AizenWireV1_OpenXcodeProjectResult().serializedData() }
 }
 
+public struct BuildXcodeProjectCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.xcode-project.build@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let resourceID: String; public let projectID: String; public let scheme: String; public let destination: String
+    public init(resourceID: String, projectID: String, scheme: String, destination: String) {
+        precondition(!resourceID.isEmpty && !projectID.isEmpty && !scheme.isEmpty && !destination.isEmpty, "Xcode builds require a resource, project, scheme, and destination")
+        self.resourceID = resourceID; self.projectID = projectID; self.scheme = scheme; self.destination = destination
+    }
+    public init(protobufBytes: Data) throws { let value = try AizenWireV1_BuildXcodeProjectCommand(serializedBytes: protobufBytes); self.init(resourceID: value.resourceID, projectID: value.projectID, scheme: value.scheme, destination: value.destination) }
+    public func protobufBytes() throws -> Data { var value = AizenWireV1_BuildXcodeProjectCommand(); value.resourceID = resourceID; value.projectID = projectID; value.scheme = scheme; value.destination = destination; return try value.serializedData() }
+}
+
+public struct BuildXcodeProjectResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.xcode-project.build@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let operationID: String
+    public init(operationID: String) { self.operationID = operationID }
+    public init(protobufBytes: Data) throws { self.init(operationID: try AizenWireV1_BuildXcodeProjectResult(serializedBytes: protobufBytes).operationID) }
+    public func protobufBytes() throws -> Data { var value = AizenWireV1_BuildXcodeProjectResult(); value.operationID = operationID; return try value.serializedData() }
+}
+
 public struct ImportLocalFolderCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.resource.import-local-folder@1")
     public static let schemaVersion: UInt32 = 1

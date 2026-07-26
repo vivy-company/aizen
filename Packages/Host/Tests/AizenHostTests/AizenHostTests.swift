@@ -1190,6 +1190,24 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(await opener.openedURL == project)
 }
 
+@Test func hostBuildsValidatedXcodeProjectsThroughItsRuntime() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder.appendingPathComponent("App.xcodeproj"), withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Xcode")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "folder", details: .hostPrivate(.init(rawValue: "local-folder:\(folder.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let builder = RecordingXcodeProjectBuilder()
+    let host = LocalHost(storage: storage, xcodeProjectInspector: StaticXcodeProjectInspector(schemes: ["App"]), xcodeProjectBuilder: builder)
+    let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(BuildXcodeProjectCommandPayload(resourceID: resource.id.description, projectID: "App.xcodeproj", scheme: "App", destination: "platform=macOS"))))
+    let result = try BuildXcodeProjectResultPayload(protobufBytes: response.payload.protobufBytes)
+    #expect(await builder.projectURL == folder.appendingPathComponent("App.xcodeproj"))
+    #expect(try await storage.load().operations.first?.id.description == result.operationID)
+    #expect(try await storage.load().operations.first?.lifecycle == .completed)
+}
+
 private actor RecordingRuntime: RunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
@@ -1213,6 +1231,11 @@ private actor RecordingXcodeProjectOpener: XcodeProjectOpening {
 private struct StaticXcodeProjectInspector: XcodeProjectInspecting {
     let schemes: [String]
     func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { schemes }
+}
+
+private actor RecordingXcodeProjectBuilder: XcodeProjectBuilding {
+    private(set) var projectURL: URL?
+    func buildXcodeProject(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws { projectURL = url }
 }
 
 private actor RecordingAgentLaunchUpdater: AgentLaunchConfigurationUpdating {

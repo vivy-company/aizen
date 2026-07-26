@@ -358,6 +358,17 @@ message OpenXcodeProjectCommand {
 
 message OpenXcodeProjectResult {}
 
+message BuildXcodeProjectCommand {
+  string resource_id = 1;
+  string project_id = 2;
+  string scheme = 3;
+  string destination = 4;
+}
+
+message BuildXcodeProjectResult {
+  string operation_id = 1;
+}
+
 message ImportLocalFolderCommand {
   string space_id = 1;
   string path = 2;

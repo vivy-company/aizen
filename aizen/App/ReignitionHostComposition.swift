@@ -92,6 +92,10 @@ actor ReignitionHostComposition: ReignitionConversationClient {
         try await client.openXcodeProject(resourceID: resourceID, projectID: projectID)
     }
 
+    func buildXcodeProject(resourceID: ResourceID, projectID: String, scheme: String) async throws -> OperationID {
+        try await client.buildXcodeProject(resourceID: resourceID, projectID: projectID, scheme: scheme)
+    }
+
     func executionContexts(spaceID: SpaceID? = nil) async throws -> [ExecutionContext] {
         try await client.executionContexts(spaceID: spaceID)
     }

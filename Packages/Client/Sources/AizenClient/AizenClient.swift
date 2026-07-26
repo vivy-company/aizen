@@ -484,6 +484,14 @@ public actor HostClient {
         _ = try OpenXcodeProjectResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func buildXcodeProject(resourceID: ResourceID, projectID: String, scheme: String, destination: String = "platform=macOS") async throws -> OperationID {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(BuildXcodeProjectCommandPayload(resourceID: resourceID.description, projectID: projectID, scheme: scheme, destination: destination))))
+        guard response.kind == .commandResult, response.payload.identifier == BuildXcodeProjectResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        let result = try BuildXcodeProjectResultPayload(protobufBytes: response.payload.protobufBytes)
+        guard let rawValue = UUID(uuidString: result.operationID) else { throw Error.invalidIdentity(result.operationID) }
+        return OperationID(rawValue: rawValue)
+    }
+
     public func importLocalFolder(spaceID: SpaceID, path: String, title: String? = nil) async throws -> ResourceID {
         let response = try await send(.init(
             messageID: UUID().uuidString,

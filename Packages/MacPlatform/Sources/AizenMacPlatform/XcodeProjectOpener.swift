@@ -32,3 +32,15 @@ public struct MacXcodeProjectInspector: XcodeProjectInspecting {
         return (document?[key] as? [String: Any])?["schemes"] as? [String] ?? []
     }
 }
+
+public struct MacXcodeProjectBuilder: XcodeProjectBuilding {
+    public init() {}
+    public func buildXcodeProject(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
+        process.arguments = [kind == .workspace ? "-workspace" : "-project", url.path, "-scheme", scheme, "-destination", destination, "build"]
+        process.standardOutput = Pipe(); process.standardError = Pipe()
+        try process.run(); process.waitUntilExit()
+        guard process.terminationStatus == 0 else { throw CocoaError(.executableNotLoadable) }
+    }
+}
