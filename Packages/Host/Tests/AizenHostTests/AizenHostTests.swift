@@ -1327,6 +1327,27 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(await updater.stage)
 }
 
+@Test func hostRecordsRepositoryCommitsAsCompletedDurableOperations() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Repository")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let committer = RecordingRepositoryCommitter()
+    let host = LocalHost(storage: storage, repositoryCommitter: committer)
+    let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(CommitRepositoryCommandPayload(resourceID: resource.id.description, message: "Ship it", expectedRepositoryRevision: "head", expectedIndexRevision: String(repeating: "a", count: 64), amend: false))))
+
+    let result = try CommitRepositoryResultPayload(protobufBytes: response.payload.protobufBytes)
+    let operation = try #require(try await storage.load().operations.first)
+    #expect(operation.id.description == result.operationID)
+    #expect(operation.lifecycle == .completed)
+    #expect(await committer.message == "Ship it")
+    #expect(!(await committer.amend))
+}
+
 @Test func localHostListsExecutionContextFilesThroughTypedWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1570,6 +1591,17 @@ private actor RecordingRepositoryIndexUpdater: RepositoryIndexUpdating {
         requestedPaths = relativePaths
         self.stage = stage
         return revision
+    }
+}
+
+private actor RecordingRepositoryCommitter: RepositoryCommitting {
+    private(set) var message: String?
+    private(set) var amend = false
+
+    func commit(at repositoryURL: URL, message: String, expectedRepositoryRevision: String, expectedIndexRevision: String, amend: Bool) async throws -> RepositoryCommitResult {
+        self.message = message
+        self.amend = amend
+        return .init(repositoryRevision: String(repeating: "c", count: 40), indexRevision: String(repeating: "b", count: 64))
     }
 }
 
