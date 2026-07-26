@@ -136,6 +136,14 @@ message CancelRunCommand {
 
 message CancelRunResult {}
 
+message ConfigureAgentLaunchCommand {
+  string executable_path = 1;
+  repeated string arguments = 2;
+  map<string, string> environment = 3;
+}
+
+message ConfigureAgentLaunchResult {}
+
 message ListSpacesQuery {}
 
 message SpaceRecord {

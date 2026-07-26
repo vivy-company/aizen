@@ -100,6 +100,17 @@ import Testing
     #expect(try CreateTerminalSessionResultPayload(protobufBytes: CreateTerminalSessionResultPayload(session: session).protobufBytes()).session == session)
 }
 
+@Test func agentLaunchConfigurationPayloadRoundTrips() throws {
+    let payload = ConfigureAgentLaunchCommandPayload(
+        executablePath: "/usr/bin/env",
+        arguments: ["codex-acp"],
+        environment: ["API_TOKEN": "secret", "PATH": "/opt/homebrew/bin"]
+    )
+
+    #expect(try ConfigureAgentLaunchCommandPayload(protobufBytes: payload.protobufBytes()) == payload)
+    #expect(try ConfigureAgentLaunchResultPayload(protobufBytes: ConfigureAgentLaunchResultPayload().protobufBytes()) == .init())
+}
+
 @Test func journalReplayPayloadRoundTripsTypedEvents() throws {
     let space = SpaceID()
     let event = JournalEvent(

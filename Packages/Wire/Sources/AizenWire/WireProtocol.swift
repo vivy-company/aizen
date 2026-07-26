@@ -511,6 +511,54 @@ public struct CancelRunResultPayload: WirePayload, Sendable, Hashable {
     }
 }
 
+/// Sends the resolved ACP launch configuration over the authenticated local transport.
+/// The Host owns persistence of the environment and never exposes it in snapshots.
+public struct ConfigureAgentLaunchCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.agent.configure-launch@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let executablePath: String
+    public let arguments: [String]
+    public let environment: [String: String]
+
+    public init(executablePath: String, arguments: [String], environment: [String: String]) {
+        precondition(!executablePath.isEmpty, "Agent configuration requires an executable")
+        self.executablePath = executablePath
+        self.arguments = arguments
+        self.environment = environment
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ConfigureAgentLaunchCommand(serializedBytes: protobufBytes)
+        self.init(executablePath: message.executablePath, arguments: message.arguments, environment: message.environment)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ConfigureAgentLaunchCommand()
+        message.executablePath = executablePath
+        message.arguments = arguments
+        message.environment = environment
+        return try message.serializedData()
+    }
+}
+
+public struct ConfigureAgentLaunchResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.agent.configure-launch@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public init() {}
+
+    public init(protobufBytes: Data) throws {
+        _ = try AizenWireV1_ConfigureAgentLaunchResult(serializedBytes: protobufBytes)
+    }
+
+    public func protobufBytes() throws -> Data {
+        try AizenWireV1_ConfigureAgentLaunchResult().serializedData()
+    }
+}
+
 public struct ListSpacesQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.space.list@1")
     public static let schemaVersion: UInt32 = 1
