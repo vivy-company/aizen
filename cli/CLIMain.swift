@@ -1043,7 +1043,7 @@ private extension AizenCLI {
     }
 
     static func openApp(path: String? = nil) throws {
-        let appURL = CLIStore.findAizenAppBundle()
+        let appURL = findAizenAppBundle()
         if appURL == nil {
             throw CLIError.appNotFound
         }

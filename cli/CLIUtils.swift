@@ -584,6 +584,19 @@ func tmuxAttach(paneId: String) throws {
     throw CLIError.ioError("Failed to attach to tmux session")
 }
 
+func findAizenAppBundle() -> URL? {
+    let candidates = [
+        "/Applications/Aizen.app",
+        "/Applications/Aizen Nightly.app",
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Aizen.app").path,
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Aizen Nightly.app").path
+    ]
+
+    return candidates.lazy
+        .map(URL.init(fileURLWithPath:))
+        .first { FileManager.default.fileExists(atPath: $0.path) }
+}
+
 func tmuxCreateSession(paneId: String, workingDirectory: String, command: String? = nil) throws {
     guard let tmux = tmuxPath() else {
         throw CLIError.tmuxNotInstalled
