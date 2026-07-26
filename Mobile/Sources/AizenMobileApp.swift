@@ -8,15 +8,25 @@ import VisionKit
 
 @main
 struct AizenMobileApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var pairing = MobilePairingStore()
+
     var body: some Scene {
         WindowGroup {
-            MobileRootView()
+            MobileRootView(pairing: pairing)
+                .onChange(of: scenePhase) { _, phase in
+                    switch phase {
+                    case .background: pairing.enterBackground()
+                    case .active: Task { await pairing.enterForeground() }
+                    default: break
+                    }
+                }
         }
     }
 }
 
 private struct MobileRootView: View {
-    @StateObject private var pairing = MobilePairingStore()
+    @ObservedObject var pairing: MobilePairingStore
     @State private var invitation = ""
     @State private var showsScanner = false
     @State private var newConversationTitle = ""
@@ -30,7 +40,7 @@ private struct MobileRootView: View {
                     case .awaitingApproval(let hostName):
                         Label("Approval pending on \(hostName)", systemImage: "clock.badge.exclamationmark")
                     case .ready(let hostName, let spaceCount):
-                        Label("\(hostName) · \(spaceCount) Spaces", systemImage: "desktopcomputer.and.iphone")
+                        Label("\(hostName) · \(spaceCount) Spaces\(pairing.isLive ? "" : " (offline)")", systemImage: "desktopcomputer.and.iphone")
                     default:
                         Label("No paired Host", systemImage: "desktopcomputer.trianglebadge.exclamationmark")
                     }

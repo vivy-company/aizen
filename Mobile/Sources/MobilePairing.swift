@@ -25,8 +25,17 @@ final class MobilePairingStore: ObservableObject {
     @Published var selectedSessionID: SessionID?
     @Published private(set) var messages: [ConversationMessage] = []
     @Published private(set) var activeRunID: RunID?
+    @Published private(set) var isLive = false
     private var client: HostClient?
     private var eventsTask: Task<Void, Never>?
+
+    init() {
+        if let cached = try? MobileProjectionCache.load() {
+            spaces = cached.spaces
+            sessions = cached.sessions
+            selectedSpaceID = cached.spaces.first?.id
+        }
+    }
 
     func submit(invitationText: String) async {
         do {
@@ -79,6 +88,8 @@ final class MobilePairingStore: ObservableObject {
             self.spaces = spaces
             selectedSpaceID = spaces.first?.id
             sessions = try await client.conversations(spaceID: selectedSpaceID)
+            try MobileProjectionCache.save(.init(spaces: spaces, sessions: sessions))
+            isLive = true
             subscribe(to: client)
             state = .ready(hostName: pairedHost.host.displayName, spaceCount: spaces.count)
         } catch {
@@ -93,7 +104,21 @@ final class MobilePairingStore: ObservableObject {
             selectedSessionID = nil
             messages = []
             sessions = try await client.conversations(spaceID: id)
+            try MobileProjectionCache.save(.init(spaces: spaces, sessions: sessions))
         } catch { state = .failed(error.localizedDescription) }
+    }
+
+    func enterBackground() {
+        eventsTask?.cancel()
+        eventsTask = nil
+        client = nil
+        activeRunID = nil
+        isLive = false
+    }
+
+    func enterForeground() async {
+        guard MobilePairedHostStore.exists else { return }
+        await reconnect()
     }
 
     func selectSession(_ id: SessionID) async {
@@ -251,6 +276,26 @@ private enum MobilePairedHostStore {
     static func load() throws -> MobilePairedHost? {
         guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
         return try JSONDecoder().decode(MobilePairedHost.self, from: data)
+    }
+    static var exists: Bool { UserDefaults.standard.data(forKey: key) != nil }
+}
+
+private struct MobileProjectionCache: Codable {
+    let spaces: [Space]
+    let sessions: [Session]
+
+    private static var url: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("mobile-projection-v1.json")
+    }
+
+    static func load() throws -> Self {
+        try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
+    }
+
+    static func save(_ cache: Self) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(cache).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 }
 
