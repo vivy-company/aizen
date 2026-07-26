@@ -187,6 +187,33 @@ import AizenWire
     try await client.removeResource(id: resourceID)
 }
 
+@Test func clientImportsRepositoryResourcesAndCheckoutContextsThroughHost() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let git = Process()
+    git.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    git.arguments = ["init", repository.path]
+    try git.run()
+    git.waitUntilExit()
+    #expect(git.terminationStatus == 0)
+
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+    let spaceID = try await client.createSpace(name: "Vivy")
+    let resourceID = try await client.importLocalRepository(spaceID: spaceID, path: repository.path)
+    let resource = try #require(try await client.resources(spaceID: spaceID).first)
+    #expect(resource.id == resourceID)
+    #expect(resource.kind == .repository)
+    #expect(resource.details == .none)
+    let contextID = try await client.createRepositoryCheckoutContext(spaceID: spaceID, resourceID: resourceID)
+    let context = try #require(try await client.executionContexts(spaceID: spaceID, resourceID: resourceID).first)
+    #expect(context.id == contextID)
+    #expect(context.kind == .repositoryCheckout)
+    #expect(context.hostReference == nil)
+}
+
 @Test func clientCancelsRunsThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
