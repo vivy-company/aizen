@@ -83,6 +83,48 @@ import AizenWire
     #expect(try await storage.load().sessions == [Session(id: sessionID, spaceID: spaceID, kind: .conversation, title: "Untethered")])
 }
 
+@Test func clientReadsTypedConversationListsAndTimelines() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    let messages = [
+        ConversationMessage(spaceID: space.id, sessionID: session.id, role: .user, content: "Hello"),
+        ConversationMessage(spaceID: space.id, sessionID: session.id, role: .assistant, content: "Hi")
+    ]
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+        $0.conversationMessages.append(contentsOf: messages)
+    }
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+
+    #expect(try await client.conversations(spaceID: space.id) == [session])
+    #expect(try await client.conversationTimeline(sessionID: session.id).map(\.content) == ["Hello", "Hi"])
+}
+
+@Test func clientCancelsRunsThroughHostCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    let run = Run(spaceID: space.id, sessionID: session.id, lifecycle: .running)
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+        $0.runs.append(run)
+    }
+    let runtime = CancelRecordingRuntime()
+    let coordinator = ConversationRunCoordinator(storage: storage, runtime: runtime)
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, conversationRuns: coordinator)))
+
+    try await client.cancelRun(id: run.id)
+    #expect(try await storage.load().runs.first?.lifecycle == .cancelled)
+    #expect(await runtime.cancelledRunID == run.id)
+}
+
 @Test func clientSendsProjectlessConversationsThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -112,5 +154,13 @@ private struct EchoHost: WireEndpoint {
 private actor ClientPromptRuntime: PromptRunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
+    func send(message: String, to runID: RunID) async throws -> String? { nil }
+}
+
+private actor CancelRecordingRuntime: PromptRunRuntime {
+    private(set) var cancelledRunID: RunID?
+
+    func start(run: Run) async throws {}
+    func cancel(runID: RunID) async throws { cancelledRunID = runID }
     func send(message: String, to runID: RunID) async throws -> String? { nil }
 }
