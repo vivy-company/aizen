@@ -1553,6 +1553,22 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     let text = try ReadContextTextFileResponsePayload(protobufBytes: textResponse.payload.protobufBytes)
     #expect(text.text == "readme")
     #expect(text.contentHash.count == 64)
+
+    let searchResponse = try await host.receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 3,
+        kind: .query,
+        channel: .state,
+        payload: try .init(SearchContextFilesQueryPayload(
+            executionContextID: context.id.description,
+            query: "README",
+            maximumMatches: 10
+        ))
+    ))
+    #expect(searchResponse.payload.identifier == SearchContextFilesResponsePayload.identifier)
+    #expect(try SearchContextFilesResponsePayload(protobufBytes: searchResponse.payload.protobufBytes).result.matches == [
+        .init(relativePath: "README.md", lineNumber: 1, preview: "readme")
+    ])
 }
 
 @Test func hostCreatesLinkedWorktreeContextsThroughAHostOperation() async throws {

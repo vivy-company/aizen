@@ -190,6 +190,10 @@ public struct RemoteHostEndpoint: WireEndpoint {
             let request = try ListContextFilesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let context = try await requiredExecutionContext(request.executionContextID)
             return .init(capability: .fileRead, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil)
+        case SearchContextFilesQueryPayload.identifier:
+            let request = try SearchContextFilesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let context = try await requiredExecutionContext(request.executionContextID)
+            return .init(capability: .fileRead, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil)
         case ReadContextTextFileQueryPayload.identifier:
             let request = try ReadContextTextFileQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let context = try await requiredExecutionContext(request.executionContextID)

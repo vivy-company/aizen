@@ -341,6 +341,8 @@ public actor LocalHost: WireEndpoint {
                 AttachTerminalResponsePayload.identifier,
                 ListContextFilesQueryPayload.identifier,
                 ListContextFilesResponsePayload.identifier,
+                SearchContextFilesQueryPayload.identifier,
+                SearchContextFilesResponsePayload.identifier,
                 ReadContextTextFileQueryPayload.identifier,
                 ReadContextTextFileResponsePayload.identifier,
                 ReplaceContextTextFileCommandPayload.identifier,
@@ -618,6 +620,16 @@ public actor LocalHost: WireEndpoint {
             )
             kind = .queryResponse
             payload = try TypedPayload(ListContextFilesResponsePayload(entries: entries))
+        case .query where envelope.payload.identifier == SearchContextFilesQueryPayload.identifier:
+            let query = try SearchContextFilesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let contextID = try Self.executionContextID(from: query.executionContextID)
+            let result = try await contextFiles.searchText(
+                contextID: contextID,
+                query: query.query,
+                maximumMatches: query.maximumMatches
+            )
+            kind = .queryResponse
+            payload = try TypedPayload(SearchContextFilesResponsePayload(result: result))
         case .query where envelope.payload.identifier == ReadContextTextFileQueryPayload.identifier:
             let query = try ReadContextTextFileQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let contextID = try Self.executionContextID(from: query.executionContextID)
