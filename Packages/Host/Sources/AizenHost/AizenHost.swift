@@ -32,27 +32,6 @@ public actor LocalHost: WireEndpoint {
     }
 }
 
-public actor HostRunRegistry {
-    private var runs: [RunID: Run] = [:]
-
-    public init() {}
-
-    public func register(_ run: Run) {
-        precondition(runs[run.id] == nil, "A Run ID may only be registered once")
-        runs[run.id] = run
-    }
-
-    public func run(for id: RunID) -> Run? { runs[id] }
-
-    public enum Error: Swift.Error, Sendable, Equatable { case unknownRun(RunID) }
-
-    public func updateLifecycle(_ lifecycle: RunLifecycle, for id: RunID) throws {
-        guard var run = runs[id] else { throw Error.unknownRun(id) }
-        run.lifecycle = lifecycle
-        runs[id] = run
-    }
-}
-
 /// Host-facing runtime contract. ACP, Process, and UI concerns remain in a macOS adapter.
 public protocol RunRuntime: Sendable {
     func start(run: Run) async throws
@@ -60,22 +39,56 @@ public protocol RunRuntime: Sendable {
 }
 
 public actor RunCoordinator {
-    private let registry: HostRunRegistry
+    public enum Error: Swift.Error, Sendable, Equatable {
+        case duplicateRun(RunID)
+        case unknownRun(RunID)
+        case invalidTransition(from: RunLifecycle, to: RunLifecycle)
+    }
+
+    private let storage: StorageRepository
     private let runtime: any RunRuntime
 
-    public init(registry: HostRunRegistry, runtime: any RunRuntime) {
-        self.registry = registry
+    public init(storage: StorageRepository, runtime: any RunRuntime) {
+        self.storage = storage
         self.runtime = runtime
     }
 
     public func start(_ run: Run) async throws {
-        await registry.register(run)
-        try await runtime.start(run: run)
-        try await registry.updateLifecycle(.running, for: run.id)
+        guard run.lifecycle == .queued else { throw Error.invalidTransition(from: run.lifecycle, to: .running) }
+        _ = try await storage.transact { snapshot in
+            guard !snapshot.runs.contains(where: { $0.id == run.id }) else { throw Error.duplicateRun(run.id) }
+            snapshot.runs.append(run)
+        }
+        do {
+            try await runtime.start(run: run)
+            try await updateLifecycle(.running, for: run.id)
+        } catch {
+            try? await updateLifecycle(.failed, for: run.id)
+            throw error
+        }
     }
 
     public func cancel(_ runID: RunID) async throws {
+        guard let run = try await run(for: runID) else { throw Error.unknownRun(runID) }
+        guard run.lifecycle.canTransition(to: .cancelled) else {
+            throw Error.invalidTransition(from: run.lifecycle, to: .cancelled)
+        }
         try await runtime.cancel(runID: runID)
-        try await registry.updateLifecycle(.cancelled, for: runID)
+        try await updateLifecycle(.cancelled, for: runID)
+    }
+
+    public func run(for id: RunID) async throws -> Run? {
+        try await storage.load().runs.first(where: { $0.id == id })
+    }
+
+    private func updateLifecycle(_ lifecycle: RunLifecycle, for id: RunID) async throws {
+        _ = try await storage.transact { snapshot in
+            guard let index = snapshot.runs.firstIndex(where: { $0.id == id }) else { throw Error.unknownRun(id) }
+            let current = snapshot.runs[index].lifecycle
+            guard current.canTransition(to: lifecycle) else {
+                throw Error.invalidTransition(from: current, to: lifecycle)
+            }
+            snapshot.runs[index].lifecycle = lifecycle
+        }
     }
 }

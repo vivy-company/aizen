@@ -21,21 +21,32 @@ import AizenWire
     #expect(snapshot.spaces.map(\.name) == ["Vivy"])
 }
 
-@Test func runRegistryRejectsUnknownRuns() async {
-    let registry = HostRunRegistry()
-    await #expect(throws: HostRunRegistry.Error.self) {
-        try await registry.updateLifecycle(.running, for: RunID())
+@Test func coordinatorOwnsRunLifecycle() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Host")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Run")
+    _ = try await storage.transact { snapshot in
+        snapshot.spaces.append(space)
+        snapshot.sessions.append(session)
     }
+    let coordinator = RunCoordinator(storage: storage, runtime: RecordingRuntime())
+    let run = Run(spaceID: space.id, sessionID: session.id)
+    try await coordinator.start(run)
+    #expect(try await coordinator.run(for: run.id)?.lifecycle == .running)
+    try await coordinator.cancel(run.id)
+    #expect(try await coordinator.run(for: run.id)?.lifecycle == .cancelled)
 }
 
-@Test func coordinatorOwnsRunLifecycle() async throws {
-    let registry = HostRunRegistry()
-    let coordinator = RunCoordinator(registry: registry, runtime: RecordingRuntime())
-    let run = Run(spaceID: SpaceID(), sessionID: SessionID())
-    try await coordinator.start(run)
-    #expect(await registry.run(for: run.id)?.lifecycle == .running)
-    try await coordinator.cancel(run.id)
-    #expect(await registry.run(for: run.id)?.lifecycle == .cancelled)
+@Test func coordinatorRejectsUnknownRunWithoutTouchingRuntime() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let coordinator = RunCoordinator(storage: StorageRepository(url: root.appendingPathComponent("storage-v2.json")), runtime: RecordingRuntime())
+    let runID = RunID()
+    await #expect(throws: RunCoordinator.Error.unknownRun(runID)) {
+        try await coordinator.cancel(runID)
+    }
 }
 
 private actor RecordingRuntime: RunRuntime {

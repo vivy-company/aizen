@@ -36,6 +36,9 @@ public enum StorageError: Error, Sendable, Equatable {
     case unsupportedSchema(Int)
     case duplicateIdentity(String)
     case missingSpace
+    case missingSession
+    case missingResource
+    case missingExecutionContext
 }
 
 public struct MigrationReport: Codable, Sendable, Hashable {
@@ -167,5 +170,31 @@ public actor StorageRepository {
         let spaceIDs = Set(snapshot.spaces.map(\.id))
         guard spaceIDs.count == snapshot.spaces.count else { throw StorageError.duplicateIdentity("space") }
         guard snapshot.sessions.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
+        guard Set(snapshot.sessions.map(\.id)).count == snapshot.sessions.count else { throw StorageError.duplicateIdentity("session") }
+        guard Set(snapshot.resources.map(\.id)).count == snapshot.resources.count else { throw StorageError.duplicateIdentity("resource") }
+        guard Set(snapshot.executionContexts.map(\.id)).count == snapshot.executionContexts.count else { throw StorageError.duplicateIdentity("execution context") }
+        guard Set(snapshot.runs.map(\.id)).count == snapshot.runs.count else { throw StorageError.duplicateIdentity("run") }
+        guard snapshot.resources.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
+        guard snapshot.executionContexts.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
+
+        let sessions = Dictionary(uniqueKeysWithValues: snapshot.sessions.map { ($0.id, $0) })
+        let resources = Dictionary(uniqueKeysWithValues: snapshot.resources.map { ($0.id, $0) })
+        let contexts = Dictionary(uniqueKeysWithValues: snapshot.executionContexts.map { ($0.id, $0) })
+        guard snapshot.executionContexts.allSatisfy({ context in
+            guard let resourceID = context.resourceID else { return true }
+            guard let resource = resources[resourceID] else { return false }
+            return resource.spaceID == context.spaceID
+        }) else { throw StorageError.missingResource }
+        guard snapshot.sessions.allSatisfy({ session in
+            guard let contextID = session.executionContextID else { return true }
+            guard let context = contexts[contextID] else { return false }
+            return context.spaceID == session.spaceID
+        }) else { throw StorageError.missingExecutionContext }
+        guard snapshot.runs.allSatisfy({ run in
+            guard let session = sessions[run.sessionID], session.spaceID == run.spaceID else { return false }
+            guard let contextID = run.executionContextID else { return true }
+            guard let context = contexts[contextID] else { return false }
+            return context.spaceID == run.spaceID
+        }) else { throw StorageError.missingSession }
     }
 }

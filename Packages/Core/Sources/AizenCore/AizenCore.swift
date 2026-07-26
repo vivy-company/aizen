@@ -284,6 +284,16 @@ public enum RunLifecycle: String, Codable, Sendable, Hashable {
     case completed
     case failed
     case cancelled
+
+    public func canTransition(to next: Self) -> Bool {
+        switch (self, next) {
+        case (.queued, .running), (.queued, .failed), (.queued, .cancelled),
+             (.running, .completed), (.running, .failed), (.running, .cancelled):
+            true
+        default:
+            false
+        }
+    }
 }
 
 public struct Run: Codable, Sendable, Hashable, Identifiable {
