@@ -586,6 +586,12 @@ public actor HostClient {
         return try ReadRepositoryDiffResponsePayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func repositoryHistory(id: ResourceID, maximumCommits: UInt32 = 50) async throws -> ReadRepositoryHistoryResponsePayload {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .query, channel: .state, payload: try .init(ReadRepositoryHistoryQueryPayload(resourceID: id.description, maximumCommits: maximumCommits))))
+        guard response.kind == .queryResponse, response.payload.identifier == ReadRepositoryHistoryResponsePayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try ReadRepositoryHistoryResponsePayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
         let response = try await send(.init(
             messageID: UUID().uuidString,
