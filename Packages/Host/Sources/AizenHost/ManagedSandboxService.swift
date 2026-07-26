@@ -153,10 +153,14 @@ public actor ManagedSandboxService {
         guard fileManager.fileExists(atPath: rootURL.path) else { return [] }
         var removed: [URL] = []
         for spaceDirectory in try fileManager.contentsOfDirectory(at: rootURL, includingPropertiesForKeys: [.isDirectoryKey]) {
-            guard UUID(uuidString: spaceDirectory.lastPathComponent) != nil else { continue }
+            guard UUID(uuidString: spaceDirectory.lastPathComponent) != nil,
+                try spaceDirectory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true else {
+                continue
+            }
             for contextDirectory in try fileManager.contentsOfDirectory(at: spaceDirectory, includingPropertiesForKeys: [.isDirectoryKey]) {
                 let directory = contextDirectory.standardizedFileURL
                 guard UUID(uuidString: directory.lastPathComponent) != nil,
+                    try directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true,
                     directory.path.hasPrefix(rootURL.path + "/"),
                     !managedDirectories.contains(directory) else {
                     continue
@@ -169,6 +173,7 @@ public actor ManagedSandboxService {
     }
 
     private func persistence(for context: ExecutionContext) -> SandboxPersistence? {
+        guard context.hostReference?.rawValue == "sandbox-\(context.id.description)" else { return nil }
         if context.kind == .managedTemporarySandbox { return .temporary }
         if context.kind == .managedPersistentSandbox { return .persistent }
         return nil
