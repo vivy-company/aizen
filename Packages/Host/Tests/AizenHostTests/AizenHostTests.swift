@@ -962,6 +962,25 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(createdMode == .copy)
 }
 
+@Test func executionContextFileServiceReturnsRelativeEntriesAndRejectsTraversal() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let checkout = root.appendingPathComponent("checkout", isDirectory: true)
+    try FileManager.default.createDirectory(at: checkout.appendingPathComponent("Sources", isDirectory: true), withIntermediateDirectories: true)
+    try Data("hello".utf8).write(to: checkout.appendingPathComponent("README.md"))
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Files")
+    let context = ExecutionContext(spaceID: space.id, kind: .repositoryCheckout, hostReference: .init(rawValue: "local-checkout:\(checkout.path)"))
+    _ = try await storage.transact { $0.spaces.append(space); $0.executionContexts.append(context) }
+    let service = ExecutionContextFileService(storage: storage)
+
+    let entries = try await service.listDirectory(contextID: context.id)
+    #expect(entries.map(\.relativePath) == ["Sources", "README.md"])
+    await #expect(throws: ExecutionContextFileService.Error.invalidRelativePath("../outside")) {
+        try await service.listDirectory(contextID: context.id, relativePath: "../outside")
+    }
+}
+
 private actor RecordingRuntime: RunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
