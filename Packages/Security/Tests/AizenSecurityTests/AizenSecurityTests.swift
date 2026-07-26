@@ -51,3 +51,48 @@ import Testing
     await #expect(throws: SecurityError.replayedSequence) { try await protection.accept(sequence: 4) }
     await #expect(throws: SecurityError.replayedSequence) { try await protection.accept(sequence: 3) }
 }
+
+@Test func mutualAuthenticationBindsBothIdentitiesRouteAndFreshSessionKeys() throws {
+    let hostIdentity = LocalCryptographicIdentity()
+    let deviceIdentity = LocalCryptographicIdentity()
+    let hostEphemeral = ConnectionEphemeralKey()
+    let deviceEphemeral = ConnectionEphemeralKey()
+    let binding = try ConnectionAuthenticationBinding(
+        protocolGeneration: 1,
+        hostID: HostID(),
+        deviceID: DeviceID(),
+        connectionID: UUID(),
+        clientNonce: Data(repeating: 1, count: 32),
+        serverNonce: Data(repeating: 2, count: 32),
+        clientEphemeralPublicKey: deviceEphemeral.publicKey,
+        serverEphemeralPublicKey: hostEphemeral.publicKey,
+        route: .lan
+    )
+    let hostProof = ConnectionAuthenticator.makeProof(participant: .host, identity: hostIdentity, binding: binding)
+    let deviceProof = ConnectionAuthenticator.makeProof(participant: .device, identity: deviceIdentity, binding: binding)
+    try ConnectionAuthenticator.verify(hostProof, expectedParticipant: .host, identity: hostIdentity.publicIdentity(), binding: binding)
+    try ConnectionAuthenticator.verify(deviceProof, expectedParticipant: .device, identity: deviceIdentity.publicIdentity(), binding: binding)
+
+    let hostKeys = try ConnectionAuthenticator.deriveKeys(participant: .host, ephemeralKey: hostEphemeral, peerEphemeralPublicKey: deviceEphemeral.publicKey, binding: binding)
+    let deviceKeys = try ConnectionAuthenticator.deriveKeys(participant: .device, ephemeralKey: deviceEphemeral, peerEphemeralPublicKey: hostEphemeral.publicKey, binding: binding)
+    #expect(hostKeys.outboundKey.withUnsafeBytes { Data($0) } == deviceKeys.inboundKey.withUnsafeBytes { Data($0) })
+    #expect(hostKeys.inboundKey.withUnsafeBytes { Data($0) } == deviceKeys.outboundKey.withUnsafeBytes { Data($0) })
+
+    let wrongRoute = try ConnectionAuthenticationBinding(
+        protocolGeneration: 1,
+        hostID: binding.hostID,
+        deviceID: binding.deviceID,
+        connectionID: binding.connectionID,
+        clientNonce: binding.clientNonce,
+        serverNonce: binding.serverNonce,
+        clientEphemeralPublicKey: binding.clientEphemeralPublicKey,
+        serverEphemeralPublicKey: binding.serverEphemeralPublicKey,
+        route: .relay
+    )
+    #expect(throws: SecurityError.invalidAuthenticationProof) {
+        try ConnectionAuthenticator.verify(hostProof, expectedParticipant: .host, identity: hostIdentity.publicIdentity(), binding: wrongRoute)
+    }
+    #expect(throws: SecurityError.invalidConnectionBinding) {
+        try ConnectionAuthenticator.deriveKeys(participant: .host, ephemeralKey: hostEphemeral, peerEphemeralPublicKey: ConnectionEphemeralKey().publicKey, binding: binding)
+    }
+}

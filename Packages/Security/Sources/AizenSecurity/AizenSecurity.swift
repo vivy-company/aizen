@@ -11,6 +11,8 @@ public enum SecurityError: Swift.Error, Sendable, Equatable {
     case invitationExpired
     case pairingTokenUnknown
     case pairingTokenRejected
+    case invalidConnectionBinding
+    case invalidAuthenticationProof
     case replayedSequence
 }
 
@@ -267,6 +269,192 @@ public struct SecurityAuditRecord: Codable, Sendable, Hashable, Identifiable {
         self.deviceID = deviceID
         self.route = route
         self.detail = detail
+    }
+}
+
+public enum ConnectionRoute: String, Codable, Sendable, Hashable {
+    case lan
+    case loopback
+    case tailscale
+    case cloudflare
+    case relay
+}
+
+/// The complete context that both identities sign before a connection can carry Host messages.
+public struct ConnectionAuthenticationBinding: Sendable, Hashable {
+    public static let nonceLength = 32
+    public static let ephemeralPublicKeyLength = 32
+
+    public let protocolGeneration: UInt32
+    public let hostID: HostID
+    public let deviceID: DeviceID
+    public let connectionID: UUID
+    public let clientNonce: Data
+    public let serverNonce: Data
+    public let clientEphemeralPublicKey: Data
+    public let serverEphemeralPublicKey: Data
+    public let route: ConnectionRoute
+
+    public init(
+        protocolGeneration: UInt32,
+        hostID: HostID,
+        deviceID: DeviceID,
+        connectionID: UUID,
+        clientNonce: Data,
+        serverNonce: Data,
+        clientEphemeralPublicKey: Data,
+        serverEphemeralPublicKey: Data,
+        route: ConnectionRoute
+    ) throws {
+        guard protocolGeneration > 0,
+              clientNonce.count == Self.nonceLength,
+              serverNonce.count == Self.nonceLength,
+              clientEphemeralPublicKey.count == Self.ephemeralPublicKeyLength,
+              serverEphemeralPublicKey.count == Self.ephemeralPublicKeyLength,
+              (try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: clientEphemeralPublicKey)) != nil,
+              (try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: serverEphemeralPublicKey)) != nil else {
+            throw SecurityError.invalidConnectionBinding
+        }
+        self.protocolGeneration = protocolGeneration
+        self.hostID = hostID
+        self.deviceID = deviceID
+        self.connectionID = connectionID
+        self.clientNonce = clientNonce
+        self.serverNonce = serverNonce
+        self.clientEphemeralPublicKey = clientEphemeralPublicKey
+        self.serverEphemeralPublicKey = serverEphemeralPublicKey
+        self.route = route
+    }
+
+    public func digest() -> Data {
+        var message = Data("aizen.connection-authentication.v1".utf8)
+        append(protocolGeneration, to: &message)
+        append(hostID.rawValue, to: &message)
+        append(deviceID.rawValue, to: &message)
+        append(connectionID, to: &message)
+        message.append(clientNonce)
+        message.append(serverNonce)
+        message.append(clientEphemeralPublicKey)
+        message.append(serverEphemeralPublicKey)
+        let routeBytes = Data(route.rawValue.utf8)
+        message.append(UInt8(routeBytes.count))
+        message.append(routeBytes)
+        return Data(SHA256.hash(data: message))
+    }
+
+    private func append(_ value: UInt32, to message: inout Data) {
+        withUnsafeBytes(of: value.bigEndian) { message.append(contentsOf: $0) }
+    }
+
+    private func append(_ value: UUID, to message: inout Data) {
+        var tuple = value.uuid
+        withUnsafeBytes(of: &tuple) { message.append(contentsOf: $0) }
+    }
+}
+
+public enum ConnectionParticipant: String, Codable, Sendable, Hashable {
+    case host
+    case device
+}
+
+public struct ConnectionAuthenticationProof: Sendable, Hashable {
+    public let participant: ConnectionParticipant
+    public let signature: Data
+
+    public init(participant: ConnectionParticipant, signature: Data) {
+        self.participant = participant
+        self.signature = signature
+    }
+}
+
+/// Ephemeral X25519 key material exists only for the lifetime of one authenticated connection.
+public struct ConnectionEphemeralKey: Sendable {
+    private let privateKey: Curve25519.KeyAgreement.PrivateKey
+
+    public init() {
+        privateKey = Curve25519.KeyAgreement.PrivateKey()
+    }
+
+    public var publicKey: Data { privateKey.publicKey.rawRepresentation }
+
+    fileprivate func sharedSecret(with peerPublicKey: Data) throws -> SharedSecret {
+        do {
+            return try privateKey.sharedSecretFromKeyAgreement(with: .init(rawRepresentation: peerPublicKey))
+        } catch {
+            throw SecurityError.invalidConnectionBinding
+        }
+    }
+}
+
+/// Directional symmetric keys derived with X25519 and HKDF-SHA256 after both signed proofs verify.
+public struct AuthenticatedConnectionKeys: Sendable {
+    public let outboundKey: SymmetricKey
+    public let inboundKey: SymmetricKey
+
+    fileprivate init(outboundKey: SymmetricKey, inboundKey: SymmetricKey) {
+        self.outboundKey = outboundKey
+        self.inboundKey = inboundKey
+    }
+}
+
+public enum ConnectionAuthenticator {
+    public static func makeProof(
+        participant: ConnectionParticipant,
+        identity: LocalCryptographicIdentity,
+        binding: ConnectionAuthenticationBinding
+    ) -> ConnectionAuthenticationProof {
+        ConnectionAuthenticationProof(participant: participant, signature: identity.sign(signingMessage(participant: participant, binding: binding)))
+    }
+
+    public static func verify(
+        _ proof: ConnectionAuthenticationProof,
+        expectedParticipant: ConnectionParticipant,
+        identity: PublicCryptographicIdentity,
+        binding: ConnectionAuthenticationBinding
+    ) throws {
+        guard proof.participant == expectedParticipant,
+              identity.verifies(signature: proof.signature, message: signingMessage(participant: expectedParticipant, binding: binding)) else {
+            throw SecurityError.invalidAuthenticationProof
+        }
+    }
+
+    public static func deriveKeys(
+        participant: ConnectionParticipant,
+        ephemeralKey: ConnectionEphemeralKey,
+        peerEphemeralPublicKey: Data,
+        binding: ConnectionAuthenticationBinding
+    ) throws -> AuthenticatedConnectionKeys {
+        let expectedLocalKey: Data
+        let expectedPeerKey: Data
+        switch participant {
+        case .host:
+            expectedLocalKey = binding.serverEphemeralPublicKey
+            expectedPeerKey = binding.clientEphemeralPublicKey
+        case .device:
+            expectedLocalKey = binding.clientEphemeralPublicKey
+            expectedPeerKey = binding.serverEphemeralPublicKey
+        }
+        guard ephemeralKey.publicKey == expectedLocalKey, peerEphemeralPublicKey == expectedPeerKey else {
+            throw SecurityError.invalidConnectionBinding
+        }
+        let sharedSecret = try ephemeralKey.sharedSecret(with: peerEphemeralPublicKey)
+        let material = sharedSecret.hkdfDerivedSymmetricKey(
+            using: SHA256.self,
+            salt: binding.digest(),
+            sharedInfo: Data("aizen.connection-keys.v1".utf8),
+            outputByteCount: 64
+        )
+        let bytes = material.withUnsafeBytes { Data($0) }
+        let hostToDevice = SymmetricKey(data: bytes.prefix(32))
+        let deviceToHost = SymmetricKey(data: bytes.suffix(32))
+        switch participant {
+        case .host: return .init(outboundKey: hostToDevice, inboundKey: deviceToHost)
+        case .device: return .init(outboundKey: deviceToHost, inboundKey: hostToDevice)
+        }
+    }
+
+    private static func signingMessage(participant: ConnectionParticipant, binding: ConnectionAuthenticationBinding) -> Data {
+        Data("aizen.connection-proof.\(participant.rawValue).v1".utf8) + binding.digest()
     }
 }
 
