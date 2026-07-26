@@ -1260,6 +1260,42 @@ public struct DiscoverXcodeProjectResponsePayload: WirePayload, Sendable, Hashab
     }
 }
 
+public struct OpenXcodeProjectCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.xcode-project.open@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let resourceID: String
+    public let projectID: String
+
+    public init(resourceID: String, projectID: String) {
+        precondition(!resourceID.isEmpty && !projectID.isEmpty, "Opening an Xcode project requires a resource and project")
+        self.resourceID = resourceID
+        self.projectID = projectID
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_OpenXcodeProjectCommand(serializedBytes: protobufBytes)
+        self.init(resourceID: message.resourceID, projectID: message.projectID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_OpenXcodeProjectCommand()
+        message.resourceID = resourceID
+        message.projectID = projectID
+        return try message.serializedData()
+    }
+}
+
+public struct OpenXcodeProjectResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.xcode-project.open@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public init() {}
+    public init(protobufBytes: Data) throws { _ = try AizenWireV1_OpenXcodeProjectResult(serializedBytes: protobufBytes) }
+    public func protobufBytes() throws -> Data { try AizenWireV1_OpenXcodeProjectResult().serializedData() }
+}
+
 public struct ImportLocalFolderCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.resource.import-local-folder@1")
     public static let schemaVersion: UInt32 = 1

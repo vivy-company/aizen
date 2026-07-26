@@ -1149,6 +1149,29 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     }
 }
 
+@Test func hostOpensOnlyTheDiscoveredXcodeProjectThroughItsRuntime() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    let project = folder.appendingPathComponent("App.xcodeproj", isDirectory: true)
+    try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Xcode")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "folder", details: .hostPrivate(.init(rawValue: "local-folder:\(folder.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let opener = RecordingXcodeProjectOpener()
+    let host = LocalHost(storage: storage, xcodeProjectOpener: opener)
+    let response = try await host.receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(OpenXcodeProjectCommandPayload(resourceID: resource.id.description, projectID: "App.xcodeproj"))
+    ))
+    #expect(response.payload.identifier == OpenXcodeProjectResultPayload.identifier)
+    #expect(await opener.openedURL == project)
+}
+
 private actor RecordingRuntime: RunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
@@ -1162,6 +1185,11 @@ private actor RecordingLinkedWorktrees: LinkedWorktreeCreating {
 private actor RecordingIndependentContexts: IndependentContextCreating {
     private(set) var mode: IndependentContextMode?
     func createIndependentContext(source: URL, destination: URL, mode: IndependentContextMode) async throws { self.mode = mode }
+}
+
+private actor RecordingXcodeProjectOpener: XcodeProjectOpening {
+    private(set) var openedURL: URL?
+    func openXcodeProject(at url: URL) async throws { openedURL = url }
 }
 
 private actor RecordingAgentLaunchUpdater: AgentLaunchConfigurationUpdating {

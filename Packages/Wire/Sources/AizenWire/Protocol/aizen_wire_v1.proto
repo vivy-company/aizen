@@ -327,6 +327,13 @@ message DiscoverXcodeProjectResponse {
   optional XcodeProjectDescriptorRecord project = 1;
 }
 
+message OpenXcodeProjectCommand {
+  string resource_id = 1;
+  string project_id = 2;
+}
+
+message OpenXcodeProjectResult {}
+
 message ImportLocalFolderCommand {
   string space_id = 1;
   string path = 2;

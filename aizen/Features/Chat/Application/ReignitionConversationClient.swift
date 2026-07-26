@@ -14,6 +14,8 @@ protocol ReignitionConversationClient: Sendable {
     func createSpace(name: String) async throws -> SpaceID
     func conversations(spaceID: SpaceID?) async throws -> [Session]
     func resources(spaceID: SpaceID?) async throws -> [Resource]
+    func discoverXcodeProject(resourceID: ResourceID) async throws -> XcodeProjectDescriptor?
+    func openXcodeProject(resourceID: ResourceID, projectID: String) async throws
     func executionContexts(spaceID: SpaceID?) async throws -> [ExecutionContext]
     func contextFiles(
         executionContextID: ExecutionContextID,

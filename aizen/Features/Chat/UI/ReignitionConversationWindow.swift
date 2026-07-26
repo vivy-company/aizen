@@ -149,6 +149,12 @@ struct ReignitionConversationWindow: View {
                             .labelStyle(.iconOnly)
                             .disabled(store.isSynchronizing)
                         }
+                        if resource.kind == .repository || resource.kind == .folder {
+                            Button("Open in Xcode", systemImage: "hammer") {
+                                Task { await store.openXcodeProject(resourceID: resource.id) }
+                            }
+                            .disabled(store.isSynchronizing)
+                        }
                     } else {
                         Label("No folder attached", systemImage: "folder")
                             .font(.subheadline)

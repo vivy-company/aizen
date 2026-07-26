@@ -452,6 +452,21 @@ public actor HostClient {
         return try DiscoverXcodeProjectResponsePayload(protobufBytes: response.payload.protobufBytes).project
     }
 
+    public func openXcodeProject(resourceID: ResourceID, projectID: String) async throws {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(OpenXcodeProjectCommandPayload(resourceID: resourceID.description, projectID: projectID))
+        ))
+        guard response.kind == .commandResult,
+              response.payload.identifier == OpenXcodeProjectResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        _ = try OpenXcodeProjectResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func importLocalFolder(spaceID: SpaceID, path: String, title: String? = nil) async throws -> ResourceID {
         let response = try await send(.init(
             messageID: UUID().uuidString,
