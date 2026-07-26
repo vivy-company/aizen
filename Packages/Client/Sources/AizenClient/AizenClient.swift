@@ -207,6 +207,14 @@ public actor HostClient {
         return ResourceID(rawValue: uuid)
     }
 
+    public func importLocalRepository(spaceID: SpaceID, path: String, title: String? = nil) async throws -> ResourceID {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(ImportLocalRepositoryCommandPayload(spaceID: spaceID.description, path: path, title: title))))
+        guard response.kind == .commandResult, response.payload.identifier == ImportLocalRepositoryResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        let result = try ImportLocalRepositoryResultPayload(protobufBytes: response.payload.protobufBytes)
+        guard let id = UUID(uuidString: result.resourceID) else { throw Error.invalidIdentity(result.resourceID) }
+        return ResourceID(rawValue: id)
+    }
+
     public func removeResource(id: ResourceID) async throws {
         let response = try await send(.init(
             messageID: UUID().uuidString,
@@ -249,6 +257,14 @@ public actor HostClient {
         let result = try CreateLocalFolderContextResultPayload(protobufBytes: response.payload.protobufBytes)
         guard let uuid = UUID(uuidString: result.contextID) else { throw Error.invalidIdentity(result.contextID) }
         return ExecutionContextID(rawValue: uuid)
+    }
+
+    public func createRepositoryCheckoutContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(CreateRepositoryCheckoutContextCommandPayload(spaceID: spaceID.description, resourceID: resourceID.description))))
+        guard response.kind == .commandResult, response.payload.identifier == CreateRepositoryCheckoutContextResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        let result = try CreateRepositoryCheckoutContextResultPayload(protobufBytes: response.payload.protobufBytes)
+        guard let id = UUID(uuidString: result.contextID) else { throw Error.invalidIdentity(result.contextID) }
+        return ExecutionContextID(rawValue: id)
     }
 
     public func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {

@@ -215,6 +215,16 @@ message ImportLocalFolderCommand {
   string title = 3;
 }
 
+message ImportLocalRepositoryCommand {
+  string space_id = 1;
+  string path = 2;
+  optional string title = 3;
+}
+
+message ImportLocalRepositoryResult {
+  string resource_id = 1;
+}
+
 message ImportLocalFolderResult {
   string resource_id = 1;
 }
@@ -247,6 +257,15 @@ message CreateLocalFolderContextCommand {
 }
 
 message CreateLocalFolderContextResult {
+  string execution_context_id = 1;
+}
+
+message CreateRepositoryCheckoutContextCommand {
+  string space_id = 1;
+  string resource_id = 2;
+}
+
+message CreateRepositoryCheckoutContextResult {
   string execution_context_id = 1;
 }
 

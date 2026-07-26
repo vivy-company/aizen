@@ -69,10 +69,14 @@ public actor LocalHost: WireEndpoint {
                 CancelRunResultPayload.identifier,
                 ImportLocalFolderCommandPayload.identifier,
                 ImportLocalFolderResultPayload.identifier,
+                ImportLocalRepositoryCommandPayload.identifier,
+                ImportLocalRepositoryResultPayload.identifier,
                 RemoveResourceCommandPayload.identifier,
                 ResourceMutationResultPayload.identifier,
                 CreateLocalFolderContextCommandPayload.identifier,
                 CreateLocalFolderContextResultPayload.identifier,
+                CreateRepositoryCheckoutContextCommandPayload.identifier,
+                CreateRepositoryCheckoutContextResultPayload.identifier,
                 AttachExecutionContextCommandPayload.identifier,
                 DetachExecutionContextCommandPayload.identifier,
                 RemoveExecutionContextCommandPayload.identifier,
@@ -225,6 +229,23 @@ public actor LocalHost: WireEndpoint {
             }
             kind = .commandResult
             payload = try TypedPayload(ImportLocalFolderResultPayload(resourceID: importedResource.id.description))
+        case .command where envelope.payload.identifier == ImportLocalRepositoryCommandPayload.identifier:
+            let command = try ImportLocalRepositoryCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try Self.spaceID(from: command.spaceID)
+            let directory = try Self.localDirectory(from: command.path)
+            guard Self.isGitRepository(directory) else { throw HostProtocolError.invalidResourcePath(directory.path) }
+            let resource = Resource(spaceID: spaceID, kind: .repository, title: command.title ?? directory.lastPathComponent, details: .hostPrivate(.init(rawValue: "local-repository:\(directory.path)")))
+            let snapshot = try await storage.transact { snapshot in
+                guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
+                if let existing = snapshot.resources.first(where: { $0.details == resource.details }) {
+                    guard existing.spaceID == spaceID else { throw HostProtocolError.duplicateResource(existing.id) }
+                    return
+                }
+                snapshot.resources.append(resource)
+            }
+            guard let imported = snapshot.resources.first(where: { $0.details == resource.details }) else { throw HostProtocolError.unknownResource(resource.id) }
+            kind = .commandResult
+            payload = try TypedPayload(ImportLocalRepositoryResultPayload(resourceID: imported.id.description))
         case .command where envelope.payload.identifier == RemoveResourceCommandPayload.identifier:
             let command = try RemoveResourceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             guard let uuid = UUID(uuidString: command.resourceID) else { throw HostProtocolError.invalidIdentity(command.resourceID) }
@@ -277,6 +298,18 @@ public actor LocalHost: WireEndpoint {
             }
             kind = .commandResult
             payload = try TypedPayload(ExecutionContextMutationResultPayload())
+        case .command where envelope.payload.identifier == CreateRepositoryCheckoutContextCommandPayload.identifier:
+            let command = try CreateRepositoryCheckoutContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try Self.spaceID(from: command.spaceID)
+            let resourceID = try Self.resourceID(from: command.resourceID)
+            let context = ExecutionContext(spaceID: spaceID, kind: .repositoryCheckout, resourceID: resourceID, hostReference: .init(rawValue: "repository-checkout:\(resourceID.description)"))
+            _ = try await storage.transact { snapshot in
+                guard let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == spaceID }), resource.kind == .repository else { throw HostProtocolError.unknownResource(resourceID) }
+                guard !snapshot.executionContexts.contains(where: { $0.resourceID == resourceID && $0.kind == .repositoryCheckout }) else { throw HostProtocolError.resourceInUse(resourceID) }
+                snapshot.executionContexts.append(context)
+            }
+            kind = .commandResult
+            payload = try TypedPayload(CreateRepositoryCheckoutContextResultPayload(contextID: context.id.description))
         case .command where envelope.payload.identifier == RemoveExecutionContextCommandPayload.identifier:
             let command = try RemoveExecutionContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let contextID = try Self.executionContextID(from: command.contextID)
@@ -344,6 +377,10 @@ public actor LocalHost: WireEndpoint {
             throw HostProtocolError.invalidResourcePath(path)
         }
         return directory
+    }
+
+    private static func isGitRepository(_ directory: URL) -> Bool {
+        FileManager.default.fileExists(atPath: directory.appendingPathComponent(".git").path)
     }
 
     private func executionContext(for sessionID: SessionID, in spaceID: SpaceID) async throws -> ExecutionContextID {

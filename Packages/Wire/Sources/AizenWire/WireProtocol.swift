@@ -822,6 +822,26 @@ public struct ImportLocalFolderCommandPayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct ImportLocalRepositoryCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.resource.import-local-repository@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let spaceID: String; public let path: String; public let title: String?
+    public init(spaceID: String, path: String, title: String? = nil) { self.spaceID = spaceID; self.path = path; self.title = title }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ImportLocalRepositoryCommand(serializedBytes: protobufBytes); self.init(spaceID: m.spaceID, path: m.path, title: m.hasTitle ? m.title : nil) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ImportLocalRepositoryCommand(); m.spaceID = spaceID; m.path = path; if let title { m.title = title }; return try m.serializedData() }
+}
+
+public struct ImportLocalRepositoryResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.resource.import-local-repository@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let resourceID: String
+    public init(resourceID: String) { self.resourceID = resourceID }
+    public init(protobufBytes: Data) throws { self.init(resourceID: try AizenWireV1_ImportLocalRepositoryResult(serializedBytes: protobufBytes).resourceID) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ImportLocalRepositoryResult(); m.resourceID = resourceID; return try m.serializedData() }
+}
+
 public struct ImportLocalFolderResultPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.resource.import-local-folder@1")
     public static let schemaVersion: UInt32 = 1
@@ -969,6 +989,26 @@ public struct CreateLocalFolderContextResultPayload: WirePayload, Sendable, Hash
         message.executionContextID = contextID
         return try message.serializedData()
     }
+}
+
+public struct CreateRepositoryCheckoutContextCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.execution-context.create-repository-checkout@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let spaceID: String; public let resourceID: String
+    public init(spaceID: String, resourceID: String) { self.spaceID = spaceID; self.resourceID = resourceID }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_CreateRepositoryCheckoutContextCommand(serializedBytes: protobufBytes); self.init(spaceID: m.spaceID, resourceID: m.resourceID) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_CreateRepositoryCheckoutContextCommand(); m.spaceID = spaceID; m.resourceID = resourceID; return try m.serializedData() }
+}
+
+public struct CreateRepositoryCheckoutContextResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.execution-context.create-repository-checkout@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let contextID: String
+    public init(contextID: String) { self.contextID = contextID }
+    public init(protobufBytes: Data) throws { self.init(contextID: try AizenWireV1_CreateRepositoryCheckoutContextResult(serializedBytes: protobufBytes).executionContextID) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_CreateRepositoryCheckoutContextResult(); m.executionContextID = contextID; return try m.serializedData() }
 }
 
 public struct AttachExecutionContextCommandPayload: WirePayload, Sendable, Hashable {
