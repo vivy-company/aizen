@@ -1575,6 +1575,42 @@ nonisolated struct AizenWireV1_CommitRepositoryResult: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_UpdateRepositoryBranchCommand: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var resourceID: String = String()
+
+  var branchName: String = String()
+
+  var expectedRepositoryRevision: String = String()
+
+  var expectedIndexRevision: String = String()
+
+  var create: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_UpdateRepositoryBranchResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var repositoryRevision: String = String()
+
+  var indexRevision: String = String()
+
+  var operationID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_ListExecutionContextsQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -5543,6 +5579,96 @@ nonisolated extension AizenWireV1_CommitRepositoryResult: SwiftProtobuf.Message,
   }
 
   static func ==(lhs: AizenWireV1_CommitRepositoryResult, rhs: AizenWireV1_CommitRepositoryResult) -> Bool {
+    if lhs.repositoryRevision != rhs.repositoryRevision {return false}
+    if lhs.indexRevision != rhs.indexRevision {return false}
+    if lhs.operationID != rhs.operationID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_UpdateRepositoryBranchCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".UpdateRepositoryBranchCommand"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{3}branch_name\0\u{3}expected_repository_revision\0\u{3}expected_index_revision\0\u{1}create\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.branchName) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.expectedRepositoryRevision) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.expectedIndexRevision) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.create) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 1)
+    }
+    if !self.branchName.isEmpty {
+      try visitor.visitSingularStringField(value: self.branchName, fieldNumber: 2)
+    }
+    if !self.expectedRepositoryRevision.isEmpty {
+      try visitor.visitSingularStringField(value: self.expectedRepositoryRevision, fieldNumber: 3)
+    }
+    if !self.expectedIndexRevision.isEmpty {
+      try visitor.visitSingularStringField(value: self.expectedIndexRevision, fieldNumber: 4)
+    }
+    if self.create != false {
+      try visitor.visitSingularBoolField(value: self.create, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_UpdateRepositoryBranchCommand, rhs: AizenWireV1_UpdateRepositoryBranchCommand) -> Bool {
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.branchName != rhs.branchName {return false}
+    if lhs.expectedRepositoryRevision != rhs.expectedRepositoryRevision {return false}
+    if lhs.expectedIndexRevision != rhs.expectedIndexRevision {return false}
+    if lhs.create != rhs.create {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_UpdateRepositoryBranchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".UpdateRepositoryBranchResult"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}repository_revision\0\u{3}index_revision\0\u{3}operation_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.repositoryRevision) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.indexRevision) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.operationID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.repositoryRevision.isEmpty {
+      try visitor.visitSingularStringField(value: self.repositoryRevision, fieldNumber: 1)
+    }
+    if !self.indexRevision.isEmpty {
+      try visitor.visitSingularStringField(value: self.indexRevision, fieldNumber: 2)
+    }
+    if !self.operationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.operationID, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_UpdateRepositoryBranchResult, rhs: AizenWireV1_UpdateRepositoryBranchResult) -> Bool {
     if lhs.repositoryRevision != rhs.repositoryRevision {return false}
     if lhs.indexRevision != rhs.indexRevision {return false}
     if lhs.operationID != rhs.operationID {return false}

@@ -161,6 +161,28 @@ import Testing
     #expect(try CommitRepositoryResultPayload(protobufBytes: result.protobufBytes()) == result)
 }
 
+@Test func repositoryBranchUpdatePayloadsRejectUnsafeNames() throws {
+    let command = UpdateRepositoryBranchCommandPayload(
+        resourceID: UUID().uuidString,
+        branchName: "feature/reignition",
+        expectedRepositoryRevision: "head",
+        expectedIndexRevision: String(repeating: "a", count: 64),
+        create: true
+    )
+    let result = UpdateRepositoryBranchResultPayload(repositoryRevision: "head", indexRevision: String(repeating: "b", count: 64), operationID: UUID().uuidString)
+    #expect(try UpdateRepositoryBranchCommandPayload(protobufBytes: command.protobufBytes()) == command)
+    #expect(try UpdateRepositoryBranchResultPayload(protobufBytes: result.protobufBytes()) == result)
+
+    var malformed = AizenWireV1_UpdateRepositoryBranchCommand()
+    malformed.resourceID = command.resourceID
+    malformed.branchName = "../escape"
+    malformed.expectedRepositoryRevision = "head"
+    malformed.expectedIndexRevision = String(repeating: "a", count: 64)
+    #expect(throws: WireCodecError.invalidRepositoryBranchCommand) {
+        try UpdateRepositoryBranchCommandPayload(protobufBytes: malformed.serializedData())
+    }
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")

@@ -1911,6 +1911,23 @@ public struct CommitRepositoryResultPayload: WirePayload, Sendable, Hashable {
     public func protobufBytes() throws -> Data { var m = AizenWireV1_CommitRepositoryResult(); m.repositoryRevision = repositoryRevision; m.indexRevision = indexRevision; m.operationID = operationID; return try m.serializedData() }
 }
 
+public struct UpdateRepositoryBranchCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.repository.update-branch@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let resourceID: String; public let branchName: String; public let expectedRepositoryRevision: String; public let expectedIndexRevision: String; public let create: Bool
+    public init(resourceID: String, branchName: String, expectedRepositoryRevision: String, expectedIndexRevision: String, create: Bool) { precondition(!resourceID.isEmpty && Self.validBranchName(branchName) && !expectedRepositoryRevision.isEmpty && expectedRepositoryRevision.utf8.count <= 128 && expectedIndexRevision.count == 64); self.resourceID = resourceID; self.branchName = branchName; self.expectedRepositoryRevision = expectedRepositoryRevision; self.expectedIndexRevision = expectedIndexRevision; self.create = create }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_UpdateRepositoryBranchCommand(serializedBytes: protobufBytes); guard !m.resourceID.isEmpty, Self.validBranchName(m.branchName), !m.expectedRepositoryRevision.isEmpty, m.expectedRepositoryRevision.utf8.count <= 128, m.expectedIndexRevision.count == 64 else { throw WireCodecError.invalidRepositoryBranchCommand }; self.init(resourceID: m.resourceID, branchName: m.branchName, expectedRepositoryRevision: m.expectedRepositoryRevision, expectedIndexRevision: m.expectedIndexRevision, create: m.create) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_UpdateRepositoryBranchCommand(); m.resourceID = resourceID; m.branchName = branchName; m.expectedRepositoryRevision = expectedRepositoryRevision; m.expectedIndexRevision = expectedIndexRevision; m.create = create; return try m.serializedData() }
+    private static func validBranchName(_ branchName: String) -> Bool { !branchName.isEmpty && branchName.utf8.count <= 240 && !branchName.hasPrefix("/") && !branchName.hasSuffix(".") && !branchName.contains("//") && !branchName.contains("..") && !branchName.contains("@{") && branchName.allSatisfy { $0.isLetter || $0.isNumber || ".-_ /".contains($0) } && !branchName.contains(" ") }
+}
+
+public struct UpdateRepositoryBranchResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.repository.update-branch@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let repositoryRevision: String; public let indexRevision: String; public let operationID: String
+    public init(repositoryRevision: String, indexRevision: String, operationID: String) { precondition(!repositoryRevision.isEmpty && indexRevision.count == 64 && UUID(uuidString: operationID) != nil); self.repositoryRevision = repositoryRevision; self.indexRevision = indexRevision; self.operationID = operationID }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_UpdateRepositoryBranchResult(serializedBytes: protobufBytes); guard !m.repositoryRevision.isEmpty, m.indexRevision.count == 64, UUID(uuidString: m.operationID) != nil else { throw WireCodecError.invalidRepositoryBranchResult }; self.init(repositoryRevision: m.repositoryRevision, indexRevision: m.indexRevision, operationID: m.operationID) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_UpdateRepositoryBranchResult(); m.repositoryRevision = repositoryRevision; m.indexRevision = indexRevision; m.operationID = operationID; return try m.serializedData() }
+}
+
 public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.execution-context.list@1")
     public static let schemaVersion: UInt32 = 1
@@ -2703,6 +2720,8 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidRepositoryIndexCommand
     case invalidRepositoryCommitCommand
     case invalidRepositoryCommitResult
+    case invalidRepositoryBranchCommand
+    case invalidRepositoryBranchResult
 }
 
 private extension ProtocolEnvelope {

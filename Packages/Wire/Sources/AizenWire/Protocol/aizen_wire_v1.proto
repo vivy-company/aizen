@@ -518,6 +518,20 @@ message CommitRepositoryResult {
   string operation_id = 3;
 }
 
+message UpdateRepositoryBranchCommand {
+  string resource_id = 1;
+  string branch_name = 2;
+  string expected_repository_revision = 3;
+  string expected_index_revision = 4;
+  bool create = 5;
+}
+
+message UpdateRepositoryBranchResult {
+  string repository_revision = 1;
+  string index_revision = 2;
+  string operation_id = 3;
+}
+
 message ListExecutionContextsQuery {
   string space_id = 1;
   string resource_id = 2;
