@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Host resolves the repository URL from a Resource before this actor is called; this type never
 /// receives a client-provided command or path fragment.
-public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading {
+public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryIndexUpdating {
     private static let maximumStatusBytes = 1_048_576
     private static let maximumIndexBytes = 67_108_864
 
@@ -62,6 +62,16 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
         return .init(repositoryRevision: revision, indexRevision: try currentIndexRevision(at: repositoryURL), branch: branch, isDetached: branch == nil, commits: commits, truncated: records.count > maximumCommits)
     }
 
+    public func updateIndex(at repositoryURL: URL, relativePaths: [String], expectedIndexRevision: String, stage: Bool) async throws -> String {
+        guard !relativePaths.isEmpty, FileManager.default.fileExists(atPath: repositoryURL.appendingPathComponent(".git").path) else { throw Error.notRepository }
+        guard try currentIndexRevision(at: repositoryURL) == expectedIndexRevision else { throw Error.indexRevisionConflict }
+        let arguments = stage
+            ? ["-C", repositoryURL.path, "add", "--"] + relativePaths
+            : ["-C", repositoryURL.path, "restore", "--staged", "--"] + relativePaths
+        _ = try runGit(arguments, maximumOutputBytes: 4_096)
+        return try currentIndexRevision(at: repositoryURL)
+    }
+
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
         case notRepository
         case gitFailed(String)
@@ -69,6 +79,7 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
         case malformedStatus
         case invalidStatusPath
         case indexTooLarge
+        case indexRevisionConflict
 
         public var errorDescription: String? {
             switch self {
@@ -78,6 +89,7 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
             case .malformedStatus: "Git returned malformed porcelain status output."
             case .invalidStatusPath: "Git returned an invalid repository-relative path."
             case .indexTooLarge: "The Git index exceeded the Host safety limit."
+            case .indexRevisionConflict: "The Git index changed; refresh before updating it."
             }
         }
     }
