@@ -148,6 +148,69 @@ final class ReignitionConversationStore: ObservableObject {
         }
     }
 
+    /// Opens an external local path through Host ownership, reusing an attached conversation when possible.
+    func openLocalPath(_ url: URL, preferredSpaceID: SpaceID?) async -> SpaceID? {
+        var openedSpaceID: SpaceID?
+        await perform {
+            let directory = Self.nearestRepositoryOrDirectory(for: url)
+            let availableSpaces = try await self.host.spaces()
+            let spaceID: SpaceID
+            if let preferredSpaceID, availableSpaces.contains(where: { $0.id == preferredSpaceID }) {
+                spaceID = preferredSpaceID
+            } else if let existingSpaceID = availableSpaces.first?.id {
+                spaceID = existingSpaceID
+            } else {
+                spaceID = try await self.host.createSpace(name: "Default")
+            }
+
+            let isRepository = FileManager.default.fileExists(
+                atPath: directory.appendingPathComponent(".git", isDirectory: false).path
+            )
+            let resourceID: ResourceID
+            if isRepository {
+                resourceID = try await self.host.importLocalRepository(
+                    spaceID: spaceID,
+                    path: directory.path,
+                    title: directory.lastPathComponent
+                )
+            } else {
+                resourceID = try await self.host.importLocalFolder(
+                    spaceID: spaceID,
+                    path: directory.path,
+                    title: directory.lastPathComponent
+                )
+            }
+
+            let contexts = try await self.host.executionContexts(spaceID: spaceID)
+            let conversations = try await self.host.conversations(spaceID: spaceID)
+            if let context = contexts.first(where: { $0.resourceID == resourceID }),
+                let conversation = conversations.first(where: {
+                    $0.kind == .conversation && $0.executionContextID == context.id
+                }) {
+                self.selectedConversationID = conversation.id
+                self.messages = try await self.host.conversationTimeline(sessionID: conversation.id)
+            } else {
+                let contextID: ExecutionContextID
+                if let context = contexts.first(where: { $0.resourceID == resourceID }) {
+                    contextID = context.id
+                } else if isRepository {
+                    contextID = try await self.host.createRepositoryCheckoutContext(spaceID: spaceID, resourceID: resourceID)
+                } else {
+                    contextID = try await self.host.createLocalFolderContext(spaceID: spaceID, resourceID: resourceID)
+                }
+                let sessionID = try await self.host.createConversation(spaceID: spaceID, title: directory.lastPathComponent)
+                try await self.host.attachExecutionContext(sessionID: sessionID, contextID: contextID)
+                self.selectedConversationID = sessionID
+                self.messages = try await self.host.conversationTimeline(sessionID: sessionID)
+            }
+
+            self.spaces = try await self.host.spaces()
+            try await self.refreshProjection(spaceID: spaceID)
+            openedSpaceID = spaceID
+        }
+        return openedSpaceID
+    }
+
     func createLinkedWorktree(
         resourceID: ResourceID,
         to sessionID: SessionID,
@@ -343,6 +406,25 @@ final class ReignitionConversationStore: ObservableObject {
         }
         isSynchronizing = false
         connectionState = await host.connectionState()
+    }
+
+    private static func nearestRepositoryOrDirectory(for url: URL) -> URL {
+        let fileManager = FileManager.default
+        var directory = url.standardizedFileURL
+        var isDirectory: ObjCBool = false
+        if fileManager.fileExists(atPath: directory.path, isDirectory: &isDirectory), !isDirectory.boolValue {
+            directory.deleteLastPathComponent()
+        }
+
+        while directory.path != "/" {
+            if fileManager.fileExists(atPath: directory.appendingPathComponent(".git", isDirectory: false).path) {
+                return directory
+            }
+            let parent = directory.deletingLastPathComponent()
+            guard parent.path != directory.path else { break }
+            directory = parent
+        }
+        return url.standardizedFileURL
     }
 }
 

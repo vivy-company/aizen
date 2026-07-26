@@ -7,4 +7,5 @@ extension Notification.Name {
     static let switchToBrowserSession = Notification.Name("SwitchToBrowserSession")
     static let openSettingsPro = Notification.Name("OpenSettingsPro")
     static let openLicenseDeepLink = Notification.Name("OpenLicenseDeepLink")
+    static let openReignitionPath = Notification.Name("OpenReignitionPath")
 }

@@ -16,6 +16,7 @@ struct ReignitionConversationWindow: View {
     @State private var contextCreation: ReignitionContextCreation?
     @State private var terminalPresentation: AizenCore.TerminalSession?
     @State private var fileBrowserContext: ExecutionContext?
+    @State private var showingLicenseDeepLinkSheet = false
 
     init(host: ReignitionHostComposition) {
         _store = StateObject(wrappedValue: ReignitionConversationStore(host: host))
@@ -61,8 +62,18 @@ struct ReignitionConversationWindow: View {
         .task {
             await store.refreshSpaces()
             if selectedSpaceID == nil { selectedSpaceID = store.spaces.first?.id }
+            openPendingDeepLinkPaths()
+            if LicenseStateStore.shared.hasPendingDeepLink {
+                showingLicenseDeepLinkSheet = true
+            }
         }
         .task(id: selectedSpaceID) { await store.refresh(spaceID: selectedSpaceID) }
+        .onReceive(NotificationCenter.default.publisher(for: .openReignitionPath)) { _ in
+            openPendingDeepLinkPaths()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openLicenseDeepLink)) { _ in
+            showingLicenseDeepLinkSheet = true
+        }
         .alert("New Conversation", isPresented: newConversationAlert) {
             TextField("Title", text: $newConversationTitle)
             Button("Create") { createConversation() }
@@ -91,6 +102,12 @@ struct ReignitionConversationWindow: View {
         }
         .sheet(item: $fileBrowserContext) { context in
             ReignitionContextFilesSheet(store: store, context: context)
+        }
+        .sheet(isPresented: $showingLicenseDeepLinkSheet) {
+            LicenseDeepLinkSheet(
+                licenseManager: LicenseStateStore.shared,
+                onOpenSettings: { ReignitionHostSettingsWindowController.shared.show() }
+            )
         }
     }
 
@@ -228,6 +245,18 @@ struct ReignitionConversationWindow: View {
         newConversationTitle = ""
         guard !title.isEmpty else { return }
         Task { await store.createConversation(spaceID: selectedSpaceID, title: title) }
+    }
+
+    private func openPendingDeepLinkPaths() {
+        let paths = DeepLinkHandler.shared.takePendingLocalPaths()
+        guard !paths.isEmpty else { return }
+        Task {
+            for url in paths {
+                if let spaceID = await store.openLocalPath(url, preferredSpaceID: selectedSpaceID) {
+                    selectedSpaceID = spaceID
+                }
+            }
+        }
     }
 
     private func createSpace() {

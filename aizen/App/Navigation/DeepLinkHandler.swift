@@ -2,7 +2,7 @@
 //  DeepLinkHandler.swift
 //  aizen
 //
-//  Handles app deep links without spawning extra windows
+//  Routes the external aizen:// boundary into the active Reignition client.
 //
 
 import AppKit
@@ -11,19 +11,16 @@ import Foundation
 @MainActor
 final class DeepLinkHandler {
     static let shared = DeepLinkHandler()
-    private let workspaceGraphQueryController = WorkspaceGraphQueryController(
-        viewContext: PersistenceController.shared.container.viewContext
-    )
+    private var pendingLocalPaths: [URL] = []
 
     private init() {}
 
     func handle(_ url: URL) {
         guard url.scheme == "aizen" else { return }
 
-        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let host = url.host ?? ""
         let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let queryItems = components?.queryItems ?? []
+        let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
 
         let token = queryItems.first(where: { $0.name == "token" })?.value
         let activateFlag = queryItems.first(where: { $0.name == "activate" })?.value?.lowercased()
@@ -35,10 +32,12 @@ final class DeepLinkHandler {
         }
 
         NSApp.activate(ignoringOtherApps: true)
+        dispatchDeepLink(host: host, path: path, token: token, autoActivate: autoActivate, openPath: openPath)
+    }
 
-        collapseDuplicateMainWindows { [weak self] in
-            self?.dispatchDeepLink(host: host, path: path, token: token, autoActivate: autoActivate, openPath: openPath)
-        }
+    func takePendingLocalPaths() -> [URL] {
+        defer { pendingLocalPaths.removeAll() }
+        return pendingLocalPaths
     }
 
     private func dispatchDeepLink(host: String, path: String, token: String?, autoActivate: Bool, openPath: String?) {
@@ -48,8 +47,9 @@ final class DeepLinkHandler {
         }
 
         if host == "open" || path == "open" {
-            if let openPath = openPath {
-                handleOpenPath(openPath)
+            if let openPath, let url = localDirectoryURL(for: openPath) {
+                pendingLocalPaths.append(url)
+                NotificationCenter.default.post(name: .openReignitionPath, object: url)
             }
             return
         }
@@ -57,87 +57,21 @@ final class DeepLinkHandler {
         let shouldOpenSettings = host == "settings" || path == "settings"
         guard shouldOpenSettings else { return }
 
-        SettingsWindowController.shared.show()
-        NotificationCenter.default.post(name: .openSettingsPro, object: nil)
+        ReignitionHostSettingsWindowController.shared.show()
     }
 
-    private func handleOpenPath(_ path: String) {
-        let normalized = normalizedPath(path)
-
-        Task { @MainActor in
-            guard let target = resolveWorktreeTarget(for: normalized) else { return }
-
-            NotificationCenter.default.post(
-                name: .navigateToWorktree,
-                object: nil,
-                userInfo: [
-                    "workspaceId": target.workspaceId,
-                    "repoId": target.repoId,
-                    "worktreeId": target.worktreeId
-                ]
-            )
-        }
-    }
-
-    private func normalizedPath(_ path: String) -> String {
+    private func localDirectoryURL(for path: String) -> URL? {
         let expanded = (path as NSString).expandingTildeInPath
+        let candidate: URL
         if expanded.hasPrefix("/") {
-            return URL(fileURLWithPath: expanded).standardizedFileURL.path
+            candidate = URL(fileURLWithPath: expanded)
+        } else {
+            candidate = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent(expanded)
         }
-        let cwd = FileManager.default.currentDirectoryPath
-        let combined = URL(fileURLWithPath: cwd).appendingPathComponent(expanded)
-        return combined.standardizedFileURL.path
-    }
-
-    private func resolveWorktreeTarget(
-        for path: String
-    ) -> (workspaceId: UUID, repoId: UUID, worktreeId: UUID)? {
-        let discovered = GitUtils.discoverRepository(from: path)
-        var repositoryPath = discovered ?? path
-        if repositoryPath.hasSuffix("/.git") {
-            repositoryPath = URL(fileURLWithPath: repositoryPath).deletingLastPathComponent().path
-        }
-        let mainRepoPath = GitUtils.getMainRepositoryPath(at: repositoryPath)
-
-        guard let repository = workspaceGraphQueryController.repository(path: mainRepoPath) else { return nil }
-        guard let repoId = repository.id,
-              let workspaceId = repository.workspace?.id else { return nil }
-
-        let worktrees = workspaceGraphQueryController.worktrees(in: repository)
-
-        let matchingWorktree = worktrees
-            .filter { worktree in
-                guard let wtPath = worktree.path else { return false }
-                return path == wtPath || path.hasPrefix(wtPath + "/")
-            }
-            .sorted { ($0.path ?? "").count > ($1.path ?? "").count }
-            .first
-
-        let targetWorktree = matchingWorktree ?? worktrees.first(where: { $0.isPrimary }) ?? worktrees.first
-        guard let worktreeId = targetWorktree?.id else { return nil }
-
-        return (workspaceId: workspaceId, repoId: repoId, worktreeId: worktreeId)
-    }
-
-    private func collapseDuplicateMainWindows(completion: @escaping () -> Void) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            let windows = NSApp.windows.filter { window in
-                window.identifier != NSUserInterfaceItemIdentifier("GitPanelWindow") &&
-                window.isVisible &&
-                !window.isMiniaturized
-            }
-
-            if windows.count > 1 {
-                let keepWindow = NSApp.mainWindow ?? windows.first
-                for window in windows {
-                    if window != keepWindow {
-                        window.close()
-                    }
-                }
-                keepWindow?.makeKeyAndOrderFront(nil)
-            }
-
-            completion()
-        }
+        let normalized = candidate.standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: normalized.path, isDirectory: &isDirectory) else { return nil }
+        return isDirectory.boolValue ? normalized : normalized.deletingLastPathComponent()
     }
 }
