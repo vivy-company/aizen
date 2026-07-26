@@ -268,23 +268,25 @@ public actor LocalHost: WireEndpoint {
             let command = try CreateLocalFolderContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
             let resourceID = try Self.resourceID(from: command.resourceID)
-            let context = ExecutionContext(
-                spaceID: spaceID,
-                kind: .localFolder,
-                resourceID: resourceID,
-                hostReference: HostPrivateReference(rawValue: "resource-context:\(resourceID.description)")
-            )
-            _ = try await storage.transact { snapshot in
-                guard let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == spaceID }), resource.kind == .folder else {
-                    throw HostProtocolError.unknownResource(resourceID)
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                let context = ExecutionContext(
+                    spaceID: spaceID,
+                    kind: .localFolder,
+                    resourceID: resourceID,
+                    hostReference: HostPrivateReference(rawValue: "resource-context:\(resourceID.description)")
+                )
+                _ = try await self.storage.transact { snapshot in
+                    guard let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == spaceID }), resource.kind == .folder else {
+                        throw HostProtocolError.unknownResource(resourceID)
+                    }
+                    guard !snapshot.executionContexts.contains(where: { $0.resourceID == resourceID && $0.kind == .localFolder }) else {
+                        throw HostProtocolError.resourceInUse(resourceID)
+                    }
+                    snapshot.executionContexts.append(context)
                 }
-                guard !snapshot.executionContexts.contains(where: { $0.resourceID == resourceID && $0.kind == .localFolder }) else {
-                    throw HostProtocolError.resourceInUse(resourceID)
-                }
-                snapshot.executionContexts.append(context)
+                return try TypedPayload(CreateLocalFolderContextResultPayload(contextID: context.id.description))
             }
             kind = .commandResult
-            payload = try TypedPayload(CreateLocalFolderContextResultPayload(contextID: context.id.description))
         case .command where envelope.payload.identifier == AttachExecutionContextCommandPayload.identifier:
             let command = try AttachExecutionContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let sessionID = try Self.sessionID(from: command.sessionID)
