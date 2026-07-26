@@ -30,6 +30,11 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         self.operations = operations
         self.artifacts = artifacts
     }
+
+    public var isEmpty: Bool {
+        spaces.isEmpty && sessions.isEmpty && resources.isEmpty && executionContexts.isEmpty &&
+            runs.isEmpty && operations.isEmpty && artifacts.isEmpty
+    }
 }
 
 public enum StorageError: Error, Sendable, Equatable {
@@ -39,6 +44,7 @@ public enum StorageError: Error, Sendable, Equatable {
     case missingSession
     case missingResource
     case missingExecutionContext
+    case migrationDestinationNotEmpty
 }
 
 public struct MigrationReport: Codable, Sendable, Hashable {
@@ -47,6 +53,7 @@ public struct MigrationReport: Codable, Sendable, Hashable {
     public var migratedContexts = 0
     public var migratedSessions = 0
     public var skippedRecords = 0
+    public var backupURLs: [URL] = []
 
     public init() {}
 }
@@ -60,9 +67,8 @@ public enum LegacyCoreDataMigration {
         destination: StorageRepository,
         backupDirectory: URL
     ) async throws -> MigrationReport {
-        try FileManager.default.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
-        let backupURL = backupDirectory.appendingPathComponent("aizen-1x-\(Int(Date().timeIntervalSince1970)).sqlite")
-        try FileManager.default.copyItem(at: sourceStoreURL, to: backupURL)
+        var report = MigrationReport()
+        report.backupURLs = try backupLegacyStore(at: sourceStoreURL, into: backupDirectory)
 
         guard let model = NSManagedObjectModel(contentsOf: legacyModelURL) else {
             throw CocoaError(.fileReadCorruptFile)
@@ -83,7 +89,6 @@ public enum LegacyCoreDataMigration {
         let worktrees = try context.fetch(NSFetchRequest<NSManagedObject>(entityName: "Worktree"))
         let chats = try context.fetch(NSFetchRequest<NSManagedObject>(entityName: "ChatSession"))
 
-        var report = MigrationReport()
         let defaultSpace = Space(name: "Personal")
         var spaces = Dictionary(uniqueKeysWithValues: workspaces.compactMap { workspace -> (UUID, Space)? in
             guard let legacyID = workspace.value(forKey: "id") as? UUID,
@@ -123,8 +128,24 @@ public enum LegacyCoreDataMigration {
             snapshot.sessions.append(Session(id: SessionID(rawValue: id), spaceID: spaceID, kind: .conversation, title: title, lifecycle: (chat.value(forKey: "archived") as? Bool) == true ? .archived : .active, executionContextID: contextID))
             report.migratedSessions += 1
         }
-        _ = try await destination.transact { $0 = snapshot }
+        _ = try await destination.replaceEmpty(with: snapshot)
         return report
+    }
+
+    static func backupLegacyStore(at sourceStoreURL: URL, into backupDirectory: URL, fileManager: FileManager = .default) throws -> [URL] {
+        try fileManager.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+        let name = "aizen-1x-\(UUID().uuidString)"
+        let sidecars = ["", "-wal", "-shm"]
+        var backups: [URL] = []
+        for suffix in sidecars {
+            let source = URL(fileURLWithPath: sourceStoreURL.path + suffix)
+            guard fileManager.fileExists(atPath: source.path) else { continue }
+            let destination = backupDirectory.appendingPathComponent(name + ".sqlite" + suffix)
+            try fileManager.copyItem(at: source, to: destination)
+            backups.append(destination)
+        }
+        guard !backups.isEmpty else { throw CocoaError(.fileNoSuchFile) }
+        return backups
     }
 }
 
@@ -164,6 +185,14 @@ public actor StorageRepository {
             try fileManager.moveItem(at: temporary, to: url)
         }
         return snapshot
+    }
+
+    /// Migration has a single writer and may only replace an untouched v2 store.
+    public func replaceEmpty(with replacement: StorageSnapshot) throws -> StorageSnapshot {
+        try transact { snapshot in
+            guard snapshot.isEmpty else { throw StorageError.migrationDestinationNotEmpty }
+            snapshot = replacement
+        }
     }
 
     private func validate(_ snapshot: StorageSnapshot) throws {
