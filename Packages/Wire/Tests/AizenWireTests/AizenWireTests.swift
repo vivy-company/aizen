@@ -106,6 +106,30 @@ import Testing
     }
 }
 
+@Test func pairingRequestPayloadRoundTripsAndRejectsMalformedIdentity() throws {
+    let payload = PairingRequestPayload(
+        tokenID: UUID(), pairingSecret: Data(repeating: 1, count: 32), hostID: HostID(), deviceID: DeviceID(),
+        deviceDisplayName: "Phone", devicePlatform: "iOS", deviceSigningPublicKey: Data(repeating: 2, count: 32),
+        deviceKeyAgreementPublicKey: Data(repeating: 3, count: 32), route: "lan"
+    )
+    #expect(try PairingRequestPayload(protobufBytes: payload.protobufBytes()) == payload)
+    #expect(try PairingPendingPayload(protobufBytes: PairingPendingPayload(tokenID: payload.tokenID).protobufBytes()).tokenID == payload.tokenID)
+
+    var malformed = AizenWireV1_PairingRequest()
+    malformed.tokenID = payload.tokenID.uuidString
+    malformed.hostID = payload.hostID.description
+    malformed.deviceID = payload.deviceID.description
+    malformed.pairingSecret = Data(repeating: 1, count: 31)
+    malformed.deviceDisplayName = "Phone"
+    malformed.devicePlatform = "iOS"
+    malformed.deviceSigningPublicKey = Data(repeating: 2, count: 32)
+    malformed.deviceKeyAgreementPublicKey = Data(repeating: 3, count: 32)
+    malformed.route = "lan"
+    #expect(throws: WireCodecError.invalidAuthenticationPayload) {
+        try PairingRequestPayload(protobufBytes: malformed.serializedData())
+    }
+}
+
 @Test func resourceRecordsPreserveHostPrivateDetails() throws {
     let resource = Resource(
         spaceID: SpaceID(),

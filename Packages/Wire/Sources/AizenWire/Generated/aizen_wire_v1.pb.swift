@@ -388,6 +388,48 @@ nonisolated struct AizenWireV1_AuthenticationProof: Sendable {
   init() {}
 }
 
+/// Sent only during first-device pairing. The Host must hold this request pending
+/// until a local approval boundary explicitly creates the Device authorization.
+nonisolated struct AizenWireV1_PairingRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var tokenID: String = String()
+
+  var pairingSecret: Data = Data()
+
+  var hostID: String = String()
+
+  var deviceID: String = String()
+
+  var deviceDisplayName: String = String()
+
+  var devicePlatform: String = String()
+
+  var deviceSigningPublicKey: Data = Data()
+
+  var deviceKeyAgreementPublicKey: Data = Data()
+
+  var route: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_PairingPending: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var tokenID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_CommandReceipt: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1797,6 +1839,106 @@ nonisolated extension AizenWireV1_AuthenticationProof: SwiftProtobuf.Message, Sw
   static func ==(lhs: AizenWireV1_AuthenticationProof, rhs: AizenWireV1_AuthenticationProof) -> Bool {
     if lhs.connectionID != rhs.connectionID {return false}
     if lhs.deviceSignature != rhs.deviceSignature {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_PairingRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".PairingRequest"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}token_id\0\u{3}pairing_secret\0\u{3}host_id\0\u{3}device_id\0\u{3}device_display_name\0\u{3}device_platform\0\u{3}device_signing_public_key\0\u{3}device_key_agreement_public_key\0\u{1}route\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.tokenID) }()
+      case 2: try { try decoder.decodeSingularBytesField(value: &self.pairingSecret) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.hostID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.deviceDisplayName) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.devicePlatform) }()
+      case 7: try { try decoder.decodeSingularBytesField(value: &self.deviceSigningPublicKey) }()
+      case 8: try { try decoder.decodeSingularBytesField(value: &self.deviceKeyAgreementPublicKey) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.route) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.tokenID.isEmpty {
+      try visitor.visitSingularStringField(value: self.tokenID, fieldNumber: 1)
+    }
+    if !self.pairingSecret.isEmpty {
+      try visitor.visitSingularBytesField(value: self.pairingSecret, fieldNumber: 2)
+    }
+    if !self.hostID.isEmpty {
+      try visitor.visitSingularStringField(value: self.hostID, fieldNumber: 3)
+    }
+    if !self.deviceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 4)
+    }
+    if !self.deviceDisplayName.isEmpty {
+      try visitor.visitSingularStringField(value: self.deviceDisplayName, fieldNumber: 5)
+    }
+    if !self.devicePlatform.isEmpty {
+      try visitor.visitSingularStringField(value: self.devicePlatform, fieldNumber: 6)
+    }
+    if !self.deviceSigningPublicKey.isEmpty {
+      try visitor.visitSingularBytesField(value: self.deviceSigningPublicKey, fieldNumber: 7)
+    }
+    if !self.deviceKeyAgreementPublicKey.isEmpty {
+      try visitor.visitSingularBytesField(value: self.deviceKeyAgreementPublicKey, fieldNumber: 8)
+    }
+    if !self.route.isEmpty {
+      try visitor.visitSingularStringField(value: self.route, fieldNumber: 9)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_PairingRequest, rhs: AizenWireV1_PairingRequest) -> Bool {
+    if lhs.tokenID != rhs.tokenID {return false}
+    if lhs.pairingSecret != rhs.pairingSecret {return false}
+    if lhs.hostID != rhs.hostID {return false}
+    if lhs.deviceID != rhs.deviceID {return false}
+    if lhs.deviceDisplayName != rhs.deviceDisplayName {return false}
+    if lhs.devicePlatform != rhs.devicePlatform {return false}
+    if lhs.deviceSigningPublicKey != rhs.deviceSigningPublicKey {return false}
+    if lhs.deviceKeyAgreementPublicKey != rhs.deviceKeyAgreementPublicKey {return false}
+    if lhs.route != rhs.route {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_PairingPending: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".PairingPending"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}token_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.tokenID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.tokenID.isEmpty {
+      try visitor.visitSingularStringField(value: self.tokenID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_PairingPending, rhs: AizenWireV1_PairingPending) -> Bool {
+    if lhs.tokenID != rhs.tokenID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

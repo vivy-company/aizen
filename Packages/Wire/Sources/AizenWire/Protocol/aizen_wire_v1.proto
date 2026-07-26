@@ -106,6 +106,24 @@ message AuthenticationProof {
   bytes device_signature = 2;
 }
 
+// Sent only during first-device pairing. The Host must hold this request pending
+// until a local approval boundary explicitly creates the Device authorization.
+message PairingRequest {
+  string token_id = 1;
+  bytes pairing_secret = 2;
+  string host_id = 3;
+  string device_id = 4;
+  string device_display_name = 5;
+  string device_platform = 6;
+  bytes device_signing_public_key = 7;
+  bytes device_key_agreement_public_key = 8;
+  string route = 9;
+}
+
+message PairingPending {
+  string token_id = 1;
+}
+
 message CommandReceipt {
   string command_id = 1;
   string operation_id = 2;

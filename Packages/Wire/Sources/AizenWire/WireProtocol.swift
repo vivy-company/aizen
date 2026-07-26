@@ -356,6 +356,81 @@ public struct AuthenticationProofPayload: WirePayload, Sendable, Hashable {
     }
 }
 
+/// First-device pairing request. Receipt only means the Host has queued it for local approval.
+public struct PairingRequestPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.pairing.request@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let tokenID: UUID
+    public let pairingSecret: Data
+    public let hostID: HostID
+    public let deviceID: DeviceID
+    public let deviceDisplayName: String
+    public let devicePlatform: String
+    public let deviceSigningPublicKey: Data
+    public let deviceKeyAgreementPublicKey: Data
+    public let route: String
+
+    public init(tokenID: UUID, pairingSecret: Data, hostID: HostID, deviceID: DeviceID, deviceDisplayName: String, devicePlatform: String, deviceSigningPublicKey: Data, deviceKeyAgreementPublicKey: Data, route: String) {
+        precondition(Self.isValid(pairingSecret: pairingSecret, displayName: deviceDisplayName, platform: devicePlatform, signingKey: deviceSigningPublicKey, agreementKey: deviceKeyAgreementPublicKey, route: route), "Pairing request has invalid identity material")
+        self.tokenID = tokenID
+        self.pairingSecret = pairingSecret
+        self.hostID = hostID
+        self.deviceID = deviceID
+        self.deviceDisplayName = deviceDisplayName
+        self.devicePlatform = devicePlatform
+        self.deviceSigningPublicKey = deviceSigningPublicKey
+        self.deviceKeyAgreementPublicKey = deviceKeyAgreementPublicKey
+        self.route = route
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_PairingRequest(serializedBytes: protobufBytes)
+        guard let tokenID = UUID(uuidString: message.tokenID), let hostID = UUID(uuidString: message.hostID), let deviceID = UUID(uuidString: message.deviceID), Self.isValid(pairingSecret: message.pairingSecret, displayName: message.deviceDisplayName, platform: message.devicePlatform, signingKey: message.deviceSigningPublicKey, agreementKey: message.deviceKeyAgreementPublicKey, route: message.route) else { throw WireCodecError.invalidAuthenticationPayload }
+        self.init(tokenID: tokenID, pairingSecret: message.pairingSecret, hostID: .init(rawValue: hostID), deviceID: .init(rawValue: deviceID), deviceDisplayName: message.deviceDisplayName, devicePlatform: message.devicePlatform, deviceSigningPublicKey: message.deviceSigningPublicKey, deviceKeyAgreementPublicKey: message.deviceKeyAgreementPublicKey, route: message.route)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_PairingRequest()
+        message.tokenID = tokenID.uuidString
+        message.pairingSecret = pairingSecret
+        message.hostID = hostID.description
+        message.deviceID = deviceID.description
+        message.deviceDisplayName = deviceDisplayName
+        message.devicePlatform = devicePlatform
+        message.deviceSigningPublicKey = deviceSigningPublicKey
+        message.deviceKeyAgreementPublicKey = deviceKeyAgreementPublicKey
+        message.route = route
+        return try message.serializedData()
+    }
+
+    private static func isValid(pairingSecret: Data, displayName: String, platform: String, signingKey: Data, agreementKey: Data, route: String) -> Bool {
+        pairingSecret.count >= 32 && !displayName.isEmpty && displayName.utf8.count <= 128 && !platform.isEmpty && platform.utf8.count <= 64 && signingKey.count == 32 && agreementKey.count == 32 && !route.isEmpty && route.utf8.count <= 32
+    }
+}
+
+public struct PairingPendingPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.pairing.pending@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let tokenID: UUID
+
+    public init(tokenID: UUID) { self.tokenID = tokenID }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_PairingPending(serializedBytes: protobufBytes)
+        guard let tokenID = UUID(uuidString: message.tokenID) else { throw WireCodecError.invalidAuthenticationPayload }
+        self.init(tokenID: tokenID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_PairingPending()
+        message.tokenID = tokenID.uuidString
+        return try message.serializedData()
+    }
+}
+
 public struct SnapshotRequestPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.snapshot@1")
     public static let schemaVersion: UInt32 = 1
