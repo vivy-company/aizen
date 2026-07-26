@@ -34,6 +34,10 @@ actor V2CLIClient {
         try await client.createConversation(spaceID: spaceID, title: title)
     }
 
+    func runs(spaceID: SpaceID? = nil) async throws -> [Run] {
+        try await client.runs(in: spaceID)
+    }
+
     static func defaultStorageURL(fileManager: FileManager = .default) -> URL {
         if let override = ProcessInfo.processInfo.environment["AIZEN_V2_STORE_PATH"], !override.isEmpty {
             return URL(fileURLWithPath: (override as NSString).expandingTildeInPath).standardizedFileURL

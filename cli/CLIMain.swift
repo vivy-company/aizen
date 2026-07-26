@@ -48,6 +48,8 @@ struct AizenCLI {
             try await handleConversation(subArgs)
         case "session":
             try await handleConversation(subArgs)
+        case "run":
+            try await handleRun(subArgs)
         case "sync":
             try await handleSync(subArgs)
         case "status":
@@ -293,6 +295,19 @@ private extension AizenCLI {
             throw CLIError.workspaceNotFound(value)
         }
         return space.id
+    }
+
+    static func handleRun(_ args: [String]) async throws {
+        guard args.first == "list" else {
+            throw CLIError.invalidArguments("run requires list")
+        }
+        let rest = Array(args.dropFirst())
+        guard rest.count <= 1 else { throw CLIError.invalidArguments("run list accepts at most one space") }
+        let client = V2CLIClient()
+        let spaceID = try await resolveV2Space(rest.first, client: client)
+        for run in try await client.runs(spaceID: spaceID) {
+            print("\(run.id.description)\t\(run.lifecycle.rawValue)\t\(run.sessionID.description)")
+        }
     }
 
     static func handleWorkspaceList(_ args: [String]) async throws {

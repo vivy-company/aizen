@@ -40,4 +40,9 @@ public actor LocalHostClient {
     public func createConversation(spaceID: SpaceID, title: String) async throws -> SessionID {
         try await client.createConversation(spaceID: spaceID, title: title)
     }
+
+    public func runs(in spaceID: SpaceID? = nil) async throws -> [Run] {
+        let snapshot = try JSONDecoder().decode(StorageSnapshot.self, from: try await client.snapshotData())
+        return snapshot.runs.filter { spaceID == nil || $0.spaceID == spaceID }
+    }
 }
