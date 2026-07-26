@@ -139,6 +139,21 @@ message ListSpacesResponse {
   repeated SpaceRecord spaces = 1;
 }
 
+message ListConversationsQuery {
+  string space_id = 1;
+}
+
+message ConversationRecord {
+  string session_id = 1;
+  string space_id = 2;
+  string title = 3;
+  string lifecycle = 4;
+}
+
+message ListConversationsResponse {
+  repeated ConversationRecord conversations = 1;
+}
+
 message SnapshotRequest {
   string scope = 1;
   uint64 after_cursor = 2;

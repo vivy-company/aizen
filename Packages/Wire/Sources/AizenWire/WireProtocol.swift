@@ -501,6 +501,63 @@ public struct ListSpacesResponsePayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct ListConversationsQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.conversation.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let spaceID: String?
+
+    public init(spaceID: String? = nil) { self.spaceID = spaceID }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListConversationsQuery(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID.isEmpty ? nil : message.spaceID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListConversationsQuery()
+        message.spaceID = spaceID ?? ""
+        return try message.serializedData()
+    }
+}
+
+public struct ListConversationsResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.conversation.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let conversations: [Session]
+
+    public init(conversations: [Session]) { self.conversations = conversations }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListConversationsResponse(serializedBytes: protobufBytes)
+        conversations = try message.conversations.map { record in
+            guard let sessionUUID = UUID(uuidString: record.sessionID), let spaceUUID = UUID(uuidString: record.spaceID) else {
+                throw WireCodecError.invalidIdentity(record.sessionID)
+            }
+            guard let lifecycle = SessionLifecycle(rawValue: record.lifecycle) else {
+                throw WireCodecError.invalidLifecycle(record.lifecycle)
+            }
+            return Session(id: SessionID(rawValue: sessionUUID), spaceID: SpaceID(rawValue: spaceUUID), kind: .conversation, title: record.title, lifecycle: lifecycle)
+        }
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListConversationsResponse()
+        message.conversations = conversations.map { conversation in
+            var record = AizenWireV1_ConversationRecord()
+            record.sessionID = conversation.id.description
+            record.spaceID = conversation.spaceID.description
+            record.title = conversation.title
+            record.lifecycle = conversation.lifecycle.rawValue
+            return record
+        }
+        return try message.serializedData()
+    }
+}
+
 public struct SnapshotResponsePayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.snapshot.host@1")
     public static let schemaVersion: UInt32 = 1
@@ -572,6 +629,7 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case unsupportedPayloadEncoding(Int)
     case missingPayload
     case invalidIdentity(String)
+    case invalidLifecycle(String)
 }
 
 private extension ProtocolEnvelope {

@@ -127,6 +127,20 @@ public actor HostClient {
         return SessionID(rawValue: uuid)
     }
 
+    public func conversations(spaceID: SpaceID? = nil) async throws -> [Session] {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(ListConversationsQueryPayload(spaceID: spaceID?.description))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == ListConversationsResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try ListConversationsResponsePayload(protobufBytes: response.payload.protobufBytes).conversations
+    }
+
     public func sendConversation(
         spaceID: SpaceID,
         sessionID: SessionID,

@@ -31,10 +31,7 @@ public actor LocalHostClient {
     }
 
     public func conversations(in spaceID: SpaceID? = nil) async throws -> [Session] {
-        let snapshot = try JSONDecoder().decode(StorageSnapshot.self, from: try await client.snapshotData())
-        return snapshot.sessions.filter { session in
-            session.kind == .conversation && (spaceID == nil || session.spaceID == spaceID)
-        }
+        try await client.conversations(spaceID: spaceID)
     }
 
     public func createConversation(spaceID: SpaceID, title: String) async throws -> SessionID {
