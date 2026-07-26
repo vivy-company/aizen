@@ -66,6 +66,10 @@ public actor LocalHostClient {
         try await client.attachExecutionContext(sessionID: sessionID, contextID: contextID)
     }
 
+    public func removeExecutionContext(id: ExecutionContextID) async throws {
+        try await client.removeExecutionContext(id: id)
+    }
+
     public func conversationTimeline(sessionID: SessionID) async throws -> [ConversationMessage] {
         try await client.conversationTimeline(sessionID: sessionID)
     }

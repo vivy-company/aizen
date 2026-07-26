@@ -74,6 +74,7 @@ public actor LocalHost: WireEndpoint {
                 CreateLocalFolderContextCommandPayload.identifier,
                 CreateLocalFolderContextResultPayload.identifier,
                 AttachExecutionContextCommandPayload.identifier,
+                RemoveExecutionContextCommandPayload.identifier,
                 ExecutionContextMutationResultPayload.identifier
             ]))
         case .query where envelope.payload.identifier == SnapshotRequestPayload.identifier:
@@ -275,6 +276,20 @@ public actor LocalHost: WireEndpoint {
             }
             kind = .commandResult
             payload = try TypedPayload(ExecutionContextMutationResultPayload())
+        case .command where envelope.payload.identifier == RemoveExecutionContextCommandPayload.identifier:
+            let command = try RemoveExecutionContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let contextID = try Self.executionContextID(from: command.contextID)
+            _ = try await storage.transact { snapshot in
+                guard snapshot.executionContexts.contains(where: { $0.id == contextID }) else {
+                    throw HostProtocolError.unknownExecutionContext(contextID)
+                }
+                guard !snapshot.sessions.contains(where: { $0.executionContextID == contextID }) else {
+                    throw HostProtocolError.executionContextInUse(contextID)
+                }
+                snapshot.executionContexts.removeAll(where: { $0.id == contextID })
+            }
+            kind = .commandResult
+            payload = try TypedPayload(ExecutionContextMutationResultPayload())
         default:
             throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier)
         }
@@ -352,6 +367,7 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case unknownExecutionContext(ExecutionContextID)
     case duplicateResource(ResourceID)
     case resourceInUse(ResourceID)
+    case executionContextInUse(ExecutionContextID)
     case invalidResourcePath(String)
     case invalidExecutionContext(ExecutionContextID)
     case spaceNotEmpty(SpaceID)

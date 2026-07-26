@@ -351,7 +351,7 @@ private extension AizenCLI {
 
     static func handleExecutionContext(_ args: [String]) async throws {
         guard let subcommand = args.first else {
-            throw CLIError.invalidArguments("context requires list, create, or attach")
+            throw CLIError.invalidArguments("context requires list, create, attach, or remove")
         }
         let rest = Array(args.dropFirst())
         let client = V2CLIClient()
@@ -379,6 +379,11 @@ private extension AizenCLI {
                 sessionID: SessionID(rawValue: sessionUUID),
                 contextID: ExecutionContextID(rawValue: contextUUID)
             )
+        case "remove":
+            guard rest.count == 1, let contextUUID = UUID(uuidString: rest[0]) else {
+                throw CLIError.invalidArguments("context remove requires a Context ID")
+            }
+            try await client.removeExecutionContext(id: ExecutionContextID(rawValue: contextUUID))
         default:
             throw CLIError.invalidArguments("Unknown context command: \(subcommand)")
         }

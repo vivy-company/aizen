@@ -255,6 +255,10 @@ message AttachExecutionContextCommand {
   string execution_context_id = 2;
 }
 
+message RemoveExecutionContextCommand {
+  string execution_context_id = 1;
+}
+
 message ExecutionContextMutationResult {}
 
 message SnapshotRequest {

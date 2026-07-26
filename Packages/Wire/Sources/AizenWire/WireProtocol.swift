@@ -994,6 +994,22 @@ public struct AttachExecutionContextCommandPayload: WirePayload, Sendable, Hasha
     }
 }
 
+public struct RemoveExecutionContextCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.execution-context.remove@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let contextID: String
+    public init(contextID: String) { self.contextID = contextID }
+    public init(protobufBytes: Data) throws {
+        self.init(contextID: try AizenWireV1_RemoveExecutionContextCommand(serializedBytes: protobufBytes).executionContextID)
+    }
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_RemoveExecutionContextCommand()
+        message.executionContextID = contextID
+        return try message.serializedData()
+    }
+}
+
 public struct ExecutionContextMutationResultPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.execution-context.mutation@1")
     public static let schemaVersion: UInt32 = 1
