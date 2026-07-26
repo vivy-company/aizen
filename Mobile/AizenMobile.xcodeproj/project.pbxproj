@@ -14,8 +14,19 @@
 		8BC71D02E0C2C61324D2F97D /* PairingQRScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DD2157875963BB839FAC50D /* PairingQRScanner.swift */; };
 		AD130E2F89C153531D09E3AD /* AizenTransport in Frameworks */ = {isa = PBXBuildFile; productRef = BFEF27BE37BB92379B72B12C /* AizenTransport */; };
 		AE6ADAEC1A2A6D76746B4ABD /* AizenSecurity in Frameworks */ = {isa = PBXBuildFile; productRef = 404E1B2BCCB2D2969928FB3C /* AizenSecurity */; };
+		DC4799A2527D02021BD856FE /* MobilePairingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E985082E2EF5E8F19BF223BA /* MobilePairingTests.swift */; };
 		E20F71192DEA8625080DC45C /* AizenWire in Frameworks */ = {isa = PBXBuildFile; productRef = C0A3D792BEC31BF0AA01E57D /* AizenWire */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8BC32FD44028A41322BA9635 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CFD69E64AD56924064355044 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 81B2874A6D20BDA36EB4F606;
+			remoteInfo = AizenMobile;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		19EF7143258535E5FC77BA2C /* Security */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Security; path = ../Packages/Security; sourceTree = SOURCE_ROOT; };
@@ -24,8 +35,10 @@
 		342D8946D4A54621D0A944EA /* Client */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Client; path = ../Packages/Client; sourceTree = SOURCE_ROOT; };
 		64B5DB681DCFC4E6EEB5A27D /* AizenMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AizenMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6DD2157875963BB839FAC50D /* PairingQRScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingQRScanner.swift; sourceTree = "<group>"; };
+		9D24C0B5BA1026A3A496CFD1 /* AizenMobileTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AizenMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CA06BE12AD3BA3EB9552B6C6 /* AizenMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AizenMobileApp.swift; sourceTree = "<group>"; };
 		DFB03383835C6DA031EA3ABC /* MobilePairing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobilePairing.swift; sourceTree = "<group>"; };
+		E985082E2EF5E8F19BF223BA /* MobilePairingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobilePairingTests.swift; sourceTree = "<group>"; };
 		F31F8117B8DE250DBB7FD0E3 /* Transport */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Transport; path = ../Packages/Transport; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -45,10 +58,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B06BBFB05103B13084937DAD /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				E985082E2EF5E8F19BF223BA /* MobilePairingTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
 		BE476C4B86916FCF3860700F /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				64B5DB681DCFC4E6EEB5A27D /* AizenMobile.app */,
+				9D24C0B5BA1026A3A496CFD1 /* AizenMobileTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -80,6 +102,7 @@
 			children = (
 				EECBA283E60856FBEF4AAC8D /* Packages */,
 				CD5754CD3D7721AC92826A02 /* Sources */,
+				B06BBFB05103B13084937DAD /* Tests */,
 				BE476C4B86916FCF3860700F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -109,6 +132,24 @@
 			productName = AizenMobile;
 			productReference = 64B5DB681DCFC4E6EEB5A27D /* AizenMobile.app */;
 			productType = "com.apple.product-type.application";
+		};
+		BF8A7B05AA11CD9522239A6F /* AizenMobileTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 08D1433F2D60F507E4BA9892 /* Build configuration list for PBXNativeTarget "AizenMobileTests" */;
+			buildPhases = (
+				47913FFB78047643A329FAB3 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				466D5D36AF5CC05C5D7F2B99 /* PBXTargetDependency */,
+			);
+			name = AizenMobileTests;
+			packageProductDependencies = (
+			);
+			productName = AizenMobileTests;
+			productReference = 9D24C0B5BA1026A3A496CFD1 /* AizenMobileTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -143,11 +184,20 @@
 			projectRoot = "";
 			targets = (
 				81B2874A6D20BDA36EB4F606 /* AizenMobile */,
+				BF8A7B05AA11CD9522239A6F /* AizenMobileTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
+		47913FFB78047643A329FAB3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DC4799A2527D02021BD856FE /* MobilePairingTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C72769A128B33C167270ABD7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -159,6 +209,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		466D5D36AF5CC05C5D7F2B99 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 81B2874A6D20BDA36EB4F606 /* AizenMobile */;
+			targetProxy = 8BC32FD44028A41322BA9635 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1FE1E20D0EFD697F4BD72168 /* Release */ = {
@@ -288,6 +346,21 @@
 			};
 			name = Debug;
 		};
+		948B33938CA84283B5EF8506 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aizen.app/Aizen";
+			};
+			name = Release;
+		};
 		9CE1FE6539A60AC3DBA79EFA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -332,9 +405,33 @@
 			};
 			name = Release;
 		};
+		CF510353FED4705D8FA007FA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aizen.app/Aizen";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		08D1433F2D60F507E4BA9892 /* Build configuration list for PBXNativeTarget "AizenMobileTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CF510353FED4705D8FA007FA /* Debug */,
+				948B33938CA84283B5EF8506 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		7FBF34A47868A1006979E68D /* Build configuration list for PBXProject "AizenMobile" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

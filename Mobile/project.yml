@@ -48,3 +48,22 @@ targets:
         product: AizenSecurity
       - package: AizenTransport
         product: AizenTransport
+  AizenMobileTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    settings:
+      base:
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Aizen.app/Aizen"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+    dependencies:
+      - target: AizenMobile
+schemes:
+  AizenMobile:
+    build:
+      targets:
+        AizenMobile: all
+    test:
+      targets:
+        - AizenMobileTests

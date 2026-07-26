@@ -175,7 +175,7 @@ final class MobilePairingStore: ObservableObject {
     }
 }
 
-private enum MobilePairingInvitation {
+enum MobilePairingInvitation {
     static func decode(_ text: String) throws -> PairingInvitation {
         let raw = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let payload: String
