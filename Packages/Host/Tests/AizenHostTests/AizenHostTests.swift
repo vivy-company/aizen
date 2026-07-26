@@ -288,8 +288,8 @@ import AizenWire
     let sandboxes = ManagedSandboxService(storage: storage, rootURL: root.appendingPathComponent("sandboxes", isDirectory: true))
     let transport = InProcessTransport(endpoint: LocalHost(storage: storage, conversationRuns: coordinator, managedSandboxes: sandboxes))
     let runID = RunID()
-    let response = try await transport.send(.init(
-        messageID: "send-conversation",
+    let envelope = ProtocolEnvelope(
+        messageID: UUID().uuidString,
         connectionSequence: 1,
         kind: .command,
         channel: .state,
@@ -300,13 +300,17 @@ import AizenWire
             runID: runID.description,
             content: "Make a plan"
         ))
-    ))
+    )
+    let response = try await transport.send(envelope)
+    let replay = try await transport.send(envelope)
+    #expect(response.payload == replay.payload)
     #expect(try SendConversationResultPayload(protobufBytes: response.payload.protobufBytes).runID == runID.description)
     let snapshot = try await storage.load()
     #expect(snapshot.runs.first?.lifecycle == .succeeded)
     #expect(snapshot.runs.first?.executionContextID == snapshot.sessions.first?.executionContextID)
     #expect(snapshot.executionContexts.first?.kind == .managedTemporarySandbox)
-    #expect((await runtime.prompted).first?.1 == "Make a plan")
+    #expect((await runtime.prompted).map(\.1) == ["Make a plan"])
+    #expect(snapshot.commands.count == 1)
 }
 
 @Test func managedSandboxProvisioningLinksAProjectlessConversation() async throws {

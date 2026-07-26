@@ -195,13 +195,15 @@ public actor LocalHost: WireEndpoint {
                 role: .user,
                 content: command.content
             )
-            let executionContextID = try await executionContext(for: sessionID, in: spaceID)
-            try await conversationRuns.submit(
-                message: message,
-                run: Run(id: runID, spaceID: spaceID, sessionID: sessionID, executionContextID: executionContextID)
-            )
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                let executionContextID = try await self.executionContext(for: sessionID, in: spaceID)
+                try await conversationRuns.submit(
+                    message: message,
+                    run: Run(id: runID, spaceID: spaceID, sessionID: sessionID, executionContextID: executionContextID)
+                )
+                return try TypedPayload(SendConversationResultPayload(runID: runID.description))
+            }
             kind = .commandResult
-            payload = try TypedPayload(SendConversationResultPayload(runID: runID.description))
         case .command where envelope.payload.identifier == CancelRunCommandPayload.identifier:
             guard let conversationRuns else { throw HostProtocolError.runtimeUnavailable }
             let command = try CancelRunCommandPayload(protobufBytes: envelope.payload.protobufBytes)
