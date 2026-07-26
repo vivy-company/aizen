@@ -98,6 +98,17 @@ import Testing
     #expect(registry.count == 0)
 }
 
+@Test func startupStatusRetainsOnlyTheLastReportedStartupError() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storageURL = root.appendingPathComponent("storage-v2.json")
+
+    try HostStartupStatusStore.recordFailure(NSError(domain: "Host", code: 1, userInfo: [NSLocalizedDescriptionKey: "Listener unavailable"]), storageURL: storageURL)
+    #expect(HostStartupStatusStore.lastError(storageURL: storageURL) == "Listener unavailable")
+    try HostStartupStatusStore.clearFailure(storageURL: storageURL)
+    #expect(HostStartupStatusStore.lastError(storageURL: storageURL) == nil)
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")

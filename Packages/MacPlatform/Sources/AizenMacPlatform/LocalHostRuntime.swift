@@ -93,7 +93,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
                 migrationState: migrationState,
                 activeConnectionCount: connectionRegistry.count,
                 activeRunCount: snapshot.runs.filter { $0.lifecycle.isActive }.count,
-                activeOperationCount: snapshot.operations.filter { $0.lifecycle == .running }.count
+                activeOperationCount: snapshot.operations.filter { $0.lifecycle == .running }.count,
+                lastStartupError: HostStartupStatusStore.lastError(storageURL: storageURL)
             )
         } catch {
             return .init(

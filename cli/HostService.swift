@@ -8,19 +8,25 @@ enum HostService {
     static let teamIdentifier = "QW4U57CXJX"
 
     static func serve(storageURL: URL) async throws -> Never {
-        let configuration = try HostMachServiceConfiguration(
-            machServiceName: machServiceName,
-            teamIdentifier: teamIdentifier
-        )
-        let displayName = Host.current().localizedName ?? ProcessInfo.processInfo.hostName
-        let credentials = try await HostIdentityStore().loadOrCreateCredentials(displayName: displayName)
-        let runtime = LocalHostRuntime(storageURL: storageURL, credentials: credentials)
-        _ = try await runtime.recoverInterruptedOperations()
-        let listener = try runtime.makeMachListener(configuration: configuration)
-        let lanListener = runtime.makeLANListener(credentials: credentials)
-        try await lanListener.start()
-        withExtendedLifetime((runtime, listener, lanListener)) {
-            dispatchMain()
+        do {
+            let configuration = try HostMachServiceConfiguration(
+                machServiceName: machServiceName,
+                teamIdentifier: teamIdentifier
+            )
+            let displayName = Host.current().localizedName ?? ProcessInfo.processInfo.hostName
+            let credentials = try await HostIdentityStore().loadOrCreateCredentials(displayName: displayName)
+            let runtime = LocalHostRuntime(storageURL: storageURL, credentials: credentials)
+            _ = try await runtime.recoverInterruptedOperations()
+            let listener = try runtime.makeMachListener(configuration: configuration)
+            let lanListener = runtime.makeLANListener(credentials: credentials)
+            try await lanListener.start()
+            try HostStartupStatusStore.clearFailure(storageURL: storageURL)
+            withExtendedLifetime((runtime, listener, lanListener)) {
+                dispatchMain()
+            }
+        } catch {
+            try? HostStartupStatusStore.recordFailure(error, storageURL: storageURL)
+            throw error
         }
     }
 }
