@@ -4,6 +4,12 @@ import Foundation
 
 public enum AizenStorageModule {}
 
+public enum DurableCommandReceipt: Sendable, Equatable {
+    case accepted(DurableCommand)
+    case duplicate(DurableCommand)
+    case conflict(DurableCommand)
+}
+
 public struct StorageSnapshot: Codable, Sendable, Hashable {
     public static let schemaVersion = 2
     public var schemaVersion: Int
@@ -230,6 +236,21 @@ public actor StorageRepository {
             guard snapshot.isEmpty else { throw StorageError.migrationDestinationNotEmpty }
             snapshot = replacement
         }
+    }
+
+    /// Atomically records a Client command before the Host begins non-repeatable side effects.
+    public func acceptCommand(_ command: DurableCommand) throws -> DurableCommandReceipt {
+        var inserted = false
+        let snapshot = try transact { snapshot in
+            guard !snapshot.commands.contains(where: { $0.id == command.id }) else { return }
+            snapshot.commands.append(command)
+            inserted = true
+        }
+        guard let stored = snapshot.commands.first(where: { $0.id == command.id }) else {
+            throw StorageError.duplicateIdentity("command")
+        }
+        if stored.payloadDigest != command.payloadDigest { return .conflict(stored) }
+        return inserted ? .accepted(stored) : .duplicate(stored)
     }
 
     private func validate(_ snapshot: StorageSnapshot) throws {

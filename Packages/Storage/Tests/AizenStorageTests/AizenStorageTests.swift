@@ -42,6 +42,20 @@ import AizenCore
     #expect(decoded == snapshot)
 }
 
+@Test func repositoryAcceptsDurableCommandsExactlyOnce() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = StorageRepository(url: directory.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Personal")
+    _ = try await repository.transact { $0.spaces.append(space) }
+    let command = DurableCommand(spaceID: space.id, payloadDigest: "sha256:one")
+    #expect(try await repository.acceptCommand(command) == .accepted(command))
+    #expect(try await repository.acceptCommand(command) == .duplicate(command))
+    let conflicting = DurableCommand(id: command.id, spaceID: space.id, payloadDigest: "sha256:two")
+    #expect(try await repository.acceptCommand(conflicting) == .conflict(command))
+    #expect(try await repository.load().commands == [command])
+}
+
 @Test func failedTransactionsLeaveTheLastValidSnapshotIntact() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: directory) }
