@@ -35,6 +35,7 @@ final class ReignitionConversationStore: ObservableObject {
 
     func refreshSpaces() async {
         await perform {
+            try await self.host.recoverPendingCommands()
             self.spaces = try await self.host.spaces()
         }
     }

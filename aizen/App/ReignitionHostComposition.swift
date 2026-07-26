@@ -41,7 +41,10 @@ actor ReignitionHostComposition {
             managedSandboxes: sandboxes,
             runEventPublisher: runEvents
         )
-        client = HostClient(transport: InProcessTransport(endpoint: host))
+        client = HostClient(
+            transport: InProcessTransport(endpoint: host),
+            commandOutbox: FileCommandOutbox(url: storageURL.deletingLastPathComponent().appendingPathComponent("client-command-outbox.json"))
+        )
     }
 
     static func defaultStorageURL(fileManager: FileManager = .default) -> URL {
@@ -54,6 +57,10 @@ actor ReignitionHostComposition {
 
     func snapshot() async throws -> StorageSnapshot {
         try JSONDecoder().decode(StorageSnapshot.self, from: try await client.snapshotData())
+    }
+
+    func recoverPendingCommands() async throws {
+        _ = try await client.retryPendingCommands()
     }
 
     func spaces() async throws -> [Space] {
