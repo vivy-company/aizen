@@ -61,6 +61,25 @@ import Testing
     #expect(!OperationLifecycle.running.canTransition(to: .queued))
 }
 
+@Test func operationResultsAndLogsStayBoundedAndPersistable() throws {
+    let operationID = OperationID()
+    let result = OperationResult(summary: "Test suite passed", artifactIDs: [ArtifactID()])
+    let chunk = OperationLogChunk(operationID: operationID, sequence: 1, stream: .standardOutput, text: "Test Suite started\\n")
+    let operation = Operation(spaceID: SpaceID(), lifecycle: .completed, progress: 1, result: result)
+
+    #expect(try JSONDecoder().decode(Operation.self, from: JSONEncoder().encode(operation)) == operation)
+    #expect(try JSONDecoder().decode(OperationLogChunk.self, from: JSONEncoder().encode(chunk)) == chunk)
+}
+
+@Test func oldOperationSnapshotsDecodeWithoutResults() throws {
+    let operation = Operation(spaceID: SpaceID(), lifecycle: .running, progress: 0)
+    var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(operation)) as! [String: Any]
+    object.removeValue(forKey: "result")
+    let data = try JSONSerialization.data(withJSONObject: object)
+
+    #expect(try JSONDecoder().decode(Operation.self, from: data).result == nil)
+}
+
 @Test func durableCommandsCarryStableIdempotencyIdentity() {
     let command = DurableCommand(spaceID: SpaceID(), deviceID: DeviceID(), payloadDigest: "sha256:abc")
     #expect(command.lifecycle == .accepted)

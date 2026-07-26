@@ -619,6 +619,48 @@ public enum OperationLifecycle: String, Codable, Sendable, Hashable {
     }
 }
 
+/// A bounded final summary for a durable operation. Artifact references remain opaque until
+/// their individual access policy is evaluated by the Host.
+public struct OperationResult: Codable, Sendable, Hashable {
+    public static let maximumSummaryUTF8Count = 4_096
+
+    public let summary: String
+    public let artifactIDs: [ArtifactID]
+
+    public init(summary: String, artifactIDs: [ArtifactID] = []) {
+        precondition(!summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Operation results need a summary")
+        precondition(summary.utf8.count <= Self.maximumSummaryUTF8Count, "Operation result summaries must be bounded")
+        self.summary = summary
+        self.artifactIDs = artifactIDs
+    }
+}
+
+/// Ordered, bounded process output retained separately from the operation record so a Host
+/// can page it without loading a whole build log into a control response.
+public struct OperationLogChunk: Codable, Sendable, Hashable {
+    public static let maximumTextUTF8Count = 64 * 1_024
+
+    public enum Stream: String, Codable, Sendable, Hashable {
+        case standardOutput
+        case standardError
+    }
+
+    public let operationID: OperationID
+    public let sequence: UInt64
+    public let stream: Stream
+    public let text: String
+
+    public init(operationID: OperationID, sequence: UInt64, stream: Stream, text: String) {
+        precondition(sequence > 0, "Operation log sequences start at one")
+        precondition(!text.isEmpty, "Operation log chunks cannot be empty")
+        precondition(text.utf8.count <= Self.maximumTextUTF8Count, "Operation log chunks must be bounded")
+        self.operationID = operationID
+        self.sequence = sequence
+        self.stream = stream
+        self.text = text
+    }
+}
+
 public struct Operation: Codable, Sendable, Hashable, Identifiable {
     public let id: OperationID
     public let spaceID: SpaceID
@@ -627,6 +669,7 @@ public struct Operation: Codable, Sendable, Hashable, Identifiable {
     public var lifecycle: OperationLifecycle
     public var progress: Double?
     public var failureDescription: String?
+    public var result: OperationResult?
 
     public init(
         id: OperationID = OperationID(),
@@ -635,7 +678,8 @@ public struct Operation: Codable, Sendable, Hashable, Identifiable {
         resourceID: ResourceID? = nil,
         lifecycle: OperationLifecycle = .queued,
         progress: Double? = nil,
-        failureDescription: String? = nil
+        failureDescription: String? = nil,
+        result: OperationResult? = nil
     ) {
         if let progress { precondition((0...1).contains(progress), "Operation progress must be between zero and one") }
         precondition(lifecycle != .failed || failureDescription != nil, "Failed operations need a failure description")
@@ -646,6 +690,25 @@ public struct Operation: Codable, Sendable, Hashable, Identifiable {
         self.lifecycle = lifecycle
         self.progress = progress
         self.failureDescription = failureDescription
+        self.result = result
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, spaceID, sessionID, resourceID, lifecycle, progress, failureDescription, result
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try values.decode(OperationID.self, forKey: .id),
+            spaceID: try values.decode(SpaceID.self, forKey: .spaceID),
+            sessionID: try values.decodeIfPresent(SessionID.self, forKey: .sessionID),
+            resourceID: try values.decodeIfPresent(ResourceID.self, forKey: .resourceID),
+            lifecycle: try values.decode(OperationLifecycle.self, forKey: .lifecycle),
+            progress: try values.decodeIfPresent(Double.self, forKey: .progress),
+            failureDescription: try values.decodeIfPresent(String.self, forKey: .failureDescription),
+            result: try values.decodeIfPresent(OperationResult.self, forKey: .result)
+        )
     }
 }
 
