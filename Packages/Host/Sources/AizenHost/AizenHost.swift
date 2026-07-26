@@ -80,6 +80,10 @@ public protocol RepositoryHistoryReading: Sendable {
     func history(at repositoryURL: URL, maximumCommits: Int) async throws -> RepositoryHistorySnapshot
 }
 
+public protocol RepositoryIndexUpdating: Sendable {
+    func updateIndex(at repositoryURL: URL, relativePaths: [String], expectedIndexRevision: String, stage: Bool) async throws -> String
+}
+
 public protocol XcodeProjectOpening: Sendable {
     func openXcodeProject(at url: URL) async throws
 }
@@ -107,6 +111,7 @@ public actor LocalHost: WireEndpoint {
     private let repositoryStatusReader: (any RepositoryStatusReading)?
     private let repositoryDiffReader: (any RepositoryDiffReading)?
     private let repositoryHistoryReader: (any RepositoryHistoryReading)?
+    private let repositoryIndexUpdater: (any RepositoryIndexUpdating)?
     private let xcodeProjectOpener: (any XcodeProjectOpening)?
     private let xcodeProjectInspector: (any XcodeProjectInspecting)?
     private let xcodeProjectBuilder: (any XcodeProjectBuilding)?
@@ -126,6 +131,7 @@ public actor LocalHost: WireEndpoint {
         repositoryStatusReader: (any RepositoryStatusReading)? = nil,
         repositoryDiffReader: (any RepositoryDiffReading)? = nil,
         repositoryHistoryReader: (any RepositoryHistoryReading)? = nil,
+        repositoryIndexUpdater: (any RepositoryIndexUpdating)? = nil,
         xcodeProjectOpener: (any XcodeProjectOpening)? = nil,
         xcodeProjectInspector: (any XcodeProjectInspecting)? = nil,
         xcodeProjectBuilder: (any XcodeProjectBuilding)? = nil
@@ -143,6 +149,7 @@ public actor LocalHost: WireEndpoint {
         self.repositoryStatusReader = repositoryStatusReader
         self.repositoryDiffReader = repositoryDiffReader
         self.repositoryHistoryReader = repositoryHistoryReader
+        self.repositoryIndexUpdater = repositoryIndexUpdater
         self.xcodeProjectOpener = xcodeProjectOpener
         self.xcodeProjectInspector = xcodeProjectInspector
         self.xcodeProjectBuilder = xcodeProjectBuilder
@@ -236,6 +243,8 @@ public actor LocalHost: WireEndpoint {
                 ReadRepositoryDiffResponsePayload.identifier,
                 ReadRepositoryHistoryQueryPayload.identifier,
                 ReadRepositoryHistoryResponsePayload.identifier,
+                UpdateRepositoryIndexCommandPayload.identifier,
+                UpdateRepositoryIndexResultPayload.identifier,
                 CreateLocalFolderContextCommandPayload.identifier,
                 CreateLocalFolderContextResultPayload.identifier,
                 CreateRepositoryCheckoutContextCommandPayload.identifier,
@@ -759,6 +768,14 @@ public actor LocalHost: WireEndpoint {
             let history = try await repositoryHistoryReader.history(at: repositoryURL, maximumCommits: Int(query.maximumCommits))
             kind = .queryResponse
             payload = try TypedPayload(ReadRepositoryHistoryResponsePayload(resourceID: resourceID.description, repositoryRevision: history.repositoryRevision, indexRevision: history.indexRevision, branch: history.branch, isDetached: history.isDetached, commits: history.commits.map { .init(revision: $0.revision, subject: $0.subject, authorName: $0.authorName, authoredAtUnixMilliseconds: $0.authoredAtUnixMilliseconds) }, truncated: history.truncated))
+        case .command where envelope.payload.identifier == UpdateRepositoryIndexCommandPayload.identifier:
+            guard let repositoryIndexUpdater else { throw HostProtocolError.runtimeUnavailable }
+            let command = try UpdateRepositoryIndexCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resourceID = try Self.resourceID(from: command.resourceID)
+            guard let resource = try await storage.load().resources.first(where: { $0.id == resourceID }), resource.kind == .repository, let repositoryURL = try Self.localResourceDirectory(for: resource) else { throw HostProtocolError.unknownResource(resourceID) }
+            let revision = try await repositoryIndexUpdater.updateIndex(at: repositoryURL, relativePaths: command.relativePaths, expectedIndexRevision: command.expectedIndexRevision, stage: command.stage)
+            kind = .commandResult
+            payload = try TypedPayload(UpdateRepositoryIndexResultPayload(indexRevision: revision))
         case .command where envelope.payload.identifier == CreateLocalFolderContextCommandPayload.identifier:
             let command = try CreateLocalFolderContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
