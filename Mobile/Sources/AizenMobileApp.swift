@@ -50,6 +50,7 @@ private struct MobileRootView: View {
                         ForEach(pairing.spaces) { space in
                             Button(space.name) { Task { await pairing.selectSpace(space.id) } }
                                 .fontWeight(pairing.selectedSpaceID == space.id ? .semibold : .regular)
+                                .disabled(!pairing.isLive)
                         }
                     }
                 }
@@ -108,7 +109,7 @@ private struct MobileRootView: View {
                                 newConversationTitle = ""
                                 Task { await pairing.createConversation(title: title) }
                             }
-                            .disabled(newConversationTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .disabled(!pairing.isLive || newConversationTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                         .padding()
                     }
@@ -131,12 +132,13 @@ private struct MobileRootView: View {
                             composer = ""
                             Task { await pairing.sendMessage(content) }
                         }
-                        .disabled(composer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(!pairing.isLive || composer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     .padding()
                     if pairing.activeRunID != nil {
                         Button("Cancel active Run", role: .destructive) { Task { await pairing.cancelActiveRun() } }
                             .padding(.bottom)
+                            .disabled(!pairing.isLive)
                     }
                 }
                 .navigationTitle(pairing.sessions.first(where: { $0.id == sessionID })?.title ?? "Conversation")

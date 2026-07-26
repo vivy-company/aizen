@@ -34,6 +34,9 @@ final class MobilePairingStore: ObservableObject {
             spaces = cached.spaces
             sessions = cached.sessions
             selectedSpaceID = cached.spaces.first?.id
+            if let pairedHost = try? MobilePairedHostStore.load() {
+                state = .ready(hostName: pairedHost.host.displayName, spaceCount: cached.spaces.count)
+            }
         }
     }
 
@@ -56,7 +59,7 @@ final class MobilePairingStore: ObservableObject {
                 device: device,
                 deviceIdentity: identity.identity
             ).submit(using: { frame in try await exchange.exchange(frame) })
-            try MobilePairedHostStore.save(.init(host: invitation.host, endpoint: endpoint))
+            try MobilePairedHostStore.save(.init(host: invitation.host, endpoint: endpoint, approvalState: .awaitingApproval))
             state = .awaitingApproval(hostName: invitation.host.displayName)
         } catch {
             state = .failed(error.localizedDescription)
@@ -68,15 +71,17 @@ final class MobilePairingStore: ObservableObject {
     }
 
     func reconnect() async {
+        var pairedHost: MobilePairedHost?
         do {
-            guard let pairedHost = try MobilePairedHostStore.load() else { throw MobilePairingError.noPairedHost }
+            guard let storedHost = try MobilePairedHostStore.load() else { throw MobilePairingError.noPairedHost }
+            pairedHost = storedHost
             state = .pairing
             let identity = try MobileDeviceIdentityStore.loadOrCreate()
             let device = DevicePublicIdentity(deviceID: identity.deviceID, displayName: UIDevice.current.name, platform: "iOS", cryptographicIdentity: identity.identity.publicIdentity(createdAt: identity.createdAt))
-            let exchange = try MobileWebSocketExchange(endpoint: pairedHost.endpoint)
+            let exchange = try MobileWebSocketExchange(endpoint: storedHost.endpoint)
             try await exchange.start()
-            _ = try TransportRouteConfiguration(kind: .lan, endpoint: pairedHost.endpoint, expectedHostIdentity: pairedHost.host.cryptographicIdentity.fingerprint.description)
-            let transport = try await RemoteClientAuthenticator(host: pairedHost.host, device: device, deviceIdentity: identity.identity, route: .lan).authenticate(
+            _ = try TransportRouteConfiguration(kind: .lan, endpoint: storedHost.endpoint, expectedHostIdentity: storedHost.host.cryptographicIdentity.fingerprint.description)
+            let transport = try await RemoteClientAuthenticator(host: storedHost.host, device: device, deviceIdentity: identity.identity, route: .lan).authenticate(
                 using: { frame in try await exchange.exchange(frame) },
                 frameSender: { frame in try await exchange.send(frame) },
                 frameStream: { exchange.frames() }
@@ -86,14 +91,27 @@ final class MobilePairingStore: ObservableObject {
             let spaces = try await client.spaces()
             self.client = client
             self.spaces = spaces
-            selectedSpaceID = spaces.first?.id
+            selectedSpaceID = spaces.contains(where: { $0.id == selectedSpaceID }) ? selectedSpaceID : spaces.first?.id
+            selectedSessionID = nil
+            messages = []
+            sessions = []
+            try MobileProjectionCache.save(.init(spaces: spaces, sessions: []))
             sessions = try await client.conversations(spaceID: selectedSpaceID)
             try MobileProjectionCache.save(.init(spaces: spaces, sessions: sessions))
+            try MobilePairedHostStore.save(.init(host: storedHost.host, endpoint: storedHost.endpoint, approvalState: .approved))
             isLive = true
             subscribe(to: client)
-            state = .ready(hostName: pairedHost.host.displayName, spaceCount: spaces.count)
+            state = .ready(hostName: storedHost.host.displayName, spaceCount: spaces.count)
         } catch {
-            state = .failed(error.localizedDescription)
+            client = nil
+            isLive = false
+            if pairedHost?.approvalState != .approved, error is RemoteClientAuthenticationError {
+                state = .awaitingApproval(hostName: pairedHost!.host.displayName)
+            } else if pairedHost?.approvalState == .approved, error is RemoteClientAuthenticationError {
+                clearRevokedPairing()
+            } else {
+                state = .failed(error.localizedDescription)
+            }
         }
     }
 
@@ -112,7 +130,6 @@ final class MobilePairingStore: ObservableObject {
         eventsTask?.cancel()
         eventsTask = nil
         client = nil
-        activeRunID = nil
         isLive = false
     }
 
@@ -172,6 +189,18 @@ final class MobilePairingStore: ObservableObject {
                 }
             }
         }
+    }
+
+    private func clearRevokedPairing() {
+        MobilePairedHostStore.clear()
+        MobileProjectionCache.clear()
+        spaces = []
+        sessions = []
+        selectedSpaceID = nil
+        selectedSessionID = nil
+        messages = []
+        activeRunID = nil
+        state = .failed("This device is no longer authorized. Pair it again from your Mac.")
     }
 }
 
@@ -266,8 +295,15 @@ private enum MobileDeviceIdentityStore {
 }
 
 private struct MobilePairedHost: Codable {
+    enum ApprovalState: String, Codable {
+        case awaitingApproval
+        case approved
+    }
+
     let host: HostPublicIdentity
     let endpoint: URL
+    /// Missing on pre-approval-state records, which were only written after a pairing request.
+    let approvalState: ApprovalState?
 }
 
 private enum MobilePairedHostStore {
@@ -277,6 +313,7 @@ private enum MobilePairedHostStore {
         guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
         return try JSONDecoder().decode(MobilePairedHost.self, from: data)
     }
+    static func clear() { UserDefaults.standard.removeObject(forKey: key) }
     static var exists: Bool { UserDefaults.standard.data(forKey: key) != nil }
 }
 
@@ -296,6 +333,10 @@ private struct MobileProjectionCache: Codable {
     static func save(_ cache: Self) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(cache).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    static func clear() {
+        try? FileManager.default.removeItem(at: url)
     }
 }
 
