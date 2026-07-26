@@ -136,6 +136,8 @@ public actor LocalHost: WireEndpoint {
                 ListContextFilesResponsePayload.identifier,
                 ReadContextTextFileQueryPayload.identifier,
                 ReadContextTextFileResponsePayload.identifier,
+                ReplaceContextTextFileCommandPayload.identifier,
+                ReplaceContextTextFileResultPayload.identifier,
                 CreateTerminalSessionCommandPayload.identifier,
                 CreateTerminalSessionResultPayload.identifier,
                 TerminalInputCommandPayload.identifier,
@@ -356,6 +358,12 @@ public actor LocalHost: WireEndpoint {
             kind = .queryResponse
             let contentHash = SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
             payload = try TypedPayload(ReadContextTextFileResponsePayload(relativePath: query.relativePath, text: text, contentHash: contentHash))
+        case .command where envelope.payload.identifier == ReplaceContextTextFileCommandPayload.identifier:
+            let command = try ReplaceContextTextFileCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let contextID = try Self.executionContextID(from: command.executionContextID)
+            let contentHash = try await contextFiles.replaceTextFile(contextID: contextID, relativePath: command.relativePath, expectedContentHash: command.expectedContentHash, text: command.text)
+            kind = .commandResult
+            payload = try TypedPayload(ReplaceContextTextFileResultPayload(relativePath: command.relativePath, contentHash: contentHash))
         case .command where envelope.payload.identifier == TerminalInputCommandPayload.identifier:
             let command = try TerminalInputCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)

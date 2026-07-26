@@ -186,6 +186,10 @@ public struct RemoteHostEndpoint: WireEndpoint {
             let request = try ReadContextTextFileQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let context = try await requiredExecutionContext(request.executionContextID)
             return .init(capability: .fileRead, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil)
+        case ReplaceContextTextFileCommandPayload.identifier:
+            let command = try ReplaceContextTextFileCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let context = try await requiredExecutionContext(command.executionContextID)
+            return .init(capability: .fileWrite, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil)
         case GetConversationTimelineQueryPayload.identifier:
             let request = try GetConversationTimelineQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let conversation = try await requiredSession(request.sessionID)

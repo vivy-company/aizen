@@ -1839,6 +1839,22 @@ public struct ReadContextTextFileResponsePayload: WirePayload, Sendable, Hashabl
     public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadContextTextFileResponse(); m.relativePath = relativePath; m.text = text; m.contentHash = contentHash; return try m.serializedData() }
 }
 
+public struct ReplaceContextTextFileCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.context-files.replace-text@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let executionContextID: String; public let relativePath: String; public let expectedContentHash: String; public let text: String
+    public init(executionContextID: String, relativePath: String, expectedContentHash: String, text: String) { self.executionContextID = executionContextID; self.relativePath = relativePath; self.expectedContentHash = expectedContentHash; self.text = text }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReplaceContextTextFileCommand(serializedBytes: protobufBytes); guard !m.executionContextID.isEmpty, !m.relativePath.isEmpty, m.expectedContentHash.count == 64 else { throw WireCodecError.invalidIdentity("context file replacement") }; self.init(executionContextID: m.executionContextID, relativePath: m.relativePath, expectedContentHash: m.expectedContentHash, text: m.text) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReplaceContextTextFileCommand(); m.executionContextID = executionContextID; m.relativePath = relativePath; m.expectedContentHash = expectedContentHash; m.text = text; return try m.serializedData() }
+}
+
+public struct ReplaceContextTextFileResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.context-files.replace-text@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let relativePath: String; public let contentHash: String
+    public init(relativePath: String, contentHash: String) { self.relativePath = relativePath; self.contentHash = contentHash }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReplaceContextTextFileResult(serializedBytes: protobufBytes); guard !m.relativePath.isEmpty, m.contentHash.count == 64 else { throw WireCodecError.invalidIdentity("context file replacement") }; self.init(relativePath: m.relativePath, contentHash: m.contentHash) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReplaceContextTextFileResult(); m.relativePath = relativePath; m.contentHash = contentHash; return try m.serializedData() }
+}
+
 public struct CreateTerminalSessionCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.terminal-session.create@1")
     public static let schemaVersion: UInt32 = 1

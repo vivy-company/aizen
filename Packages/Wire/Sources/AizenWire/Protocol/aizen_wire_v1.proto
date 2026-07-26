@@ -482,6 +482,18 @@ message ReadContextTextFileResponse {
   string content_hash = 3;
 }
 
+message ReplaceContextTextFileCommand {
+  string execution_context_id = 1;
+  string relative_path = 2;
+  string expected_content_hash = 3;
+  string text = 4;
+}
+
+message ReplaceContextTextFileResult {
+  string relative_path = 1;
+  string content_hash = 2;
+}
+
 message CreateTerminalSessionCommand {
   string terminal_session_id = 1;
   string space_id = 2;
