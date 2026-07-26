@@ -32,20 +32,42 @@ public actor RemoteSessionAuthenticator {
     private let host: HostPublicIdentity
     private let hostIdentity: LocalCryptographicIdentity
     private let storage: StorageRepository
+    private let rateLimiter: RemoteRequestRateLimiter
     private let pendingLifetime: TimeInterval
     private var pendingSessions: [UUID: PendingSession] = [:]
 
-    public init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, storage: StorageRepository, pendingLifetime: TimeInterval = 30) {
+    public init(
+        host: HostPublicIdentity,
+        hostIdentity: LocalCryptographicIdentity,
+        storage: StorageRepository,
+        rateLimiter: RemoteRequestRateLimiter = .init(),
+        pendingLifetime: TimeInterval = 30
+    ) {
         precondition(pendingLifetime > 0, "Authentication pending lifetime must be positive")
         precondition(host.cryptographicIdentity == hostIdentity.publicIdentity(createdAt: host.cryptographicIdentity.createdAt), "Host public and private identities must match")
         self.host = host
         self.hostIdentity = hostIdentity
         self.storage = storage
+        self.rateLimiter = rateLimiter
         self.pendingLifetime = pendingLifetime
     }
 
-    public func begin(_ start: AuthenticationStartPayload, protocolGeneration: UInt32 = UInt32(AizenHostModule.protocolGeneration)) async throws -> AuthenticationChallengePayload {
+    public func begin(
+        _ start: AuthenticationStartPayload,
+        source: RemoteRequestSource,
+        protocolGeneration: UInt32 = UInt32(AizenHostModule.protocolGeneration)
+    ) async throws -> AuthenticationChallengePayload {
         pruneExpiredSessions(now: Date())
+        do {
+            try await rateLimiter.require(kind: .authentication, source: source, deviceID: start.deviceID)
+        } catch {
+            await auditFailure(deviceID: start.deviceID, route: start.route)
+            throw error
+        }
+        guard pendingSessions[start.connectionID] == nil else {
+            await auditFailure(deviceID: start.deviceID, route: start.route)
+            throw RemoteSessionAuthenticationError.rejected
+        }
         guard start.hostID == host.hostID, let route = ConnectionRoute(rawValue: start.route) else {
             await auditFailure(deviceID: start.deviceID, route: start.route)
             throw RemoteSessionAuthenticationError.rejected

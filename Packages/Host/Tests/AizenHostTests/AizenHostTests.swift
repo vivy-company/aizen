@@ -75,7 +75,11 @@ import AizenWire
         route: "lan"
     )
     let authenticator = RemoteSessionAuthenticator(host: host, hostIdentity: hostIdentity, storage: storage)
-    let challenge = try await authenticator.begin(start)
+    let source = RemoteRequestSource("192.168.1.20")
+    let challenge = try await authenticator.begin(start, source: source)
+    await #expect(throws: RemoteSessionAuthenticationError.rejected) {
+        try await authenticator.begin(start, source: source)
+    }
     let binding = try ConnectionAuthenticationBinding(
         protocolGeneration: 1,
         hostID: challenge.hostID,
@@ -105,7 +109,7 @@ import AizenWire
         route: "lan"
     )
     await #expect(throws: RemoteSessionAuthenticationError.rejected) {
-        try await authenticator.begin(unpaired)
+        try await authenticator.begin(unpaired, source: source)
     }
 
     var revoked = DeviceAuthorization(device: device, grants: [.init(capability: .spaceRead)])
@@ -122,7 +126,25 @@ import AizenWire
         route: "lan"
     )
     await #expect(throws: RemoteSessionAuthenticationError.rejected) {
-        try await authenticator.begin(reconnect)
+        try await authenticator.begin(reconnect, source: source)
+    }
+}
+
+@Test func remoteRequestRateLimiterBoundsBurstAndRefillsWithoutUnboundedSources() async throws {
+    let limit = RemoteRequestRateLimit(burst: 2, refillWindow: 10)
+    let limits = Dictionary(uniqueKeysWithValues: RemoteRequestKind.allCases.map { ($0, limit) })
+    let limiter = RemoteRequestRateLimiter(limits: limits, maximumTrackedBuckets: 1)
+    let source = RemoteRequestSource("192.168.1.20")
+    let start = Date(timeIntervalSince1970: 1_000)
+
+    try await limiter.require(kind: .authentication, source: source, now: start)
+    try await limiter.require(kind: .authentication, source: source, now: start)
+    await #expect(throws: RemoteRequestRateLimitError.limited(.authentication)) {
+        try await limiter.require(kind: .authentication, source: source, now: start)
+    }
+    try await limiter.require(kind: .authentication, source: source, now: start.addingTimeInterval(5))
+    await #expect(throws: RemoteRequestRateLimitError.limited(.snapshot)) {
+        try await limiter.require(kind: .snapshot, source: RemoteRequestSource("192.168.1.21"), now: start)
     }
 }
 
