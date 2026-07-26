@@ -34,14 +34,17 @@ public actor HostClient {
         case sequenceExhausted
         case unexpectedPayload(PayloadIdentifier)
         case invalidIdentity(String)
+        case eventStreamingUnavailable
     }
 
     private let transport: any WireTransport
+    private let eventTransport: (any RunEventTransport)?
     private var nextSequence: UInt64 = 1
     public private(set) var connectionState: ClientConnectionState = .disconnected
 
     public init(transport: any WireTransport) {
         self.transport = transport
+        eventTransport = transport as? any RunEventTransport
     }
 
     public func send(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
@@ -52,6 +55,11 @@ public actor HostClient {
 
     public func disconnect() {
         connectionState = .disconnected
+    }
+
+    public func runEvents() async throws -> AsyncStream<RunEvent> {
+        guard let eventTransport else { throw Error.eventStreamingUnavailable }
+        return try await eventTransport.runEvents()
     }
 
     public func snapshot(scope: String = "host") async throws -> SnapshotResponsePayload {

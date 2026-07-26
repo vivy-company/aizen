@@ -38,7 +38,8 @@ actor ReignitionHostComposition {
         host = LocalHost(
             storage: storage,
             conversationRuns: ConversationRunCoordinator(storage: storage, runtime: runtime, eventPublisher: runEvents),
-            managedSandboxes: sandboxes
+            managedSandboxes: sandboxes,
+            runEventPublisher: runEvents
         )
         client = HostClient(transport: InProcessTransport(endpoint: host))
     }
@@ -80,7 +81,11 @@ actor ReignitionHostComposition {
     }
 
     func events() async -> AsyncStream<RunEvent> {
-        await runEvents.events()
+        do {
+            return try await client.runEvents()
+        } catch {
+            return AsyncStream { $0.finish() }
+        }
     }
 
     func prepareLegacyMigration(legacyStoreURL: URL?, legacyModelURL: URL?, fileManager: FileManager = .default) async throws -> MigrationPreparation {

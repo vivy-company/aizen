@@ -121,6 +121,25 @@ import AizenWire
     #expect(try await client.runs(spaceID: space.id) == [run])
 }
 
+@Test func clientReceivesSharedTransportRunEvents() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let publisher = RunEventPublisher()
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, runEventPublisher: publisher)))
+    let stream = try await client.runEvents()
+    let run = Run(spaceID: SpaceID(), sessionID: SessionID())
+    let eventTask = Task {
+        var iterator = stream.makeAsyncIterator()
+        return await iterator.next()
+    }
+
+    await publisher.publish(for: run, kind: .assistantTextDelta("Hello"))
+    let event = try #require(await eventTask.value)
+    #expect(event.runID == run.id)
+    #expect(event.kind == .assistantTextDelta("Hello"))
+}
+
 @Test func clientCancelsRunsThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

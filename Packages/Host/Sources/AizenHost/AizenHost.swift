@@ -14,15 +14,23 @@ public actor LocalHost: WireEndpoint {
     private let storage: StorageRepository
     private let conversationRuns: ConversationRunCoordinator?
     private let managedSandboxes: ManagedSandboxService?
+    private let runEventPublisher: RunEventPublisher?
 
     public init(
         storage: StorageRepository,
         conversationRuns: ConversationRunCoordinator? = nil,
-        managedSandboxes: ManagedSandboxService? = nil
+        managedSandboxes: ManagedSandboxService? = nil,
+        runEventPublisher: RunEventPublisher? = nil
     ) {
         self.storage = storage
         self.conversationRuns = conversationRuns
         self.managedSandboxes = managedSandboxes
+        self.runEventPublisher = runEventPublisher
+    }
+
+    public func runEvents() async -> AsyncStream<RunEvent> {
+        guard let runEventPublisher else { return AsyncStream { $0.finish() } }
+        return await runEventPublisher.events()
     }
 
     public func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
@@ -215,6 +223,8 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case spaceNotEmpty(SpaceID)
     case runtimeUnavailable
 }
+
+extension LocalHost: RunEventEndpoint {}
 
 /// Host-facing runtime contract. ACP, Process, and UI concerns remain in a macOS adapter.
 public protocol RunRuntime: Sendable {
