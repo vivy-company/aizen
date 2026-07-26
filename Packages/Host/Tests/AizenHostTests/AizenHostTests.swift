@@ -612,9 +612,42 @@ import AizenWire
     }
 }
 
+@Test func hostForwardsAgentLaunchConfigurationThroughWire() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let updater = RecordingAgentLaunchUpdater()
+    let host = LocalHost(
+        storage: StorageRepository(url: root.appendingPathComponent("storage-v2.json")),
+        agentLaunchConfiguration: updater
+    )
+    let command = ConfigureAgentLaunchCommandPayload(
+        executablePath: "/usr/bin/env",
+        arguments: ["codex-acp"],
+        environment: ["TOKEN": "secret"]
+    )
+    let response = try await host.receive(.init(
+        messageID: "configure-agent",
+        connectionSequence: 1,
+        kind: .command,
+        channel: .control,
+        payload: try .init(command)
+    ))
+
+    #expect(try ConfigureAgentLaunchResultPayload(protobufBytes: response.payload.protobufBytes) == .init())
+    #expect(await updater.configuration == command)
+}
+
 private actor RecordingRuntime: RunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
+}
+
+private actor RecordingAgentLaunchUpdater: AgentLaunchConfigurationUpdating {
+    private(set) var configuration: ConfigureAgentLaunchCommandPayload?
+
+    func updateAgentLaunchConfiguration(_ configuration: ConfigureAgentLaunchCommandPayload) async throws {
+        self.configuration = configuration
+    }
 }
 
 private actor RecordingTerminalRuntime: TerminalRuntime {

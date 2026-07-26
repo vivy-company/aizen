@@ -11,6 +11,11 @@ public enum AizenHostModule {
     public static let productVersion = "2.0.0"
 }
 
+/// MacPlatform owns the secure persistence implementation; Host only coordinates the command.
+public protocol AgentLaunchConfigurationUpdating: Sendable {
+    func updateAgentLaunchConfiguration(_ configuration: ConfigureAgentLaunchCommandPayload) async throws
+}
+
 /// Explicit local Host composition. It owns Storage but exposes only Wire envelopes and Core snapshots.
 public actor LocalHost: WireEndpoint {
     private let storage: StorageRepository
@@ -18,19 +23,22 @@ public actor LocalHost: WireEndpoint {
     private let managedSandboxes: ManagedSandboxService?
     private let runEventPublisher: RunEventPublisher?
     private let terminalRuntime: (any TerminalRuntime)?
+    private let agentLaunchConfiguration: (any AgentLaunchConfigurationUpdating)?
 
     public init(
         storage: StorageRepository,
         conversationRuns: ConversationRunCoordinator? = nil,
         managedSandboxes: ManagedSandboxService? = nil,
         runEventPublisher: RunEventPublisher? = nil,
-        terminalRuntime: (any TerminalRuntime)? = nil
+        terminalRuntime: (any TerminalRuntime)? = nil,
+        agentLaunchConfiguration: (any AgentLaunchConfigurationUpdating)? = nil
     ) {
         self.storage = storage
         self.conversationRuns = conversationRuns
         self.managedSandboxes = managedSandboxes
         self.runEventPublisher = runEventPublisher
         self.terminalRuntime = terminalRuntime
+        self.agentLaunchConfiguration = agentLaunchConfiguration
     }
 
     public func runEvents() async -> AsyncStream<RunEvent> {
@@ -83,6 +91,8 @@ public actor LocalHost: WireEndpoint {
                 SendConversationResultPayload.identifier,
                 CancelRunCommandPayload.identifier,
                 CancelRunResultPayload.identifier,
+                ConfigureAgentLaunchCommandPayload.identifier,
+                ConfigureAgentLaunchResultPayload.identifier,
                 ImportLocalFolderCommandPayload.identifier,
                 ImportLocalFolderResultPayload.identifier,
                 ImportLocalRepositoryCommandPayload.identifier,
@@ -302,6 +312,14 @@ public actor LocalHost: WireEndpoint {
             payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
                 try await conversationRuns.cancel(runID: runID)
                 return try TypedPayload(CancelRunResultPayload())
+            }
+            kind = .commandResult
+        case .command where envelope.payload.identifier == ConfigureAgentLaunchCommandPayload.identifier:
+            let command = try ConfigureAgentLaunchCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            guard let agentLaunchConfiguration else { throw HostProtocolError.runtimeUnavailable }
+            payload = try await executeDurably(envelope: envelope, spaceID: nil) {
+                try await agentLaunchConfiguration.updateAgentLaunchConfiguration(command)
+                return try TypedPayload(ConfigureAgentLaunchResultPayload())
             }
             kind = .commandResult
         case .command where envelope.payload.identifier == ImportLocalFolderCommandPayload.identifier:
