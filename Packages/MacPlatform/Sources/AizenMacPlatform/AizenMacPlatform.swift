@@ -37,7 +37,11 @@ public protocol ACPRunDelegateProviding: Sendable {
 /// Narrow external boundary that lets Host tests use fake ACP clients while production uses `ACP.Client`.
 public protocol ACPRunClient: Sendable {
     func start(configuration: ACPRunConfiguration, delegate: (any ClientDelegate)?) async throws -> String
-    func sendPrompt(sessionID: String, text: String) async throws -> String?
+    func sendPrompt(
+        sessionID: String,
+        text: String,
+        onAssistantTextDelta: @escaping @Sendable (String) async -> Void
+    ) async throws -> String?
     func cancel(sessionID: String) async throws
     func terminate() async
 }
@@ -57,6 +61,7 @@ public struct SwiftACPClientFactory: ACPRunClientFactory {
 public actor SwiftACPClient: ACPRunClient {
     private let client = Client()
     private var assistantTextBySession: [String: String] = [:]
+    private var assistantTextConsumers: [String: @Sendable (String) async -> Void] = [:]
     private var notificationTask: Task<Void, Never>?
 
     public init() {}
@@ -93,8 +98,14 @@ public actor SwiftACPClient: ACPRunClient {
         try await client.sendCancelNotification(sessionId: SessionId(sessionID))
     }
 
-    public func sendPrompt(sessionID: String, text: String) async throws -> String? {
+    public func sendPrompt(
+        sessionID: String,
+        text: String,
+        onAssistantTextDelta: @escaping @Sendable (String) async -> Void
+    ) async throws -> String? {
         assistantTextBySession[sessionID] = ""
+        assistantTextConsumers[sessionID] = onAssistantTextDelta
+        defer { assistantTextConsumers.removeValue(forKey: sessionID) }
         _ = try await client.sendPrompt(sessionId: SessionId(sessionID), content: [.text(.init(text: text))])
         // ACP returns the prompt response before this consumer has necessarily drained every queued update.
         try? await Task.sleep(for: .milliseconds(100))
@@ -106,6 +117,7 @@ public actor SwiftACPClient: ACPRunClient {
         notificationTask?.cancel()
         notificationTask = nil
         assistantTextBySession.removeAll()
+        assistantTextConsumers.removeAll()
         await client.setDelegate(nil)
         await client.terminate()
     }
@@ -120,8 +132,9 @@ public actor SwiftACPClient: ACPRunClient {
         }
     }
 
-    private func appendAssistantText(_ text: String, for sessionID: String) {
+    private func appendAssistantText(_ text: String, for sessionID: String) async {
         assistantTextBySession[sessionID, default: ""] += text
+        await assistantTextConsumers[sessionID]?(text)
     }
 
     private nonisolated static func assistantText(from notification: JSONRPCNotification, expectedSessionID: String) -> String? {
@@ -184,9 +197,17 @@ public actor ACPRunRuntime: RunRuntime {
         await activeRun.client.terminate()
     }
 
-    public func send(message: String, to runID: RunID) async throws -> String? {
+    public func send(
+        message: String,
+        to runID: RunID,
+        onAssistantTextDelta: @escaping @Sendable (String) async -> Void
+    ) async throws -> String? {
         guard let activeRun = activeRuns[runID] else { throw Error.unknownRun(runID) }
-        return try await activeRun.client.sendPrompt(sessionID: activeRun.sessionID, text: message)
+        return try await activeRun.client.sendPrompt(
+            sessionID: activeRun.sessionID,
+            text: message,
+            onAssistantTextDelta: onAssistantTextDelta
+        )
     }
 }
 

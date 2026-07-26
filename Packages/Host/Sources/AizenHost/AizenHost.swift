@@ -223,7 +223,11 @@ public protocol RunRuntime: Sendable {
 }
 
 public protocol PromptRunRuntime: RunRuntime {
-    func send(message: String, to runID: RunID) async throws -> String?
+    func send(
+        message: String,
+        to runID: RunID,
+        onAssistantTextDelta: @escaping @Sendable (String) async -> Void
+    ) async throws -> String?
 }
 
 public actor RunCoordinator {

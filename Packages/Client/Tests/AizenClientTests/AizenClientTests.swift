@@ -171,7 +171,7 @@ private struct EchoHost: WireEndpoint {
 private actor ClientPromptRuntime: PromptRunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
-    func send(message: String, to runID: RunID) async throws -> String? { nil }
+    func send(message: String, to runID: RunID, onAssistantTextDelta: @escaping @Sendable (String) async -> Void) async throws -> String? { nil }
 }
 
 private actor CancelRecordingRuntime: PromptRunRuntime {
@@ -179,5 +179,5 @@ private actor CancelRecordingRuntime: PromptRunRuntime {
 
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws { cancelledRunID = runID }
-    func send(message: String, to runID: RunID) async throws -> String? { nil }
+    func send(message: String, to runID: RunID, onAssistantTextDelta: @escaping @Sendable (String) async -> Void) async throws -> String? { nil }
 }

@@ -14,6 +14,7 @@ public actor ConversationRunCoordinator {
     private let storage: StorageRepository
     private let runtime: any PromptRunRuntime
     private let runs: RunCoordinator
+    private let eventPublisher: RunEventPublisher?
 
     public init(
         storage: StorageRepository,
@@ -22,6 +23,7 @@ public actor ConversationRunCoordinator {
     ) {
         self.storage = storage
         self.runtime = runtime
+        self.eventPublisher = eventPublisher
         runs = RunCoordinator(storage: storage, runtime: runtime, eventPublisher: eventPublisher)
     }
 
@@ -39,7 +41,13 @@ public actor ConversationRunCoordinator {
         }
         do {
             try await runs.startPersisted(run)
-            if let assistantContent = try await runtime.send(message: message.content, to: run.id), !assistantContent.isEmpty {
+            if let assistantContent = try await runtime.send(
+                message: message.content,
+                to: run.id,
+                onAssistantTextDelta: { [eventPublisher] text in
+                    await eventPublisher?.publish(for: run, kind: .assistantTextDelta(text))
+                }
+            ), !assistantContent.isEmpty {
                 _ = try await storage.transact { snapshot in
                     snapshot.conversationMessages.append(
                         ConversationMessage(

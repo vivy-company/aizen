@@ -270,7 +270,17 @@ import AizenWire
         $0.sessions.append(session)
     }
     let runtime = PromptRecordingRuntime(assistantReply: "Here is the plan.")
-    let coordinator = ConversationRunCoordinator(storage: storage, runtime: runtime)
+    let publisher = RunEventPublisher()
+    let stream = await publisher.events()
+    let collector = Task { () -> [RunEvent] in
+        var iterator = stream.makeAsyncIterator()
+        var events: [RunEvent] = []
+        while events.count < 5, let event = await iterator.next() {
+            events.append(event)
+        }
+        return events
+    }
+    let coordinator = ConversationRunCoordinator(storage: storage, runtime: runtime, eventPublisher: publisher)
     let run = Run(spaceID: space.id, sessionID: session.id)
     let message = ConversationMessage(spaceID: space.id, sessionID: session.id, role: .user, content: "Make a plan")
 
@@ -280,6 +290,9 @@ import AizenWire
     #expect(messages.map(\.role) == [.user, .assistant])
     #expect(messages.map(\.content) == ["Make a plan", "Here is the plan."])
     #expect(messages.last?.runID == run.id)
+    #expect((await collector.value).map(\.kind) == [
+        .lifecycle(.preparingContext), .lifecycle(.startingAgent), .lifecycle(.running), .assistantTextDelta("Here is the plan."), .lifecycle(.succeeded)
+    ])
 }
 
 @Test func coordinatorRejectsUnknownRunWithoutTouchingRuntime() async throws {
@@ -307,8 +320,13 @@ private actor PromptRecordingRuntime: PromptRunRuntime {
 
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
-    func send(message: String, to runID: RunID) async throws -> String? {
+    func send(
+        message: String,
+        to runID: RunID,
+        onAssistantTextDelta: @escaping @Sendable (String) async -> Void
+    ) async throws -> String? {
         prompted.append((runID, message))
+        if let assistantReply { await onAssistantTextDelta(assistantReply) }
         return assistantReply
     }
 }
