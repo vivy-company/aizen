@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Host resolves the repository URL from a Resource before this actor is called; this type never
 /// receives a client-provided command or path fragment.
-public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryIndexUpdating {
+public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryBranchReading, RepositoryIndexUpdating {
     private static let maximumStatusBytes = 1_048_576
     private static let maximumIndexBytes = 67_108_864
 
@@ -60,6 +60,20 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
             return .init(revision: String(fields[0]), subject: String(fields[1]), authorName: String(fields[2]), authoredAtUnixMilliseconds: seconds * 1_000)
         }
         return .init(repositoryRevision: revision, indexRevision: try currentIndexRevision(at: repositoryURL), branch: branch, isDetached: branch == nil, commits: commits, truncated: records.count > maximumCommits)
+    }
+
+    public func branches(at repositoryURL: URL, maximumBranches: Int) async throws -> RepositoryBranchesSnapshot {
+        guard maximumBranches > 0, FileManager.default.fileExists(atPath: repositoryURL.appendingPathComponent(".git").path) else { throw Error.notRepository }
+        let current = try? runGit(["-C", repositoryURL.path, "symbolic-ref", "--quiet", "--short", "HEAD"], maximumOutputBytes: 512)
+        let output = try runGit(["-C", repositoryURL.path, "for-each-ref", "--format=%(refname:short)%09%(objectname)", "refs/heads"], maximumOutputBytes: 262_144)
+        let records = output.split(separator: "\n", omittingEmptySubsequences: true)
+        let branches = try records.prefix(maximumBranches).map { record -> RepositoryBranchesSnapshot.Branch in
+            let fields = record.split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false)
+            guard fields.count == 2, !fields[0].isEmpty, !fields[1].isEmpty else { throw Error.malformedStatus }
+            let name = String(fields[0])
+            return .init(name: name, revision: String(fields[1]), isCurrent: name == current)
+        }
+        return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL), branches: branches, truncated: records.count > maximumBranches)
     }
 
     public func updateIndex(at repositoryURL: URL, relativePaths: [String], expectedIndexRevision: String, stage: Bool) async throws -> String {

@@ -236,6 +236,27 @@ import Testing
     #expect(try gitOutput(["-C", root.path, "diff", "--cached", "--name-only"]).isEmpty)
 }
 
+@Test func gitRepositoryStatusReaderReturnsBoundedLocalBranches() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try runGit(["init", "--initial-branch=main", root.path])
+    try runGit(["-C", root.path, "config", "user.email", "aizen@example.test"])
+    try runGit(["-C", root.path, "config", "user.name", "Aizen Test"])
+    try Data("seed\n".utf8).write(to: root.appendingPathComponent("README.md"))
+    try runGit(["-C", root.path, "add", "README.md"])
+    try runGit(["-C", root.path, "commit", "-m", "seed"])
+    try runGit(["-C", root.path, "branch", "feature/test"])
+
+    let branches = try await GitRepositoryStatusReader().branches(at: root, maximumBranches: 1)
+    #expect(branches.branches.count == 1)
+    #expect(branches.branches.first?.name == "feature/test")
+    #expect(!branches.branches[0].isCurrent)
+    #expect(branches.truncated)
+    #expect(branches.repositoryRevision.count == 40)
+    #expect(branches.indexRevision.count == 64)
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")
