@@ -1211,6 +1211,55 @@ public struct ListResourcesResponsePayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct DiscoverXcodeProjectQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.xcode-project.discover@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let resourceID: String
+
+    public init(resourceID: String) { self.resourceID = resourceID }
+    public init(protobufBytes: Data) throws {
+        self.init(resourceID: try AizenWireV1_DiscoverXcodeProjectQuery(serializedBytes: protobufBytes).resourceID)
+    }
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_DiscoverXcodeProjectQuery()
+        message.resourceID = resourceID
+        return try message.serializedData()
+    }
+}
+
+public struct DiscoverXcodeProjectResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.xcode-project.discover@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let project: XcodeProjectDescriptor?
+
+    public init(project: XcodeProjectDescriptor?) { self.project = project }
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_DiscoverXcodeProjectResponse(serializedBytes: protobufBytes)
+        guard message.hasProject else { self.init(project: nil); return }
+        let record = message.project
+        guard let resourceUUID = UUID(uuidString: record.resourceID),
+              let kind = XcodeProjectDescriptor.Kind(rawValue: record.kind) else {
+            throw WireCodecError.invalidIdentity(record.resourceID)
+        }
+        self.init(project: .init(resourceID: ResourceID(rawValue: resourceUUID), id: record.id, name: record.name, kind: kind, schemes: record.schemes))
+    }
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_DiscoverXcodeProjectResponse()
+        if let project {
+            var record = AizenWireV1_XcodeProjectDescriptorRecord()
+            record.resourceID = project.resourceID.description
+            record.id = project.id
+            record.name = project.name
+            record.kind = project.kind.rawValue
+            record.schemes = project.schemes
+            message.project = record
+        }
+        return try message.serializedData()
+    }
+}
+
 public struct ImportLocalFolderCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.resource.import-local-folder@1")
     public static let schemaVersion: UInt32 = 1

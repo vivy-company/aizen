@@ -569,6 +569,39 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(try await storage.load().journalEvents.map(\.cursor) == [1, 2, 3, 4, 5, 6])
 }
 
+@Test func hostDiscoversWorkspaceBeforeProjectWithoutExposingItsPath() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder.appendingPathComponent("App.xcodeproj"), withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: folder.appendingPathComponent("App.xcworkspace"), withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    _ = try await storage.transact { $0.spaces.append(space) }
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
+    let imported = try await transport.send(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(ImportLocalFolderCommandPayload(spaceID: space.id.description, path: folder.path))
+    ))
+    let resourceID = try ImportLocalFolderResultPayload(protobufBytes: imported.payload.protobufBytes).resourceID
+    let response = try await transport.send(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 2,
+        kind: .query,
+        channel: .state,
+        payload: try .init(DiscoverXcodeProjectQueryPayload(resourceID: resourceID))
+    ))
+    let project = try #require(try DiscoverXcodeProjectResponsePayload(protobufBytes: response.payload.protobufBytes).project)
+    #expect(project.resourceID.description == resourceID)
+    #expect(project.id == "App.xcworkspace")
+    #expect(project.name == "App")
+    #expect(project.kind == .workspace)
+    #expect(!project.id.contains(folder.path))
+}
+
 @Test func hostRenamesAndDeletesEmptySpacesThroughTypedCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

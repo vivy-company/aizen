@@ -94,6 +94,8 @@ public actor LocalHost: WireEndpoint {
                 ListRunsResponsePayload.identifier,
                 ListResourcesQueryPayload.identifier,
                 ListResourcesResponsePayload.identifier,
+                DiscoverXcodeProjectQueryPayload.identifier,
+                DiscoverXcodeProjectResponsePayload.identifier,
                 ListExecutionContextsQueryPayload.identifier,
                 ListExecutionContextsResponsePayload.identifier,
                 ListTerminalSessionsQueryPayload.identifier,
@@ -211,6 +213,15 @@ public actor LocalHost: WireEndpoint {
             let resources = try await storage.load().resources.filter { spaceID == nil || $0.spaceID == spaceID }
             kind = .queryResponse
             payload = try TypedPayload(ListResourcesResponsePayload(resources: resources))
+        case .query where envelope.payload.identifier == DiscoverXcodeProjectQueryPayload.identifier:
+            let query = try DiscoverXcodeProjectQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resourceID = try Self.resourceID(from: query.resourceID)
+            let snapshot = try await storage.load()
+            guard let resource = snapshot.resources.first(where: { $0.id == resourceID }) else {
+                throw HostProtocolError.unknownResource(resourceID)
+            }
+            kind = .queryResponse
+            payload = try TypedPayload(DiscoverXcodeProjectResponsePayload(project: try Self.discoverXcodeProject(for: resource)))
         case .query where envelope.payload.identifier == ListExecutionContextsQueryPayload.identifier:
             let query = try ListExecutionContextsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try query.spaceID.map(Self.spaceID(from:))
@@ -810,6 +821,32 @@ public actor LocalHost: WireEndpoint {
             throw HostProtocolError.invalidResourcePath(path)
         }
         return directory
+    }
+
+    private static func discoverXcodeProject(for resource: Resource) throws -> XcodeProjectDescriptor? {
+        guard case let .hostPrivate(reference) = resource.details else { return nil }
+        let prefixes = resource.kind == .repository ? ["local-repository:"] : resource.kind == .folder ? ["local-folder:"] : []
+        guard let prefix = prefixes.first(where: { reference.rawValue.hasPrefix($0) }) else { return nil }
+        let directory = try localDirectory(from: String(reference.rawValue.dropFirst(prefix.count)))
+        let entries = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        let candidates = entries.compactMap { url -> (url: URL, kind: XcodeProjectDescriptor.Kind)? in
+            switch url.pathExtension {
+            case "xcworkspace": return (url, .workspace)
+            case "xcodeproj": return (url, .project)
+            default: return nil
+            }
+        }.sorted {
+            if $0.kind != $1.kind { return $0.kind == .workspace }
+            return $0.url.lastPathComponent.localizedStandardCompare($1.url.lastPathComponent) == .orderedAscending
+        }
+        guard let candidate = candidates.first else { return nil }
+        return XcodeProjectDescriptor(
+            resourceID: resource.id,
+            id: candidate.url.lastPathComponent,
+            name: candidate.url.deletingPathExtension().lastPathComponent,
+            kind: candidate.kind,
+            schemes: []
+        )
     }
 
     private static func isGitRepository(_ directory: URL) -> Bool {

@@ -311,6 +311,22 @@ message ListResourcesResponse {
   repeated ResourceRecord resources = 1;
 }
 
+message DiscoverXcodeProjectQuery {
+  string resource_id = 1;
+}
+
+message XcodeProjectDescriptorRecord {
+  string resource_id = 1;
+  string id = 2;
+  string name = 3;
+  string kind = 4;
+  repeated string schemes = 5;
+}
+
+message DiscoverXcodeProjectResponse {
+  optional XcodeProjectDescriptorRecord project = 1;
+}
+
 message ImportLocalFolderCommand {
   string space_id = 1;
   string path = 2;
