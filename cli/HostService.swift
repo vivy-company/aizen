@@ -1,5 +1,4 @@
 import AizenMacPlatform
-import Dispatch
 import Foundation
 
 @MainActor
@@ -23,9 +22,18 @@ enum HostService {
             let lanListener = runtime.makeLANListener(credentials: credentials)
             try await lanListener.start()
             try HostStartupStatusStore.clearFailure(storageURL: storageURL)
-            withExtendedLifetime((runtime, listener, lanListener)) {
-                dispatchMain()
+
+            // The Host runs from the CLI's async entry point, which is main-actor isolated.
+            // Suspending keeps its listeners alive without blocking the main dispatch queue.
+            let lifetime = AsyncStream<Void>.makeStream()
+            defer {
+                lifetime.continuation.finish()
+                withExtendedLifetime((runtime, listener, lanListener)) {}
             }
+            for await _ in lifetime.stream {
+                // This stream is intentionally never yielded to or finished while the Host runs.
+            }
+            fatalError("The Host service lifetime ended unexpectedly.")
         } catch {
             try? HostStartupStatusStore.recordFailure(error, storageURL: storageURL)
             throw error
