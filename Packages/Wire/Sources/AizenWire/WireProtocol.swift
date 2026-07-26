@@ -1899,6 +1899,30 @@ public struct CreateTerminalSessionResultPayload: WirePayload, Sendable, Hashabl
     }
 }
 
+public struct AttachTerminalQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.terminal.attach@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let terminalSessionID: String
+    public let afterSequence: UInt64
+    public let scrollbackBytes: UInt32
+    public let columns: UInt32
+    public let rows: UInt32
+    public init(terminalSessionID: String, afterSequence: UInt64 = 0, scrollbackBytes: UInt32 = 65_536, columns: UInt32 = 0, rows: UInt32 = 0) { self.terminalSessionID = terminalSessionID; self.afterSequence = afterSequence; self.scrollbackBytes = scrollbackBytes; self.columns = columns; self.rows = rows }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_AttachTerminalQuery(serializedBytes: protobufBytes); guard !m.terminalSessionID.isEmpty, (1...1_000_000).contains(m.scrollbackBytes), (m.columns == 0) == (m.rows == 0), m.columns <= 1_000, m.rows <= 1_000 else { throw WireCodecError.invalidIdentity("terminal attach") }; self.init(terminalSessionID: m.terminalSessionID, afterSequence: m.afterSequence, scrollbackBytes: m.scrollbackBytes, columns: m.columns, rows: m.rows) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_AttachTerminalQuery(); m.terminalSessionID = terminalSessionID; m.afterSequence = afterSequence; m.scrollbackBytes = scrollbackBytes; m.columns = columns; m.rows = rows; return try m.serializedData() }
+}
+
+public struct AttachTerminalResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.terminal.attach@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let terminalSessionID: String; public let sequence: UInt64; public let output: Data; public let truncated: Bool
+    public init(terminalSessionID: String, sequence: UInt64, output: Data, truncated: Bool) { self.terminalSessionID = terminalSessionID; self.sequence = sequence; self.output = output; self.truncated = truncated }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_AttachTerminalResponse(serializedBytes: protobufBytes); guard !m.terminalSessionID.isEmpty else { throw WireCodecError.invalidIdentity("terminal attach response") }; self.init(terminalSessionID: m.terminalSessionID, sequence: m.sequence, output: m.output, truncated: m.truncated) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_AttachTerminalResponse(); m.terminalSessionID = terminalSessionID; m.sequence = sequence; m.output = output; m.truncated = truncated; return try m.serializedData() }
+}
+
 public struct AcquireTerminalControlCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.terminal-control.acquire@1")
     public static let schemaVersion: UInt32 = 1

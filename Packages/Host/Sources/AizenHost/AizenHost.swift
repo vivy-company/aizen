@@ -44,6 +44,7 @@ public actor LocalHost: WireEndpoint {
     private let managedSandboxes: ManagedSandboxService?
     private let runEventPublisher: RunEventPublisher?
     private let terminalRuntime: (any TerminalRuntime)?
+    private let terminalTranscripts: TerminalTranscriptRegistry
     private let agentLaunchConfiguration: (any AgentLaunchConfigurationUpdating)?
     private let pairingRegistry: PairingRequestRegistry?
     private let linkedWorktrees: (any LinkedWorktreeCreating)?
@@ -59,6 +60,7 @@ public actor LocalHost: WireEndpoint {
         managedSandboxes: ManagedSandboxService? = nil,
         runEventPublisher: RunEventPublisher? = nil,
         terminalRuntime: (any TerminalRuntime)? = nil,
+        terminalTranscripts: TerminalTranscriptRegistry = .init(),
         agentLaunchConfiguration: (any AgentLaunchConfigurationUpdating)? = nil,
         pairingRegistry: PairingRequestRegistry? = nil,
         linkedWorktrees: (any LinkedWorktreeCreating)? = nil,
@@ -72,6 +74,7 @@ public actor LocalHost: WireEndpoint {
         self.managedSandboxes = managedSandboxes
         self.runEventPublisher = runEventPublisher
         self.terminalRuntime = terminalRuntime
+        self.terminalTranscripts = terminalTranscripts
         self.agentLaunchConfiguration = agentLaunchConfiguration
         self.pairingRegistry = pairingRegistry
         self.linkedWorktrees = linkedWorktrees
@@ -127,6 +130,8 @@ public actor LocalHost: WireEndpoint {
                 ListExecutionContextsResponsePayload.identifier,
                 ListTerminalSessionsQueryPayload.identifier,
                 ListTerminalSessionsResponsePayload.identifier,
+                AttachTerminalQueryPayload.identifier,
+                AttachTerminalResponsePayload.identifier,
                 ListContextFilesQueryPayload.identifier,
                 ListContextFilesResponsePayload.identifier,
                 ReadContextTextFileQueryPayload.identifier,
@@ -319,6 +324,21 @@ public actor LocalHost: WireEndpoint {
             let sessions = try await storage.load().terminalSessions.filter { spaceID == nil || $0.spaceID == spaceID }
             kind = .queryResponse
             payload = try TypedPayload(ListTerminalSessionsResponsePayload(sessions: sessions))
+        case .query where envelope.payload.identifier == AttachTerminalQueryPayload.identifier:
+            let query = try AttachTerminalQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let terminalSessionID = try Self.sessionID(from: query.terminalSessionID)
+            guard let terminalRuntime else { throw HostProtocolError.runtimeUnavailable }
+            guard let session = try await storage.load().terminalSessions.first(where: { $0.id == terminalSessionID }) else {
+                throw HostProtocolError.unknownSession(terminalSessionID)
+            }
+            if query.columns > 0, let columns = Int(exactly: query.columns), let rows = Int(exactly: query.rows) {
+                try await terminalRuntime.resize(session: session, columns: columns, rows: rows)
+            }
+            let capture = try await terminalRuntime.captureOutput(for: session, maximumBytes: Int(query.scrollbackBytes))
+            _ = await terminalTranscripts.record(terminalID: terminalSessionID, capture: capture)
+            let transcript = await terminalTranscripts.snapshot(terminalID: terminalSessionID, after: query.afterSequence)
+            kind = .queryResponse
+            payload = try TypedPayload(AttachTerminalResponsePayload(terminalSessionID: query.terminalSessionID, sequence: transcript.sequence, output: transcript.bytes, truncated: transcript.truncated))
         case .query where envelope.payload.identifier == ListContextFilesQueryPayload.identifier:
             let query = try ListContextFilesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let contextID = try Self.executionContextID(from: query.executionContextID)

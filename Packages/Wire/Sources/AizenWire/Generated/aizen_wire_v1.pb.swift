@@ -1524,6 +1524,44 @@ nonisolated struct AizenWireV1_CreateTerminalSessionResult: Sendable {
   fileprivate var _session: AizenWireV1_TerminalSessionRecord? = nil
 }
 
+nonisolated struct AizenWireV1_AttachTerminalQuery: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var terminalSessionID: String = String()
+
+  var afterSequence: UInt64 = 0
+
+  var scrollbackBytes: UInt32 = 0
+
+  var columns: UInt32 = 0
+
+  var rows: UInt32 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_AttachTerminalResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var terminalSessionID: String = String()
+
+  var sequence: UInt64 = 0
+
+  var output: Data = Data()
+
+  var truncated: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 /// Remote control is bound to the authenticated Device by the Host session; no
 /// request carries a claimed controller identity or a shell command.
 nonisolated struct AizenWireV1_AcquireTerminalControlCommand: Sendable {
@@ -5063,6 +5101,101 @@ nonisolated extension AizenWireV1_CreateTerminalSessionResult: SwiftProtobuf.Mes
 
   static func ==(lhs: AizenWireV1_CreateTerminalSessionResult, rhs: AizenWireV1_CreateTerminalSessionResult) -> Bool {
     if lhs._session != rhs._session {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_AttachTerminalQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".AttachTerminalQuery"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}terminal_session_id\0\u{3}after_sequence\0\u{3}scrollback_bytes\0\u{1}columns\0\u{1}rows\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.terminalSessionID) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.afterSequence) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.scrollbackBytes) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.columns) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self.rows) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.terminalSessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.terminalSessionID, fieldNumber: 1)
+    }
+    if self.afterSequence != 0 {
+      try visitor.visitSingularUInt64Field(value: self.afterSequence, fieldNumber: 2)
+    }
+    if self.scrollbackBytes != 0 {
+      try visitor.visitSingularUInt32Field(value: self.scrollbackBytes, fieldNumber: 3)
+    }
+    if self.columns != 0 {
+      try visitor.visitSingularUInt32Field(value: self.columns, fieldNumber: 4)
+    }
+    if self.rows != 0 {
+      try visitor.visitSingularUInt32Field(value: self.rows, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_AttachTerminalQuery, rhs: AizenWireV1_AttachTerminalQuery) -> Bool {
+    if lhs.terminalSessionID != rhs.terminalSessionID {return false}
+    if lhs.afterSequence != rhs.afterSequence {return false}
+    if lhs.scrollbackBytes != rhs.scrollbackBytes {return false}
+    if lhs.columns != rhs.columns {return false}
+    if lhs.rows != rhs.rows {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_AttachTerminalResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".AttachTerminalResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}terminal_session_id\0\u{1}sequence\0\u{1}output\0\u{1}truncated\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.terminalSessionID) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.sequence) }()
+      case 3: try { try decoder.decodeSingularBytesField(value: &self.output) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.truncated) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.terminalSessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.terminalSessionID, fieldNumber: 1)
+    }
+    if self.sequence != 0 {
+      try visitor.visitSingularUInt64Field(value: self.sequence, fieldNumber: 2)
+    }
+    if !self.output.isEmpty {
+      try visitor.visitSingularBytesField(value: self.output, fieldNumber: 3)
+    }
+    if self.truncated != false {
+      try visitor.visitSingularBoolField(value: self.truncated, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_AttachTerminalResponse, rhs: AizenWireV1_AttachTerminalResponse) -> Bool {
+    if lhs.terminalSessionID != rhs.terminalSessionID {return false}
+    if lhs.sequence != rhs.sequence {return false}
+    if lhs.output != rhs.output {return false}
+    if lhs.truncated != rhs.truncated {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

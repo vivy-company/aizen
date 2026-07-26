@@ -168,6 +168,10 @@ public struct RemoteHostEndpoint: WireEndpoint {
                 return .init(capability: .terminalRead, spaceID: try spaceID(rawSpaceID), resourceID: nil, rateLimitKind: nil)
             }
             return .init(capability: .terminalRead, spaceID: nil, resourceID: nil, rateLimitKind: nil)
+        case AttachTerminalQueryPayload.identifier:
+            let query = try AttachTerminalQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let terminal = try await requiredTerminal(query.terminalSessionID)
+            return .init(capability: .terminalRead, spaceID: terminal.spaceID, resourceID: nil, rateLimitKind: nil)
         case ListContextFilesQueryPayload.identifier:
             let request = try ListContextFilesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let context = try await requiredExecutionContext(request.executionContextID)

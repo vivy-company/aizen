@@ -493,6 +493,21 @@ message CreateTerminalSessionResult {
   TerminalSessionRecord session = 1;
 }
 
+message AttachTerminalQuery {
+  string terminal_session_id = 1;
+  uint64 after_sequence = 2;
+  uint32 scrollback_bytes = 3;
+  uint32 columns = 4;
+  uint32 rows = 5;
+}
+
+message AttachTerminalResponse {
+  string terminal_session_id = 1;
+  uint64 sequence = 2;
+  bytes output = 3;
+  bool truncated = 4;
+}
+
 // Remote control is bound to the authenticated Device by the Host session; no
 // request carries a claimed controller identity or a shell command.
 message AcquireTerminalControlCommand {

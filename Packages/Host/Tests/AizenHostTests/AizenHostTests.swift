@@ -28,6 +28,27 @@ import AizenWire
     #expect(replay.bytes == Data("bcdef".utf8))
 }
 
+@Test func hostAttachesToBoundedTerminalOutput() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Private")
+    let terminal = TerminalSession(spaceID: space.id, executionContextID: nil, title: nil, tmuxSessionName: "test", paneID: "%1", initialCommand: nil)
+    _ = try await storage.transact { $0.spaces.append(space); $0.terminalSessions.append(terminal) }
+    let runtime = RecordingTerminalRuntime()
+    await runtime.setCapture(Data("abcdef".utf8))
+    let host = LocalHost(storage: storage, terminalRuntime: runtime, terminalTranscripts: .init(maximumBytes: 4))
+    let request = ProtocolEnvelope(messageID: "attach", connectionSequence: 1, kind: .query, channel: .terminal, payload: try .init(AttachTerminalQueryPayload(terminalSessionID: terminal.id.description, scrollbackBytes: 4)))
+    let response = try await host.receive(request)
+    let attached = try AttachTerminalResponsePayload(protobufBytes: response.payload.protobufBytes)
+    #expect(attached.sequence == 1)
+    #expect(attached.output == Data("cdef".utf8))
+    #expect(!attached.truncated)
+    let replay = ProtocolEnvelope(messageID: "attach-replay", connectionSequence: 2, kind: .query, channel: .terminal, payload: try .init(AttachTerminalQueryPayload(terminalSessionID: terminal.id.description, afterSequence: attached.sequence, scrollbackBytes: 4)))
+    let replayResponse = try await host.receive(replay)
+    #expect(try AttachTerminalResponsePayload(protobufBytes: replayResponse.payload.protobufBytes).output.isEmpty)
+}
+
 @Test func terminalControlLeasesExpireAndDeduplicateDeviceInput() async throws {
     let clock = TerminalLeaseTestClock(Date(timeIntervalSince1970: 1_000))
     let registry = TerminalControlLeaseRegistry(now: { clock.now })
@@ -1438,6 +1459,7 @@ private actor RecordingTerminalRuntime: TerminalRuntime {
     private(set) var createdTerminalID: SessionID?
     private(set) var inputs: [Data] = []
     private(set) var resizes: [(Int, Int)] = []
+    private var capture: Data = .init()
 
     func createTerminal(
         id: SessionID,
@@ -1457,6 +1479,12 @@ private actor RecordingTerminalRuntime: TerminalRuntime {
 
     func resize(session: TerminalSession, columns: Int, rows: Int) async throws {
         resizes.append((columns, rows))
+    }
+
+    func setCapture(_ capture: Data) { self.capture = capture }
+
+    func captureOutput(for session: TerminalSession, maximumBytes: Int) async throws -> Data {
+        Data(capture.suffix(maximumBytes))
     }
 }
 
