@@ -298,6 +298,32 @@ import AizenWire
     }
 }
 
+@Test func remoteHostEndpointRequiresGitPushCapabilityForRepositoryPushes() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Private")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)")))
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: LocalCryptographicIdentity().publicIdentity())
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    try await storage.saveDeviceAuthorization(.init(device: device, grants: [.init(capability: .gitPull, spaceIDs: [space.id], resourceIDs: [resource.id])]))
+    let endpoint = RemoteHostEndpoint(
+        endpoint: LocalHost(storage: storage, repositoryPusher: RecordingRepositoryPusher()),
+        storage: storage,
+        authorization: DeviceAuthorizationGate(storage: storage),
+        rateLimiter: RemoteRequestRateLimiter(),
+        terminalControl: TerminalControlLeaseRegistry(),
+        session: try authenticatedSession(for: device.deviceID),
+        source: RemoteRequestSource("192.168.1.20")
+    )
+    let push = ProtocolEnvelope(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(PushRepositoryCommandPayload(resourceID: resource.id.description, expectedRepositoryRevision: "head", expectedIndexRevision: String(repeating: "a", count: 64))))
+    await #expect(throws: DeviceAuthorizationError.capabilityDenied(.gitPush)) {
+        try await endpoint.receive(push)
+    }
+}
+
 @Test func remoteTerminalControlOwnsAndOrdersRuntimeTraffic() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
