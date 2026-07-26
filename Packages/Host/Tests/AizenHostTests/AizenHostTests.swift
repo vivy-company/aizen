@@ -156,6 +156,19 @@ import AizenWire
     #expect(attachFirst.payload == attachReplay.payload)
     #expect(try await storage.load().sessions.first?.executionContextID?.description == contextID)
     #expect(try await storage.load().commands.count == 3)
+
+    let detachEnvelope = ProtocolEnvelope(
+        messageID: UUID().uuidString,
+        connectionSequence: 4,
+        kind: .command,
+        channel: .state,
+        payload: try .init(DetachExecutionContextCommandPayload(sessionID: session.id.description))
+    )
+    let detachFirst = try await transport.send(detachEnvelope)
+    let detachReplay = try await transport.send(detachEnvelope)
+    #expect(detachFirst.payload == detachReplay.payload)
+    #expect(try await storage.load().sessions.first?.executionContextID == nil)
+    #expect(try await storage.load().commands.count == 4)
 }
 
 @Test func hostRenamesAndDeletesEmptySpacesThroughTypedCommands() async throws {

@@ -341,14 +341,19 @@ public actor LocalHost: WireEndpoint {
         case .command where envelope.payload.identifier == DetachExecutionContextCommandPayload.identifier:
             let command = try DetachExecutionContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let sessionID = try Self.sessionID(from: command.sessionID)
-            _ = try await storage.transact { snapshot in
-                guard let index = snapshot.sessions.firstIndex(where: { $0.id == sessionID }) else {
-                    throw HostProtocolError.unknownSession(sessionID)
+            guard let spaceID = try await storage.load().sessions.first(where: { $0.id == sessionID })?.spaceID else {
+                throw HostProtocolError.unknownSession(sessionID)
+            }
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                _ = try await self.storage.transact { snapshot in
+                    guard let index = snapshot.sessions.firstIndex(where: { $0.id == sessionID }) else {
+                        throw HostProtocolError.unknownSession(sessionID)
+                    }
+                    snapshot.sessions[index].executionContextID = nil
                 }
-                snapshot.sessions[index].executionContextID = nil
+                return try TypedPayload(ExecutionContextMutationResultPayload())
             }
             kind = .commandResult
-            payload = try TypedPayload(ExecutionContextMutationResultPayload())
         default:
             throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier)
         }
