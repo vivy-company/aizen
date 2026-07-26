@@ -534,9 +534,10 @@ import AizenWire
     let client = HostClient(transport: InProcessTransport(endpoint: host))
     let project = try #require(await client.discoverXcodeProject(resourceID: resource.id))
     #expect(project.configurations == ["Debug", "Release"])
-    let operationID = try await client.buildXcodeProject(resourceID: resource.id, projectID: "App.xcodeproj", scheme: "App")
+    let operationID = try await client.testXcodeProject(resourceID: resource.id, projectID: "App.xcodeproj", scheme: "App")
     try await client.cancelOperation(id: operationID)
     #expect(await builder.didCancel)
+    #expect(await builder.action == .test)
     #expect(try await storage.load().operations.first?.lifecycle == .cancelled)
 }
 
@@ -643,8 +644,12 @@ private struct ClientXcodeProjectInspector: XcodeProjectInspecting {
 
 private actor ClientCancellableXcodeBuilder: XcodeProjectBuilding, XcodeBuildRunning {
     private(set) var didCancel = false
+    private(set) var action: XcodeProjectAction?
 
-    func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws -> any XcodeBuildRunning { self }
+    func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String, action: XcodeProjectAction) async throws -> any XcodeBuildRunning {
+        self.action = action
+        return self
+    }
     func waitForCompletion() async throws {
         while !didCancel {
             try await Task.sleep(for: .seconds(1))

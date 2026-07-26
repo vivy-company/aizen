@@ -491,7 +491,21 @@ public actor HostClient {
     }
 
     public func buildXcodeProject(resourceID: ResourceID, projectID: String, scheme: String, destination: String = "platform=macOS") async throws -> OperationID {
-        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(BuildXcodeProjectCommandPayload(resourceID: resourceID.description, projectID: projectID, scheme: scheme, destination: destination))))
+        try await startXcodeProjectAction(resourceID: resourceID, projectID: projectID, scheme: scheme, destination: destination, action: .build)
+    }
+
+    public func testXcodeProject(resourceID: ResourceID, projectID: String, scheme: String, destination: String = "platform=macOS") async throws -> OperationID {
+        try await startXcodeProjectAction(resourceID: resourceID, projectID: projectID, scheme: scheme, destination: destination, action: .test)
+    }
+
+    private func startXcodeProjectAction(
+        resourceID: ResourceID,
+        projectID: String,
+        scheme: String,
+        destination: String,
+        action: XcodeProjectAction
+    ) async throws -> OperationID {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(BuildXcodeProjectCommandPayload(resourceID: resourceID.description, projectID: projectID, scheme: scheme, destination: destination, action: action))))
         guard response.kind == .commandResult, response.payload.identifier == BuildXcodeProjectResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
         let result = try BuildXcodeProjectResultPayload(protobufBytes: response.payload.protobufBytes)
         guard let rawValue = UUID(uuidString: result.operationID) else { throw Error.invalidIdentity(result.operationID) }
