@@ -429,6 +429,18 @@ message CreateLinkedWorktreeContextResult {
   string operation_id = 2;
 }
 
+message CreateIndependentContextCommand {
+  string space_id = 1;
+  string resource_id = 2;
+  string destination_path = 3;
+  string mode = 4;
+}
+
+message CreateIndependentContextResult {
+  string execution_context_id = 1;
+  string operation_id = 2;
+}
+
 message AttachExecutionContextCommand {
   string session_id = 1;
   string execution_context_id = 2;

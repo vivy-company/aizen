@@ -81,6 +81,13 @@ public actor StorageBackedACPRunConfigurationResolver: ACPRunConfigurationResolv
                 String(reference.dropFirst("local-checkout:".count)),
                 contextID: context.id
             )
+        } else if (context.kind == .repositoryCheckout || context.kind == .copiedEnvironment),
+                  let reference = context.hostReference?.rawValue,
+                  reference.hasPrefix("local-independent:") {
+            workingDirectory = try Self.existingDirectory(
+                String(reference.dropFirst("local-independent:".count)),
+                contextID: context.id
+            )
         } else if (context.kind == .localFolder || context.kind == .repositoryCheckout),
             let resourceID = context.resourceID,
             let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == run.spaceID }),

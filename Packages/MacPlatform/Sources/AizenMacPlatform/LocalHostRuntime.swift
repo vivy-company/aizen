@@ -40,6 +40,7 @@ public final class LocalHostRuntime: @unchecked Sendable {
             delegateProvider: NoACPToolDelegateProvider()
         )
         self.agentLaunchConfiguration = agentLaunchConfiguration
+        let worktrees = GitLinkedWorktreeService()
         let host = LocalHost(
             storage: storage,
             conversationRuns: ConversationRunCoordinator(storage: storage, runtime: runtime, eventPublisher: runEvents),
@@ -48,7 +49,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
             terminalRuntime: TmuxTerminalRuntime(),
             agentLaunchConfiguration: agentLaunchConfiguration,
             pairingRegistry: pairing,
-            linkedWorktrees: GitLinkedWorktreeService()
+            linkedWorktrees: worktrees,
+            independentContexts: worktrees
         )
         self.host = host
         migrationGate = HostMigrationGate(

@@ -922,7 +922,29 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(snapshot.operations.first?.id.description == result.operationID)
     #expect(snapshot.operations.first?.lifecycle == .completed)
     let createdDestination = await worktrees.destination
-    #expect(createdDestination == destination)
+    #expect(createdDestination?.path == destination.path)
+}
+
+@Test func hostCreatesIndependentCopyContextsThroughAHostOperation() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let source = root.appendingPathComponent("source", isDirectory: true)
+    try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Copies")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "Source", details: .hostPrivate(.init(rawValue: "local-folder:\(source.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let creator = RecordingIndependentContexts()
+    let host = LocalHost(storage: storage, independentContexts: creator)
+    let destination = root.appendingPathComponent("copy", isDirectory: true)
+    let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(CreateIndependentContextCommandPayload(spaceID: space.id.description, resourceID: resource.id.description, destinationPath: destination.path, mode: .copy))))
+    let result = try CreateIndependentContextResultPayload(protobufBytes: response.payload.protobufBytes)
+    let snapshot = try await storage.load()
+    #expect(snapshot.executionContexts.first?.id.description == result.contextID)
+    #expect(snapshot.executionContexts.first?.kind == .copiedEnvironment)
+    #expect(snapshot.operations.first?.id.description == result.operationID)
+    let createdMode = await creator.mode
+    #expect(createdMode == .copy)
 }
 
 private actor RecordingRuntime: RunRuntime {
@@ -933,6 +955,11 @@ private actor RecordingRuntime: RunRuntime {
 private actor RecordingLinkedWorktrees: LinkedWorktreeCreating {
     private(set) var destination: URL?
     func createLinkedWorktree(source: URL, destination: URL, branch: String, createBranch: Bool, baseBranch: String?) async throws { self.destination = destination }
+}
+
+private actor RecordingIndependentContexts: IndependentContextCreating {
+    private(set) var mode: IndependentContextMode?
+    func createIndependentContext(source: URL, destination: URL, mode: IndependentContextMode) async throws { self.mode = mode }
 }
 
 private actor RecordingAgentLaunchUpdater: AgentLaunchConfigurationUpdating {

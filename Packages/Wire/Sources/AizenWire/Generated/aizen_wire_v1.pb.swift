@@ -1339,6 +1339,38 @@ nonisolated struct AizenWireV1_CreateLinkedWorktreeContextResult: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_CreateIndependentContextCommand: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var spaceID: String = String()
+
+  var resourceID: String = String()
+
+  var destinationPath: String = String()
+
+  var mode: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_CreateIndependentContextResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var executionContextID: String = String()
+
+  var operationID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_AttachExecutionContextCommand: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -4220,6 +4252,86 @@ nonisolated extension AizenWireV1_CreateLinkedWorktreeContextResult: SwiftProtob
   }
 
   static func ==(lhs: AizenWireV1_CreateLinkedWorktreeContextResult, rhs: AizenWireV1_CreateLinkedWorktreeContextResult) -> Bool {
+    if lhs.executionContextID != rhs.executionContextID {return false}
+    if lhs.operationID != rhs.operationID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_CreateIndependentContextCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".CreateIndependentContextCommand"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}space_id\0\u{3}resource_id\0\u{3}destination_path\0\u{1}mode\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.destinationPath) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.mode) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 1)
+    }
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 2)
+    }
+    if !self.destinationPath.isEmpty {
+      try visitor.visitSingularStringField(value: self.destinationPath, fieldNumber: 3)
+    }
+    if !self.mode.isEmpty {
+      try visitor.visitSingularStringField(value: self.mode, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_CreateIndependentContextCommand, rhs: AizenWireV1_CreateIndependentContextCommand) -> Bool {
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.destinationPath != rhs.destinationPath {return false}
+    if lhs.mode != rhs.mode {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_CreateIndependentContextResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".CreateIndependentContextResult"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}execution_context_id\0\u{3}operation_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.executionContextID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.operationID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.executionContextID.isEmpty {
+      try visitor.visitSingularStringField(value: self.executionContextID, fieldNumber: 1)
+    }
+    if !self.operationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.operationID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_CreateIndependentContextResult, rhs: AizenWireV1_CreateIndependentContextResult) -> Bool {
     if lhs.executionContextID != rhs.executionContextID {return false}
     if lhs.operationID != rhs.operationID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

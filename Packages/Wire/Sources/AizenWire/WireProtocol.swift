@@ -1655,6 +1655,28 @@ public struct CreateLinkedWorktreeContextResultPayload: WirePayload, Sendable, H
     public func protobufBytes() throws -> Data { var m = AizenWireV1_CreateLinkedWorktreeContextResult(); m.executionContextID = contextID; m.operationID = operationID; return try m.serializedData() }
 }
 
+public enum IndependentContextMode: String, Sendable, Hashable { case clone, copy }
+
+public struct CreateIndependentContextCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.execution-context.create-independent@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let spaceID: String; public let resourceID: String; public let destinationPath: String; public let mode: IndependentContextMode
+    public init(spaceID: String, resourceID: String, destinationPath: String, mode: IndependentContextMode) { precondition(!spaceID.isEmpty && !resourceID.isEmpty && destinationPath.hasPrefix("/")); self.spaceID = spaceID; self.resourceID = resourceID; self.destinationPath = destinationPath; self.mode = mode }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_CreateIndependentContextCommand(serializedBytes: protobufBytes); guard let mode = IndependentContextMode(rawValue: m.mode) else { throw WireCodecError.invalidLifecycle(m.mode) }; self.init(spaceID: m.spaceID, resourceID: m.resourceID, destinationPath: m.destinationPath, mode: mode) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_CreateIndependentContextCommand(); m.spaceID = spaceID; m.resourceID = resourceID; m.destinationPath = destinationPath; m.mode = mode.rawValue; return try m.serializedData() }
+}
+
+public struct CreateIndependentContextResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.execution-context.create-independent@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let contextID: String; public let operationID: String
+    public init(contextID: String, operationID: String) { self.contextID = contextID; self.operationID = operationID }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_CreateIndependentContextResult(serializedBytes: protobufBytes); self.init(contextID: m.executionContextID, operationID: m.operationID) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_CreateIndependentContextResult(); m.executionContextID = contextID; m.operationID = operationID; return try m.serializedData() }
+}
+
 public struct AttachExecutionContextCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.session.attach-execution-context@1")
     public static let schemaVersion: UInt32 = 1
