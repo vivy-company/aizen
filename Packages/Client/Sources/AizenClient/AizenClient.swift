@@ -637,6 +637,26 @@ public actor HostClient {
         return try CommitRepositoryResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func updateRepositoryBranch(id: ResourceID, branchName: String, expectedRepositoryRevision: String, expectedIndexRevision: String, create: Bool) async throws -> UpdateRepositoryBranchResultPayload {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(UpdateRepositoryBranchCommandPayload(
+                resourceID: id.description,
+                branchName: branchName,
+                expectedRepositoryRevision: expectedRepositoryRevision,
+                expectedIndexRevision: expectedIndexRevision,
+                create: create
+            ))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == UpdateRepositoryBranchResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try UpdateRepositoryBranchResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
         let response = try await send(.init(
             messageID: UUID().uuidString,
