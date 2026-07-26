@@ -275,6 +275,30 @@ import AizenWire
     #expect(try await client.runs(spaceID: space.id) == [run])
 }
 
+@Test func recreatingAClientDoesNotTerminateHostOwnedRuns() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Persistent")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Long-running")
+    let run = Run(spaceID: space.id, sessionID: session.id, lifecycle: .running)
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+        $0.runs.append(run)
+    }
+    let host = LocalHost(storage: storage)
+
+    var firstClient: HostClient? = HostClient(transport: InProcessTransport(endpoint: host))
+    #expect(try await firstClient?.runs(spaceID: space.id) == [run])
+    await firstClient?.disconnect()
+    firstClient = nil
+
+    let recreatedClient = HostClient(transport: InProcessTransport(endpoint: host))
+    #expect(try await recreatedClient.runs(spaceID: space.id) == [run])
+    #expect(try await storage.load().runs.first?.lifecycle == .running)
+}
+
 @Test func clientReceivesSharedTransportRunEvents() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
