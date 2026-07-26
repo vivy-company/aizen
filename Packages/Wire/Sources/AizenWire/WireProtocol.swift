@@ -867,6 +867,142 @@ public struct ResourceMutationResultPayload: WirePayload, Sendable, Hashable {
     public func protobufBytes() throws -> Data { try AizenWireV1_ResourceMutationResult().serializedData() }
 }
 
+public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.execution-context.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let spaceID: String?
+    public let resourceID: String?
+
+    public init(spaceID: String? = nil, resourceID: String? = nil) {
+        self.spaceID = spaceID
+        self.resourceID = resourceID
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListExecutionContextsQuery(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID.isEmpty ? nil : message.spaceID, resourceID: message.resourceID.isEmpty ? nil : message.resourceID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListExecutionContextsQuery()
+        message.spaceID = spaceID ?? ""
+        message.resourceID = resourceID ?? ""
+        return try message.serializedData()
+    }
+}
+
+public struct ListExecutionContextsResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.execution-context.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let contexts: [ExecutionContext]
+
+    public init(contexts: [ExecutionContext]) { self.contexts = contexts }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListExecutionContextsResponse(serializedBytes: protobufBytes)
+        contexts = try message.contexts.map { record in
+            guard let contextUUID = UUID(uuidString: record.executionContextID), let spaceUUID = UUID(uuidString: record.spaceID) else {
+                throw WireCodecError.invalidIdentity(record.executionContextID)
+            }
+            let resourceID = record.resourceID.isEmpty ? nil : UUID(uuidString: record.resourceID).map(ResourceID.init(rawValue:))
+            guard record.resourceID.isEmpty || resourceID != nil else { throw WireCodecError.invalidIdentity(record.resourceID) }
+            return ExecutionContext(
+                id: ExecutionContextID(rawValue: contextUUID),
+                spaceID: SpaceID(rawValue: spaceUUID),
+                kind: ExecutionContextKind(rawValue: record.kind),
+                resourceID: resourceID
+            )
+        }
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListExecutionContextsResponse()
+        message.contexts = contexts.map { context in
+            var record = AizenWireV1_ExecutionContextRecord()
+            record.executionContextID = context.id.description
+            record.spaceID = context.spaceID.description
+            record.resourceID = context.resourceID?.description ?? ""
+            record.kind = context.kind.rawValue
+            return record
+        }
+        return try message.serializedData()
+    }
+}
+
+public struct CreateLocalFolderContextCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.execution-context.create-local-folder@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let spaceID: String
+    public let resourceID: String
+
+    public init(spaceID: String, resourceID: String) {
+        precondition(!spaceID.isEmpty && !resourceID.isEmpty, "Context creation requires Space and Resource identities")
+        self.spaceID = spaceID
+        self.resourceID = resourceID
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_CreateLocalFolderContextCommand(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID, resourceID: message.resourceID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_CreateLocalFolderContextCommand()
+        message.spaceID = spaceID
+        message.resourceID = resourceID
+        return try message.serializedData()
+    }
+}
+
+public struct CreateLocalFolderContextResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.execution-context.create-local-folder@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let contextID: String
+    public init(contextID: String) { self.contextID = contextID }
+    public init(protobufBytes: Data) throws { self.init(contextID: try AizenWireV1_CreateLocalFolderContextResult(serializedBytes: protobufBytes).executionContextID) }
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_CreateLocalFolderContextResult()
+        message.executionContextID = contextID
+        return try message.serializedData()
+    }
+}
+
+public struct AttachExecutionContextCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.session.attach-execution-context@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let sessionID: String
+    public let contextID: String
+    public init(sessionID: String, contextID: String) {
+        precondition(!sessionID.isEmpty && !contextID.isEmpty, "Context attachment requires Session and Context identities")
+        self.sessionID = sessionID
+        self.contextID = contextID
+    }
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_AttachExecutionContextCommand(serializedBytes: protobufBytes)
+        self.init(sessionID: message.sessionID, contextID: message.executionContextID)
+    }
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_AttachExecutionContextCommand()
+        message.sessionID = sessionID
+        message.executionContextID = contextID
+        return try message.serializedData()
+    }
+}
+
+public struct ExecutionContextMutationResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.execution-context.mutation@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public init() {}
+    public init(protobufBytes: Data) throws { _ = try AizenWireV1_ExecutionContextMutationResult(serializedBytes: protobufBytes) }
+    public func protobufBytes() throws -> Data { try AizenWireV1_ExecutionContextMutationResult().serializedData() }
+}
+
 public struct SnapshotResponsePayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.snapshot.host@1")
     public static let schemaVersion: UInt32 = 1

@@ -155,8 +155,17 @@ import AizenWire
     #expect(resource.kind == .folder)
     #expect(resource.title == "folder")
     #expect(resource.details == .none)
-    try await client.removeResource(id: resourceID)
-    #expect(try await client.resources(spaceID: spaceID).isEmpty)
+    let contextID = try await client.createLocalFolderContext(spaceID: spaceID, resourceID: resourceID)
+    let context = try #require(try await client.executionContexts(spaceID: spaceID, resourceID: resourceID).first)
+    #expect(context.id == contextID)
+    #expect(context.kind == .localFolder)
+    #expect(context.hostReference == nil)
+    let sessionID = try await client.createConversation(spaceID: spaceID, title: "Coding")
+    try await client.attachExecutionContext(sessionID: sessionID, contextID: contextID)
+    #expect(try await storage.load().sessions.first(where: { $0.id == sessionID })?.executionContextID == contextID)
+    await #expect(throws: HostProtocolError.resourceInUse(resourceID)) {
+        try await client.removeResource(id: resourceID)
+    }
 }
 
 @Test func clientCancelsRunsThroughHostCommands() async throws {

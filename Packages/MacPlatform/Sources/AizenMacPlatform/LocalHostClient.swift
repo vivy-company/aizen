@@ -54,6 +54,18 @@ public actor LocalHostClient {
         try await client.removeResource(id: id)
     }
 
+    public func executionContexts(in spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
+        try await client.executionContexts(spaceID: spaceID, resourceID: resourceID)
+    }
+
+    public func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
+        try await client.createLocalFolderContext(spaceID: spaceID, resourceID: resourceID)
+    }
+
+    public func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {
+        try await client.attachExecutionContext(sessionID: sessionID, contextID: contextID)
+    }
+
     public func conversationTimeline(sessionID: SessionID) async throws -> [ConversationMessage] {
         try await client.conversationTimeline(sessionID: sessionID)
     }

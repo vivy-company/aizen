@@ -54,6 +54,8 @@ public actor LocalHost: WireEndpoint {
                 ListRunsResponsePayload.identifier,
                 ListResourcesQueryPayload.identifier,
                 ListResourcesResponsePayload.identifier,
+                ListExecutionContextsQueryPayload.identifier,
+                ListExecutionContextsResponsePayload.identifier,
                 CreateSpaceCommandPayload.identifier,
                 CreateSpaceResultPayload.identifier,
                 RenameSpaceCommandPayload.identifier,
@@ -68,7 +70,11 @@ public actor LocalHost: WireEndpoint {
                 ImportLocalFolderCommandPayload.identifier,
                 ImportLocalFolderResultPayload.identifier,
                 RemoveResourceCommandPayload.identifier,
-                ResourceMutationResultPayload.identifier
+                ResourceMutationResultPayload.identifier,
+                CreateLocalFolderContextCommandPayload.identifier,
+                CreateLocalFolderContextResultPayload.identifier,
+                AttachExecutionContextCommandPayload.identifier,
+                ExecutionContextMutationResultPayload.identifier
             ]))
         case .query where envelope.payload.identifier == SnapshotRequestPayload.identifier:
             let request = try SnapshotRequestPayload(protobufBytes: envelope.payload.protobufBytes)
@@ -108,6 +114,15 @@ public actor LocalHost: WireEndpoint {
             let resources = try await storage.load().resources.filter { spaceID == nil || $0.spaceID == spaceID }
             kind = .queryResponse
             payload = try TypedPayload(ListResourcesResponsePayload(resources: resources))
+        case .query where envelope.payload.identifier == ListExecutionContextsQueryPayload.identifier:
+            let query = try ListExecutionContextsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try query.spaceID.map(Self.spaceID(from:))
+            let resourceID = try query.resourceID.map(Self.resourceID(from:))
+            let contexts = try await storage.load().executionContexts.filter {
+                (spaceID == nil || $0.spaceID == spaceID) && (resourceID == nil || $0.resourceID == resourceID)
+            }
+            kind = .queryResponse
+            payload = try TypedPayload(ListExecutionContextsResponsePayload(contexts: contexts))
         case .command where envelope.payload.identifier == CreateSpaceCommandPayload.identifier:
             let command = try CreateSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let space = Space(name: command.name, icon: command.icon, summary: command.summary)
@@ -215,6 +230,45 @@ public actor LocalHost: WireEndpoint {
             }
             kind = .commandResult
             payload = try TypedPayload(ResourceMutationResultPayload())
+        case .command where envelope.payload.identifier == CreateLocalFolderContextCommandPayload.identifier:
+            let command = try CreateLocalFolderContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try Self.spaceID(from: command.spaceID)
+            let resourceID = try Self.resourceID(from: command.resourceID)
+            let context = ExecutionContext(
+                spaceID: spaceID,
+                kind: .localFolder,
+                resourceID: resourceID,
+                hostReference: HostPrivateReference(rawValue: "resource-context:\(resourceID.description)")
+            )
+            _ = try await storage.transact { snapshot in
+                guard let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == spaceID }), resource.kind == .folder else {
+                    throw HostProtocolError.unknownResource(resourceID)
+                }
+                guard !snapshot.executionContexts.contains(where: { $0.resourceID == resourceID && $0.kind == .localFolder }) else {
+                    throw HostProtocolError.resourceInUse(resourceID)
+                }
+                snapshot.executionContexts.append(context)
+            }
+            kind = .commandResult
+            payload = try TypedPayload(CreateLocalFolderContextResultPayload(contextID: context.id.description))
+        case .command where envelope.payload.identifier == AttachExecutionContextCommandPayload.identifier:
+            let command = try AttachExecutionContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let sessionID = try Self.sessionID(from: command.sessionID)
+            let contextID = try Self.executionContextID(from: command.contextID)
+            _ = try await storage.transact { snapshot in
+                guard let context = snapshot.executionContexts.first(where: { $0.id == contextID }) else {
+                    throw HostProtocolError.unknownExecutionContext(contextID)
+                }
+                guard let index = snapshot.sessions.firstIndex(where: { $0.id == sessionID }) else {
+                    throw HostProtocolError.unknownSession(sessionID)
+                }
+                guard snapshot.sessions[index].spaceID == context.spaceID else {
+                    throw HostProtocolError.invalidExecutionContext(contextID)
+                }
+                snapshot.sessions[index].executionContextID = contextID
+            }
+            kind = .commandResult
+            payload = try TypedPayload(ExecutionContextMutationResultPayload())
         default:
             throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier)
         }
@@ -237,6 +291,16 @@ public actor LocalHost: WireEndpoint {
     private static func sessionID(from value: String) throws -> SessionID {
         guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
         return SessionID(rawValue: rawValue)
+    }
+
+    private static func resourceID(from value: String) throws -> ResourceID {
+        guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
+        return ResourceID(rawValue: rawValue)
+    }
+
+    private static func executionContextID(from value: String) throws -> ExecutionContextID {
+        guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
+        return ExecutionContextID(rawValue: rawValue)
     }
 
     private static func localDirectory(from path: String) throws -> URL {
@@ -279,9 +343,11 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case unknownSpace(SpaceID)
     case unknownSession(SessionID)
     case unknownResource(ResourceID)
+    case unknownExecutionContext(ExecutionContextID)
     case duplicateResource(ResourceID)
     case resourceInUse(ResourceID)
     case invalidResourcePath(String)
+    case invalidExecutionContext(ExecutionContextID)
     case spaceNotEmpty(SpaceID)
     case runtimeUnavailable
 }

@@ -225,6 +225,38 @@ message RemoveResourceCommand {
 
 message ResourceMutationResult {}
 
+message ListExecutionContextsQuery {
+  string space_id = 1;
+  string resource_id = 2;
+}
+
+message ExecutionContextRecord {
+  string execution_context_id = 1;
+  string space_id = 2;
+  string resource_id = 3;
+  string kind = 4;
+}
+
+message ListExecutionContextsResponse {
+  repeated ExecutionContextRecord contexts = 1;
+}
+
+message CreateLocalFolderContextCommand {
+  string space_id = 1;
+  string resource_id = 2;
+}
+
+message CreateLocalFolderContextResult {
+  string execution_context_id = 1;
+}
+
+message AttachExecutionContextCommand {
+  string session_id = 1;
+  string execution_context_id = 2;
+}
+
+message ExecutionContextMutationResult {}
+
 message SnapshotRequest {
   string scope = 1;
   uint64 after_cursor = 2;

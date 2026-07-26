@@ -57,19 +57,35 @@ public actor StorageBackedACPRunConfigurationResolver: ACPRunConfigurationResolv
         guard let context = snapshot.executionContexts.first(where: { $0.id == executionContextID && $0.spaceID == run.spaceID }) else {
             throw Error.unknownExecutionContext(executionContextID)
         }
-        guard context.kind == .managedTemporarySandbox || context.kind == .managedPersistentSandbox,
-            context.hostReference?.rawValue == "sandbox-\(context.id.description)" else {
+        let agent = try await agentConfiguration.launchConfiguration()
+        let workingDirectory: String
+        if context.kind == .managedTemporarySandbox || context.kind == .managedPersistentSandbox {
+            guard context.hostReference?.rawValue == "sandbox-\(context.id.description)" else {
+                throw Error.invalidExecutionContext(context.id)
+            }
+            workingDirectory = managedSandboxRoot
+                .appendingPathComponent(context.spaceID.description, isDirectory: true)
+                .appendingPathComponent(context.id.description, isDirectory: true)
+                .path
+        } else if context.kind == .localFolder,
+            let resourceID = context.resourceID,
+            let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == run.spaceID }),
+            case .hostPrivate(let reference) = resource.details,
+            reference.rawValue.hasPrefix("local-folder:") {
+            let path = String(reference.rawValue.dropFirst("local-folder:".count))
+            let directory = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+                throw Error.invalidExecutionContext(context.id)
+            }
+            workingDirectory = directory.path
+        } else {
             throw Error.invalidExecutionContext(context.id)
         }
-
-        let agent = try await agentConfiguration.launchConfiguration()
-        let workingDirectory = managedSandboxRoot
-            .appendingPathComponent(context.spaceID.description, isDirectory: true)
-            .appendingPathComponent(context.id.description, isDirectory: true)
         return ACPRunConfiguration(
             executablePath: agent.executablePath,
             arguments: agent.arguments,
-            workingDirectory: workingDirectory.path,
+            workingDirectory: workingDirectory,
             environment: agent.environment
         )
     }

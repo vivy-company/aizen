@@ -221,6 +221,50 @@ public actor HostClient {
         _ = try ResourceMutationResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(ListExecutionContextsQueryPayload(spaceID: spaceID?.description, resourceID: resourceID?.description))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == ListExecutionContextsResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try ListExecutionContextsResponsePayload(protobufBytes: response.payload.protobufBytes).contexts
+    }
+
+    public func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(CreateLocalFolderContextCommandPayload(spaceID: spaceID.description, resourceID: resourceID.description))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == CreateLocalFolderContextResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        let result = try CreateLocalFolderContextResultPayload(protobufBytes: response.payload.protobufBytes)
+        guard let uuid = UUID(uuidString: result.contextID) else { throw Error.invalidIdentity(result.contextID) }
+        return ExecutionContextID(rawValue: uuid)
+    }
+
+    public func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(AttachExecutionContextCommandPayload(sessionID: sessionID.description, contextID: contextID.description))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == ExecutionContextMutationResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        _ = try ExecutionContextMutationResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func sendConversation(
         spaceID: SpaceID,
         sessionID: SessionID,
