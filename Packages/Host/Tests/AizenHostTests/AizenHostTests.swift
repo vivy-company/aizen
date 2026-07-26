@@ -324,6 +324,31 @@ import AizenWire
     }
 }
 
+@Test func remoteHostEndpointRequiresScopedXcodeBuildCapabilityForOperationCancellation() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Private")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "Folder", details: .hostPrivate(.init(rawValue: "local-folder:\(root.path)")))
+    let operation = AizenCore.Operation(spaceID: space.id, resourceID: resource.id, lifecycle: .running, progress: 0)
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: LocalCryptographicIdentity().publicIdentity())
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource); $0.operations.append(operation) }
+    try await storage.saveDeviceAuthorization(.init(device: device, grants: [.init(capability: .xcodeRead, spaceIDs: [space.id], resourceIDs: [resource.id])]))
+    let endpoint = RemoteHostEndpoint(
+        endpoint: LocalHost(storage: storage),
+        storage: storage,
+        authorization: DeviceAuthorizationGate(storage: storage),
+        rateLimiter: RemoteRequestRateLimiter(),
+        terminalControl: TerminalControlLeaseRegistry(),
+        session: try authenticatedSession(for: device.deviceID),
+        source: RemoteRequestSource("192.168.1.20")
+    )
+    let cancel = ProtocolEnvelope(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(CancelOperationCommandPayload(operationID: operation.id.description)))
+    await #expect(throws: DeviceAuthorizationError.capabilityDenied(.xcodeBuild)) {
+        try await endpoint.receive(cancel)
+    }
+}
+
 @Test func remoteTerminalControlOwnsAndOrdersRuntimeTraffic() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
