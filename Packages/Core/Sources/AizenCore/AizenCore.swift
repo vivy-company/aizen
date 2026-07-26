@@ -396,6 +396,60 @@ public struct RunEvent: Sendable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Durable event journal
+
+public enum EventDurability: String, Codable, Sendable, Hashable {
+    case durable
+    case recoverable
+    case ephemeral
+}
+
+/// A transport-independent event retained by the Host for replay and snapshot consistency.
+public struct JournalEvent: Codable, Sendable, Hashable, Identifiable {
+    public let id: UUID
+    public let cursor: UInt64
+    public let spaceID: SpaceID?
+    public let aggregateID: String
+    public let aggregateType: String
+    public let aggregateRevision: UInt64
+    public let occurredAt: Date
+    public let payloadIdentifier: String
+    public let payloadSchemaVersion: UInt32
+    public let payloadBytes: Data
+    public let durability: EventDurability
+
+    public init(
+        id: UUID = UUID(),
+        cursor: UInt64,
+        spaceID: SpaceID? = nil,
+        aggregateID: String,
+        aggregateType: String,
+        aggregateRevision: UInt64,
+        occurredAt: Date = Date(),
+        payloadIdentifier: String,
+        payloadSchemaVersion: UInt32,
+        payloadBytes: Data,
+        durability: EventDurability
+    ) {
+        precondition(cursor > 0, "Journal cursors start at one")
+        precondition(!aggregateID.isEmpty, "Journal events require an aggregate identity")
+        precondition(!aggregateType.isEmpty, "Journal events require an aggregate type")
+        precondition(!payloadIdentifier.isEmpty, "Journal events require a payload identifier")
+        precondition(payloadSchemaVersion > 0, "Journal payload schemas start at one")
+        self.id = id
+        self.cursor = cursor
+        self.spaceID = spaceID
+        self.aggregateID = aggregateID
+        self.aggregateType = aggregateType
+        self.aggregateRevision = aggregateRevision
+        self.occurredAt = occurredAt
+        self.payloadIdentifier = payloadIdentifier
+        self.payloadSchemaVersion = payloadSchemaVersion
+        self.payloadBytes = payloadBytes
+        self.durability = durability
+    }
+}
+
 public enum OperationLifecycle: String, Codable, Sendable, Hashable {
     case queued
     case running

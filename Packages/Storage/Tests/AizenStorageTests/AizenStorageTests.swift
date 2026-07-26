@@ -80,6 +80,40 @@ import AizenCore
     #expect(try await repository.load().commands == [command])
 }
 
+@Test func repositoryReplaysBoundedScopedJournalEvents() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = StorageRepository(url: directory.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Personal")
+    _ = try await repository.transact { $0.spaces.append(space) }
+    let hostEvent = try await repository.appendJournalEvent(
+        aggregateID: "host",
+        aggregateType: "host",
+        aggregateRevision: 1,
+        payloadIdentifier: "aizen.event.host@1",
+        payloadSchemaVersion: 1,
+        payloadBytes: Data([1]),
+        durability: .durable
+    )
+    let spaceEvent = try await repository.appendJournalEvent(
+        spaceID: space.id,
+        aggregateID: space.id.description,
+        aggregateType: "space",
+        aggregateRevision: 1,
+        payloadIdentifier: "aizen.event.space@1",
+        payloadSchemaVersion: 1,
+        payloadBytes: Data([2]),
+        durability: .durable
+    )
+    #expect(hostEvent.cursor == 1)
+    #expect(spaceEvent.cursor == 2)
+    #expect(try await repository.journalEvents(after: 0, spaceID: space.id).map(\.cursor) == [1, 2])
+    #expect(try await repository.journalEvents(after: 1, spaceID: space.id) == [spaceEvent])
+    #expect(try await repository.journalCursorBounds().latest == 2)
+    #expect(try await repository.pruneJournalEvents(keepingMostRecent: 1) == 1)
+    #expect(try await repository.journalCursorBounds().oldest == 2)
+}
+
 @Test func failedTransactionsLeaveTheLastValidSnapshotIntact() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: directory) }

@@ -22,11 +22,12 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
     public var operations: [AizenCore.Operation]
     public var artifacts: [Artifact]
     public var commands: [DurableCommand]
+    public var journalEvents: [JournalEvent]
 
     public init(
         schemaVersion: Int = Self.schemaVersion,
         spaces: [Space] = [], sessions: [Session] = [], conversationMessages: [ConversationMessage] = [], resources: [Resource] = [],
-        executionContexts: [ExecutionContext] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = []
+        executionContexts: [ExecutionContext] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = [], journalEvents: [JournalEvent] = []
     ) {
         precondition(schemaVersion == Self.schemaVersion, "Storage snapshots must use schema v2")
         self.schemaVersion = schemaVersion
@@ -39,15 +40,16 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         self.operations = operations
         self.artifacts = artifacts
         self.commands = commands
+        self.journalEvents = journalEvents
     }
 
     public var isEmpty: Bool {
         spaces.isEmpty && sessions.isEmpty && conversationMessages.isEmpty && resources.isEmpty && executionContexts.isEmpty &&
-            runs.isEmpty && operations.isEmpty && artifacts.isEmpty && commands.isEmpty
+            runs.isEmpty && operations.isEmpty && artifacts.isEmpty && commands.isEmpty && journalEvents.isEmpty
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, runs, operations, artifacts, commands
+        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, runs, operations, artifacts, commands, journalEvents
     }
 
     public init(from decoder: Decoder) throws {
@@ -62,6 +64,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         operations = try values.decode([AizenCore.Operation].self, forKey: .operations)
         artifacts = try values.decode([Artifact].self, forKey: .artifacts)
         commands = try values.decodeIfPresent([DurableCommand].self, forKey: .commands) ?? []
+        journalEvents = try values.decodeIfPresent([JournalEvent].self, forKey: .journalEvents) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -76,6 +79,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         try values.encode(operations, forKey: .operations)
         try values.encode(artifacts, forKey: .artifacts)
         try values.encode(commands, forKey: .commands)
+        try values.encode(journalEvents, forKey: .journalEvents)
     }
 }
 
@@ -90,6 +94,8 @@ public enum StorageError: Error, Sendable, Equatable {
     case missingCommand
     case invalidCommandTransition
     case invalidCommandResult
+    case eventCursorExhausted
+    case invalidEventRetention
     case migrationDestinationNotEmpty
 }
 
@@ -269,6 +275,56 @@ public actor StorageRepository {
         return command
     }
 
+    public func appendJournalEvent(
+        spaceID: SpaceID? = nil,
+        aggregateID: String,
+        aggregateType: String,
+        aggregateRevision: UInt64,
+        payloadIdentifier: String,
+        payloadSchemaVersion: UInt32,
+        payloadBytes: Data,
+        durability: EventDurability
+    ) throws -> JournalEvent {
+        let snapshot = try transact { snapshot in
+            let cursor = (snapshot.journalEvents.last?.cursor ?? 0)
+            guard cursor < UInt64.max else { throw StorageError.eventCursorExhausted }
+            snapshot.journalEvents.append(JournalEvent(
+                cursor: cursor + 1,
+                spaceID: spaceID,
+                aggregateID: aggregateID,
+                aggregateType: aggregateType,
+                aggregateRevision: aggregateRevision,
+                payloadIdentifier: payloadIdentifier,
+                payloadSchemaVersion: payloadSchemaVersion,
+                payloadBytes: payloadBytes,
+                durability: durability
+            ))
+        }
+        guard let event = snapshot.journalEvents.last else { throw StorageError.eventCursorExhausted }
+        return event
+    }
+
+    public func journalEvents(after cursor: UInt64, spaceID: SpaceID? = nil) throws -> [JournalEvent] {
+        try load().journalEvents.filter { $0.cursor > cursor && (spaceID == nil || $0.spaceID == nil || $0.spaceID == spaceID) }
+    }
+
+    public func journalCursorBounds() throws -> (oldest: UInt64?, latest: UInt64) {
+        let events = try load().journalEvents
+        return (events.first?.cursor, events.last?.cursor ?? 0)
+    }
+
+    public func pruneJournalEvents(keepingMostRecent retention: Int) throws -> Int {
+        guard retention >= 0 else { throw StorageError.invalidEventRetention }
+        var removed = 0
+        _ = try transact { snapshot in
+            let count = snapshot.journalEvents.count
+            guard count > retention else { return }
+            removed = count - retention
+            snapshot.journalEvents.removeFirst(removed)
+        }
+        return removed
+    }
+
     private func validate(_ snapshot: StorageSnapshot) throws {
         let spaceIDs = Set(snapshot.spaces.map(\.id))
         guard spaceIDs.count == snapshot.spaces.count else { throw StorageError.duplicateIdentity("space") }
@@ -279,6 +335,8 @@ public actor StorageRepository {
         guard Set(snapshot.executionContexts.map(\.id)).count == snapshot.executionContexts.count else { throw StorageError.duplicateIdentity("execution context") }
         guard Set(snapshot.runs.map(\.id)).count == snapshot.runs.count else { throw StorageError.duplicateIdentity("run") }
         guard Set(snapshot.commands.map(\.id)).count == snapshot.commands.count else { throw StorageError.duplicateIdentity("command") }
+        guard Set(snapshot.journalEvents.map(\.id)).count == snapshot.journalEvents.count else { throw StorageError.duplicateIdentity("journal event") }
+        guard zip(snapshot.journalEvents, snapshot.journalEvents.dropFirst()).allSatisfy({ $0.cursor < $1.cursor }) else { throw StorageError.duplicateIdentity("journal cursor") }
         guard snapshot.resources.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
         guard snapshot.executionContexts.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
 
