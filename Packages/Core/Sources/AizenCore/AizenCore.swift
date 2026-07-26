@@ -307,14 +307,16 @@ public struct XcodeProjectDescriptor: Codable, Sendable, Hashable, Identifiable 
     public let name: String
     public let kind: Kind
     public let schemes: [String]
+    public let configurations: [String]
 
-    public init(resourceID: ResourceID, id: String, name: String, kind: Kind, schemes: [String]) {
+    public init(resourceID: ResourceID, id: String, name: String, kind: Kind, schemes: [String], configurations: [String] = []) {
         precondition(!id.isEmpty && !name.isEmpty, "Xcode project descriptors require an identity and name")
         self.resourceID = resourceID
         self.id = id
         self.name = name
         self.kind = kind
         self.schemes = schemes
+        self.configurations = configurations
     }
 }
 

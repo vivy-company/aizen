@@ -46,10 +46,12 @@ import Testing
         id: "App.xcodeproj",
         name: "App",
         kind: .project,
-        schemes: ["App"]
+        schemes: ["App"],
+        configurations: ["Debug", "Release"]
     )
     #expect(descriptor.kind == .project)
     #expect(descriptor.schemes == ["App"])
+    #expect(descriptor.configurations == ["Debug", "Release"])
 }
 
 @Test func operationRejectsInvalidDurableState() {
