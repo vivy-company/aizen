@@ -348,17 +348,26 @@ public actor LocalHost: WireEndpoint {
         case .command where envelope.payload.identifier == RemoveExecutionContextCommandPayload.identifier:
             let command = try RemoveExecutionContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let contextID = try Self.executionContextID(from: command.contextID)
-            _ = try await storage.transact { snapshot in
-                guard snapshot.executionContexts.contains(where: { $0.id == contextID }) else {
+            if let replayed = try await durableReplayResult(for: envelope) {
+                payload = replayed
+            } else {
+                guard let spaceID = try await storage.load().executionContexts.first(where: { $0.id == contextID })?.spaceID else {
                     throw HostProtocolError.unknownExecutionContext(contextID)
                 }
-                guard !snapshot.sessions.contains(where: { $0.executionContextID == contextID }) else {
-                    throw HostProtocolError.executionContextInUse(contextID)
+                payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                    _ = try await self.storage.transact { snapshot in
+                        guard snapshot.executionContexts.contains(where: { $0.id == contextID }) else {
+                            throw HostProtocolError.unknownExecutionContext(contextID)
+                        }
+                        guard !snapshot.sessions.contains(where: { $0.executionContextID == contextID }) else {
+                            throw HostProtocolError.executionContextInUse(contextID)
+                        }
+                        snapshot.executionContexts.removeAll(where: { $0.id == contextID })
+                    }
+                    return try TypedPayload(ExecutionContextMutationResultPayload())
                 }
-                snapshot.executionContexts.removeAll(where: { $0.id == contextID })
             }
             kind = .commandResult
-            payload = try TypedPayload(ExecutionContextMutationResultPayload())
         case .command where envelope.payload.identifier == DetachExecutionContextCommandPayload.identifier:
             let command = try DetachExecutionContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let sessionID = try Self.sessionID(from: command.sessionID)
