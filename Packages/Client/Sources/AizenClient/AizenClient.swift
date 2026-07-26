@@ -69,4 +69,9 @@ public actor HostClient {
         }
         return try SnapshotResponsePayload(protobufBytes: response.payload.protobufBytes)
     }
+
+    /// Returns the Storage-owned snapshot representation without exposing Wire payload types to UI clients.
+    public func snapshotData(scope: String = "host") async throws -> Data {
+        try await snapshot(scope: scope).snapshot
+    }
 }

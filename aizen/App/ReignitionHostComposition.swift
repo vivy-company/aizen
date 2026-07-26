@@ -27,7 +27,6 @@ actor ReignitionHostComposition {
     }
 
     func snapshot() async throws -> StorageSnapshot {
-        let response = try await client.snapshot()
-        return try JSONDecoder().decode(StorageSnapshot.self, from: response.snapshot)
+        try JSONDecoder().decode(StorageSnapshot.self, from: try await client.snapshotData())
     }
 }
