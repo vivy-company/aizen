@@ -31,6 +31,29 @@ import AizenWire
     }
 }
 
+@Test func pairingApprovalRequiresAValidSingleUseInvitation() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let hostIdentity = LocalCryptographicIdentity()
+    let invitation = try PairingInvitation(
+        secret: Data(repeating: 9, count: 32),
+        host: HostPublicIdentity(hostID: HostID(), displayName: "Mac", cryptographicIdentity: hostIdentity.publicIdentity()),
+        endpointHints: ["wss://aizen.local"],
+        expiresAt: Date().addingTimeInterval(60)
+    )
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: LocalCryptographicIdentity().publicIdentity())
+    let service = PairingApprovalService(tokens: PairingTokenAuthority(), storage: storage)
+    try await service.issue(invitation)
+
+    let authorization = try await service.approve(device: device, tokenID: invitation.tokenID, secret: invitation.secret, grants: [.init(capability: .spaceRead)], route: "lan")
+    #expect(authorization.permits(.spaceRead))
+    #expect(try await storage.deviceAuthorization(for: device.deviceID) == authorization)
+    await #expect(throws: SecurityError.pairingTokenUnknown) {
+        try await service.approve(device: device, tokenID: invitation.tokenID, secret: invitation.secret, grants: [], route: "lan")
+    }
+}
+
 @Test func localHostReturnsTheStorageSnapshotThroughWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
