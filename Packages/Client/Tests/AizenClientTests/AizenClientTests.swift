@@ -52,6 +52,16 @@ import AizenWire
     #expect(try await storage.load().spaces == [Space(id: id, name: "CLI")])
 }
 
+@Test func clientCreatesProjectlessConversationsThroughHostCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+    let spaceID = try await client.createSpace(name: "CLI")
+    let sessionID = try await client.createConversation(spaceID: spaceID, title: "Untethered")
+    #expect(try await storage.load().sessions == [Session(id: sessionID, spaceID: spaceID, kind: .conversation, title: "Untethered")])
+}
+
 private struct EchoHost: WireEndpoint {
     func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope { envelope }
 }

@@ -29,7 +29,9 @@ public actor LocalHost: WireEndpoint {
                 SnapshotRequestPayload.identifier,
                 SnapshotResponsePayload.identifier,
                 CreateSpaceCommandPayload.identifier,
-                CreateSpaceResultPayload.identifier
+                CreateSpaceResultPayload.identifier,
+                CreateConversationCommandPayload.identifier,
+                CreateConversationResultPayload.identifier
             ]))
         case .query where envelope.payload.identifier == SnapshotRequestPayload.identifier:
             let request = try SnapshotRequestPayload(protobufBytes: envelope.payload.protobufBytes)
@@ -42,6 +44,17 @@ public actor LocalHost: WireEndpoint {
             _ = try await storage.transact { $0.spaces.append(space) }
             kind = .commandResult
             payload = try TypedPayload(CreateSpaceResultPayload(spaceID: space.id.description))
+        case .command where envelope.payload.identifier == CreateConversationCommandPayload.identifier:
+            let command = try CreateConversationCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            guard let rawSpaceID = UUID(uuidString: command.spaceID) else { throw HostProtocolError.invalidIdentity(command.spaceID) }
+            let spaceID = SpaceID(rawValue: rawSpaceID)
+            let session = Session(spaceID: spaceID, kind: .conversation, title: command.title)
+            _ = try await storage.transact { snapshot in
+                guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
+                snapshot.sessions.append(session)
+            }
+            kind = .commandResult
+            payload = try TypedPayload(CreateConversationResultPayload(sessionID: session.id.description))
         default:
             throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier)
         }
@@ -59,6 +72,8 @@ public actor LocalHost: WireEndpoint {
 
 public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case unsupportedRequest(kind: WireMessageKind, payload: PayloadIdentifier)
+    case invalidIdentity(String)
+    case unknownSpace(SpaceID)
 }
 
 /// Host-facing runtime contract. ACP, Process, and UI concerns remain in a macOS adapter.

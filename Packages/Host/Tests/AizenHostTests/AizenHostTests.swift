@@ -57,6 +57,26 @@ import AizenWire
     #expect(try await storage.load().spaces.map(\.name) == ["Vivy"])
 }
 
+@Test func hostCreatesProjectlessConversationsThroughTypedCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    _ = try await storage.transact { $0.spaces.append(space) }
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
+    let response = try await transport.send(.init(
+        messageID: "create-conversation",
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(CreateConversationCommandPayload(spaceID: space.id.description, title: "Plan"))
+    ))
+    let result = try CreateConversationResultPayload(protobufBytes: response.payload.protobufBytes)
+    let snapshot = try await storage.load()
+    #expect(UUID(uuidString: result.sessionID) != nil)
+    #expect(snapshot.sessions == [Session(id: SessionID(rawValue: UUID(uuidString: result.sessionID)!), spaceID: space.id, kind: .conversation, title: "Plan")])
+}
+
 @Test func coordinatorRejectsUnknownRunWithoutTouchingRuntime() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

@@ -94,6 +94,15 @@ message CreateSpaceResult {
   string space_id = 1;
 }
 
+message CreateConversationCommand {
+  string space_id = 1;
+  string title = 2;
+}
+
+message CreateConversationResult {
+  string session_id = 1;
+}
+
 message SnapshotRequest {
   string scope = 1;
   uint64 after_cursor = 2;

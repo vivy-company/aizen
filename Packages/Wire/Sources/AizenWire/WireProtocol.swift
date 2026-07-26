@@ -267,6 +267,57 @@ public struct CreateSpaceResultPayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct CreateConversationCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.conversation.create@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let spaceID: String
+    public let title: String
+
+    public init(spaceID: String, title: String) {
+        precondition(!spaceID.isEmpty, "Conversations require a Space identity")
+        precondition(!title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Conversations require a title")
+        self.spaceID = spaceID
+        self.title = title
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_CreateConversationCommand(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID, title: message.title)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_CreateConversationCommand()
+        message.spaceID = spaceID
+        message.title = title
+        return try message.serializedData()
+    }
+}
+
+public struct CreateConversationResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.conversation.create@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let sessionID: String
+
+    public init(sessionID: String) {
+        precondition(!sessionID.isEmpty, "Created Conversations require an identity")
+        self.sessionID = sessionID
+    }
+
+    public init(protobufBytes: Data) throws {
+        self.init(sessionID: try AizenWireV1_CreateConversationResult(serializedBytes: protobufBytes).sessionID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_CreateConversationResult()
+        message.sessionID = sessionID
+        return try message.serializedData()
+    }
+}
+
 /// `snapshot` is a versioned Storage representation whose internal encoding is owned by Storage,
 /// while this enclosing payload remains an actual protobuf message on every transport.
 public struct SnapshotResponsePayload: WirePayload, Sendable, Hashable {
