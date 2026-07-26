@@ -171,6 +171,12 @@ import Testing
     #expect(try AcquireTerminalControlCommandPayload(protobufBytes: acquire.protobufBytes()) == acquire)
     let input = TerminalInputCommandPayload(terminalSessionID: session.id.description, sequence: 1, input: Data("pwd\n".utf8))
     #expect(try TerminalInputCommandPayload(protobufBytes: input.protobufBytes()) == input)
+    let resize = TerminalResizeCommandPayload(terminalSessionID: session.id.description, sequence: 2, columns: 120, rows: 40)
+    #expect(try TerminalResizeCommandPayload(protobufBytes: resize.protobufBytes()) == resize)
+    let lease = TerminalControlLeaseResultPayload(terminalSessionID: session.id.description, controllerDeviceID: DeviceID().description, expiresAt: Date(timeIntervalSince1970: 1_500))
+    #expect(try TerminalControlLeaseResultPayload(protobufBytes: lease.protobufBytes()) == lease)
+    let operation = TerminalOperationResultPayload(terminalSessionID: session.id.description, sequence: 2)
+    #expect(try TerminalOperationResultPayload(protobufBytes: operation.protobufBytes()) == operation)
 }
 
 @Test func agentLaunchConfigurationPayloadRoundTrips() throws {

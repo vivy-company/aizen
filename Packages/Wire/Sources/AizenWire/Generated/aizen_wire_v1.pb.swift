@@ -1602,6 +1602,22 @@ nonisolated struct AizenWireV1_TerminalResizeCommand: Sendable {
   init() {}
 }
 
+/// Acknowledges terminal traffic after the Host runtime has accepted it. Sequence
+/// is zero only for release, which has no ordered terminal operation.
+nonisolated struct AizenWireV1_TerminalOperationResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var terminalSessionID: String = String()
+
+  var sequence: UInt64 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_CreateLocalFolderContextCommand: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -5237,6 +5253,41 @@ nonisolated extension AizenWireV1_TerminalResizeCommand: SwiftProtobuf.Message, 
     if lhs.sequence != rhs.sequence {return false}
     if lhs.columns != rhs.columns {return false}
     if lhs.rows != rhs.rows {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_TerminalOperationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".TerminalOperationResult"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}terminal_session_id\0\u{1}sequence\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.terminalSessionID) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.sequence) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.terminalSessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.terminalSessionID, fieldNumber: 1)
+    }
+    if self.sequence != 0 {
+      try visitor.visitSingularUInt64Field(value: self.sequence, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_TerminalOperationResult, rhs: AizenWireV1_TerminalOperationResult) -> Bool {
+    if lhs.terminalSessionID != rhs.terminalSessionID {return false}
+    if lhs.sequence != rhs.sequence {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

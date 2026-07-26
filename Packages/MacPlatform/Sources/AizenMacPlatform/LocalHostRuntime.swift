@@ -14,6 +14,7 @@ public final class LocalHostRuntime: @unchecked Sendable {
     private let connectionRegistry = HostConnectionRegistry()
     private let storageURL: URL
     private let terminalRuntime: any TerminalRuntime
+    private let terminalControl = TerminalControlLeaseRegistry()
 
     public init(storageURL: URL, credentials providedCredentials: HostIdentityCredentials? = nil) {
         self.storageURL = storageURL
@@ -147,7 +148,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
             hostIdentity: credentials.localIdentity,
             storage: storage,
             endpoint: migrationGate,
-            pairing: pairing
+            pairing: pairing,
+            terminalControl: terminalControl
         )
     }
 }

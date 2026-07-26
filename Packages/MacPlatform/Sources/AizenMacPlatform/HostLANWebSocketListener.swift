@@ -24,13 +24,14 @@ public final class HostLANWebSocketListener {
     private let authorization: DeviceAuthorizationGate
     private let rateLimiter: RemoteRequestRateLimiter
     private let pairing: PairingRequestRegistry
+    private let terminalControl: TerminalControlLeaseRegistry
     private let queue = DispatchQueue(label: "win.aizen.host.lan")
     private var listener: NWListener?
     private var advertisement: HostBonjourAdvertisement?
     private var connections: [UUID: HostLANWebSocketConnection] = [:]
     public private(set) var port: UInt16?
 
-    public init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, storage: StorageRepository, endpoint: any WireEndpoint, pairing: PairingRequestRegistry) {
+    public init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, storage: StorageRepository, endpoint: any WireEndpoint, pairing: PairingRequestRegistry, terminalControl: TerminalControlLeaseRegistry) {
         self.host = host
         self.hostIdentity = hostIdentity
         self.storage = storage
@@ -40,6 +41,7 @@ public final class HostLANWebSocketListener {
         authenticator = RemoteSessionAuthenticator(host: host, hostIdentity: hostIdentity, storage: storage, rateLimiter: rateLimiter)
         authorization = DeviceAuthorizationGate(storage: storage)
         self.pairing = pairing
+        self.terminalControl = terminalControl
     }
 
     public func start() async throws {
@@ -112,6 +114,7 @@ public final class HostLANWebSocketListener {
                 authorization: authorization,
                 rateLimiter: rateLimiter,
                 pairing: pairing,
+                terminalControl: terminalControl,
                 source: source
             ),
             onClose: { [weak self] in
@@ -144,17 +147,19 @@ actor HostLANWebSocketProcessor {
     private let authorization: DeviceAuthorizationGate
     private let rateLimiter: RemoteRequestRateLimiter
     private let pairing: PairingRequestRegistry
+    private let terminalControl: TerminalControlLeaseRegistry
     private let pairingAuthenticator: PairingSessionAuthenticator
     private let source: RemoteRequestSource
     private var phase = Phase.awaitingStart
 
-    init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, authenticator: RemoteSessionAuthenticator, endpoint: any WireEndpoint, storage: StorageRepository, authorization: DeviceAuthorizationGate, rateLimiter: RemoteRequestRateLimiter, pairing: PairingRequestRegistry, source: RemoteRequestSource) {
+    init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, authenticator: RemoteSessionAuthenticator, endpoint: any WireEndpoint, storage: StorageRepository, authorization: DeviceAuthorizationGate, rateLimiter: RemoteRequestRateLimiter, pairing: PairingRequestRegistry, terminalControl: TerminalControlLeaseRegistry, source: RemoteRequestSource) {
         self.authenticator = authenticator
         self.endpoint = endpoint
         self.storage = storage
         self.authorization = authorization
         self.rateLimiter = rateLimiter
         self.pairing = pairing
+        self.terminalControl = terminalControl
         pairingAuthenticator = PairingSessionAuthenticator(host: host, hostIdentity: hostIdentity)
         self.source = source
     }
@@ -182,7 +187,7 @@ actor HostLANWebSocketProcessor {
             case .paired:
                 let session = try await authenticator.finish(try AuthenticationProofPayload(protobufBytes: envelope.payload.protobufBytes))
                 let channel = AuthenticatedWireChannel(keys: session.keys, binding: session.binding)
-                let endpoint = RemoteHostEndpoint(endpoint: endpoint, storage: storage, authorization: authorization, rateLimiter: rateLimiter, session: session, source: source)
+                let endpoint = RemoteHostEndpoint(endpoint: endpoint, storage: storage, authorization: authorization, rateLimiter: rateLimiter, terminalControl: terminalControl, session: session, source: source)
                 phase = .authenticated(channel, endpoint)
                 return try await channel.seal(ProtocolEnvelope(messageID: UUID().uuidString, connectionID: session.connectionID.uuidString, connectionSequence: 1, kind: .capabilities, channel: .control, correlationID: envelope.messageID, payload: .init(CapabilitiesPayload(identifiers: [HelloPayload.identifier, CapabilitiesPayload.identifier]))))
             case .pairing:

@@ -23,9 +23,9 @@ import AizenWire
     await #expect(throws: TerminalControlLeaseRegistry.Error.controlledByAnotherDevice(firstDevice)) {
         _ = try await registry.acquire(terminalID: terminalID, deviceID: secondDevice)
     }
-    try await registry.acceptInput(terminalID: terminalID, deviceID: firstDevice, sequence: 1)
+    try await registry.acceptOperation(terminalID: terminalID, deviceID: firstDevice, sequence: 1)
     await #expect(throws: TerminalControlLeaseRegistry.Error.replayedInputSequence) {
-        try await registry.acceptInput(terminalID: terminalID, deviceID: firstDevice, sequence: 1)
+        try await registry.acceptOperation(terminalID: terminalID, deviceID: firstDevice, sequence: 1)
     }
 
     clock.advance(by: 31)
@@ -33,7 +33,7 @@ import AizenWire
     let secondLease = try await registry.acquire(terminalID: terminalID, deviceID: secondDevice)
     #expect(secondLease.deviceID == secondDevice)
     await #expect(throws: TerminalControlLeaseRegistry.Error.notController) {
-        try await registry.acceptInput(terminalID: terminalID, deviceID: firstDevice, sequence: 2)
+        try await registry.acceptOperation(terminalID: terminalID, deviceID: firstDevice, sequence: 2)
     }
 }
 
@@ -221,6 +221,7 @@ import AizenWire
         storage: storage,
         authorization: gate,
         rateLimiter: RemoteRequestRateLimiter(),
+        terminalControl: TerminalControlLeaseRegistry(),
         session: try authenticatedSession(for: allowedDevice.deviceID),
         source: source
     )
@@ -233,6 +234,7 @@ import AizenWire
         storage: storage,
         authorization: gate,
         rateLimiter: RemoteRequestRateLimiter(),
+        terminalControl: TerminalControlLeaseRegistry(),
         session: try authenticatedSession(for: DeviceID()),
         source: source
     )
@@ -255,6 +257,110 @@ import AizenWire
     await #expect(throws: RemoteHostAuthorizationError.unsupportedPayload(ApprovePairingRequestCommandPayload.identifier)) {
         try await allowed.receive(localOnlyApproval)
     }
+}
+
+@Test func remoteTerminalControlOwnsAndOrdersRuntimeTraffic() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Private")
+    let terminal = TerminalSession(
+        id: SessionID(),
+        spaceID: space.id,
+        executionContextID: nil,
+        title: "Shell",
+        tmuxSessionName: "aizen-test",
+        paneID: "%1",
+        initialCommand: nil
+    )
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.terminalSessions.append(terminal)
+    }
+    let device = DevicePublicIdentity(
+        deviceID: DeviceID(),
+        displayName: "Phone",
+        platform: "iOS",
+        cryptographicIdentity: LocalCryptographicIdentity().publicIdentity()
+    )
+    try await storage.saveDeviceAuthorization(.init(device: device, grants: [
+        .init(capability: .hostRead),
+        .init(capability: .terminalControl, spaceIDs: [space.id])
+    ]))
+    let runtime = RecordingTerminalRuntime()
+    let endpoint = RemoteHostEndpoint(
+        endpoint: LocalHost(storage: storage, terminalRuntime: runtime),
+        storage: storage,
+        authorization: DeviceAuthorizationGate(storage: storage),
+        rateLimiter: RemoteRequestRateLimiter(),
+        terminalControl: TerminalControlLeaseRegistry(),
+        session: try authenticatedSession(for: device.deviceID),
+        source: RemoteRequestSource("192.168.1.20")
+    )
+
+    let hello = ProtocolEnvelope(
+        messageID: "hello",
+        connectionSequence: 0,
+        kind: .hello,
+        channel: .control,
+        payload: try .init(HelloPayload(minimumProtocolGeneration: 1, maximumProtocolGeneration: 1, productVersion: "test"))
+    )
+    let capabilities = try CapabilitiesPayload(protobufBytes: (try await endpoint.receive(hello)).payload.protobufBytes)
+    #expect(capabilities.identifiers.contains(AcquireTerminalControlCommandPayload.identifier))
+    #expect(capabilities.identifiers.contains(ReleaseTerminalControlCommandPayload.identifier))
+    #expect(capabilities.identifiers.contains(TerminalControlLeaseResultPayload.identifier))
+
+    let acquire = ProtocolEnvelope(
+        messageID: "acquire",
+        connectionSequence: 1,
+        kind: .command,
+        channel: .terminal,
+        payload: try .init(AcquireTerminalControlCommandPayload(terminalSessionID: terminal.id.description))
+    )
+    let leaseResponse = try await endpoint.receive(acquire)
+    let lease = try TerminalControlLeaseResultPayload(protobufBytes: leaseResponse.payload.protobufBytes)
+    #expect(lease.terminalSessionID == terminal.id.description)
+    #expect(lease.controllerDeviceID == device.deviceID.description)
+
+    let input = ProtocolEnvelope(
+        messageID: "input",
+        connectionSequence: 2,
+        kind: .command,
+        channel: .terminal,
+        payload: try .init(TerminalInputCommandPayload(terminalSessionID: terminal.id.description, sequence: 1, input: Data("echo hi\\n".utf8)))
+    )
+    let inputResponse = try await endpoint.receive(input)
+    #expect(try TerminalOperationResultPayload(protobufBytes: inputResponse.payload.protobufBytes).sequence == 1)
+    #expect(await runtime.inputs == [Data("echo hi\\n".utf8)])
+
+    let resize = ProtocolEnvelope(
+        messageID: "resize",
+        connectionSequence: 3,
+        kind: .command,
+        channel: .terminal,
+        payload: try .init(TerminalResizeCommandPayload(terminalSessionID: terminal.id.description, sequence: 2, columns: 120, rows: 40))
+    )
+    let resizeResponse = try await endpoint.receive(resize)
+    #expect(try TerminalOperationResultPayload(protobufBytes: resizeResponse.payload.protobufBytes).sequence == 2)
+    let resizes = await runtime.resizes
+    #expect(resizes.count == 1)
+    #expect(resizes.first?.0 == 120)
+    #expect(resizes.first?.1 == 40)
+
+    await #expect(throws: TerminalControlLeaseRegistry.Error.replayedInputSequence) {
+        try await endpoint.receive(input)
+    }
+    #expect(await runtime.inputs == [Data("echo hi\\n".utf8)])
+
+    let release = ProtocolEnvelope(
+        messageID: "release",
+        connectionSequence: 4,
+        kind: .command,
+        channel: .terminal,
+        payload: try .init(ReleaseTerminalControlCommandPayload(terminalSessionID: terminal.id.description))
+    )
+    let releaseResponse = try await endpoint.receive(release)
+    #expect(try TerminalOperationResultPayload(protobufBytes: releaseResponse.payload.protobufBytes).sequence == 0)
 }
 
 private func authenticatedSession(for deviceID: DeviceID) throws -> AuthenticatedRemoteSession {
@@ -1313,6 +1419,8 @@ private actor RecordingAgentLaunchUpdater: AgentLaunchConfigurationUpdating {
 
 private actor RecordingTerminalRuntime: TerminalRuntime {
     private(set) var createdTerminalID: SessionID?
+    private(set) var inputs: [Data] = []
+    private(set) var resizes: [(Int, Int)] = []
 
     func createTerminal(
         id: SessionID,
@@ -1324,6 +1432,14 @@ private actor RecordingTerminalRuntime: TerminalRuntime {
     ) async throws -> TerminalLaunch {
         createdTerminalID = id
         return TerminalLaunch(tmuxSessionName: "aizen-terminal", paneID: "%1")
+    }
+
+    func sendInput(to session: TerminalSession, input: Data) async throws {
+        inputs.append(input)
+    }
+
+    func resize(session: TerminalSession, columns: Int, rows: Int) async throws {
+        resizes.append((columns, rows))
     }
 }
 

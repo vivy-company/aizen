@@ -24,6 +24,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
     private let storage: StorageRepository
     private let authorization: DeviceAuthorizationGate
     private let rateLimiter: RemoteRequestRateLimiter
+    private let terminalControl: TerminalControlLeaseRegistry
     private let session: AuthenticatedRemoteSession
     private let source: RemoteRequestSource
 
@@ -32,6 +33,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
         storage: StorageRepository,
         authorization: DeviceAuthorizationGate,
         rateLimiter: RemoteRequestRateLimiter,
+        terminalControl: TerminalControlLeaseRegistry,
         session: AuthenticatedRemoteSession,
         source: RemoteRequestSource
     ) {
@@ -39,6 +41,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
         self.storage = storage
         self.authorization = authorization
         self.rateLimiter = rateLimiter
+        self.terminalControl = terminalControl
         self.session = session
         self.source = source
     }
@@ -60,7 +63,58 @@ public struct RemoteHostEndpoint: WireEndpoint {
             try await rateLimiter.require(kind: .unauthorizedCommand, source: source, deviceID: session.deviceID)
             throw error
         }
-        return try await endpoint.receive(envelope)
+        switch envelope.payload.identifier {
+        case HelloPayload.identifier:
+            let response = try await endpoint.receive(envelope)
+            let capabilities = try CapabilitiesPayload(protobufBytes: response.payload.protobufBytes)
+            let identifiers = Set(capabilities.identifiers).union([
+                AcquireTerminalControlCommandPayload.identifier,
+                ReleaseTerminalControlCommandPayload.identifier,
+                TerminalControlLeaseResultPayload.identifier
+            ])
+            return ProtocolEnvelope(
+                messageID: response.messageID,
+                connectionID: response.connectionID,
+                connectionSequence: response.connectionSequence,
+                kind: response.kind,
+                channel: response.channel,
+                correlationID: response.correlationID,
+                payload: try TypedPayload(CapabilitiesPayload(identifiers: identifiers.sorted { $0.rawValue < $1.rawValue }))
+            )
+        case AcquireTerminalControlCommandPayload.identifier:
+            let command = try AcquireTerminalControlCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let terminal = try await requiredTerminal(command.terminalSessionID)
+            let lease = try await terminalControl.acquire(
+                terminalID: terminal.id,
+                deviceID: session.deviceID,
+                duration: TimeInterval(command.leaseSeconds)
+            )
+            return try response(
+                to: envelope,
+                payload: TerminalControlLeaseResultPayload(
+                    terminalSessionID: command.terminalSessionID,
+                    controllerDeviceID: lease.deviceID.description,
+                    expiresAt: lease.expiresAt
+                )
+            )
+        case ReleaseTerminalControlCommandPayload.identifier:
+            let command = try ReleaseTerminalControlCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let terminal = try await requiredTerminal(command.terminalSessionID)
+            try await terminalControl.release(terminalID: terminal.id, deviceID: session.deviceID)
+            return try response(to: envelope, payload: TerminalOperationResultPayload(terminalSessionID: command.terminalSessionID, sequence: 0))
+        case TerminalInputCommandPayload.identifier:
+            let command = try TerminalInputCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let terminal = try await requiredTerminal(command.terminalSessionID)
+            try await terminalControl.acceptOperation(terminalID: terminal.id, deviceID: session.deviceID, sequence: command.sequence)
+            return try await endpoint.receive(envelope)
+        case TerminalResizeCommandPayload.identifier:
+            let command = try TerminalResizeCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let terminal = try await requiredTerminal(command.terminalSessionID)
+            try await terminalControl.acceptOperation(terminalID: terminal.id, deviceID: session.deviceID, sequence: command.sequence)
+            return try await endpoint.receive(envelope)
+        default:
+            return try await endpoint.receive(envelope)
+        }
     }
 
     private func requirement(for envelope: ProtocolEnvelope) async throws -> Requirement {
@@ -110,7 +164,10 @@ public struct RemoteHostEndpoint: WireEndpoint {
             return try requirementForOptionalSpace(request.spaceID)
         case ListTerminalSessionsQueryPayload.identifier:
             let request = try ListTerminalSessionsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
-            return try requirementForOptionalSpace(request.spaceID)
+            if let rawSpaceID = request.spaceID {
+                return .init(capability: .terminalRead, spaceID: try spaceID(rawSpaceID), resourceID: nil, rateLimitKind: nil)
+            }
+            return .init(capability: .terminalRead, spaceID: nil, resourceID: nil, rateLimitKind: nil)
         case ListContextFilesQueryPayload.identifier:
             let request = try ListContextFilesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let context = try await requiredExecutionContext(request.executionContextID)
@@ -165,6 +222,18 @@ public struct RemoteHostEndpoint: WireEndpoint {
             let context = try await requiredExecutionContext(request.executionContextID)
             guard context.spaceID == requestedSpaceID else { throw RemoteHostAuthorizationError.mismatchedSpace }
             return .init(capability: .terminalCreate, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil)
+        case AcquireTerminalControlCommandPayload.identifier:
+            let command = try AcquireTerminalControlCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            return try await terminalControlRequirement(for: command.terminalSessionID)
+        case ReleaseTerminalControlCommandPayload.identifier:
+            let command = try ReleaseTerminalControlCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            return try await terminalControlRequirement(for: command.terminalSessionID)
+        case TerminalInputCommandPayload.identifier:
+            let command = try TerminalInputCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            return try await terminalControlRequirement(for: command.terminalSessionID)
+        case TerminalResizeCommandPayload.identifier:
+            let command = try TerminalResizeCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            return try await terminalControlRequirement(for: command.terminalSessionID)
         case CreateLocalFolderContextCommandPayload.identifier:
             let request = try CreateLocalFolderContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let requestedSpaceID = try spaceID(request.spaceID)
@@ -220,6 +289,37 @@ public struct RemoteHostEndpoint: WireEndpoint {
             throw RemoteHostAuthorizationError.malformedReference(rawID)
         }
         return context
+    }
+
+    private func requiredTerminal(_ rawID: String) async throws -> TerminalSession {
+        let id = try sessionID(rawID)
+        guard let terminal = try await storage.load().terminalSessions.first(where: { $0.id == id }) else {
+            throw RemoteHostAuthorizationError.malformedReference(rawID)
+        }
+        return terminal
+    }
+
+    private func terminalControlRequirement(for rawTerminalID: String) async throws -> Requirement {
+        let terminal = try await requiredTerminal(rawTerminalID)
+        let resourceID: ResourceID?
+        if let executionContextID = terminal.executionContextID {
+            resourceID = try await requiredExecutionContext(executionContextID.description).resourceID
+        } else {
+            resourceID = nil
+        }
+        return .init(capability: .terminalControl, spaceID: terminal.spaceID, resourceID: resourceID, rateLimitKind: nil)
+    }
+
+    private func response(to request: ProtocolEnvelope, payload: some WirePayload) throws -> ProtocolEnvelope {
+        ProtocolEnvelope(
+            messageID: UUID().uuidString,
+            connectionID: request.connectionID,
+            connectionSequence: request.connectionSequence,
+            kind: .commandResult,
+            channel: .terminal,
+            correlationID: request.messageID,
+            payload: try TypedPayload(payload)
+        )
     }
 
     private func spaceID(_ rawValue: String) throws -> SpaceID {

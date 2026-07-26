@@ -61,8 +61,8 @@ public actor TerminalControlLeaseRegistry {
         activeLease(for: terminalID)
     }
 
-    /// Validates ownership and monotonically increasing input before the runtime receives bytes.
-    public func acceptInput(terminalID: SessionID, deviceID: DeviceID, sequence: UInt64) throws {
+    /// Validates ownership and monotonically increasing terminal traffic before the runtime receives it.
+    public func acceptOperation(terminalID: SessionID, deviceID: DeviceID, sequence: UInt64) throws {
         guard sequence > 0 else { throw Error.invalidInputSequence }
         guard let lease = activeLease(for: terminalID), lease.deviceID == deviceID else {
             throw Error.notController

@@ -523,6 +523,13 @@ message TerminalResizeCommand {
   uint32 rows = 4;
 }
 
+// Acknowledges terminal traffic after the Host runtime has accepted it. Sequence
+// is zero only for release, which has no ordered terminal operation.
+message TerminalOperationResult {
+  string terminal_session_id = 1;
+  uint64 sequence = 2;
+}
+
 message CreateLocalFolderContextCommand {
   string space_id = 1;
   string resource_id = 2;

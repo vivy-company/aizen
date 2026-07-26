@@ -133,6 +133,9 @@ public actor LocalHost: WireEndpoint {
                 ReadContextTextFileResponsePayload.identifier,
                 CreateTerminalSessionCommandPayload.identifier,
                 CreateTerminalSessionResultPayload.identifier,
+                TerminalInputCommandPayload.identifier,
+                TerminalResizeCommandPayload.identifier,
+                TerminalOperationResultPayload.identifier,
                 CreateSpaceCommandPayload.identifier,
                 CreateSpaceResultPayload.identifier,
                 RenameSpaceCommandPayload.identifier,
@@ -332,6 +335,30 @@ public actor LocalHost: WireEndpoint {
             let text = try await contextFiles.readTextFile(contextID: contextID, relativePath: query.relativePath)
             kind = .queryResponse
             payload = try TypedPayload(ReadContextTextFileResponsePayload(relativePath: query.relativePath, text: text))
+        case .command where envelope.payload.identifier == TerminalInputCommandPayload.identifier:
+            let command = try TerminalInputCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)
+            guard let terminalRuntime else { throw HostProtocolError.runtimeUnavailable }
+            guard let session = try await storage.load().terminalSessions.first(where: { $0.id == terminalSessionID }) else {
+                throw HostProtocolError.unknownSession(terminalSessionID)
+            }
+            try await terminalRuntime.sendInput(to: session, input: command.input)
+            payload = try TypedPayload(TerminalOperationResultPayload(terminalSessionID: command.terminalSessionID, sequence: command.sequence))
+            kind = .commandResult
+        case .command where envelope.payload.identifier == TerminalResizeCommandPayload.identifier:
+            let command = try TerminalResizeCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            guard let columns = Int(exactly: command.columns), let rows = Int(exactly: command.rows),
+                  (1...1_000).contains(columns), (1...1_000).contains(rows) else {
+                throw HostProtocolError.invalidTerminalDimensions
+            }
+            let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)
+            guard let terminalRuntime else { throw HostProtocolError.runtimeUnavailable }
+            guard let session = try await storage.load().terminalSessions.first(where: { $0.id == terminalSessionID }) else {
+                throw HostProtocolError.unknownSession(terminalSessionID)
+            }
+            try await terminalRuntime.resize(session: session, columns: columns, rows: rows)
+            payload = try TypedPayload(TerminalOperationResultPayload(terminalSessionID: command.terminalSessionID, sequence: command.sequence))
+            kind = .commandResult
         case .command where envelope.payload.identifier == CreateTerminalSessionCommandPayload.identifier:
             let command = try CreateTerminalSessionCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)
@@ -1054,6 +1081,7 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case commandIncomplete(CommandID)
     case invalidResourcePath(String)
     case invalidExecutionContext(ExecutionContextID)
+    case invalidTerminalDimensions
     case spaceNotEmpty(SpaceID)
     case runtimeUnavailable
 
@@ -1061,7 +1089,7 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
         switch self {
         case .unsupportedRequest:
             .unsupportedRequest
-        case .invalidIdentity, .invalidResourcePath, .invalidExecutionContext:
+        case .invalidIdentity, .invalidResourcePath, .invalidExecutionContext, .invalidTerminalDimensions:
             .invalidRequest
         case .unknownSpace:
             .unknownSpace

@@ -188,7 +188,8 @@ import Testing
         hostIdentity: hostIdentity,
         storage: storage,
         endpoint: LocalHost(storage: storage),
-        pairing: PairingRequestRegistry(hostID: host.hostID, approval: PairingApprovalService(storage: storage))
+        pairing: PairingRequestRegistry(hostID: host.hostID, approval: PairingApprovalService(storage: storage)),
+        terminalControl: TerminalControlLeaseRegistry()
     )
     try await listener.start()
     defer { listener.stop() }
@@ -240,6 +241,7 @@ private func listenerPort(_ listener: HostLANWebSocketListener) async throws -> 
         authorization: DeviceAuthorizationGate(storage: storage),
         rateLimiter: rateLimiter,
         pairing: PairingRequestRegistry(hostID: host.hostID, approval: PairingApprovalService(storage: storage)),
+        terminalControl: TerminalControlLeaseRegistry(),
         source: source
     )
     let connectionID = UUID()
@@ -317,6 +319,7 @@ private func listenerPort(_ listener: HostLANWebSocketListener) async throws -> 
         authorization: DeviceAuthorizationGate(storage: storage),
         rateLimiter: rateLimiter,
         pairing: pairing,
+        terminalControl: TerminalControlLeaseRegistry(),
         source: source
     )
     let connectionID = UUID()
