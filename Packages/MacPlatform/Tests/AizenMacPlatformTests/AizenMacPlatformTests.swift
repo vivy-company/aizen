@@ -147,6 +147,28 @@ import Testing
     #expect(!full.truncated)
 }
 
+@Test func gitRepositoryStatusReaderReturnsBoundedRealDiff() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try runGit(["init", "--initial-branch=main", root.path])
+    try runGit(["-C", root.path, "config", "user.email", "aizen@example.test"])
+    try runGit(["-C", root.path, "config", "user.name", "Aizen Test"])
+    let file = root.appendingPathComponent("README.md")
+    try Data("before\n".utf8).write(to: file)
+    try runGit(["-C", root.path, "add", "README.md"])
+    try runGit(["-C", root.path, "commit", "-m", "seed"])
+    try Data("after\n".utf8).write(to: file)
+
+    let reader = GitRepositoryStatusReader()
+    let diff = try await reader.diff(at: root, relativePath: "README.md", maximumBytes: 4_096)
+    let text = String(decoding: diff.unifiedDiff, as: UTF8.self)
+    #expect(text.contains("-before"))
+    #expect(text.contains("+after"))
+    #expect(diff.repositoryRevision.count == 40)
+    #expect(diff.indexRevision.count == 64)
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")

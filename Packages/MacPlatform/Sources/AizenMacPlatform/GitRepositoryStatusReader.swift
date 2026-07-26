@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Host resolves the repository URL from a Resource before this actor is called; this type never
 /// receives a client-provided command or path fragment.
-public actor GitRepositoryStatusReader: RepositoryStatusReading {
+public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading {
     private static let maximumStatusBytes = 1_048_576
     private static let maximumIndexBytes = 67_108_864
 
@@ -30,6 +30,19 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading {
             entries: entries.entries,
             truncated: entries.truncated
         )
+    }
+
+    public func diff(at repositoryURL: URL, relativePath: String, maximumBytes: Int) async throws -> RepositoryDiffSnapshot {
+        guard maximumBytes > 0, FileManager.default.fileExists(atPath: repositoryURL.appendingPathComponent(".git").path) else { throw Error.notRepository }
+        let pathArguments = relativePath.isEmpty ? [] : ["--", relativePath]
+        let diffArguments: [String]
+        if (try? runGit(["-C", repositoryURL.path, "rev-parse", "--verify", "HEAD"], maximumOutputBytes: 512)) != nil {
+            diffArguments = ["-C", repositoryURL.path, "diff", "--no-ext-diff", "--no-color", "--no-textconv", "--binary", "HEAD"] + pathArguments
+        } else {
+            diffArguments = ["-C", repositoryURL.path, "diff", "--no-ext-diff", "--no-color", "--no-textconv", "--binary", "--cached"] + pathArguments
+        }
+        let output = try runGitData(diffArguments, maximumOutputBytes: maximumBytes)
+        return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL), unifiedDiff: output, truncated: false)
     }
 
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {

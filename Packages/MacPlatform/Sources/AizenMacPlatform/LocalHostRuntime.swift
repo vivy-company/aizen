@@ -47,6 +47,7 @@ public final class LocalHostRuntime: @unchecked Sendable {
         self.agentLaunchConfiguration = agentLaunchConfiguration
         let worktrees = GitLinkedWorktreeService()
         let terminalRuntime = TmuxTerminalRuntime()
+        let repositoryReader = GitRepositoryStatusReader()
         self.terminalRuntime = terminalRuntime
         let host = LocalHost(
             storage: storage,
@@ -58,7 +59,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
             pairingRegistry: pairing,
             linkedWorktrees: worktrees,
             independentContexts: worktrees,
-            repositoryStatusReader: GitRepositoryStatusReader(),
+            repositoryStatusReader: repositoryReader,
+            repositoryDiffReader: repositoryReader,
             xcodeProjectOpener: MacXcodeProjectOpener(),
             xcodeProjectInspector: MacXcodeProjectInspector(),
             xcodeProjectBuilder: MacXcodeProjectBuilder()
