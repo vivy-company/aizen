@@ -54,6 +54,78 @@ import AizenWire
     }
 }
 
+@Test func remoteSessionAuthenticationAcceptsOnlyPersistedUnrevokedDeviceIdentity() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let hostIdentity = LocalCryptographicIdentity()
+    let host = HostPublicIdentity(hostID: HostID(), displayName: "Mac", cryptographicIdentity: hostIdentity.publicIdentity())
+    let deviceIdentity = LocalCryptographicIdentity()
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: deviceIdentity.publicIdentity())
+    try await storage.saveDeviceAuthorization(.init(device: device, grants: [.init(capability: .spaceRead)]))
+    let clientEphemeral = ConnectionEphemeralKey()
+    let start = AuthenticationStartPayload(
+        hostID: host.hostID,
+        deviceID: device.deviceID,
+        connectionID: UUID(),
+        clientNonce: Data(repeating: 1, count: 32),
+        deviceSigningPublicKey: device.cryptographicIdentity.signingPublicKey,
+        deviceKeyAgreementPublicKey: device.cryptographicIdentity.keyAgreementPublicKey,
+        clientEphemeralPublicKey: clientEphemeral.publicKey,
+        route: "lan"
+    )
+    let authenticator = RemoteSessionAuthenticator(host: host, hostIdentity: hostIdentity, storage: storage)
+    let challenge = try await authenticator.begin(start)
+    let binding = try ConnectionAuthenticationBinding(
+        protocolGeneration: 1,
+        hostID: challenge.hostID,
+        deviceID: challenge.deviceID,
+        connectionID: challenge.connectionID,
+        clientNonce: challenge.clientNonce,
+        serverNonce: challenge.serverNonce,
+        clientEphemeralPublicKey: start.clientEphemeralPublicKey,
+        serverEphemeralPublicKey: challenge.serverEphemeralPublicKey,
+        route: .lan
+    )
+    let hostPublicIdentity = try PublicCryptographicIdentity(signingPublicKey: challenge.hostSigningPublicKey, keyAgreementPublicKey: challenge.hostKeyAgreementPublicKey, createdAt: host.cryptographicIdentity.createdAt)
+    try ConnectionAuthenticator.verify(.init(participant: .host, signature: challenge.hostSignature), expectedParticipant: .host, identity: hostPublicIdentity, binding: binding)
+    let deviceProof = ConnectionAuthenticator.makeProof(participant: .device, identity: deviceIdentity, binding: binding)
+    let session = try await authenticator.finish(.init(connectionID: start.connectionID, deviceSignature: deviceProof.signature))
+    #expect(session.deviceID == device.deviceID)
+    #expect(session.route == .lan)
+
+    let unpaired = AuthenticationStartPayload(
+        hostID: host.hostID,
+        deviceID: DeviceID(),
+        connectionID: UUID(),
+        clientNonce: Data(repeating: 2, count: 32),
+        deviceSigningPublicKey: device.cryptographicIdentity.signingPublicKey,
+        deviceKeyAgreementPublicKey: device.cryptographicIdentity.keyAgreementPublicKey,
+        clientEphemeralPublicKey: ConnectionEphemeralKey().publicKey,
+        route: "lan"
+    )
+    await #expect(throws: RemoteSessionAuthenticationError.rejected) {
+        try await authenticator.begin(unpaired)
+    }
+
+    var revoked = DeviceAuthorization(device: device, grants: [.init(capability: .spaceRead)])
+    revoked.revokedAt = Date()
+    try await storage.saveDeviceAuthorization(revoked)
+    let reconnect = AuthenticationStartPayload(
+        hostID: host.hostID,
+        deviceID: device.deviceID,
+        connectionID: UUID(),
+        clientNonce: Data(repeating: 3, count: 32),
+        deviceSigningPublicKey: device.cryptographicIdentity.signingPublicKey,
+        deviceKeyAgreementPublicKey: device.cryptographicIdentity.keyAgreementPublicKey,
+        clientEphemeralPublicKey: ConnectionEphemeralKey().publicKey,
+        route: "lan"
+    )
+    await #expect(throws: RemoteSessionAuthenticationError.rejected) {
+        try await authenticator.begin(reconnect)
+    }
+}
+
 @Test func localHostReturnsTheStorageSnapshotThroughWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
