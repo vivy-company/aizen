@@ -197,6 +197,13 @@ import Testing
     #expect(try PullRepositoryResultPayload(protobufBytes: result.protobufBytes()) == result)
 }
 
+@Test func repositoryPushPayloadsCarryRevisionPreconditions() throws {
+    let command = PushRepositoryCommandPayload(resourceID: UUID().uuidString, expectedRepositoryRevision: "head", expectedIndexRevision: String(repeating: "a", count: 64))
+    let result = PushRepositoryResultPayload(repositoryRevision: "head", indexRevision: String(repeating: "b", count: 64), operationID: UUID().uuidString)
+    #expect(try PushRepositoryCommandPayload(protobufBytes: command.protobufBytes()) == command)
+    #expect(try PushRepositoryResultPayload(protobufBytes: result.protobufBytes()) == result)
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")

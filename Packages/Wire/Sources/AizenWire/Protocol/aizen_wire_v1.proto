@@ -556,6 +556,18 @@ message PullRepositoryResult {
   string operation_id = 3;
 }
 
+message PushRepositoryCommand {
+  string resource_id = 1;
+  string expected_repository_revision = 2;
+  string expected_index_revision = 3;
+}
+
+message PushRepositoryResult {
+  string repository_revision = 1;
+  string index_revision = 2;
+  string operation_id = 3;
+}
+
 message ListExecutionContextsQuery {
   string space_id = 1;
   string resource_id = 2;
