@@ -13,7 +13,7 @@ public actor LocalHostClient {
     public init(storageURL: URL, commandOutboxURL: URL? = nil) {
         let storage = StorageRepository(url: storageURL)
         client = HostClient(
-            transport: InProcessTransport(endpoint: LocalHost(storage: storage)),
+            transport: InProcessTransport(endpoint: LocalHost(storage: storage, terminalRuntime: TmuxTerminalRuntime())),
             commandOutbox: commandOutboxURL.map(FileCommandOutbox.init(url:))
         )
     }
