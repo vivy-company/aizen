@@ -40,6 +40,12 @@ public enum PairedTLSOptions {
             dispatchData(key),
             dispatchData(PairedTLSPreSharedKey.identity(for: deviceID))
         )
+        // The Host uses a bootstrap certificate. The paired PSK and the signed Aizen
+        // challenge immediately above Wire are the identity checks; a public PKI name
+        // must not substitute for either of them.
+        sec_protocol_options_set_verify_block(options.securityProtocolOptions, { _, _, complete in
+            complete(true)
+        }, DispatchQueue(label: "win.aizen.remote-tls-verify"))
         return options
     }
 
