@@ -1,3 +1,4 @@
+import AizenCore
 import AizenTransport
 import AizenWire
 import Dispatch
@@ -36,12 +37,19 @@ public struct HostMachServiceConfiguration: Sendable, Equatable {
 }
 
 /// Client transport for the user-level Host Mach service.
-public final class MachWireTransport: @unchecked Sendable, WireTransport {
+public final class MachWireTransport: @unchecked Sendable, RunEventTransport {
     private let connection: xpc_connection_t
+    private let events = MachRunEventHub()
 
     public init(machServiceName: String) {
         connection = xpc_connection_create_mach_service(machServiceName, nil, 0)
-        xpc_connection_set_event_handler(connection) { _ in }
+        xpc_connection_set_event_handler(connection) { [events] message in
+            guard xpc_get_type(message) == XPC_TYPE_DICTIONARY else { return }
+            var length = 0
+            guard let bytes = xpc_dictionary_get_data(message, "event", &length) else { return }
+            let data = Data(bytes: bytes, count: length)
+            Task { await events.receive(data) }
+        }
         xpc_connection_activate(connection)
     }
 
@@ -71,6 +79,10 @@ public final class MachWireTransport: @unchecked Sendable, WireTransport {
             }
         }
         return try ProtocolEnvelope(serializedData: response)
+    }
+
+    public func runEvents() async throws -> AsyncStream<RunEvent> {
+        await events.stream()
     }
 }
 
@@ -115,6 +127,21 @@ private final class MachWireService: @unchecked Sendable {
 
     func accept(_ connection: xpc_object_t) {
         let peer = MachConnection(connection)
+        if let eventEndpoint = endpoint as? any RunEventEndpoint {
+            Task { [peer] in
+                let stream = await eventEndpoint.runEvents()
+                for await event in stream {
+                    guard let envelope = try? ProtocolEnvelope(
+                        messageID: UUID().uuidString,
+                        connectionSequence: event.sequence,
+                        kind: .event,
+                        channel: .runStream,
+                        payload: TypedPayload(RunEventPayload(event: event))
+                    ).serializedData() else { continue }
+                    peer.sendEvent(envelope)
+                }
+            }
+        }
         xpc_connection_set_event_handler(connection) { [endpoint, peer] message in
             guard xpc_get_type(message) == XPC_TYPE_DICTIONARY,
                   let reply = xpc_dictionary_create_reply(message) else {
@@ -153,6 +180,41 @@ private final class MachConnection: @unchecked Sendable {
 
     func send(_ message: MachMessage) {
         xpc_connection_send_message(value, message.value)
+    }
+
+    func sendEvent(_ data: Data) {
+        let message = xpc_dictionary_create_empty()
+        data.withUnsafeBytes { bytes in
+            xpc_dictionary_set_data(message, "event", bytes.baseAddress, bytes.count)
+        }
+        xpc_connection_send_message(value, message)
+    }
+}
+
+private actor MachRunEventHub {
+    private var continuations: [UUID: AsyncStream<RunEvent>.Continuation] = [:]
+
+    func stream() -> AsyncStream<RunEvent> {
+        let identifier = UUID()
+        let stream = AsyncStream<RunEvent>.makeStream(bufferingPolicy: .bufferingNewest(100))
+        continuations[identifier] = stream.continuation
+        stream.continuation.onTermination = { [weak self] _ in
+            Task { await self?.remove(identifier) }
+        }
+        return stream.stream
+    }
+
+    func receive(_ data: Data) {
+        guard let envelope = try? ProtocolEnvelope(serializedData: data),
+              envelope.kind == .event,
+              envelope.channel == .runStream,
+              envelope.payload.identifier == RunEventPayload.identifier,
+              let event = try? RunEventPayload(protobufBytes: envelope.payload.protobufBytes).event else { return }
+        for continuation in continuations.values { continuation.yield(event) }
+    }
+
+    private func remove(_ identifier: UUID) {
+        continuations.removeValue(forKey: identifier)
     }
 }
 
