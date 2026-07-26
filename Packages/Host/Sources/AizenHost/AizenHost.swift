@@ -267,15 +267,24 @@ public actor LocalHost: WireEndpoint {
             let command = try RemoveResourceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             guard let uuid = UUID(uuidString: command.resourceID) else { throw HostProtocolError.invalidIdentity(command.resourceID) }
             let resourceID = ResourceID(rawValue: uuid)
-            _ = try await storage.transact { snapshot in
-                guard snapshot.resources.contains(where: { $0.id == resourceID }) else { throw HostProtocolError.unknownResource(resourceID) }
-                guard !snapshot.executionContexts.contains(where: { $0.resourceID == resourceID }) else {
-                    throw HostProtocolError.resourceInUse(resourceID)
+            if let replayed = try await durableReplayResult(for: envelope) {
+                payload = replayed
+            } else {
+                guard let spaceID = try await storage.load().resources.first(where: { $0.id == resourceID })?.spaceID else {
+                    throw HostProtocolError.unknownResource(resourceID)
                 }
-                snapshot.resources.removeAll(where: { $0.id == resourceID })
+                payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                    _ = try await self.storage.transact { snapshot in
+                        guard snapshot.resources.contains(where: { $0.id == resourceID }) else { throw HostProtocolError.unknownResource(resourceID) }
+                        guard !snapshot.executionContexts.contains(where: { $0.resourceID == resourceID }) else {
+                            throw HostProtocolError.resourceInUse(resourceID)
+                        }
+                        snapshot.resources.removeAll(where: { $0.id == resourceID })
+                    }
+                    return try TypedPayload(ResourceMutationResultPayload())
+                }
             }
             kind = .commandResult
-            payload = try TypedPayload(ResourceMutationResultPayload())
         case .command where envelope.payload.identifier == CreateLocalFolderContextCommandPayload.identifier:
             let command = try CreateLocalFolderContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
@@ -390,6 +399,9 @@ public actor LocalHost: WireEndpoint {
         spaceID: SpaceID,
         operation: () async throws -> TypedPayload
     ) async throws -> TypedPayload {
+        if let replayed = try await durableReplayResult(for: envelope) {
+            return replayed
+        }
         guard let rawCommandID = UUID(uuidString: envelope.messageID) else {
             return try await operation()
         }
@@ -427,6 +439,24 @@ public actor LocalHost: WireEndpoint {
         case .conflict:
             throw HostProtocolError.commandIDConflict(command.id)
         }
+    }
+
+    private func durableReplayResult(for envelope: ProtocolEnvelope) async throws -> TypedPayload? {
+        guard let rawCommandID = UUID(uuidString: envelope.messageID) else { return nil }
+        let commandID = CommandID(rawValue: rawCommandID)
+        guard let stored = try await storage.load().commands.first(where: { $0.id == commandID }) else { return nil }
+        guard stored.payloadDigest == Self.payloadDigest(envelope.payload) else {
+            throw HostProtocolError.commandIDConflict(commandID)
+        }
+        guard stored.lifecycle == .succeeded, let result = stored.result else {
+            throw HostProtocolError.commandIncomplete(commandID)
+        }
+        return TypedPayload(
+            identifier: PayloadIdentifier(rawValue: result.payloadIdentifier),
+            schemaVersion: result.schemaVersion,
+            protobufBytes: result.protobufBytes,
+            stateAffecting: true
+        )
     }
 
     private static func payloadDigest(_ payload: TypedPayload) -> String {
