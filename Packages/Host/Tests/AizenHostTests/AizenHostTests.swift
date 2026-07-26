@@ -212,6 +212,17 @@ import AizenWire
     await #expect(throws: RemoteHostAuthorizationError.unsupportedPayload(CreateSpaceResultPayload.identifier)) {
         try await allowed.receive(unsupported)
     }
+
+    let localOnlyApproval = ProtocolEnvelope(
+        messageID: UUID().uuidString,
+        connectionSequence: 3,
+        kind: .command,
+        channel: .control,
+        payload: try .init(ApprovePairingRequestCommandPayload(tokenID: UUID(), capabilities: ["host.read"]))
+    )
+    await #expect(throws: RemoteHostAuthorizationError.unsupportedPayload(ApprovePairingRequestCommandPayload.identifier)) {
+        try await allowed.receive(localOnlyApproval)
+    }
 }
 
 private func authenticatedSession(for deviceID: DeviceID) throws -> AuthenticatedRemoteSession {
