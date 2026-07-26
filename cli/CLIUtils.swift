@@ -564,6 +564,10 @@ func tmuxSessionExists(paneId: String) -> Bool {
 }
 
 func tmuxAttach(paneId: String) throws {
+    try tmuxAttach(sessionName: "aizen-\(paneId)")
+}
+
+func tmuxAttach(sessionName: String) throws {
     guard let tmux = tmuxPath() else {
         throw CLIError.tmuxNotInstalled
     }
@@ -571,8 +575,6 @@ func tmuxAttach(paneId: String) throws {
     guard isTTY() else {
         throw CLIError.invalidArguments("tmux attach requires a terminal")
     }
-
-    let sessionName = "aizen-\(paneId)"
 
     // Replace current process with tmux attach
     let args = [tmux, "attach", "-t", sessionName]

@@ -794,6 +794,67 @@ private extension AizenCLI {
             print(terminalHelpText())
             return
         }
+        guard !parsed.flags.contains("cross-project") else {
+            throw CLIError.invalidArguments("Cross-project terminals are not available through the v2 Host yet.")
+        }
+
+        let targetPath = parsed.positionals.first.map(normalizePath) ?? FileManager.default.currentDirectoryPath
+        guard FileManager.default.fileExists(atPath: targetPath) else { throw CLIError.pathNotFound(targetPath) }
+        guard await GitUtils.isGitRepository(at: targetPath) else { throw CLIError.notGitRepository(targetPath) }
+
+        let client = V2CLIClient()
+        let spaces = try await client.spaces()
+        let space: Space
+        if let name = parsed.options["workspace"] {
+            guard let match = spaces.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                throw CLIError.workspaceNotFound(name)
+            }
+            space = match
+        } else if spaces.count == 1, let onlySpace = spaces.first {
+            space = onlySpace
+        } else {
+            throw CLIError.invalidArguments("Specify --workspace when creating a terminal.")
+        }
+
+        let directory = URL(fileURLWithPath: targetPath).standardizedFileURL.resolvingSymlinksInPath().path
+        let reference = HostPrivateReference(rawValue: "local-repository:\(directory)")
+        let resources = try await client.resources(spaceID: space.id)
+        let resourceID: ResourceID
+        if let existing = resources.first(where: { $0.kind == .repository && $0.details == .hostPrivate(reference) }) {
+            resourceID = existing.id
+        } else {
+            resourceID = try await client.importLocalRepository(spaceID: space.id, path: directory)
+        }
+        let contexts = try await client.executionContexts(spaceID: space.id, resourceID: resourceID)
+        let executionContextID: ExecutionContextID
+        if let existing = contexts.first(where: { $0.kind == .repositoryCheckout }) {
+            executionContextID = existing.id
+        } else {
+            executionContextID = try await client.createRepositoryCheckoutContext(spaceID: space.id, resourceID: resourceID)
+        }
+        let terminal = try await client.createTerminalSession(
+            spaceID: space.id,
+            executionContextID: executionContextID,
+            title: parsed.options["name"],
+            initialCommand: parsed.options["command"]
+        )
+        let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
+        if parsed.flags.contains("attach") {
+            print(style.success("Created terminal for \(space.name)"))
+            try tmuxAttach(sessionName: terminal.tmuxSessionName)
+        } else {
+            print(style.success("Created terminal: \(terminal.title ?? directory)"))
+            print(style.label("Session: \(terminal.tmuxSessionName)"))
+            print("Use \(style.header("aizen sessions --workspace \(space.name)")) to list Host-owned terminals.")
+        }
+    }
+
+    static func handleLegacyTerminal(_ args: [String]) async throws {
+        let parsed = try parseArguments(args)
+        if parsed.flags.contains("help") {
+            print(terminalHelpText())
+            return
+        }
 
         guard isTmuxAvailable() else {
             throw CLIError.tmuxNotInstalled
@@ -1806,18 +1867,16 @@ Usage:
   aizen terminal . --attach                            Create and attach
   aizen terminal . -c "npm run dev"                   Run command in session
   aizen terminal . --name "Dev Server"                Custom tab name
-  aizen terminal --cross-project --workspace <name>    Create workspace cross-project session
 
 Options:
   -a, --attach              Attach to session after creating
   -c, --command <cmd>       Run command in the terminal
   --name <name>             Custom name for the terminal tab
-  -w, --workspace <name>    Workspace for untracked repos or cross-project
-  --cross-project           Create terminal in workspace cross-project root
+  -w, --workspace <name>    Space for the Host-owned repository terminal
   --no-color                Disable colored output
 
-Create a new terminal session that persists via tmux.
-The session will appear in Aizen when you open the app.
+Create a new Host-owned terminal session that persists via tmux.
+When a repository is not tracked yet, it is imported into the selected Space.
 """
     }
 
