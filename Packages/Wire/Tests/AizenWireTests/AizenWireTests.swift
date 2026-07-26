@@ -211,6 +211,17 @@ import Testing
     #expect(try CancelOperationResultPayload(protobufBytes: result.protobufBytes()) == result)
 }
 
+@Test func xcodeBuildCommandsRejectUnboundedOrUnsupportedDestinations() throws {
+    var command = AizenWireV1_BuildXcodeProjectCommand()
+    command.resourceID = UUID().uuidString
+    command.projectID = "App.xcodeproj"
+    command.scheme = "App"
+    command.destination = "platform=iOS Simulator,name=User Device"
+    #expect(throws: WireCodecError.invalidXcodeBuildCommand) {
+        try BuildXcodeProjectCommandPayload(protobufBytes: command.serializedData())
+    }
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")
