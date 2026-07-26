@@ -9,6 +9,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
     public var schemaVersion: Int
     public var spaces: [Space]
     public var sessions: [Session]
+    public var conversationMessages: [ConversationMessage]
     public var resources: [Resource]
     public var executionContexts: [ExecutionContext]
     public var runs: [Run]
@@ -17,13 +18,14 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
 
     public init(
         schemaVersion: Int = Self.schemaVersion,
-        spaces: [Space] = [], sessions: [Session] = [], resources: [Resource] = [],
+        spaces: [Space] = [], sessions: [Session] = [], conversationMessages: [ConversationMessage] = [], resources: [Resource] = [],
         executionContexts: [ExecutionContext] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], artifacts: [Artifact] = []
     ) {
         precondition(schemaVersion == Self.schemaVersion, "Storage snapshots must use schema v2")
         self.schemaVersion = schemaVersion
         self.spaces = spaces
         self.sessions = sessions
+        self.conversationMessages = conversationMessages
         self.resources = resources
         self.executionContexts = executionContexts
         self.runs = runs
@@ -32,8 +34,38 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
     }
 
     public var isEmpty: Bool {
-        spaces.isEmpty && sessions.isEmpty && resources.isEmpty && executionContexts.isEmpty &&
+        spaces.isEmpty && sessions.isEmpty && conversationMessages.isEmpty && resources.isEmpty && executionContexts.isEmpty &&
             runs.isEmpty && operations.isEmpty && artifacts.isEmpty
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, runs, operations, artifacts
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try values.decode(Int.self, forKey: .schemaVersion)
+        spaces = try values.decode([Space].self, forKey: .spaces)
+        sessions = try values.decode([Session].self, forKey: .sessions)
+        conversationMessages = try values.decodeIfPresent([ConversationMessage].self, forKey: .conversationMessages) ?? []
+        resources = try values.decode([Resource].self, forKey: .resources)
+        executionContexts = try values.decode([ExecutionContext].self, forKey: .executionContexts)
+        runs = try values.decode([Run].self, forKey: .runs)
+        operations = try values.decode([AizenCore.Operation].self, forKey: .operations)
+        artifacts = try values.decode([Artifact].self, forKey: .artifacts)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(schemaVersion, forKey: .schemaVersion)
+        try values.encode(spaces, forKey: .spaces)
+        try values.encode(sessions, forKey: .sessions)
+        try values.encode(conversationMessages, forKey: .conversationMessages)
+        try values.encode(resources, forKey: .resources)
+        try values.encode(executionContexts, forKey: .executionContexts)
+        try values.encode(runs, forKey: .runs)
+        try values.encode(operations, forKey: .operations)
+        try values.encode(artifacts, forKey: .artifacts)
     }
 }
 
@@ -42,6 +74,7 @@ public enum StorageError: Error, Sendable, Equatable {
     case duplicateIdentity(String)
     case missingSpace
     case missingSession
+    case missingRun
     case missingResource
     case missingExecutionContext
     case migrationDestinationNotEmpty
@@ -200,6 +233,7 @@ public actor StorageRepository {
         guard spaceIDs.count == snapshot.spaces.count else { throw StorageError.duplicateIdentity("space") }
         guard snapshot.sessions.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
         guard Set(snapshot.sessions.map(\.id)).count == snapshot.sessions.count else { throw StorageError.duplicateIdentity("session") }
+        guard Set(snapshot.conversationMessages.map(\.id)).count == snapshot.conversationMessages.count else { throw StorageError.duplicateIdentity("conversation message") }
         guard Set(snapshot.resources.map(\.id)).count == snapshot.resources.count else { throw StorageError.duplicateIdentity("resource") }
         guard Set(snapshot.executionContexts.map(\.id)).count == snapshot.executionContexts.count else { throw StorageError.duplicateIdentity("execution context") }
         guard Set(snapshot.runs.map(\.id)).count == snapshot.runs.count else { throw StorageError.duplicateIdentity("run") }
@@ -219,6 +253,16 @@ public actor StorageRepository {
             guard let context = contexts[contextID] else { return false }
             return context.spaceID == session.spaceID
         }) else { throw StorageError.missingExecutionContext }
+        guard snapshot.conversationMessages.allSatisfy({ message in
+            guard let session = sessions[message.sessionID] else { return false }
+            return session.spaceID == message.spaceID
+        }) else { throw StorageError.missingSession }
+        let runs = Dictionary(uniqueKeysWithValues: snapshot.runs.map { ($0.id, $0) })
+        guard snapshot.conversationMessages.allSatisfy({ message in
+            guard let runID = message.runID else { return true }
+            guard let run = runs[runID] else { return false }
+            return run.spaceID == message.spaceID && run.sessionID == message.sessionID
+        }) else { throw StorageError.missingRun }
         guard snapshot.runs.allSatisfy({ run in
             guard let session = sessions[run.sessionID], session.spaceID == run.spaceID else { return false }
             guard let contextID = run.executionContextID else { return true }

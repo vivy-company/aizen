@@ -18,6 +18,30 @@ import AizenCore
     #expect(try await repository.load() == saved)
 }
 
+@Test func repositoryPersistsCanonicalConversationMessages() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = StorageRepository(url: directory.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Personal")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "No repository needed")
+    let message = ConversationMessage(spaceID: space.id, sessionID: session.id, role: .user, content: "Hello")
+    _ = try await repository.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+        $0.conversationMessages.append(message)
+    }
+    #expect(try await repository.load().conversationMessages == [message])
+}
+
+@Test func snapshotDecodesExistingV2FilesWithoutMessages() throws {
+    let snapshot = StorageSnapshot()
+    let oldFormat = """
+    {"schemaVersion":2,"spaces":[],"sessions":[],"resources":[],"executionContexts":[],"runs":[],"operations":[],"artifacts":[]}
+    """
+    let decoded = try JSONDecoder().decode(StorageSnapshot.self, from: Data(oldFormat.utf8))
+    #expect(decoded == snapshot)
+}
+
 @Test func failedTransactionsLeaveTheLastValidSnapshotIntact() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: directory) }

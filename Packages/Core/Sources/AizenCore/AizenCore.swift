@@ -37,6 +37,7 @@ public enum HostIdentity: DomainIDKind {}
 public enum DeviceIdentity: DomainIDKind {}
 public enum SpaceIdentity: DomainIDKind {}
 public enum SessionIdentity: DomainIDKind {}
+public enum ConversationMessageIdentity: DomainIDKind {}
 public enum ResourceIdentity: DomainIDKind {}
 public enum ExecutionContextIdentity: DomainIDKind {}
 public enum RunIdentity: DomainIDKind {}
@@ -48,6 +49,7 @@ public typealias HostID = DomainID<HostIdentity>
 public typealias DeviceID = DomainID<DeviceIdentity>
 public typealias SpaceID = DomainID<SpaceIdentity>
 public typealias SessionID = DomainID<SessionIdentity>
+public typealias ConversationMessageID = DomainID<ConversationMessageIdentity>
 public typealias ResourceID = DomainID<ResourceIdentity>
 public typealias ExecutionContextID = DomainID<ExecutionContextIdentity>
 public typealias RunID = DomainID<RunIdentity>
@@ -203,6 +205,43 @@ public struct Session: Codable, Sendable, Hashable, Identifiable {
         self.lifecycle = lifecycle
         self.resourceIDs = resourceIDs
         self.executionContextID = executionContextID
+    }
+}
+
+public enum ConversationMessageRole: String, Codable, Sendable, Hashable {
+    case user
+    case assistant
+    case system
+    case tool
+}
+
+/// Canonical durable turn content. Streaming deltas remain Client state until committed as a message.
+public struct ConversationMessage: Codable, Sendable, Hashable, Identifiable {
+    public let id: ConversationMessageID
+    public let spaceID: SpaceID
+    public let sessionID: SessionID
+    public var runID: RunID?
+    public var role: ConversationMessageRole
+    public var content: String
+    public let createdAt: Date
+
+    public init(
+        id: ConversationMessageID = ConversationMessageID(),
+        spaceID: SpaceID,
+        sessionID: SessionID,
+        runID: RunID? = nil,
+        role: ConversationMessageRole,
+        content: String,
+        createdAt: Date = Date()
+    ) {
+        precondition(!content.isEmpty, "Conversation messages require content")
+        self.id = id
+        self.spaceID = spaceID
+        self.sessionID = sessionID
+        self.runID = runID
+        self.role = role
+        self.content = content
+        self.createdAt = createdAt
     }
 }
 
