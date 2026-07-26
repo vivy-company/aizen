@@ -54,6 +54,31 @@ import AizenWire
     }
 }
 
+@Test func pairingRequestsRequireLocalApprovalAndNeverExposeTheSecret() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let hostIdentity = LocalCryptographicIdentity()
+    let host = HostPublicIdentity(hostID: HostID(), displayName: "Mac", cryptographicIdentity: hostIdentity.publicIdentity())
+    let secret = Data(repeating: 7, count: 32)
+    let invitation = try PairingInvitation(secret: secret, host: host, endpointHints: [], expiresAt: Date().addingTimeInterval(60))
+    let approval = PairingApprovalService(storage: storage)
+    try await approval.issue(invitation)
+    let deviceIdentity = LocalCryptographicIdentity()
+    let request = PairingRequestPayload(tokenID: invitation.tokenID, pairingSecret: secret, hostID: host.hostID, deviceID: DeviceID(), deviceDisplayName: "Phone", devicePlatform: "iOS", deviceSigningPublicKey: deviceIdentity.publicIdentity().signingPublicKey, deviceKeyAgreementPublicKey: deviceIdentity.publicIdentity().keyAgreementPublicKey, route: "lan")
+    let registry = PairingRequestRegistry(hostID: host.hostID, approval: approval)
+
+    let pending = try await registry.submit(request)
+    #expect(pending.device.displayName == "Phone")
+    #expect(try await storage.deviceAuthorizations().isEmpty)
+    let authorization = try await registry.approve(tokenID: pending.tokenID, grants: [.init(capability: .spaceRead)])
+    #expect(authorization.device.deviceID == request.deviceID)
+    #expect(try await storage.deviceAuthorization(for: request.deviceID) == authorization)
+    await #expect(throws: PairingRequestError.unknownRequest) {
+        try await registry.approve(tokenID: pending.tokenID, grants: [])
+    }
+}
+
 @Test func remoteSessionAuthenticationAcceptsOnlyPersistedUnrevokedDeviceIdentity() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
