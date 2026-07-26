@@ -192,7 +192,18 @@ actor ReignitionHostComposition: ReignitionConversationClient {
 
     func events() async -> AsyncStream<RunEvent> {
         do {
-            return try await client.runEvents()
+            let events = try await client.runEvents()
+            return AsyncStream { continuation in
+                let forwarding = Task {
+                    for await event in events {
+                        if case let .run(run) = event {
+                            continuation.yield(run)
+                        }
+                    }
+                    continuation.finish()
+                }
+                continuation.onTermination = { _ in forwarding.cancel() }
+            }
         } catch {
             return AsyncStream { $0.finish() }
         }
