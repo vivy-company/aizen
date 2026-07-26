@@ -1,4 +1,5 @@
 import AizenClient
+import AizenCore
 import AizenHost
 import AizenMacPlatform
 import AizenStorage
@@ -49,6 +50,22 @@ actor ReignitionHostComposition {
 
     func snapshot() async throws -> StorageSnapshot {
         try JSONDecoder().decode(StorageSnapshot.self, from: try await client.snapshotData())
+    }
+
+    func conversations(spaceID: SpaceID? = nil) async throws -> [Session] {
+        try await client.conversations(spaceID: spaceID)
+    }
+
+    func conversationTimeline(sessionID: SessionID) async throws -> [ConversationMessage] {
+        try await client.conversationTimeline(sessionID: sessionID)
+    }
+
+    func createConversation(spaceID: SpaceID, title: String) async throws -> SessionID {
+        try await client.createConversation(spaceID: spaceID, title: title)
+    }
+
+    func sendConversation(spaceID: SpaceID, sessionID: SessionID, content: String) async throws -> RunID {
+        try await client.sendConversation(spaceID: spaceID, sessionID: sessionID, content: content)
     }
 
     func prepareLegacyMigration(legacyStoreURL: URL?, legacyModelURL: URL?, fileManager: FileManager = .default) async throws -> MigrationPreparation {
