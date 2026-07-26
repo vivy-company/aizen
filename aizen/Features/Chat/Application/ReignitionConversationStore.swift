@@ -14,6 +14,7 @@ final class ReignitionConversationStore: ObservableObject {
     @Published private(set) var executionContexts: [ExecutionContext] = []
     @Published private(set) var terminalSessions: [AizenCore.TerminalSession] = []
     @Published private(set) var operations: [AizenCore.Operation] = []
+    @Published private(set) var repositoryStateByResourceID: [ResourceID: RefreshRepositoryResourceResultPayload] = [:]
     @Published private(set) var selectedConversationID: SessionID?
     @Published private(set) var messages: [ConversationMessage] = []
     @Published private(set) var activeRunLifecycles: [RunID: RunLifecycle] = [:]
@@ -203,6 +204,13 @@ final class ReignitionConversationStore: ObservableObject {
             try await self.refreshProjection(spaceID: session.spaceID)
         }
         return terminal
+    }
+
+    func refreshRepository(resourceID: ResourceID) async {
+        await perform {
+            let state = try await self.host.refreshRepositoryResource(id: resourceID)
+            self.repositoryStateByResourceID[resourceID] = state
+        }
     }
 
     func detachExecutionContext(from sessionID: SessionID) async {

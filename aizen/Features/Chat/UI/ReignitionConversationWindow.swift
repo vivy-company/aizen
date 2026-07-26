@@ -100,6 +100,14 @@ struct ReignitionConversationWindow: View {
                         Label(resource.title, systemImage: resource.kind == .repository ? "folder.badge.gearshape" : "folder")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
+                        if resource.kind == .repository {
+                            repositoryState(resource)
+                            Button("Refresh Repository", systemImage: "arrow.clockwise") {
+                                Task { await store.refreshRepository(resourceID: resource.id) }
+                            }
+                            .labelStyle(.iconOnly)
+                            .disabled(store.isSynchronizing)
+                        }
                     } else {
                         Label("No folder attached", systemImage: "folder")
                             .font(.subheadline)
@@ -337,6 +345,35 @@ struct ReignitionConversationWindow: View {
         Task {
             terminalPresentation = await store.createTerminal(for: sessionID)
         }
+    }
+
+    @ViewBuilder
+    private func repositoryState(_ resource: Resource) -> some View {
+        if let state = store.repositoryStateByResourceID[resource.id] {
+            Label(repositoryStateTitle(state), systemImage: repositoryStateSymbol(state))
+                .font(.caption)
+                .foregroundStyle(repositoryStateColor(state))
+        }
+    }
+
+    private func repositoryStateTitle(_ state: RefreshRepositoryResourceResultPayload) -> String {
+        switch state.availability {
+        case .available:
+            var title = state.branch ?? (state.isDetached ? "Detached HEAD" : "Repository ready")
+            if state.isRebaseInProgress { title += " · Rebase" }
+            if state.hasSubmodules { title += " · Submodules" }
+            return title
+        case .missing: return "Repository missing"
+        case .notRepository: return "Not a repository"
+        }
+    }
+
+    private func repositoryStateSymbol(_ state: RefreshRepositoryResourceResultPayload) -> String {
+        state.availability == .available ? "checkmark.circle" : "exclamationmark.triangle"
+    }
+
+    private func repositoryStateColor(_ state: RefreshRepositoryResourceResultPayload) -> Color {
+        state.availability == .available ? .secondary : .orange
     }
 }
 

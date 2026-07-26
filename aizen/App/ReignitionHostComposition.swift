@@ -126,6 +126,10 @@ actor ReignitionHostComposition {
         )
     }
 
+    func refreshRepositoryResource(id: ResourceID) async throws -> RefreshRepositoryResourceResultPayload {
+        try await client.refreshRepositoryResource(id: id)
+    }
+
     func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {
         try await client.attachExecutionContext(sessionID: sessionID, contextID: contextID)
     }
