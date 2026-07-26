@@ -189,6 +189,10 @@ import AizenWire
     #expect(try await client.contextFiles(executionContextID: context.id) == [
         .init(relativePath: "README.md", name: "README.md", isDirectory: false)
     ])
+    #expect(try await client.searchContextFiles(executionContextID: context.id, query: "README") == .init(
+        matches: [.init(relativePath: "README.md", lineNumber: 1, preview: "readme")],
+        truncated: false
+    ))
     #expect(try await client.contextTextFile(executionContextID: context.id, relativePath: "README.md") == "readme")
 }
 

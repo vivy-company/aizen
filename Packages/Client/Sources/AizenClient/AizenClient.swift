@@ -761,6 +761,28 @@ public actor HostClient {
         return try ListContextFilesResponsePayload(protobufBytes: response.payload.protobufBytes).entries
     }
 
+    public func searchContextFiles(
+        executionContextID: ExecutionContextID,
+        query: String,
+        maximumMatches: Int = SearchContextFilesQueryPayload.defaultMaximumMatches
+    ) async throws -> ContextFileSearchResult {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(SearchContextFilesQueryPayload(
+                executionContextID: executionContextID.description,
+                query: query,
+                maximumMatches: maximumMatches
+            ))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == SearchContextFilesResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try SearchContextFilesResponsePayload(protobufBytes: response.payload.protobufBytes).result
+    }
+
     public func contextTextFile(executionContextID: ExecutionContextID, relativePath: String) async throws -> String {
         let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .query, channel: .state, payload: try .init(ReadContextTextFileQueryPayload(executionContextID: executionContextID.description, relativePath: relativePath))))
         guard response.kind == .queryResponse, response.payload.identifier == ReadContextTextFileResponsePayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
