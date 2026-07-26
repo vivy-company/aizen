@@ -104,6 +104,30 @@ import AizenWire
     #expect(try await storage.load().spaces.map(\.name) == ["Vivy"])
 }
 
+@Test func hostReplaysAcceptedFolderImportCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    _ = try await storage.transact { $0.spaces.append(space) }
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
+    let messageID = UUID().uuidString
+    let envelope = try ProtocolEnvelope(
+        messageID: messageID,
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(ImportLocalFolderCommandPayload(spaceID: space.id.description, path: folder.path))
+    )
+    let first = try await transport.send(envelope)
+    let replay = try await transport.send(envelope)
+    #expect(first.payload == replay.payload)
+    #expect(try await storage.load().resources.count == 1)
+    #expect(try await storage.load().commands.count == 1)
+}
+
 @Test func hostRenamesAndDeletesEmptySpacesThroughTypedCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

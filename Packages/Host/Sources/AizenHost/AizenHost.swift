@@ -2,6 +2,7 @@ import AizenCore
 import AizenStorage
 import AizenTransport
 import AizenWire
+import CryptoKit
 import Foundation
 
 /// Host command/query composition. Mac-only runtime adapters stay outside this package.
@@ -207,28 +208,30 @@ public actor LocalHost: WireEndpoint {
         case .command where envelope.payload.identifier == ImportLocalFolderCommandPayload.identifier:
             let command = try ImportLocalFolderCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
-            let directory = try Self.localDirectory(from: command.path)
-            let resource = Resource(
-                spaceID: spaceID,
-                kind: .folder,
-                title: command.title ?? directory.lastPathComponent,
-                details: .hostPrivate(HostPrivateReference(rawValue: "local-folder:\(directory.path)"))
-            )
-            let snapshot = try await storage.transact { snapshot in
-                guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
-                if let existing = snapshot.resources.first(where: { $0.details == resource.details }) {
-                    guard existing.spaceID == spaceID else {
-                        throw HostProtocolError.duplicateResource(existing.id)
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                let directory = try Self.localDirectory(from: command.path)
+                let resource = Resource(
+                    spaceID: spaceID,
+                    kind: .folder,
+                    title: command.title ?? directory.lastPathComponent,
+                    details: .hostPrivate(HostPrivateReference(rawValue: "local-folder:\(directory.path)"))
+                )
+                let snapshot = try await self.storage.transact { snapshot in
+                    guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
+                    if let existing = snapshot.resources.first(where: { $0.details == resource.details }) {
+                        guard existing.spaceID == spaceID else {
+                            throw HostProtocolError.duplicateResource(existing.id)
+                        }
+                        return
                     }
-                    return
+                    snapshot.resources.append(resource)
                 }
-                snapshot.resources.append(resource)
-            }
-            guard let importedResource = snapshot.resources.first(where: { $0.details == resource.details }) else {
-                throw HostProtocolError.unknownResource(resource.id)
+                guard let importedResource = snapshot.resources.first(where: { $0.details == resource.details }) else {
+                    throw HostProtocolError.unknownResource(resource.id)
+                }
+                return try TypedPayload(ImportLocalFolderResultPayload(resourceID: importedResource.id.description))
             }
             kind = .commandResult
-            payload = try TypedPayload(ImportLocalFolderResultPayload(resourceID: importedResource.id.description))
         case .command where envelope.payload.identifier == ImportLocalRepositoryCommandPayload.identifier:
             let command = try ImportLocalRepositoryCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
@@ -354,6 +357,55 @@ public actor LocalHost: WireEndpoint {
         return SpaceID(rawValue: rawValue)
     }
 
+    private func executeDurably(
+        envelope: ProtocolEnvelope,
+        spaceID: SpaceID,
+        operation: () async throws -> TypedPayload
+    ) async throws -> TypedPayload {
+        guard let rawCommandID = UUID(uuidString: envelope.messageID) else {
+            return try await operation()
+        }
+        let command = DurableCommand(
+            id: CommandID(rawValue: rawCommandID),
+            spaceID: spaceID,
+            payloadDigest: Self.payloadDigest(envelope.payload)
+        )
+        switch try await storage.acceptCommand(command) {
+        case .accepted:
+            _ = try await storage.transitionCommand(id: command.id, to: .executing)
+            do {
+                let payload = try await operation()
+                let result = DurableCommandResult(
+                    payloadIdentifier: payload.identifier.rawValue,
+                    schemaVersion: payload.schemaVersion,
+                    protobufBytes: payload.protobufBytes
+                )
+                _ = try await storage.transitionCommand(id: command.id, to: .succeeded, result: result)
+                return payload
+            } catch {
+                _ = try? await storage.transitionCommand(id: command.id, to: .failed)
+                throw error
+            }
+        case .duplicate(let stored):
+            guard stored.lifecycle == .succeeded, let result = stored.result else {
+                throw HostProtocolError.commandIncomplete(command.id)
+            }
+            return TypedPayload(
+                identifier: PayloadIdentifier(rawValue: result.payloadIdentifier),
+                schemaVersion: result.schemaVersion,
+                protobufBytes: result.protobufBytes,
+                stateAffecting: true
+            )
+        case .conflict:
+            throw HostProtocolError.commandIDConflict(command.id)
+        }
+    }
+
+    private static func payloadDigest(_ payload: TypedPayload) -> String {
+        let digest = SHA256.hash(data: payload.protobufBytes)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
     private static func sessionID(from value: String) throws -> SessionID {
         guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
         return SessionID(rawValue: rawValue)
@@ -417,6 +469,8 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case duplicateResource(ResourceID)
     case resourceInUse(ResourceID)
     case executionContextInUse(ExecutionContextID)
+    case commandIDConflict(CommandID)
+    case commandIncomplete(CommandID)
     case invalidResourcePath(String)
     case invalidExecutionContext(ExecutionContextID)
     case spaceNotEmpty(SpaceID)
