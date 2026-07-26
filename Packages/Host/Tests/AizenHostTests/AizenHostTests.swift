@@ -1,4 +1,5 @@
 import Foundation
+import AizenCore
 import AizenStorage
 import AizenTransport
 import Testing
@@ -18,4 +19,11 @@ import AizenWire
     let response = try await transport.send(.init(messageID: "spaces", connectionSequence: 1, kind: .query, channel: .state, payload: .init(identifier: .init(rawValue: "aizen.query.space.list@1"), schemaVersion: 1, protobufBytes: Data(), stateAffecting: false)))
     let snapshot = try JSONDecoder().decode(StorageSnapshot.self, from: response.payload.protobufBytes)
     #expect(snapshot.spaces.map(\.name) == ["Vivy"])
+}
+
+@Test func runRegistryRejectsUnknownRuns() async {
+    let registry = HostRunRegistry()
+    await #expect(throws: HostRunRegistry.Error.self) {
+        try await registry.updateLifecycle(.running, for: RunID())
+    }
 }

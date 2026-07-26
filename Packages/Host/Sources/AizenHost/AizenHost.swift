@@ -44,8 +44,10 @@ public actor HostRunRegistry {
 
     public func run(for id: RunID) -> Run? { runs[id] }
 
-    public func updateLifecycle(_ lifecycle: RunLifecycle, for id: RunID) {
-        guard var run = runs[id] else { return }
+    public enum Error: Swift.Error, Sendable, Equatable { case unknownRun(RunID) }
+
+    public func updateLifecycle(_ lifecycle: RunLifecycle, for id: RunID) throws {
+        guard var run = runs[id] else { throw Error.unknownRun(id) }
         run.lifecycle = lifecycle
         runs[id] = run
     }
