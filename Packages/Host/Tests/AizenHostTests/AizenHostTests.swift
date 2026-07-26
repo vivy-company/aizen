@@ -347,6 +347,15 @@ import AizenWire
     await #expect(throws: DeviceAuthorizationError.capabilityDenied(.xcodeBuild)) {
         try await endpoint.receive(cancel)
     }
+    let log = ProtocolEnvelope(
+        messageID: UUID().uuidString,
+        connectionSequence: 2,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ReadOperationLogQueryPayload(operationID: operation.id.description, maximumBytes: 4_096))
+    )
+    let response = try await endpoint.receive(log)
+    #expect(try ReadOperationLogResponsePayload(protobufBytes: response.payload.protobufBytes).chunks.isEmpty)
 }
 
 @Test func remoteTerminalControlOwnsAndOrdersRuntimeTraffic() async throws {
@@ -513,6 +522,28 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
         payload: try .init(ListOperationsQueryPayload(operationID: operation.id.description))
     ))
     #expect(try ListOperationsResponsePayload(protobufBytes: response.payload.protobufBytes).operations == [operation])
+}
+
+@Test func hostReadsBoundedDurableOperationLogsThroughTypedWire() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Operations")
+    let operation = Operation(spaceID: space.id, lifecycle: .running, progress: 0)
+    _ = try await storage.transact { $0.spaces.append(space); $0.operations.append(operation) }
+    _ = try await storage.appendOperationLogChunk(operationID: operation.id, stream: .standardOutput, text: "compile\\n")
+    _ = try await storage.appendOperationLogChunk(operationID: operation.id, stream: .standardError, text: "warning\\n")
+
+    let response = try await LocalHost(storage: storage).receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ReadOperationLogQueryPayload(operationID: operation.id.description, maximumBytes: 64 * 1_024))
+    ))
+    let log = try ReadOperationLogResponsePayload(protobufBytes: response.payload.protobufBytes)
+    #expect(log.chunks.map(\.text) == ["compile\\n", "warning\\n"])
+    #expect(!log.truncated)
 }
 
 @Test func localHostReplaysJournalEventsOrRequiresASnapshot() async throws {

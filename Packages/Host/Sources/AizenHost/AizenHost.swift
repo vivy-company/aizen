@@ -302,6 +302,8 @@ public actor LocalHost: WireEndpoint {
                 ListRunsResponsePayload.identifier,
                 ListOperationsQueryPayload.identifier,
                 ListOperationsResponsePayload.identifier,
+                ReadOperationLogQueryPayload.identifier,
+                ReadOperationLogResponsePayload.identifier,
                 ListResourcesQueryPayload.identifier,
                 ListResourcesResponsePayload.identifier,
                 DiscoverXcodeProjectQueryPayload.identifier,
@@ -459,6 +461,25 @@ public actor LocalHost: WireEndpoint {
             }
             kind = .queryResponse
             payload = try TypedPayload(ListOperationsResponsePayload(operations: operations))
+        case .query where envelope.payload.identifier == ReadOperationLogQueryPayload.identifier:
+            let query = try ReadOperationLogQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let operationID = try Self.operationID(from: query.operationID)
+            guard try await storage.load().operations.contains(where: { $0.id == operationID }) else {
+                throw HostProtocolError.unknownOperation(operationID)
+            }
+            let chunks = try await storage.operationLogChunks(
+                operationID: operationID,
+                afterSequence: query.afterSequence,
+                maximumBytes: query.maximumBytes
+            )
+            let lastSequence = chunks.last?.sequence ?? query.afterSequence
+            let truncated = !(try await storage.operationLogChunks(
+                operationID: operationID,
+                afterSequence: lastSequence,
+                maximumBytes: 1_024 * 1_024
+            )).isEmpty
+            kind = .queryResponse
+            payload = try TypedPayload(ReadOperationLogResponsePayload(chunks: chunks, truncated: truncated))
         case .query where envelope.payload.identifier == ListResourcesQueryPayload.identifier:
             let query = try ListResourcesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try query.spaceID.map(Self.spaceID(from:))

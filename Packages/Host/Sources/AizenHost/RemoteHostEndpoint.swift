@@ -140,6 +140,10 @@ public struct RemoteHostEndpoint: WireEndpoint {
         case ListOperationsQueryPayload.identifier:
             let request = try ListOperationsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             return try requirementForOptionalSpace(request.spaceID)
+        case ReadOperationLogQueryPayload.identifier:
+            let request = try ReadOperationLogQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let operation = try await requiredOperation(request.operationID)
+            return .init(capability: .xcodeRead, spaceID: operation.spaceID, resourceID: operation.resourceID, rateLimitKind: nil)
         case ListResourcesQueryPayload.identifier:
             let request = try ListResourcesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             return try requirementForOptionalSpace(request.spaceID)
