@@ -236,6 +236,29 @@ import Testing
     #expect(try gitOutput(["-C", destination.path, "branch", "--show-current"]) == "feature/test")
 }
 
+@Test func independentContextServiceCreatesCloneAndGitlessCopy() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let source = root.appendingPathComponent("source", isDirectory: true)
+    try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+    try git(["init", source.path])
+    try git(["-C", source.path, "config", "user.email", "test@example.com"])
+    try git(["-C", source.path, "config", "user.name", "Aizen Test"])
+    try "seed".write(to: source.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+    try git(["-C", source.path, "add", "README.md"])
+    try git(["-C", source.path, "commit", "-m", "seed"])
+    let service = GitLinkedWorktreeService()
+    let clone = root.appendingPathComponent("clone", isDirectory: true)
+    let copy = root.appendingPathComponent("copy", isDirectory: true)
+
+    try await service.createIndependentContext(source: source, destination: clone, mode: .clone)
+    try await service.createIndependentContext(source: source, destination: copy, mode: .copy)
+
+    #expect(FileManager.default.fileExists(atPath: clone.appendingPathComponent(".git").path))
+    #expect(FileManager.default.fileExists(atPath: copy.appendingPathComponent("README.md").path))
+    #expect(!FileManager.default.fileExists(atPath: copy.appendingPathComponent(".git").path))
+}
+
 private func git(_ arguments: [String]) throws {
     _ = try gitOutput(arguments)
 }
