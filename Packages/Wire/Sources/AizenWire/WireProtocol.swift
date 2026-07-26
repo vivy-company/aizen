@@ -72,6 +72,7 @@ public enum HostErrorCode: String, Sendable, Hashable {
     case unknownRun = "unknown-run"
     case unknownResource = "unknown-resource"
     case unknownExecutionContext = "unknown-execution-context"
+    case unknownOperation = "unknown-operation"
     case conflict = "conflict"
     case commandIncomplete = "command-incomplete"
     case unavailable = "unavailable"
