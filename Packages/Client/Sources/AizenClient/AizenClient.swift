@@ -657,6 +657,12 @@ public actor HostClient {
         return try UpdateRepositoryBranchResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func fetchRepository(id: ResourceID, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> FetchRepositoryResultPayload {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(FetchRepositoryCommandPayload(resourceID: id.description, expectedRepositoryRevision: expectedRepositoryRevision, expectedIndexRevision: expectedIndexRevision))))
+        guard response.kind == .commandResult, response.payload.identifier == FetchRepositoryResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try FetchRepositoryResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
         let response = try await send(.init(
             messageID: UUID().uuidString,
