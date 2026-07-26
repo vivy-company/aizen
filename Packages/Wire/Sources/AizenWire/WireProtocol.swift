@@ -2380,6 +2380,35 @@ public struct ReplaceContextTextFileResultPayload: WirePayload, Sendable, Hashab
     public func protobufBytes() throws -> Data { var m = AizenWireV1_ReplaceContextTextFileResult(); m.relativePath = relativePath; m.contentHash = contentHash; return try m.serializedData() }
 }
 
+public enum ContextTextPatchKind: Sendable, Hashable {
+    case insert
+    case delete
+    case replace
+
+    fileprivate init(_ value: AizenWireV1_ContextTextPatchKind) throws {
+        switch value { case .insert: self = .insert; case .delete: self = .delete; case .replace: self = .replace; default: throw WireCodecError.invalidIdentity("context text patch kind") }
+    }
+    fileprivate var protobufValue: AizenWireV1_ContextTextPatchKind {
+        switch self { case .insert: .insert; case .delete: .delete; case .replace: .replace }
+    }
+}
+
+public struct ApplyContextTextPatchCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.context-files.apply-text-patch@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let executionContextID: String; public let relativePath: String; public let expectedContentHash: String; public let kind: ContextTextPatchKind; public let startLine: UInt32; public let endLineExclusive: UInt32; public let replacementText: String
+    public init(executionContextID: String, relativePath: String, expectedContentHash: String, kind: ContextTextPatchKind, startLine: UInt32, endLineExclusive: UInt32, replacementText: String) { self.executionContextID = executionContextID; self.relativePath = relativePath; self.expectedContentHash = expectedContentHash; self.kind = kind; self.startLine = startLine; self.endLineExclusive = endLineExclusive; self.replacementText = replacementText }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ApplyContextTextPatchCommand(serializedBytes: protobufBytes); guard !m.executionContextID.isEmpty, !m.relativePath.isEmpty, m.expectedContentHash.count == 64, m.startLine <= m.endLineExclusive else { throw WireCodecError.invalidIdentity("context text patch") }; self.init(executionContextID: m.executionContextID, relativePath: m.relativePath, expectedContentHash: m.expectedContentHash, kind: try .init(m.kind), startLine: m.startLine, endLineExclusive: m.endLineExclusive, replacementText: m.replacementText) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ApplyContextTextPatchCommand(); m.executionContextID = executionContextID; m.relativePath = relativePath; m.expectedContentHash = expectedContentHash; m.kind = kind.protobufValue; m.startLine = startLine; m.endLineExclusive = endLineExclusive; m.replacementText = replacementText; return try m.serializedData() }
+}
+
+public struct ApplyContextTextPatchResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.context-files.apply-text-patch@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let relativePath: String; public let contentHash: String
+    public init(relativePath: String, contentHash: String) { self.relativePath = relativePath; self.contentHash = contentHash }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ApplyContextTextPatchResult(serializedBytes: protobufBytes); guard !m.relativePath.isEmpty, m.contentHash.count == 64 else { throw WireCodecError.invalidIdentity("context text patch") }; self.init(relativePath: m.relativePath, contentHash: m.contentHash) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ApplyContextTextPatchResult(); m.relativePath = relativePath; m.contentHash = contentHash; return try m.serializedData() }
+}
+
 public struct CreateTerminalSessionCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.terminal-session.create@1")
     public static let schemaVersion: UInt32 = 1

@@ -203,6 +203,48 @@ nonisolated enum AizenWireV1_PayloadEncoding: SwiftProtobuf.Enum, Swift.CaseIter
 
 }
 
+nonisolated enum AizenWireV1_ContextTextPatchKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  typealias RawValue = Int
+  case unspecified // = 0
+  case insert // = 1
+  case delete // = 2
+  case replace // = 3
+  case UNRECOGNIZED(Int)
+
+  init() {
+    self = .unspecified
+  }
+
+  init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .insert
+    case 2: self = .delete
+    case 3: self = .replace
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .insert: return 1
+    case .delete: return 2
+    case .replace: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  static let allCases: [AizenWireV1_ContextTextPatchKind] = [
+    .unspecified,
+    .insert,
+    .delete,
+    .replace,
+  ]
+
+}
+
 nonisolated struct AizenWireV1_ProtocolEnvelope: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2037,6 +2079,44 @@ nonisolated struct AizenWireV1_ReplaceContextTextFileResult: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_ApplyContextTextPatchCommand: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var executionContextID: String = String()
+
+  var relativePath: String = String()
+
+  var expectedContentHash: String = String()
+
+  var kind: AizenWireV1_ContextTextPatchKind = .unspecified
+
+  var startLine: UInt32 = 0
+
+  var endLineExclusive: UInt32 = 0
+
+  var replacementText: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_ApplyContextTextPatchResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var relativePath: String = String()
+
+  var contentHash: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_CreateTerminalSessionCommand: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2569,6 +2649,10 @@ nonisolated extension AizenWireV1_LogicalChannel: SwiftProtobuf._ProtoNameProvid
 
 nonisolated extension AizenWireV1_PayloadEncoding: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PAYLOAD_ENCODING_UNSPECIFIED\0\u{1}PAYLOAD_ENCODING_PROTOBUF\0")
+}
+
+nonisolated extension AizenWireV1_ContextTextPatchKind: SwiftProtobuf._ProtoNameProviding {
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CONTEXT_TEXT_PATCH_KIND_UNSPECIFIED\0\u{1}CONTEXT_TEXT_PATCH_KIND_INSERT\0\u{1}CONTEXT_TEXT_PATCH_KIND_DELETE\0\u{1}CONTEXT_TEXT_PATCH_KIND_REPLACE\0")
 }
 
 nonisolated extension AizenWireV1_ProtocolEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -6954,6 +7038,101 @@ nonisolated extension AizenWireV1_ReplaceContextTextFileResult: SwiftProtobuf.Me
   }
 
   static func ==(lhs: AizenWireV1_ReplaceContextTextFileResult, rhs: AizenWireV1_ReplaceContextTextFileResult) -> Bool {
+    if lhs.relativePath != rhs.relativePath {return false}
+    if lhs.contentHash != rhs.contentHash {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ApplyContextTextPatchCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ApplyContextTextPatchCommand"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}execution_context_id\0\u{3}relative_path\0\u{3}expected_content_hash\0\u{1}kind\0\u{3}start_line\0\u{3}end_line_exclusive\0\u{3}replacement_text\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.executionContextID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.relativePath) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.expectedContentHash) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self.startLine) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.endLineExclusive) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.replacementText) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.executionContextID.isEmpty {
+      try visitor.visitSingularStringField(value: self.executionContextID, fieldNumber: 1)
+    }
+    if !self.relativePath.isEmpty {
+      try visitor.visitSingularStringField(value: self.relativePath, fieldNumber: 2)
+    }
+    if !self.expectedContentHash.isEmpty {
+      try visitor.visitSingularStringField(value: self.expectedContentHash, fieldNumber: 3)
+    }
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 4)
+    }
+    if self.startLine != 0 {
+      try visitor.visitSingularUInt32Field(value: self.startLine, fieldNumber: 5)
+    }
+    if self.endLineExclusive != 0 {
+      try visitor.visitSingularUInt32Field(value: self.endLineExclusive, fieldNumber: 6)
+    }
+    if !self.replacementText.isEmpty {
+      try visitor.visitSingularStringField(value: self.replacementText, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ApplyContextTextPatchCommand, rhs: AizenWireV1_ApplyContextTextPatchCommand) -> Bool {
+    if lhs.executionContextID != rhs.executionContextID {return false}
+    if lhs.relativePath != rhs.relativePath {return false}
+    if lhs.expectedContentHash != rhs.expectedContentHash {return false}
+    if lhs.kind != rhs.kind {return false}
+    if lhs.startLine != rhs.startLine {return false}
+    if lhs.endLineExclusive != rhs.endLineExclusive {return false}
+    if lhs.replacementText != rhs.replacementText {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ApplyContextTextPatchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ApplyContextTextPatchResult"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}relative_path\0\u{3}content_hash\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.relativePath) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.contentHash) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.relativePath.isEmpty {
+      try visitor.visitSingularStringField(value: self.relativePath, fieldNumber: 1)
+    }
+    if !self.contentHash.isEmpty {
+      try visitor.visitSingularStringField(value: self.contentHash, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ApplyContextTextPatchResult, rhs: AizenWireV1_ApplyContextTextPatchResult) -> Bool {
     if lhs.relativePath != rhs.relativePath {return false}
     if lhs.contentHash != rhs.contentHash {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

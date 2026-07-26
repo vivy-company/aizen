@@ -692,6 +692,28 @@ message ReplaceContextTextFileResult {
   string content_hash = 2;
 }
 
+enum ContextTextPatchKind {
+  CONTEXT_TEXT_PATCH_KIND_UNSPECIFIED = 0;
+  CONTEXT_TEXT_PATCH_KIND_INSERT = 1;
+  CONTEXT_TEXT_PATCH_KIND_DELETE = 2;
+  CONTEXT_TEXT_PATCH_KIND_REPLACE = 3;
+}
+
+message ApplyContextTextPatchCommand {
+  string execution_context_id = 1;
+  string relative_path = 2;
+  string expected_content_hash = 3;
+  ContextTextPatchKind kind = 4;
+  uint32 start_line = 5;
+  uint32 end_line_exclusive = 6;
+  string replacement_text = 7;
+}
+
+message ApplyContextTextPatchResult {
+  string relative_path = 1;
+  string content_hash = 2;
+}
+
 message CreateTerminalSessionCommand {
   string terminal_session_id = 1;
   string space_id = 2;
