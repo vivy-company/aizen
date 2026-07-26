@@ -8,6 +8,6 @@ let package = Package(
     dependencies: [.package(path: "../Core")],
     targets: [
         .target(name: "AizenStorage", dependencies: [.product(name: "AizenCore", package: "Core")]),
-        .testTarget(name: "AizenStorageTests", dependencies: ["AizenStorage"])
+        .testTarget(name: "AizenStorageTests", dependencies: ["AizenStorage", .product(name: "AizenCore", package: "Core")])
     ]
 )
