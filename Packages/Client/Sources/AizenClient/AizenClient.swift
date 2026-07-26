@@ -588,6 +588,24 @@ public actor HostClient {
         _ = try CancelRunResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func configureAgentLaunch(executablePath: String, arguments: [String], environment: [String: String]) async throws {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .control,
+            payload: try .init(ConfigureAgentLaunchCommandPayload(
+                executablePath: executablePath,
+                arguments: arguments,
+                environment: environment
+            ))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == ConfigureAgentLaunchResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        _ = try ConfigureAgentLaunchResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     private func nextConnectionSequence() throws -> UInt64 {
         guard nextSequence < UInt64.max else { throw Error.sequenceExhausted }
         defer { nextSequence += 1 }
