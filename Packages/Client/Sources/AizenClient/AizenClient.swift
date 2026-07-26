@@ -592,6 +592,12 @@ public actor HostClient {
         return try ReadRepositoryHistoryResponsePayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func repositoryBranches(id: ResourceID, maximumBranches: UInt32 = 50) async throws -> ReadRepositoryBranchesResponsePayload {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .query, channel: .state, payload: try .init(ReadRepositoryBranchesQueryPayload(resourceID: id.description, maximumBranches: maximumBranches))))
+        guard response.kind == .queryResponse, response.payload.identifier == ReadRepositoryBranchesResponsePayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try ReadRepositoryBranchesResponsePayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func updateRepositoryIndex(id: ResourceID, relativePaths: [String], expectedIndexRevision: String, stage: Bool) async throws -> UpdateRepositoryIndexResultPayload {
         let response = try await send(.init(
             messageID: UUID().uuidString,
