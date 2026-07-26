@@ -6,10 +6,21 @@ import Foundation
 @preconcurrency import XPC
 
 /// Errors surfaced by the authenticated production Mach XPC transport.
-public enum MachWireTransportError: Swift.Error, Sendable, Equatable {
+public enum MachWireTransportError: Swift.Error, Sendable, Equatable, LocalizedError {
     case invalidResponse
     case unavailable
     case invalidCodeSigningRequirement(Int32)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidResponse:
+            "Aizen Host returned an invalid response."
+        case .unavailable:
+            "Aizen Host is unavailable. Start or repair the Host service, then try again."
+        case .invalidCodeSigningRequirement:
+            "Aizen Host could not validate its trusted client signature requirement."
+        }
+    }
 }
 
 public enum HostMachServiceConfigurationError: Swift.Error, Sendable, Equatable {
