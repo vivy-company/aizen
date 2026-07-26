@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import AizenCore
+import AizenSecurity
 @testable import AizenStorage
 
 @Test func moduleLoads() { _ = AizenStorageModule.self }
@@ -58,6 +59,25 @@ import AizenCore
     """
     let decoded = try JSONDecoder().decode(StorageSnapshot.self, from: Data(oldFormat.utf8))
     #expect(decoded == snapshot)
+}
+
+@Test func repositoryPersistsAuthorizationAndContentFreeSecurityAudit() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = StorageRepository(url: directory.appendingPathComponent("storage-v2.json"))
+    let device = DevicePublicIdentity(
+        deviceID: DeviceID(),
+        displayName: "Phone",
+        platform: "iOS",
+        cryptographicIdentity: LocalCryptographicIdentity().publicIdentity()
+    )
+    let authorization = DeviceAuthorization(device: device, grants: [CapabilityGrant(capability: .spaceRead)])
+
+    try await repository.saveDeviceAuthorization(authorization)
+    try await repository.appendSecurityAuditRecord(SecurityAuditRecord(kind: .pairingApproved, deviceID: device.deviceID, route: "lan"))
+
+    #expect(try await repository.deviceAuthorization(for: device.deviceID) == authorization)
+    #expect(try await repository.load().securityAuditRecords.map(\.kind) == [.pairingApproved])
 }
 
 @Test func repositoryAcceptsDurableCommandsExactlyOnce() async throws {
