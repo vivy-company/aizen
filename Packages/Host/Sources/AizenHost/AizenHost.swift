@@ -1104,11 +1104,30 @@ public protocol TerminalRuntime: Sendable {
 
     /// Returns the persisted sessions that remain attachable after the Host starts again.
     func recoverableTerminalSessionIDs(_ sessions: [TerminalSession]) async throws -> Set<SessionID>
+
+    /// Sends literal bytes to an existing Host-owned terminal. The caller never supplies a shell command.
+    func sendInput(to session: TerminalSession, input: Data) async throws
+
+    /// Resizes an existing Host-owned terminal after the Host has validated the requested bounds.
+    func resize(session: TerminalSession, columns: Int, rows: Int) async throws
+}
+
+public enum TerminalRuntimeError: Swift.Error, Sendable, Equatable {
+    case remoteInteractionUnavailable
+    case invalidDimensions
 }
 
 public extension TerminalRuntime {
     func recoverableTerminalSessionIDs(_ sessions: [TerminalSession]) async throws -> Set<SessionID> {
         Set(sessions.map(\.id))
+    }
+
+    func sendInput(to session: TerminalSession, input: Data) async throws {
+        throw TerminalRuntimeError.remoteInteractionUnavailable
+    }
+
+    func resize(session: TerminalSession, columns: Int, rows: Int) async throws {
+        throw TerminalRuntimeError.remoteInteractionUnavailable
     }
 }
 

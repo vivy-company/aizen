@@ -57,6 +57,21 @@ public actor TmuxTerminalRuntime: TerminalRuntime {
         })
     }
 
+    public func sendInput(to session: TerminalSession, input: Data) async throws {
+        guard !input.isEmpty else { return }
+        let tmux = try tmuxExecutable()
+        let text = String(decoding: input, as: UTF8.self)
+        try run(tmux, arguments: ["send-keys", "-t", session.paneID, "-l", text])
+    }
+
+    public func resize(session: TerminalSession, columns: Int, rows: Int) async throws {
+        guard (1...1_000).contains(columns), (1...1_000).contains(rows) else {
+            throw TerminalRuntimeError.invalidDimensions
+        }
+        let tmux = try tmuxExecutable()
+        try run(tmux, arguments: ["resize-pane", "-t", session.paneID, "-x", String(columns), "-y", String(rows)])
+    }
+
     private var configurationURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".aizen", isDirectory: true)
