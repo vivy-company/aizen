@@ -27,6 +27,25 @@ import Testing
     #expect(hostErrorPayload(for: NSError(domain: "test", code: 1)).code == HostErrorCode.commandFailed.rawValue)
 }
 
+@Test func localHostRuntimeFailsInterruptedOperationsBeforeServingClients() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storageURL = root.appendingPathComponent("storage-v2.json")
+    let storage = StorageRepository(url: storageURL)
+    let space = Space(name: "Recovery")
+    let operation = Operation(spaceID: space.id, lifecycle: .running, progress: 0.5)
+    _ = try await storage.transact { snapshot in
+        snapshot.spaces.append(space)
+        snapshot.operations.append(operation)
+    }
+
+    let runtime = LocalHostRuntime(storageURL: storageURL)
+    #expect(try await runtime.recoverInterruptedOperations() == 1)
+    let recovered = try #require(try await storage.load().operations.first)
+    #expect(recovered.lifecycle == .failed)
+    #expect(recovered.failureDescription == "Aizen Host restarted before this operation completed.")
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")

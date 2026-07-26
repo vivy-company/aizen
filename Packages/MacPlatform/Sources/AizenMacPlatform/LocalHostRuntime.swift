@@ -66,6 +66,20 @@ public final class LocalHostRuntime: @unchecked Sendable {
         try MachWireHostListener(configuration: configuration, endpoint: migrationGate)
     }
 
+    /// A process-owned operation cannot survive a Host restart. Persist that fact before clients resume polling.
+    @discardableResult
+    public func recoverInterruptedOperations() async throws -> Int {
+        var recoveredCount = 0
+        _ = try await storage.transact { snapshot in
+            for index in snapshot.operations.indices where snapshot.operations[index].lifecycle == .running {
+                snapshot.operations[index].lifecycle = .failed
+                snapshot.operations[index].failureDescription = "Aizen Host restarted before this operation completed."
+                recoveredCount += 1
+            }
+        }
+        return recoveredCount
+    }
+
     @MainActor
     public func makeLANListener(credentials: HostIdentityCredentials) -> HostLANWebSocketListener {
         HostLANWebSocketListener(
