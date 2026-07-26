@@ -1928,6 +1928,22 @@ public struct UpdateRepositoryBranchResultPayload: WirePayload, Sendable, Hashab
     public func protobufBytes() throws -> Data { var m = AizenWireV1_UpdateRepositoryBranchResult(); m.repositoryRevision = repositoryRevision; m.indexRevision = indexRevision; m.operationID = operationID; return try m.serializedData() }
 }
 
+public struct FetchRepositoryCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.repository.fetch@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let resourceID: String; public let expectedRepositoryRevision: String; public let expectedIndexRevision: String
+    public init(resourceID: String, expectedRepositoryRevision: String, expectedIndexRevision: String) { precondition(!resourceID.isEmpty && !expectedRepositoryRevision.isEmpty && expectedRepositoryRevision.utf8.count <= 128 && expectedIndexRevision.count == 64); self.resourceID = resourceID; self.expectedRepositoryRevision = expectedRepositoryRevision; self.expectedIndexRevision = expectedIndexRevision }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_FetchRepositoryCommand(serializedBytes: protobufBytes); guard !m.resourceID.isEmpty, !m.expectedRepositoryRevision.isEmpty, m.expectedRepositoryRevision.utf8.count <= 128, m.expectedIndexRevision.count == 64 else { throw WireCodecError.invalidRepositoryFetchCommand }; self.init(resourceID: m.resourceID, expectedRepositoryRevision: m.expectedRepositoryRevision, expectedIndexRevision: m.expectedIndexRevision) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_FetchRepositoryCommand(); m.resourceID = resourceID; m.expectedRepositoryRevision = expectedRepositoryRevision; m.expectedIndexRevision = expectedIndexRevision; return try m.serializedData() }
+}
+
+public struct FetchRepositoryResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.repository.fetch@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let repositoryRevision: String; public let indexRevision: String; public let operationID: String
+    public init(repositoryRevision: String, indexRevision: String, operationID: String) { precondition(!repositoryRevision.isEmpty && indexRevision.count == 64 && UUID(uuidString: operationID) != nil); self.repositoryRevision = repositoryRevision; self.indexRevision = indexRevision; self.operationID = operationID }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_FetchRepositoryResult(serializedBytes: protobufBytes); guard !m.repositoryRevision.isEmpty, m.indexRevision.count == 64, UUID(uuidString: m.operationID) != nil else { throw WireCodecError.invalidRepositoryFetchResult }; self.init(repositoryRevision: m.repositoryRevision, indexRevision: m.indexRevision, operationID: m.operationID) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_FetchRepositoryResult(); m.repositoryRevision = repositoryRevision; m.indexRevision = indexRevision; m.operationID = operationID; return try m.serializedData() }
+}
+
 public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.execution-context.list@1")
     public static let schemaVersion: UInt32 = 1
@@ -2722,6 +2738,8 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidRepositoryCommitResult
     case invalidRepositoryBranchCommand
     case invalidRepositoryBranchResult
+    case invalidRepositoryFetchCommand
+    case invalidRepositoryFetchResult
 }
 
 private extension ProtocolEnvelope {
