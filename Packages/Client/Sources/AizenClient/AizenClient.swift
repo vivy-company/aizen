@@ -33,6 +33,7 @@ public actor HostClient {
     public enum Error: Swift.Error, Sendable, Equatable {
         case sequenceExhausted
         case unexpectedPayload(PayloadIdentifier)
+        case invalidIdentity(String)
     }
 
     private let transport: any WireTransport
@@ -54,12 +55,9 @@ public actor HostClient {
     }
 
     public func snapshot(scope: String = "host") async throws -> SnapshotResponsePayload {
-        guard nextSequence < UInt64.max else { throw Error.sequenceExhausted }
-        let sequence = nextSequence
-        nextSequence += 1
         let response = try await send(.init(
             messageID: UUID().uuidString,
-            connectionSequence: sequence,
+            connectionSequence: try nextConnectionSequence(),
             kind: .query,
             channel: .state,
             payload: try .init(SnapshotRequestPayload(scope: scope))
@@ -73,5 +71,27 @@ public actor HostClient {
     /// Returns the Storage-owned snapshot representation without exposing Wire payload types to UI clients.
     public func snapshotData(scope: String = "host") async throws -> Data {
         try await snapshot(scope: scope).snapshot
+    }
+
+    public func createSpace(name: String, icon: String? = nil, summary: String? = nil) async throws -> SpaceID {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(CreateSpaceCommandPayload(name: name, icon: icon, summary: summary))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == CreateSpaceResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        let result = try CreateSpaceResultPayload(protobufBytes: response.payload.protobufBytes)
+        guard let uuid = UUID(uuidString: result.spaceID) else { throw Error.invalidIdentity(result.spaceID) }
+        return SpaceID(rawValue: uuid)
+    }
+
+    private func nextConnectionSequence() throws -> UInt64 {
+        guard nextSequence < UInt64.max else { throw Error.sequenceExhausted }
+        defer { nextSequence += 1 }
+        return nextSequence
     }
 }

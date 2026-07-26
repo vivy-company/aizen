@@ -27,13 +27,21 @@ public actor LocalHost: WireEndpoint {
                 HelloPayload.identifier,
                 CapabilitiesPayload.identifier,
                 SnapshotRequestPayload.identifier,
-                SnapshotResponsePayload.identifier
+                SnapshotResponsePayload.identifier,
+                CreateSpaceCommandPayload.identifier,
+                CreateSpaceResultPayload.identifier
             ]))
         case .query where envelope.payload.identifier == SnapshotRequestPayload.identifier:
             let request = try SnapshotRequestPayload(protobufBytes: envelope.payload.protobufBytes)
             let snapshot = try await storage.load()
             kind = .queryResponse
             payload = try TypedPayload(SnapshotResponsePayload(scope: request.scope, cursor: 0, snapshot: JSONEncoder().encode(snapshot)))
+        case .command where envelope.payload.identifier == CreateSpaceCommandPayload.identifier:
+            let command = try CreateSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let space = Space(name: command.name, icon: command.icon, summary: command.summary)
+            _ = try await storage.transact { $0.spaces.append(space) }
+            kind = .commandResult
+            payload = try TypedPayload(CreateSpaceResultPayload(spaceID: space.id.description))
         default:
             throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier)
         }

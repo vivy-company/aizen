@@ -43,6 +43,15 @@ import AizenWire
     #expect(snapshot.spaces.map(\.name) == ["Vivy"])
 }
 
+@Test func clientCreatesSpacesThroughHostCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+    let id = try await client.createSpace(name: "CLI")
+    #expect(try await storage.load().spaces == [Space(id: id, name: "CLI")])
+}
+
 private struct EchoHost: WireEndpoint {
     func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope { envelope }
 }

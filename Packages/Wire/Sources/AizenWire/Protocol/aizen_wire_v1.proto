@@ -84,6 +84,16 @@ message CommandResult {
   string error_code = 3;
 }
 
+message CreateSpaceCommand {
+  string name = 1;
+  string icon = 2;
+  string summary = 3;
+}
+
+message CreateSpaceResult {
+  string space_id = 1;
+}
+
 message SnapshotRequest {
   string scope = 1;
   uint64 after_cursor = 2;

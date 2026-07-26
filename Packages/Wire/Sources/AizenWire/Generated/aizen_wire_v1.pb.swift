@@ -25,8 +25,8 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-public nonisolated enum AizenWireV1_MessageKind: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
+nonisolated enum AizenWireV1_MessageKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  typealias RawValue = Int
   case unspecified // = 0
   case hello // = 1
   case authentication // = 2
@@ -46,11 +46,11 @@ public nonisolated enum AizenWireV1_MessageKind: SwiftProtobuf.Enum, Swift.CaseI
   case error // = 16
   case UNRECOGNIZED(Int)
 
-  public init() {
+  init() {
     self = .unspecified
   }
 
-  public init?(rawValue: Int) {
+  init?(rawValue: Int) {
     switch rawValue {
     case 0: self = .unspecified
     case 1: self = .hello
@@ -73,7 +73,7 @@ public nonisolated enum AizenWireV1_MessageKind: SwiftProtobuf.Enum, Swift.CaseI
     }
   }
 
-  public var rawValue: Int {
+  var rawValue: Int {
     switch self {
     case .unspecified: return 0
     case .hello: return 1
@@ -97,7 +97,7 @@ public nonisolated enum AizenWireV1_MessageKind: SwiftProtobuf.Enum, Swift.CaseI
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [AizenWireV1_MessageKind] = [
+  static let allCases: [AizenWireV1_MessageKind] = [
     .unspecified,
     .hello,
     .authentication,
@@ -119,8 +119,8 @@ public nonisolated enum AizenWireV1_MessageKind: SwiftProtobuf.Enum, Swift.CaseI
 
 }
 
-public nonisolated enum AizenWireV1_LogicalChannel: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
+nonisolated enum AizenWireV1_LogicalChannel: SwiftProtobuf.Enum, Swift.CaseIterable {
+  typealias RawValue = Int
   case unspecified // = 0
   case control // = 1
   case state // = 2
@@ -129,11 +129,11 @@ public nonisolated enum AizenWireV1_LogicalChannel: SwiftProtobuf.Enum, Swift.Ca
   case blob // = 5
   case UNRECOGNIZED(Int)
 
-  public init() {
+  init() {
     self = .unspecified
   }
 
-  public init?(rawValue: Int) {
+  init?(rawValue: Int) {
     switch rawValue {
     case 0: self = .unspecified
     case 1: self = .control
@@ -145,7 +145,7 @@ public nonisolated enum AizenWireV1_LogicalChannel: SwiftProtobuf.Enum, Swift.Ca
     }
   }
 
-  public var rawValue: Int {
+  var rawValue: Int {
     switch self {
     case .unspecified: return 0
     case .control: return 1
@@ -158,7 +158,7 @@ public nonisolated enum AizenWireV1_LogicalChannel: SwiftProtobuf.Enum, Swift.Ca
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [AizenWireV1_LogicalChannel] = [
+  static let allCases: [AizenWireV1_LogicalChannel] = [
     .unspecified,
     .control,
     .state,
@@ -169,17 +169,17 @@ public nonisolated enum AizenWireV1_LogicalChannel: SwiftProtobuf.Enum, Swift.Ca
 
 }
 
-public nonisolated enum AizenWireV1_PayloadEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
+nonisolated enum AizenWireV1_PayloadEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
+  typealias RawValue = Int
   case unspecified // = 0
   case protobuf // = 1
   case UNRECOGNIZED(Int)
 
-  public init() {
+  init() {
     self = .unspecified
   }
 
-  public init?(rawValue: Int) {
+  init?(rawValue: Int) {
     switch rawValue {
     case 0: self = .unspecified
     case 1: self = .protobuf
@@ -187,7 +187,7 @@ public nonisolated enum AizenWireV1_PayloadEncoding: SwiftProtobuf.Enum, Swift.C
     }
   }
 
-  public var rawValue: Int {
+  var rawValue: Int {
     switch self {
     case .unspecified: return 0
     case .protobuf: return 1
@@ -196,252 +196,280 @@ public nonisolated enum AizenWireV1_PayloadEncoding: SwiftProtobuf.Enum, Swift.C
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [AizenWireV1_PayloadEncoding] = [
+  static let allCases: [AizenWireV1_PayloadEncoding] = [
     .unspecified,
     .protobuf,
   ]
 
 }
 
-public nonisolated struct AizenWireV1_ProtocolEnvelope: Sendable {
+nonisolated struct AizenWireV1_ProtocolEnvelope: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var protocolGeneration: UInt32 = 0
+  var protocolGeneration: UInt32 = 0
 
-  public var messageID: String = String()
+  var messageID: String = String()
 
-  public var connectionID: String = String()
+  var connectionID: String = String()
 
-  public var connectionSequence: UInt64 = 0
+  var connectionSequence: UInt64 = 0
 
-  public var kind: AizenWireV1_MessageKind = .unspecified
+  var kind: AizenWireV1_MessageKind = .unspecified
 
-  public var channel: AizenWireV1_LogicalChannel = .unspecified
+  var channel: AizenWireV1_LogicalChannel = .unspecified
 
-  public var correlationID: String = String()
+  var correlationID: String = String()
 
-  public var acknowledgement: AizenWireV1_Acknowledgement {
+  var acknowledgement: AizenWireV1_Acknowledgement {
     get {_acknowledgement ?? AizenWireV1_Acknowledgement()}
     set {_acknowledgement = newValue}
   }
   /// Returns true if `acknowledgement` has been explicitly set.
-  public var hasAcknowledgement: Bool {self._acknowledgement != nil}
+  var hasAcknowledgement: Bool {self._acknowledgement != nil}
   /// Clears the value of `acknowledgement`. Subsequent reads from it will return its default value.
-  public mutating func clearAcknowledgement() {self._acknowledgement = nil}
+  mutating func clearAcknowledgement() {self._acknowledgement = nil}
 
-  public var payload: AizenWireV1_TypedPayload {
+  var payload: AizenWireV1_TypedPayload {
     get {_payload ?? AizenWireV1_TypedPayload()}
     set {_payload = newValue}
   }
   /// Returns true if `payload` has been explicitly set.
-  public var hasPayload: Bool {self._payload != nil}
+  var hasPayload: Bool {self._payload != nil}
   /// Clears the value of `payload`. Subsequent reads from it will return its default value.
-  public mutating func clearPayload() {self._payload = nil}
+  mutating func clearPayload() {self._payload = nil}
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public init() {}
+  init() {}
 
   fileprivate var _acknowledgement: AizenWireV1_Acknowledgement? = nil
   fileprivate var _payload: AizenWireV1_TypedPayload? = nil
 }
 
-public nonisolated struct AizenWireV1_Acknowledgement: Sendable {
+nonisolated struct AizenWireV1_Acknowledgement: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var sequence: UInt64 = 0
+  var sequence: UInt64 = 0
 
-  public var messageID: String = String()
+  var messageID: String = String()
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public init() {}
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_TypedPayload: Sendable {
+nonisolated struct AizenWireV1_TypedPayload: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var type: String = String()
+  var type: String = String()
 
-  public var schemaVersion: UInt32 = 0
+  var schemaVersion: UInt32 = 0
 
-  public var encoding: AizenWireV1_PayloadEncoding = .unspecified
+  var encoding: AizenWireV1_PayloadEncoding = .unspecified
 
-  public var bytes: Data = Data()
+  var bytes: Data = Data()
 
-  public var stateAffecting: Bool = false
+  var stateAffecting: Bool = false
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public init() {}
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_Hello: Sendable {
+nonisolated struct AizenWireV1_Hello: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var minimumProtocolGeneration: UInt32 = 0
+  var minimumProtocolGeneration: UInt32 = 0
 
-  public var maximumProtocolGeneration: UInt32 = 0
+  var maximumProtocolGeneration: UInt32 = 0
 
-  public var productVersion: String = String()
+  var productVersion: String = String()
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public init() {}
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_Capabilities: Sendable {
+nonisolated struct AizenWireV1_Capabilities: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var identifiers: [String] = []
+  var identifiers: [String] = []
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public init() {}
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_CommandReceipt: Sendable {
+nonisolated struct AizenWireV1_CommandReceipt: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var commandID: String = String()
+  var commandID: String = String()
 
-  public var operationID: String = String()
+  var operationID: String = String()
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public init() {}
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_CommandResult: Sendable {
+nonisolated struct AizenWireV1_CommandResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var commandID: String = String()
+  var commandID: String = String()
 
-  public var succeeded: Bool = false
+  var succeeded: Bool = false
 
-  public var errorCode: String = String()
+  var errorCode: String = String()
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public init() {}
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_SnapshotRequest: Sendable {
+nonisolated struct AizenWireV1_CreateSpaceCommand: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var scope: String = String()
+  var name: String = String()
 
-  public var afterCursor: UInt64 = 0
+  var icon: String = String()
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var summary: String = String()
 
-  public init() {}
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_SnapshotResponse: Sendable {
+nonisolated struct AizenWireV1_CreateSpaceResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var scope: String = String()
+  var spaceID: String = String()
 
-  public var cursor: UInt64 = 0
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public var snapshot: Data = Data()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_Event: Sendable {
+nonisolated struct AizenWireV1_SnapshotRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var cursor: UInt64 = 0
+  var scope: String = String()
 
-  public var eventID: String = String()
+  var afterCursor: UInt64 = 0
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public init() {}
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_Ping: Sendable {
+nonisolated struct AizenWireV1_SnapshotResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var nonce: UInt64 = 0
+  var scope: String = String()
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var cursor: UInt64 = 0
 
-  public init() {}
+  var snapshot: Data = Data()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_Close: Sendable {
+nonisolated struct AizenWireV1_Event: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var code: String = String()
+  var cursor: UInt64 = 0
 
-  public var reason: String = String()
+  var eventID: String = String()
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public init() {}
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_BlobDescriptor: Sendable {
+nonisolated struct AizenWireV1_Ping: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var blobID: String = String()
+  var nonce: UInt64 = 0
 
-  public var byteCount: UInt64 = 0
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public var sha256: Data = Data()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
+  init() {}
 }
 
-public nonisolated struct AizenWireV1_BlobChunk: Sendable {
+nonisolated struct AizenWireV1_Close: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var blobID: String = String()
+  var code: String = String()
 
-  public var offset: UInt64 = 0
+  var reason: String = String()
 
-  public var bytes: Data = Data()
+  var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public var finalChunk: Bool = false
+  init() {}
+}
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+nonisolated struct AizenWireV1_BlobDescriptor: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
 
-  public init() {}
+  var blobID: String = String()
+
+  var byteCount: UInt64 = 0
+
+  var sha256: Data = Data()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_BlobChunk: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var blobID: String = String()
+
+  var offset: UInt64 = 0
+
+  var bytes: Data = Data()
+
+  var finalChunk: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -449,22 +477,22 @@ public nonisolated struct AizenWireV1_BlobChunk: Sendable {
 fileprivate nonisolated let _protobuf_package = "aizen.wire.v1"
 
 nonisolated extension AizenWireV1_MessageKind: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MESSAGE_KIND_UNSPECIFIED\0\u{1}MESSAGE_KIND_HELLO\0\u{1}MESSAGE_KIND_AUTHENTICATION\0\u{1}MESSAGE_KIND_CAPABILITIES\0\u{1}MESSAGE_KIND_COMMAND\0\u{1}MESSAGE_KIND_COMMAND_RECEIPT\0\u{1}MESSAGE_KIND_COMMAND_RESULT\0\u{1}MESSAGE_KIND_QUERY\0\u{1}MESSAGE_KIND_QUERY_RESPONSE\0\u{1}MESSAGE_KIND_SNAPSHOT\0\u{1}MESSAGE_KIND_EVENT\0\u{1}MESSAGE_KIND_EVENT_ACKNOWLEDGEMENT\0\u{1}MESSAGE_KIND_PING\0\u{1}MESSAGE_KIND_PONG\0\u{1}MESSAGE_KIND_CLOSE\0\u{1}MESSAGE_KIND_BLOB\0\u{1}MESSAGE_KIND_ERROR\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MESSAGE_KIND_UNSPECIFIED\0\u{1}MESSAGE_KIND_HELLO\0\u{1}MESSAGE_KIND_AUTHENTICATION\0\u{1}MESSAGE_KIND_CAPABILITIES\0\u{1}MESSAGE_KIND_COMMAND\0\u{1}MESSAGE_KIND_COMMAND_RECEIPT\0\u{1}MESSAGE_KIND_COMMAND_RESULT\0\u{1}MESSAGE_KIND_QUERY\0\u{1}MESSAGE_KIND_QUERY_RESPONSE\0\u{1}MESSAGE_KIND_SNAPSHOT\0\u{1}MESSAGE_KIND_EVENT\0\u{1}MESSAGE_KIND_EVENT_ACKNOWLEDGEMENT\0\u{1}MESSAGE_KIND_PING\0\u{1}MESSAGE_KIND_PONG\0\u{1}MESSAGE_KIND_CLOSE\0\u{1}MESSAGE_KIND_BLOB\0\u{1}MESSAGE_KIND_ERROR\0")
 }
 
 nonisolated extension AizenWireV1_LogicalChannel: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0LOGICAL_CHANNEL_UNSPECIFIED\0\u{1}LOGICAL_CHANNEL_CONTROL\0\u{1}LOGICAL_CHANNEL_STATE\0\u{1}LOGICAL_CHANNEL_RUN_STREAM\0\u{1}LOGICAL_CHANNEL_TERMINAL\0\u{1}LOGICAL_CHANNEL_BLOB\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0LOGICAL_CHANNEL_UNSPECIFIED\0\u{1}LOGICAL_CHANNEL_CONTROL\0\u{1}LOGICAL_CHANNEL_STATE\0\u{1}LOGICAL_CHANNEL_RUN_STREAM\0\u{1}LOGICAL_CHANNEL_TERMINAL\0\u{1}LOGICAL_CHANNEL_BLOB\0")
 }
 
 nonisolated extension AizenWireV1_PayloadEncoding: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PAYLOAD_ENCODING_UNSPECIFIED\0\u{1}PAYLOAD_ENCODING_PROTOBUF\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PAYLOAD_ENCODING_UNSPECIFIED\0\u{1}PAYLOAD_ENCODING_PROTOBUF\0")
 }
 
 nonisolated extension AizenWireV1_ProtocolEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ProtocolEnvelope"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}protocol_generation\0\u{3}message_id\0\u{3}connection_id\0\u{3}connection_sequence\0\u{1}kind\0\u{1}channel\0\u{3}correlation_id\0\u{1}acknowledgement\0\u{1}payload\0")
+  static let protoMessageName: String = _protobuf_package + ".ProtocolEnvelope"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}protocol_generation\0\u{3}message_id\0\u{3}connection_id\0\u{3}connection_sequence\0\u{1}kind\0\u{1}channel\0\u{3}correlation_id\0\u{1}acknowledgement\0\u{1}payload\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -484,7 +512,7 @@ nonisolated extension AizenWireV1_ProtocolEnvelope: SwiftProtobuf.Message, Swift
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     // The use of inline closures is to circumvent an issue where the compiler
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
@@ -519,7 +547,7 @@ nonisolated extension AizenWireV1_ProtocolEnvelope: SwiftProtobuf.Message, Swift
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_ProtocolEnvelope, rhs: AizenWireV1_ProtocolEnvelope) -> Bool {
+  static func ==(lhs: AizenWireV1_ProtocolEnvelope, rhs: AizenWireV1_ProtocolEnvelope) -> Bool {
     if lhs.protocolGeneration != rhs.protocolGeneration {return false}
     if lhs.messageID != rhs.messageID {return false}
     if lhs.connectionID != rhs.connectionID {return false}
@@ -535,10 +563,10 @@ nonisolated extension AizenWireV1_ProtocolEnvelope: SwiftProtobuf.Message, Swift
 }
 
 nonisolated extension AizenWireV1_Acknowledgement: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".Acknowledgement"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sequence\0\u{3}message_id\0")
+  static let protoMessageName: String = _protobuf_package + ".Acknowledgement"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sequence\0\u{3}message_id\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -551,7 +579,7 @@ nonisolated extension AizenWireV1_Acknowledgement: SwiftProtobuf.Message, SwiftP
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.sequence != 0 {
       try visitor.visitSingularUInt64Field(value: self.sequence, fieldNumber: 1)
     }
@@ -561,7 +589,7 @@ nonisolated extension AizenWireV1_Acknowledgement: SwiftProtobuf.Message, SwiftP
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_Acknowledgement, rhs: AizenWireV1_Acknowledgement) -> Bool {
+  static func ==(lhs: AizenWireV1_Acknowledgement, rhs: AizenWireV1_Acknowledgement) -> Bool {
     if lhs.sequence != rhs.sequence {return false}
     if lhs.messageID != rhs.messageID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -570,10 +598,10 @@ nonisolated extension AizenWireV1_Acknowledgement: SwiftProtobuf.Message, SwiftP
 }
 
 nonisolated extension AizenWireV1_TypedPayload: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".TypedPayload"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{3}schema_version\0\u{1}encoding\0\u{1}bytes\0\u{3}state_affecting\0")
+  static let protoMessageName: String = _protobuf_package + ".TypedPayload"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{3}schema_version\0\u{1}encoding\0\u{1}bytes\0\u{3}state_affecting\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -589,7 +617,7 @@ nonisolated extension AizenWireV1_TypedPayload: SwiftProtobuf.Message, SwiftProt
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.type.isEmpty {
       try visitor.visitSingularStringField(value: self.type, fieldNumber: 1)
     }
@@ -608,7 +636,7 @@ nonisolated extension AizenWireV1_TypedPayload: SwiftProtobuf.Message, SwiftProt
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_TypedPayload, rhs: AizenWireV1_TypedPayload) -> Bool {
+  static func ==(lhs: AizenWireV1_TypedPayload, rhs: AizenWireV1_TypedPayload) -> Bool {
     if lhs.type != rhs.type {return false}
     if lhs.schemaVersion != rhs.schemaVersion {return false}
     if lhs.encoding != rhs.encoding {return false}
@@ -620,10 +648,10 @@ nonisolated extension AizenWireV1_TypedPayload: SwiftProtobuf.Message, SwiftProt
 }
 
 nonisolated extension AizenWireV1_Hello: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".Hello"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}minimum_protocol_generation\0\u{3}maximum_protocol_generation\0\u{3}product_version\0")
+  static let protoMessageName: String = _protobuf_package + ".Hello"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}minimum_protocol_generation\0\u{3}maximum_protocol_generation\0\u{3}product_version\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -637,7 +665,7 @@ nonisolated extension AizenWireV1_Hello: SwiftProtobuf.Message, SwiftProtobuf._M
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.minimumProtocolGeneration != 0 {
       try visitor.visitSingularUInt32Field(value: self.minimumProtocolGeneration, fieldNumber: 1)
     }
@@ -650,7 +678,7 @@ nonisolated extension AizenWireV1_Hello: SwiftProtobuf.Message, SwiftProtobuf._M
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_Hello, rhs: AizenWireV1_Hello) -> Bool {
+  static func ==(lhs: AizenWireV1_Hello, rhs: AizenWireV1_Hello) -> Bool {
     if lhs.minimumProtocolGeneration != rhs.minimumProtocolGeneration {return false}
     if lhs.maximumProtocolGeneration != rhs.maximumProtocolGeneration {return false}
     if lhs.productVersion != rhs.productVersion {return false}
@@ -660,10 +688,10 @@ nonisolated extension AizenWireV1_Hello: SwiftProtobuf.Message, SwiftProtobuf._M
 }
 
 nonisolated extension AizenWireV1_Capabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".Capabilities"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}identifiers\0")
+  static let protoMessageName: String = _protobuf_package + ".Capabilities"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}identifiers\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -675,14 +703,14 @@ nonisolated extension AizenWireV1_Capabilities: SwiftProtobuf.Message, SwiftProt
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.identifiers.isEmpty {
       try visitor.visitRepeatedStringField(value: self.identifiers, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_Capabilities, rhs: AizenWireV1_Capabilities) -> Bool {
+  static func ==(lhs: AizenWireV1_Capabilities, rhs: AizenWireV1_Capabilities) -> Bool {
     if lhs.identifiers != rhs.identifiers {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -690,10 +718,10 @@ nonisolated extension AizenWireV1_Capabilities: SwiftProtobuf.Message, SwiftProt
 }
 
 nonisolated extension AizenWireV1_CommandReceipt: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".CommandReceipt"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}command_id\0\u{3}operation_id\0")
+  static let protoMessageName: String = _protobuf_package + ".CommandReceipt"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}command_id\0\u{3}operation_id\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -706,7 +734,7 @@ nonisolated extension AizenWireV1_CommandReceipt: SwiftProtobuf.Message, SwiftPr
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.commandID.isEmpty {
       try visitor.visitSingularStringField(value: self.commandID, fieldNumber: 1)
     }
@@ -716,7 +744,7 @@ nonisolated extension AizenWireV1_CommandReceipt: SwiftProtobuf.Message, SwiftPr
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_CommandReceipt, rhs: AizenWireV1_CommandReceipt) -> Bool {
+  static func ==(lhs: AizenWireV1_CommandReceipt, rhs: AizenWireV1_CommandReceipt) -> Bool {
     if lhs.commandID != rhs.commandID {return false}
     if lhs.operationID != rhs.operationID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -725,10 +753,10 @@ nonisolated extension AizenWireV1_CommandReceipt: SwiftProtobuf.Message, SwiftPr
 }
 
 nonisolated extension AizenWireV1_CommandResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".CommandResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}command_id\0\u{1}succeeded\0\u{3}error_code\0")
+  static let protoMessageName: String = _protobuf_package + ".CommandResult"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}command_id\0\u{1}succeeded\0\u{3}error_code\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -742,7 +770,7 @@ nonisolated extension AizenWireV1_CommandResult: SwiftProtobuf.Message, SwiftPro
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.commandID.isEmpty {
       try visitor.visitSingularStringField(value: self.commandID, fieldNumber: 1)
     }
@@ -755,7 +783,7 @@ nonisolated extension AizenWireV1_CommandResult: SwiftProtobuf.Message, SwiftPro
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_CommandResult, rhs: AizenWireV1_CommandResult) -> Bool {
+  static func ==(lhs: AizenWireV1_CommandResult, rhs: AizenWireV1_CommandResult) -> Bool {
     if lhs.commandID != rhs.commandID {return false}
     if lhs.succeeded != rhs.succeeded {return false}
     if lhs.errorCode != rhs.errorCode {return false}
@@ -764,11 +792,81 @@ nonisolated extension AizenWireV1_CommandResult: SwiftProtobuf.Message, SwiftPro
   }
 }
 
-nonisolated extension AizenWireV1_SnapshotRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".SnapshotRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}scope\0\u{3}after_cursor\0")
+nonisolated extension AizenWireV1_CreateSpaceCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".CreateSpaceCommand"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}icon\0\u{1}summary\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.icon) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.summary) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    if !self.icon.isEmpty {
+      try visitor.visitSingularStringField(value: self.icon, fieldNumber: 2)
+    }
+    if !self.summary.isEmpty {
+      try visitor.visitSingularStringField(value: self.summary, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_CreateSpaceCommand, rhs: AizenWireV1_CreateSpaceCommand) -> Bool {
+    if lhs.name != rhs.name {return false}
+    if lhs.icon != rhs.icon {return false}
+    if lhs.summary != rhs.summary {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_CreateSpaceResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".CreateSpaceResult"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}space_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_CreateSpaceResult, rhs: AizenWireV1_CreateSpaceResult) -> Bool {
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_SnapshotRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".SnapshotRequest"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}scope\0\u{3}after_cursor\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -781,7 +879,7 @@ nonisolated extension AizenWireV1_SnapshotRequest: SwiftProtobuf.Message, SwiftP
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.scope.isEmpty {
       try visitor.visitSingularStringField(value: self.scope, fieldNumber: 1)
     }
@@ -791,7 +889,7 @@ nonisolated extension AizenWireV1_SnapshotRequest: SwiftProtobuf.Message, SwiftP
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_SnapshotRequest, rhs: AizenWireV1_SnapshotRequest) -> Bool {
+  static func ==(lhs: AizenWireV1_SnapshotRequest, rhs: AizenWireV1_SnapshotRequest) -> Bool {
     if lhs.scope != rhs.scope {return false}
     if lhs.afterCursor != rhs.afterCursor {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -800,10 +898,10 @@ nonisolated extension AizenWireV1_SnapshotRequest: SwiftProtobuf.Message, SwiftP
 }
 
 nonisolated extension AizenWireV1_SnapshotResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".SnapshotResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}scope\0\u{1}cursor\0\u{1}snapshot\0")
+  static let protoMessageName: String = _protobuf_package + ".SnapshotResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}scope\0\u{1}cursor\0\u{1}snapshot\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -817,7 +915,7 @@ nonisolated extension AizenWireV1_SnapshotResponse: SwiftProtobuf.Message, Swift
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.scope.isEmpty {
       try visitor.visitSingularStringField(value: self.scope, fieldNumber: 1)
     }
@@ -830,7 +928,7 @@ nonisolated extension AizenWireV1_SnapshotResponse: SwiftProtobuf.Message, Swift
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_SnapshotResponse, rhs: AizenWireV1_SnapshotResponse) -> Bool {
+  static func ==(lhs: AizenWireV1_SnapshotResponse, rhs: AizenWireV1_SnapshotResponse) -> Bool {
     if lhs.scope != rhs.scope {return false}
     if lhs.cursor != rhs.cursor {return false}
     if lhs.snapshot != rhs.snapshot {return false}
@@ -840,10 +938,10 @@ nonisolated extension AizenWireV1_SnapshotResponse: SwiftProtobuf.Message, Swift
 }
 
 nonisolated extension AizenWireV1_Event: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".Event"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cursor\0\u{3}event_id\0")
+  static let protoMessageName: String = _protobuf_package + ".Event"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cursor\0\u{3}event_id\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -856,7 +954,7 @@ nonisolated extension AizenWireV1_Event: SwiftProtobuf.Message, SwiftProtobuf._M
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.cursor != 0 {
       try visitor.visitSingularUInt64Field(value: self.cursor, fieldNumber: 1)
     }
@@ -866,7 +964,7 @@ nonisolated extension AizenWireV1_Event: SwiftProtobuf.Message, SwiftProtobuf._M
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_Event, rhs: AizenWireV1_Event) -> Bool {
+  static func ==(lhs: AizenWireV1_Event, rhs: AizenWireV1_Event) -> Bool {
     if lhs.cursor != rhs.cursor {return false}
     if lhs.eventID != rhs.eventID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -875,10 +973,10 @@ nonisolated extension AizenWireV1_Event: SwiftProtobuf.Message, SwiftProtobuf._M
 }
 
 nonisolated extension AizenWireV1_Ping: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".Ping"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}nonce\0")
+  static let protoMessageName: String = _protobuf_package + ".Ping"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}nonce\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -890,14 +988,14 @@ nonisolated extension AizenWireV1_Ping: SwiftProtobuf.Message, SwiftProtobuf._Me
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.nonce != 0 {
       try visitor.visitSingularUInt64Field(value: self.nonce, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_Ping, rhs: AizenWireV1_Ping) -> Bool {
+  static func ==(lhs: AizenWireV1_Ping, rhs: AizenWireV1_Ping) -> Bool {
     if lhs.nonce != rhs.nonce {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -905,10 +1003,10 @@ nonisolated extension AizenWireV1_Ping: SwiftProtobuf.Message, SwiftProtobuf._Me
 }
 
 nonisolated extension AizenWireV1_Close: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".Close"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}reason\0")
+  static let protoMessageName: String = _protobuf_package + ".Close"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}reason\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -921,7 +1019,7 @@ nonisolated extension AizenWireV1_Close: SwiftProtobuf.Message, SwiftProtobuf._M
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.code.isEmpty {
       try visitor.visitSingularStringField(value: self.code, fieldNumber: 1)
     }
@@ -931,7 +1029,7 @@ nonisolated extension AizenWireV1_Close: SwiftProtobuf.Message, SwiftProtobuf._M
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_Close, rhs: AizenWireV1_Close) -> Bool {
+  static func ==(lhs: AizenWireV1_Close, rhs: AizenWireV1_Close) -> Bool {
     if lhs.code != rhs.code {return false}
     if lhs.reason != rhs.reason {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -940,10 +1038,10 @@ nonisolated extension AizenWireV1_Close: SwiftProtobuf.Message, SwiftProtobuf._M
 }
 
 nonisolated extension AizenWireV1_BlobDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".BlobDescriptor"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}blob_id\0\u{3}byte_count\0\u{1}sha256\0")
+  static let protoMessageName: String = _protobuf_package + ".BlobDescriptor"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}blob_id\0\u{3}byte_count\0\u{1}sha256\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -957,7 +1055,7 @@ nonisolated extension AizenWireV1_BlobDescriptor: SwiftProtobuf.Message, SwiftPr
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.blobID.isEmpty {
       try visitor.visitSingularStringField(value: self.blobID, fieldNumber: 1)
     }
@@ -970,7 +1068,7 @@ nonisolated extension AizenWireV1_BlobDescriptor: SwiftProtobuf.Message, SwiftPr
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_BlobDescriptor, rhs: AizenWireV1_BlobDescriptor) -> Bool {
+  static func ==(lhs: AizenWireV1_BlobDescriptor, rhs: AizenWireV1_BlobDescriptor) -> Bool {
     if lhs.blobID != rhs.blobID {return false}
     if lhs.byteCount != rhs.byteCount {return false}
     if lhs.sha256 != rhs.sha256 {return false}
@@ -980,10 +1078,10 @@ nonisolated extension AizenWireV1_BlobDescriptor: SwiftProtobuf.Message, SwiftPr
 }
 
 nonisolated extension AizenWireV1_BlobChunk: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".BlobChunk"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}blob_id\0\u{1}offset\0\u{1}bytes\0\u{3}final_chunk\0")
+  static let protoMessageName: String = _protobuf_package + ".BlobChunk"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}blob_id\0\u{1}offset\0\u{1}bytes\0\u{3}final_chunk\0")
 
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
@@ -998,7 +1096,7 @@ nonisolated extension AizenWireV1_BlobChunk: SwiftProtobuf.Message, SwiftProtobu
     }
   }
 
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.blobID.isEmpty {
       try visitor.visitSingularStringField(value: self.blobID, fieldNumber: 1)
     }
@@ -1014,7 +1112,7 @@ nonisolated extension AizenWireV1_BlobChunk: SwiftProtobuf.Message, SwiftProtobu
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: AizenWireV1_BlobChunk, rhs: AizenWireV1_BlobChunk) -> Bool {
+  static func ==(lhs: AizenWireV1_BlobChunk, rhs: AizenWireV1_BlobChunk) -> Bool {
     if lhs.blobID != rhs.blobID {return false}
     if lhs.offset != rhs.offset {return false}
     if lhs.bytes != rhs.bytes {return false}
