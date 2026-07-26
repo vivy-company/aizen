@@ -13,6 +13,9 @@ let package = Package(
             .product(name: "AizenStorage", package: "Storage"),
             .product(name: "AizenTransport", package: "Transport")
         ]),
-        .testTarget(name: "AizenHostTests", dependencies: ["AizenHost"])
+        .testTarget(name: "AizenHostTests", dependencies: [
+            "AizenHost",
+            .product(name: "AizenTransport", package: "Transport")
+        ])
     ]
 )
