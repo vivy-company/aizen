@@ -2,6 +2,7 @@ import AizenCore
 import AizenClient
 import AizenWire
 import AppKit
+import GhosttyKit
 import SwiftUI
 
 /// A complete Mac Client path for projectless Reignition conversations.
@@ -13,6 +14,7 @@ struct ReignitionConversationWindow: View {
     @State private var newConversationTitle = ""
     @State private var newSpaceName = ""
     @State private var contextCreation: ReignitionContextCreation?
+    @State private var terminalPresentation: AizenCore.TerminalSession?
 
     init(host: ReignitionHostComposition) {
         _store = StateObject(wrappedValue: ReignitionConversationStore(host: host))
@@ -83,6 +85,9 @@ struct ReignitionConversationWindow: View {
                 contextCreation = nil
             }
         }
+        .sheet(item: $terminalPresentation) { terminal in
+            ReignitionTerminalSheet(terminal: terminal)
+        }
     }
 
     @ViewBuilder
@@ -101,6 +106,10 @@ struct ReignitionConversationWindow: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
+                    Button("Open Terminal", systemImage: "terminal") {
+                        openTerminal(for: conversation.id)
+                    }
+                    .disabled(conversation.executionContextID == nil || store.isSynchronizing)
                     folderMenu(for: conversation)
                 }
                 .padding(.horizontal)
@@ -322,6 +331,67 @@ struct ReignitionConversationWindow: View {
                 )
             }
         }
+    }
+
+    private func openTerminal(for sessionID: SessionID) {
+        Task {
+            terminalPresentation = await store.createTerminal(for: sessionID)
+        }
+    }
+}
+
+private struct ReignitionTerminalSheet: View {
+    let terminal: AizenCore.TerminalSession
+
+    var body: some View {
+        ReignitionTerminalSurface(terminal: terminal)
+            .frame(minWidth: 760, minHeight: 480)
+    }
+}
+
+private struct ReignitionTerminalSurface: NSViewRepresentable {
+    let terminal: AizenCore.TerminalSession
+    @EnvironmentObject private var ghosttyApp: Ghostty.App
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSView {
+        let container = NSView()
+        container.wantsLayer = true
+        return container
+    }
+
+    func updateNSView(_ container: NSView, context: Context) {
+        guard context.coordinator.surface == nil else { return }
+        ghosttyApp.ensureRunning()
+        guard let app = ghosttyApp.app,
+              let command = attachCommand else { return }
+        let surface = AizenTerminalSurfaceView(
+            frame: container.bounds,
+            worktreePath: FileManager.default.homeDirectoryForCurrentUser.path,
+            ghosttyApp: app,
+            appWrapper: ghosttyApp,
+            paneId: terminal.paneID,
+            command: command
+        )
+        surface.autoresizingMask = [.width, .height]
+        container.addSubview(surface)
+        context.coordinator.surface = surface
+    }
+
+    static func dismantleNSView(_ container: NSView, coordinator: Coordinator) {
+        coordinator.surface?.removeFromSuperview()
+        coordinator.surface = nil
+    }
+
+    private var attachCommand: String? {
+        guard terminal.tmuxSessionName.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }),
+              let tmux = TmuxSessionSupport.tmuxPath() else { return nil }
+        return "\(tmux) attach-session -t \(terminal.tmuxSessionName)"
+    }
+
+    final class Coordinator {
+        var surface: AizenTerminalSurfaceView?
     }
 }
 

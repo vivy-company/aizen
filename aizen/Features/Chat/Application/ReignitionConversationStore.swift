@@ -190,6 +190,21 @@ final class ReignitionConversationStore: ObservableObject {
         }
     }
 
+    func createTerminal(for sessionID: SessionID) async -> AizenCore.TerminalSession? {
+        guard let session = conversations.first(where: { $0.id == sessionID }),
+              let executionContextID = session.executionContextID else { return nil }
+        var terminal: AizenCore.TerminalSession?
+        await perform {
+            terminal = try await self.host.createTerminalSession(
+                spaceID: session.spaceID,
+                executionContextID: executionContextID,
+                title: session.title
+            )
+            try await self.refreshProjection(spaceID: session.spaceID)
+        }
+        return terminal
+    }
+
     func detachExecutionContext(from sessionID: SessionID) async {
         guard let session = conversations.first(where: { $0.id == sessionID }) else { return }
         await perform {

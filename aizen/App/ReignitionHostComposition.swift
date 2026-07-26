@@ -112,6 +112,20 @@ actor ReignitionHostComposition {
         try await client.createIndependentContext(spaceID: spaceID, resourceID: resourceID, destinationPath: destinationPath, mode: mode).contextID
     }
 
+    func createTerminalSession(
+        spaceID: SpaceID,
+        executionContextID: ExecutionContextID,
+        title: String? = nil,
+        initialCommand: String? = nil
+    ) async throws -> AizenCore.TerminalSession {
+        try await client.createTerminalSession(
+            spaceID: spaceID,
+            executionContextID: executionContextID,
+            title: title,
+            initialCommand: initialCommand
+        )
+    }
+
     func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {
         try await client.attachExecutionContext(sessionID: sessionID, contextID: contextID)
     }
