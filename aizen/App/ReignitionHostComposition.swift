@@ -60,6 +60,10 @@ actor ReignitionHostComposition {
         try await client.spaces()
     }
 
+    func createSpace(name: String) async throws -> SpaceID {
+        try await client.createSpace(name: name)
+    }
+
     func conversations(spaceID: SpaceID? = nil) async throws -> [Session] {
         try await client.conversations(spaceID: spaceID)
     }

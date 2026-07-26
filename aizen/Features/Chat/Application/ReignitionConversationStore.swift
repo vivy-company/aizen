@@ -45,6 +45,18 @@ final class ReignitionConversationStore: ObservableObject {
         }
     }
 
+    func createSpace(name: String) async -> SpaceID? {
+        var createdID: SpaceID?
+        await perform {
+            createdID = try await self.host.createSpace(name: name)
+            self.spaces = try await self.host.spaces()
+            if let createdID {
+                try await self.refreshProjection(spaceID: createdID)
+            }
+        }
+        return createdID
+    }
+
     func select(_ sessionID: SessionID?) async {
         selectedConversationID = sessionID
         messages = []
@@ -136,7 +148,7 @@ final class ReignitionConversationStore: ObservableObject {
         return activeRunIDs.compactMap { assistantTextByRun[$0] }.joined().nonEmpty
     }
 
-    func folderResource(for session: Session) -> Resource? {
+    func resource(for session: Session) -> Resource? {
         guard let contextID = session.executionContextID,
             let resourceID = executionContexts.first(where: { $0.id == contextID })?.resourceID else { return nil }
         return resources.first(where: { $0.id == resourceID })

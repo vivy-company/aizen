@@ -9,6 +9,7 @@ struct ReignitionConversationWindow: View {
     @State private var selectedSpaceID: SpaceID?
     @State private var draft = ""
     @State private var newConversationTitle = ""
+    @State private var newSpaceName = ""
 
     init(host: ReignitionHostComposition) {
         _store = StateObject(wrappedValue: ReignitionConversationStore(host: host))
@@ -26,6 +27,9 @@ struct ReignitionConversationWindow: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
+                    Button("New Space…", systemImage: "plus") {
+                        newSpaceName = "New Space"
+                    }
                 }
                 Section("Conversations") {
                     ForEach(store.conversations) { conversation in
@@ -60,6 +64,11 @@ struct ReignitionConversationWindow: View {
         } message: {
             Text(store.lastError ?? "An unknown error occurred.")
         }
+        .alert("New Space", isPresented: newSpaceAlert) {
+            TextField("Name", text: $newSpaceName)
+            Button("Create") { createSpace() }
+            Button("Cancel", role: .cancel) { newSpaceName = "" }
+        }
     }
 
     @ViewBuilder
@@ -68,8 +77,8 @@ struct ReignitionConversationWindow: View {
             let conversation = store.conversations.first(where: { $0.id == conversationID }) {
             VStack(spacing: 0) {
                 HStack {
-                    if let resource = store.folderResource(for: conversation) {
-                        Label(resource.title, systemImage: "folder")
+                    if let resource = store.resource(for: conversation) {
+                        Label(resource.title, systemImage: resource.kind == .repository ? "folder.badge.gearshape" : "folder")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     } else {
@@ -138,6 +147,13 @@ struct ReignitionConversationWindow: View {
         )
     }
 
+    private var newSpaceAlert: Binding<Bool> {
+        Binding(
+            get: { !newSpaceName.isEmpty },
+            set: { if !$0 { newSpaceName = "" } }
+        )
+    }
+
     private var errorAlert: Binding<Bool> {
         Binding(
             get: { store.lastError != nil },
@@ -153,10 +169,21 @@ struct ReignitionConversationWindow: View {
         Task { await store.createConversation(spaceID: selectedSpaceID, title: title) }
     }
 
+    private func createSpace() {
+        let name = newSpaceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        newSpaceName = ""
+        guard !name.isEmpty else { return }
+        Task {
+            if let spaceID = await store.createSpace(name: name) {
+                selectedSpaceID = spaceID
+            }
+        }
+    }
+
     @ViewBuilder
     private func folderMenu(for conversation: Session) -> some View {
         Menu("Attach Folder", systemImage: "folder.badge.plus") {
-            if store.folderResource(for: conversation) != nil {
+            if store.resource(for: conversation) != nil {
                 Button("Detach Folder", systemImage: "folder.badge.minus", role: .destructive) {
                     Task { await store.detachExecutionContext(from: conversation.id) }
                 }
