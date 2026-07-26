@@ -22,6 +22,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
     public var terminalSessions: [TerminalSession]
     public var runs: [Run]
     public var operations: [AizenCore.Operation]
+    public var operationLogChunks: [OperationLogChunk]
     public var artifacts: [Artifact]
     public var commands: [DurableCommand]
     public var journalEvents: [JournalEvent]
@@ -32,7 +33,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
     public init(
         schemaVersion: Int = Self.schemaVersion,
         spaces: [Space] = [], sessions: [Session] = [], conversationMessages: [ConversationMessage] = [], resources: [Resource] = [],
-        executionContexts: [ExecutionContext] = [], terminalSessions: [TerminalSession] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = [], journalEvents: [JournalEvent] = [], pairingTokens: [PairingTokenRecord] = [], deviceAuthorizations: [DeviceAuthorization] = [], securityAuditRecords: [SecurityAuditRecord] = []
+        executionContexts: [ExecutionContext] = [], terminalSessions: [TerminalSession] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], operationLogChunks: [OperationLogChunk] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = [], journalEvents: [JournalEvent] = [], pairingTokens: [PairingTokenRecord] = [], deviceAuthorizations: [DeviceAuthorization] = [], securityAuditRecords: [SecurityAuditRecord] = []
     ) {
         precondition(schemaVersion == Self.schemaVersion, "Storage snapshots must use schema v2")
         self.schemaVersion = schemaVersion
@@ -44,6 +45,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         self.terminalSessions = terminalSessions
         self.runs = runs
         self.operations = operations
+        self.operationLogChunks = operationLogChunks
         self.artifacts = artifacts
         self.commands = commands
         self.journalEvents = journalEvents
@@ -54,11 +56,11 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
 
     public var isEmpty: Bool {
         spaces.isEmpty && sessions.isEmpty && conversationMessages.isEmpty && resources.isEmpty && executionContexts.isEmpty &&
-            terminalSessions.isEmpty && runs.isEmpty && operations.isEmpty && artifacts.isEmpty && commands.isEmpty && journalEvents.isEmpty && pairingTokens.isEmpty && deviceAuthorizations.isEmpty && securityAuditRecords.isEmpty
+            terminalSessions.isEmpty && runs.isEmpty && operations.isEmpty && operationLogChunks.isEmpty && artifacts.isEmpty && commands.isEmpty && journalEvents.isEmpty && pairingTokens.isEmpty && deviceAuthorizations.isEmpty && securityAuditRecords.isEmpty
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, terminalSessions, runs, operations, artifacts, commands, journalEvents, pairingTokens, deviceAuthorizations, securityAuditRecords
+        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, terminalSessions, runs, operations, operationLogChunks, artifacts, commands, journalEvents, pairingTokens, deviceAuthorizations, securityAuditRecords
     }
 
     public init(from decoder: Decoder) throws {
@@ -72,6 +74,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         terminalSessions = try values.decodeIfPresent([TerminalSession].self, forKey: .terminalSessions) ?? []
         runs = try values.decode([Run].self, forKey: .runs)
         operations = try values.decode([AizenCore.Operation].self, forKey: .operations)
+        operationLogChunks = try values.decodeIfPresent([OperationLogChunk].self, forKey: .operationLogChunks) ?? []
         artifacts = try values.decode([Artifact].self, forKey: .artifacts)
         commands = try values.decodeIfPresent([DurableCommand].self, forKey: .commands) ?? []
         journalEvents = try values.decodeIfPresent([JournalEvent].self, forKey: .journalEvents) ?? []
@@ -91,6 +94,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         try values.encode(terminalSessions, forKey: .terminalSessions)
         try values.encode(runs, forKey: .runs)
         try values.encode(operations, forKey: .operations)
+        try values.encode(operationLogChunks, forKey: .operationLogChunks)
         try values.encode(artifacts, forKey: .artifacts)
         try values.encode(commands, forKey: .commands)
         try values.encode(journalEvents, forKey: .journalEvents)
@@ -108,11 +112,15 @@ public enum StorageError: Error, Sendable, Equatable {
     case missingRun
     case missingResource
     case missingExecutionContext
+    case missingOperation
     case missingCommand
     case invalidCommandTransition
     case invalidCommandResult
     case eventCursorExhausted
     case invalidEventRetention
+    case invalidOperationLogRetention
+    case invalidOperationLogReadLimit
+    case operationLogSequenceExhausted
     case migrationDestinationNotEmpty
 }
 
@@ -345,6 +353,55 @@ public actor StorageRepository {
         return (events.first?.cursor, events.last?.cursor ?? 0)
     }
 
+    /// Appends process output atomically while retaining a bounded tail for each operation.
+    /// Callers provide already bounded chunks from their runtime adapter.
+    public func appendOperationLogChunk(
+        operationID: OperationID,
+        stream: OperationLogChunk.Stream,
+        text: String,
+        retainingAtMost maximumBytes: Int = 1_024 * 1_024
+    ) throws -> OperationLogChunk {
+        guard maximumBytes >= OperationLogChunk.maximumTextUTF8Count else { throw StorageError.invalidOperationLogRetention }
+        var appended: OperationLogChunk?
+        _ = try transact { snapshot in
+            guard snapshot.operations.contains(where: { $0.id == operationID }) else { throw StorageError.missingOperation }
+            let existing = snapshot.operationLogChunks.filter { $0.operationID == operationID }
+            guard let sequence = existing.last?.sequence.addingReportingOverflow(1), !sequence.overflow else {
+                if existing.isEmpty {
+                    let chunk = OperationLogChunk(operationID: operationID, sequence: 1, stream: stream, text: text)
+                    snapshot.operationLogChunks.append(chunk)
+                    appended = chunk
+                    return
+                }
+                throw StorageError.operationLogSequenceExhausted
+            }
+            let chunk = OperationLogChunk(operationID: operationID, sequence: sequence.partialValue, stream: stream, text: text)
+            snapshot.operationLogChunks.append(chunk)
+            var retainedBytes = existing.reduce(0) { $0 + $1.text.utf8.count } + text.utf8.count
+            while retainedBytes > maximumBytes,
+                  let index = snapshot.operationLogChunks.firstIndex(where: { $0.operationID == operationID }) {
+                retainedBytes -= snapshot.operationLogChunks.remove(at: index).text.utf8.count
+            }
+            appended = chunk
+        }
+        guard let appended else { throw StorageError.missingOperation }
+        return appended
+    }
+
+    public func operationLogChunks(operationID: OperationID, afterSequence: UInt64 = 0, maximumBytes: Int = 256 * 1_024) throws -> [OperationLogChunk] {
+        guard (1...1_024 * 1_024).contains(maximumBytes) else { throw StorageError.invalidOperationLogReadLimit }
+        let chunks = try load().operationLogChunks.filter { $0.operationID == operationID && $0.sequence > afterSequence }
+        var remaining = maximumBytes
+        var page: [OperationLogChunk] = []
+        for chunk in chunks {
+            let count = chunk.text.utf8.count
+            guard count <= remaining else { break }
+            page.append(chunk)
+            remaining -= count
+        }
+        return page
+    }
+
     public func saveDeviceAuthorization(_ authorization: DeviceAuthorization) throws {
         _ = try transact { snapshot in
             snapshot.deviceAuthorizations.removeAll { $0.device.deviceID == authorization.device.deviceID }
@@ -453,6 +510,7 @@ public actor StorageRepository {
         guard Set(snapshot.executionContexts.map(\.id)).count == snapshot.executionContexts.count else { throw StorageError.duplicateIdentity("execution context") }
         guard Set(snapshot.terminalSessions.map(\.id)).count == snapshot.terminalSessions.count else { throw StorageError.duplicateIdentity("terminal session") }
         guard Set(snapshot.runs.map(\.id)).count == snapshot.runs.count else { throw StorageError.duplicateIdentity("run") }
+        guard Set(snapshot.operations.map(\.id)).count == snapshot.operations.count else { throw StorageError.duplicateIdentity("operation") }
         guard Set(snapshot.commands.map(\.id)).count == snapshot.commands.count else { throw StorageError.duplicateIdentity("command") }
         guard Set(snapshot.journalEvents.map(\.id)).count == snapshot.journalEvents.count else { throw StorageError.duplicateIdentity("journal event") }
         guard Set(snapshot.pairingTokens.map(\.tokenID)).count == snapshot.pairingTokens.count else { throw StorageError.duplicateIdentity("pairing token") }
@@ -486,6 +544,12 @@ public actor StorageRepository {
             return session.spaceID == message.spaceID
         }) else { throw StorageError.missingSession }
         let runs = Dictionary(uniqueKeysWithValues: snapshot.runs.map { ($0.id, $0) })
+        let operations = Dictionary(uniqueKeysWithValues: snapshot.operations.map { ($0.id, $0) })
+        guard snapshot.operationLogChunks.allSatisfy({ operations[$0.operationID] != nil }) else { throw StorageError.missingOperation }
+        let operationLogs = Dictionary(grouping: snapshot.operationLogChunks, by: \.operationID)
+        guard operationLogs.values.allSatisfy({ chunks in zip(chunks, chunks.dropFirst()).allSatisfy { $0.sequence < $1.sequence } }) else {
+            throw StorageError.duplicateIdentity("operation log sequence")
+        }
         guard snapshot.conversationMessages.allSatisfy({ message in
             guard let runID = message.runID else { return true }
             guard let run = runs[runID] else { return false }

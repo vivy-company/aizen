@@ -61,6 +61,23 @@ import AizenSecurity
     #expect(decoded == snapshot)
 }
 
+@Test func repositoryPersistsBoundedOperationLogsInSequence() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = StorageRepository(url: directory.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Builds")
+    let operation = Operation(spaceID: space.id, lifecycle: .running, progress: 0)
+    _ = try await repository.transact { $0.spaces.append(space); $0.operations.append(operation) }
+
+    _ = try await repository.appendOperationLogChunk(operationID: operation.id, stream: .standardOutput, text: "prepare\\n")
+    _ = try await repository.appendOperationLogChunk(operationID: operation.id, stream: .standardError, text: "warning\\n")
+
+    let chunks = try await repository.operationLogChunks(operationID: operation.id, maximumBytes: 64 * 1_024)
+    #expect(chunks.map(\.sequence) == [1, 2])
+    #expect(chunks.map(\.stream) == [.standardOutput, .standardError])
+    #expect(chunks.map(\.text) == ["prepare\\n", "warning\\n"])
+}
+
 @Test func repositoryPersistsAuthorizationAndContentFreeSecurityAudit() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: directory) }
