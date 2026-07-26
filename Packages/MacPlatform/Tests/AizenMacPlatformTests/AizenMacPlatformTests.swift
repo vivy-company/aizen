@@ -1,7 +1,7 @@
 import ACP
 import AizenCore
 import AizenHost
-import AizenMacPlatform
+@testable import AizenMacPlatform
 import AizenSecurity
 import AizenStorage
 import AizenTransport
@@ -59,6 +59,79 @@ import Testing
         try PairedTLSOptions.server(host: host, hostIdentity: hostIdentity, authorizations: [])
     }
     _ = try PairedTLSOptions.server(host: host, hostIdentity: hostIdentity, authorizations: [.init(device: device, grants: [.init(capability: .hostRead)])])
+}
+
+@Test func lanWebSocketProcessorAuthenticatesAndSealsRemoteRequests() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "LAN")
+    _ = try await storage.transact { $0.spaces.append(space) }
+    let hostIdentity = LocalCryptographicIdentity()
+    let host = HostPublicIdentity(hostID: HostID(), displayName: "Mac", cryptographicIdentity: hostIdentity.publicIdentity())
+    let deviceIdentity = LocalCryptographicIdentity()
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: deviceIdentity.publicIdentity())
+    try await storage.saveDeviceAuthorization(.init(device: device, grants: [.init(capability: .hostRead)]))
+    let source = RemoteRequestSource("192.168.1.20")
+    let rateLimiter = RemoteRequestRateLimiter()
+    let processor = HostLANWebSocketProcessor(
+        authenticator: RemoteSessionAuthenticator(host: host, hostIdentity: hostIdentity, storage: storage, rateLimiter: rateLimiter),
+        endpoint: LocalHost(storage: storage),
+        storage: storage,
+        authorization: DeviceAuthorizationGate(storage: storage),
+        rateLimiter: rateLimiter,
+        source: source
+    )
+    let connectionID = UUID()
+    let clientEphemeral = ConnectionEphemeralKey()
+    let start = AuthenticationStartPayload(
+        hostID: host.hostID,
+        deviceID: device.deviceID,
+        connectionID: connectionID,
+        clientNonce: Data(repeating: 1, count: 32),
+        deviceSigningPublicKey: device.cryptographicIdentity.signingPublicKey,
+        deviceKeyAgreementPublicKey: device.cryptographicIdentity.keyAgreementPublicKey,
+        clientEphemeralPublicKey: clientEphemeral.publicKey,
+        route: "lan"
+    )
+    let startEnvelope = try ProtocolEnvelope(
+        messageID: "start",
+        connectionID: connectionID.uuidString,
+        connectionSequence: 1,
+        kind: .authentication,
+        channel: .control,
+        payload: .init(start)
+    )
+    let challengeEnvelope = try ProtocolEnvelope(serializedData: try await processor.receive(startEnvelope.serializedData()))
+    let challenge = try AuthenticationChallengePayload(protobufBytes: challengeEnvelope.payload.protobufBytes)
+    let binding = try ConnectionAuthenticationBinding(
+        protocolGeneration: challengeEnvelope.protocolGeneration,
+        hostID: challenge.hostID,
+        deviceID: challenge.deviceID,
+        connectionID: challenge.connectionID,
+        clientNonce: challenge.clientNonce,
+        serverNonce: challenge.serverNonce,
+        clientEphemeralPublicKey: clientEphemeral.publicKey,
+        serverEphemeralPublicKey: challenge.serverEphemeralPublicKey,
+        route: .lan
+    )
+    let proof = ConnectionAuthenticator.makeProof(participant: .device, identity: deviceIdentity, binding: binding)
+    let proofEnvelope = ProtocolEnvelope(
+        messageID: "proof",
+        connectionID: connectionID.uuidString,
+        connectionSequence: 2,
+        kind: .authentication,
+        channel: .control,
+        payload: try .init(AuthenticationProofPayload(connectionID: connectionID, deviceSignature: proof.signature))
+    )
+    let deviceKeys = try ConnectionAuthenticator.deriveKeys(participant: .device, ephemeralKey: clientEphemeral, peerEphemeralPublicKey: challenge.serverEphemeralPublicKey, binding: binding)
+    let deviceChannel = AuthenticatedWireChannel(keys: deviceKeys, binding: binding)
+    let capabilities = try await deviceChannel.open(try await processor.receive(proofEnvelope.serializedData()))
+    #expect(capabilities.kind == .capabilities)
+
+    let request = ProtocolEnvelope(messageID: "spaces", connectionSequence: 3, kind: .query, channel: .state, payload: try .init(ListSpacesQueryPayload()))
+    let response = try await deviceChannel.open(try await processor.receive(try await deviceChannel.seal(request)))
+    #expect(try ListSpacesResponsePayload(protobufBytes: response.payload.protobufBytes).spaces.map(\.name) == ["LAN"])
 }
 
 @Test func localHostRuntimeOwnsTheStorageBackedHost() async throws {

@@ -23,6 +23,7 @@ let package = Package(
             .product(name: "AizenStorage", package: "Storage"),
             .product(name: "AizenSecurity", package: "Security"),
             .product(name: "AizenTransport", package: "Transport"),
+            .product(name: "AizenWire", package: "Wire"),
             .product(name: "ACP", package: "swift-acp")
         ]),
         .testTarget(name: "AizenMacPlatformTests", dependencies: [
