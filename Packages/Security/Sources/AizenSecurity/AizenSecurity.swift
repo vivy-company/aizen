@@ -1,4 +1,5 @@
 import AizenCore
+import AizenTransport
 import AizenWire
 import CryptoKit
 import Foundation
@@ -280,6 +281,7 @@ public enum ConnectionRoute: String, Codable, Sendable, Hashable {
     case loopback
     case tailscale
     case cloudflare
+    case custom
     case relay
 }
 

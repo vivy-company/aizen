@@ -149,6 +149,61 @@ import Testing
     #expect(hostKey != otherHostKey)
 }
 
+@Test func remoteClientAuthenticatorPinsTheHostBeforeUsingWireFrames() async throws {
+    let hostIdentity = LocalCryptographicIdentity()
+    let host = HostPublicIdentity(hostID: HostID(), displayName: "Mac", cryptographicIdentity: hostIdentity.publicIdentity())
+    let deviceIdentity = LocalCryptographicIdentity()
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: deviceIdentity.publicIdentity())
+    let server = AuthenticatedTestServer(host: host, hostIdentity: hostIdentity, device: device)
+    let client = RemoteClientAuthenticator(host: host, device: device, deviceIdentity: deviceIdentity, route: .tailscale)
+
+    let transport = try await client.authenticate { frame in
+        try await server.exchange(frame)
+    }
+    let request = ProtocolEnvelope(messageID: "authenticated-remote", connectionSequence: 1, kind: .hello, channel: .control, payload: try .init(HelloPayload(minimumProtocolGeneration: 1, maximumProtocolGeneration: 1, productVersion: "2.0.0")))
+    #expect(try await transport.send(request) == request)
+}
+
+private actor AuthenticatedTestServer {
+    private let host: HostPublicIdentity
+    private let hostIdentity: LocalCryptographicIdentity
+    private let device: DevicePublicIdentity
+    private var binding: ConnectionAuthenticationBinding?
+    private var ephemeralKey: ConnectionEphemeralKey?
+    private var channel: AuthenticatedWireChannel?
+
+    init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, device: DevicePublicIdentity) {
+        self.host = host
+        self.hostIdentity = hostIdentity
+        self.device = device
+    }
+
+    func exchange(_ data: Data) async throws -> Data {
+        if let channel {
+            return try await channel.seal(try await channel.open(data))
+        }
+        let envelope = try ProtocolEnvelope(serializedData: data)
+        if envelope.payload.identifier == AuthenticationStartPayload.identifier {
+            let start = try AuthenticationStartPayload(protobufBytes: envelope.payload.protobufBytes)
+            let ephemeralKey = ConnectionEphemeralKey()
+            let binding = try ConnectionAuthenticationBinding(protocolGeneration: envelope.protocolGeneration, hostID: host.hostID, deviceID: device.deviceID, connectionID: start.connectionID, clientNonce: start.clientNonce, serverNonce: Data(repeating: 4, count: 32), clientEphemeralPublicKey: start.clientEphemeralPublicKey, serverEphemeralPublicKey: ephemeralKey.publicKey, route: .tailscale)
+            self.binding = binding
+            self.ephemeralKey = ephemeralKey
+            let proof = ConnectionAuthenticator.makeProof(participant: .host, identity: hostIdentity, binding: binding)
+            return try ProtocolEnvelope(messageID: "challenge", connectionID: start.connectionID.uuidString, connectionSequence: 1, kind: .authentication, channel: .control, correlationID: envelope.messageID, payload: .init(AuthenticationChallengePayload(hostID: host.hostID, deviceID: device.deviceID, connectionID: start.connectionID, clientNonce: start.clientNonce, serverNonce: binding.serverNonce, hostSigningPublicKey: host.cryptographicIdentity.signingPublicKey, hostKeyAgreementPublicKey: host.cryptographicIdentity.keyAgreementPublicKey, serverEphemeralPublicKey: ephemeralKey.publicKey, route: ConnectionRoute.tailscale.rawValue, hostSignature: proof.signature))).serializedData()
+        }
+
+        let proof = try AuthenticationProofPayload(protobufBytes: envelope.payload.protobufBytes)
+        guard let binding = self.binding, let ephemeralKey = self.ephemeralKey else {
+            throw SecurityError.invalidConnectionBinding
+        }
+        try ConnectionAuthenticator.verify(.init(participant: .device, signature: proof.deviceSignature), expectedParticipant: .device, identity: device.cryptographicIdentity, binding: binding)
+        let channel = AuthenticatedWireChannel(keys: try ConnectionAuthenticator.deriveKeys(participant: .host, ephemeralKey: ephemeralKey, peerEphemeralPublicKey: binding.clientEphemeralPublicKey, binding: binding), binding: binding)
+        self.channel = channel
+        return try await channel.seal(ProtocolEnvelope(messageID: "ready", connectionID: binding.connectionID.uuidString, connectionSequence: 1, kind: .capabilities, channel: .control, correlationID: envelope.messageID, payload: .init(CapabilitiesPayload(identifiers: []))))
+    }
+}
+
 private func tlsPSKSalt(hostID: HostID, deviceID: DeviceID) -> Data {
     var salt = Data("aizen.tls-psk.salt.v1".utf8)
     for identifier in [hostID.rawValue, deviceID.rawValue] {
