@@ -532,6 +532,8 @@ import AizenWire
     let builder = ClientCancellableXcodeBuilder()
     let host = LocalHost(storage: storage, xcodeProjectInspector: ClientXcodeProjectInspector(), xcodeProjectBuilder: builder)
     let client = HostClient(transport: InProcessTransport(endpoint: host))
+    let project = try #require(await client.discoverXcodeProject(resourceID: resource.id))
+    #expect(project.configurations == ["Debug", "Release"])
     let operationID = try await client.buildXcodeProject(resourceID: resource.id, projectID: "App.xcodeproj", scheme: "App")
     try await client.cancelOperation(id: operationID)
     #expect(await builder.didCancel)
@@ -636,6 +638,7 @@ private actor ClientTerminalRuntime: TerminalRuntime {
 
 private struct ClientXcodeProjectInspector: XcodeProjectInspecting {
     func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { ["App"] }
+    func configurations(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { ["Debug", "Release"] }
 }
 
 private actor ClientCancellableXcodeBuilder: XcodeProjectBuilding, XcodeBuildRunning {
