@@ -31,3 +31,22 @@ public actor LocalHost: WireEndpoint {
         )
     }
 }
+
+public actor HostRunRegistry {
+    private var runs: [RunID: Run] = [:]
+
+    public init() {}
+
+    public func register(_ run: Run) {
+        precondition(runs[run.id] == nil, "A Run ID may only be registered once")
+        runs[run.id] = run
+    }
+
+    public func run(for id: RunID) -> Run? { runs[id] }
+
+    public func updateLifecycle(_ lifecycle: RunLifecycle, for id: RunID) {
+        guard var run = runs[id] else { return }
+        run.lifecycle = lifecycle
+        runs[id] = run
+    }
+}
