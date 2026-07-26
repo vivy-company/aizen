@@ -433,6 +433,27 @@ import AizenWire
     #expect(context.hostReference == nil)
 }
 
+@Test func clientReadsStructuredRepositoryStatusThroughHost() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Git")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let reader = ClientRepositoryStatusReader()
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, repositoryStatusReader: reader)))
+
+    #expect(try await client.repositoryStatus(id: resource.id, maximumEntries: 1) == .init(
+        resourceID: resource.id.description,
+        repositoryRevision: "revision",
+        indexRevision: "index",
+        entries: [.init(path: "README.md", indexStatus: "?", worktreeStatus: "?")],
+        truncated: false
+    ))
+}
+
 @Test func clientImportsWebResourcesThroughHost() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -565,6 +586,17 @@ private actor ClientTerminalRuntime: TerminalRuntime {
         initialCommand: String?
     ) async throws -> TerminalLaunch {
         TerminalLaunch(tmuxSessionName: "aizen-client", paneID: "%1")
+    }
+}
+
+private actor ClientRepositoryStatusReader: RepositoryStatusReading {
+    func status(at repositoryURL: URL, maximumEntries: Int) async throws -> RepositoryStatusSnapshot {
+        .init(
+            repositoryRevision: "revision",
+            indexRevision: "index",
+            entries: [.init(path: "README.md", indexStatus: "?", worktreeStatus: "?")],
+            truncated: false
+        )
     }
 }
 
