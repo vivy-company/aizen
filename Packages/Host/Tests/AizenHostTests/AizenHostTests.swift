@@ -1665,11 +1665,31 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
         try await Task.sleep(for: .milliseconds(10))
     }
     #expect(await builder.projectURL == folder.appendingPathComponent("App.xcodeproj"))
+    #expect(await builder.action == .build)
     await builder.complete()
     for _ in 0 ..< 20 where try await storage.load().operations.first?.lifecycle != .completed {
         try await Task.sleep(for: .milliseconds(10))
     }
     #expect(try await storage.load().operations.first?.lifecycle == .completed)
+}
+
+@Test func hostStartsStructuredXcodeTestsThroughItsRuntime() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder.appendingPathComponent("App.xcodeproj"), withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Xcode")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "folder", details: .hostPrivate(.init(rawValue: "local-folder:\(folder.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let builder = ControlledXcodeProjectBuilder()
+    let host = LocalHost(storage: storage, xcodeProjectInspector: StaticXcodeProjectInspector(schemes: ["AppTests"]), xcodeProjectBuilder: builder)
+    _ = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(BuildXcodeProjectCommandPayload(resourceID: resource.id.description, projectID: "App.xcodeproj", scheme: "AppTests", destination: "platform=macOS", action: .test))))
+    for _ in 0 ..< 20 where await builder.action == nil {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await builder.action == .test)
+    await builder.complete()
 }
 
 @Test func hostCancelsRunningXcodeBuildOperations() async throws {
@@ -1806,12 +1826,14 @@ private struct StaticXcodeProjectInspector: XcodeProjectInspecting {
 
 private actor ControlledXcodeProjectBuilder: XcodeProjectBuilding, XcodeBuildRunning {
     private(set) var projectURL: URL?
+    private(set) var action: XcodeProjectAction?
     private(set) var didCancel = false
     private var continuation: CheckedContinuation<Void, Error>?
     private var completed = false
 
-    func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws -> any XcodeBuildRunning {
+    func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String, action: XcodeProjectAction) async throws -> any XcodeBuildRunning {
         projectURL = url
+        self.action = action
         return self
     }
 

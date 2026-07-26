@@ -187,7 +187,7 @@ public protocol XcodeBuildRunning: Sendable {
 }
 
 public protocol XcodeProjectBuilding: Sendable {
-    func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws -> any XcodeBuildRunning
+    func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String, action: XcodeProjectAction) async throws -> any XcodeBuildRunning
 }
 
 /// Explicit local Host composition. It owns Storage but exposes only Wire envelopes and Core snapshots.
@@ -508,7 +508,8 @@ public actor LocalHost: WireEndpoint {
                     at: directory.appendingPathComponent(project.id),
                     kind: project.kind,
                     scheme: command.scheme,
-                    destination: command.destination
+                    destination: command.destination,
+                    action: command.action
                 )
                 self.xcodeBuilds[operation.id] = build
                 Task { [weak self] in
