@@ -395,6 +395,20 @@ import Testing
     }
 }
 
+@Test func macXcodeBuildProcessCancellationTerminatesTheSubprocess() async throws {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sleep")
+    process.arguments = ["30"]
+    try process.run()
+    let build = MacXcodeBuildProcess(process: process)
+    let completion = Task { try await build.waitForCompletion() }
+    try await Task.sleep(for: .milliseconds(50))
+    await build.cancel()
+    await #expect(throws: MacXcodeBuildError.failed(SIGTERM)) {
+        try await completion.value
+    }
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")

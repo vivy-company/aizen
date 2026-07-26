@@ -33,14 +33,53 @@ public struct MacXcodeProjectInspector: XcodeProjectInspecting {
     }
 }
 
-public struct MacXcodeProjectBuilder: XcodeProjectBuilding {
+public actor MacXcodeProjectBuilder: XcodeProjectBuilding {
     public init() {}
-    public func buildXcodeProject(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws {
+    public func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws -> any XcodeBuildRunning {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
         process.arguments = [kind == .workspace ? "-workspace" : "-project", url.path, "-scheme", scheme, "-destination", destination, "build"]
         process.standardOutput = Pipe(); process.standardError = Pipe()
-        try process.run(); process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw CocoaError(.executableNotLoadable) }
+        try process.run()
+        return MacXcodeBuildProcess(process: process)
+    }
+}
+
+actor MacXcodeBuildProcess: XcodeBuildRunning {
+    private let process: XcodeBuildProcessReference
+
+    init(process: Process) {
+        self.process = .init(process: process)
+    }
+
+    func waitForCompletion() async throws {
+        let status = await Task.detached { [process] in
+            process.process.waitUntilExit()
+            return process.process.terminationStatus
+        }.value
+        guard status == 0 else { throw MacXcodeBuildError.failed(status) }
+    }
+
+    func cancel() {
+        guard process.process.isRunning else { return }
+        process.process.terminate()
+    }
+}
+
+private final class XcodeBuildProcessReference: @unchecked Sendable {
+    let process: Process
+
+    init(process: Process) {
+        self.process = process
+    }
+}
+
+enum MacXcodeBuildError: LocalizedError, Sendable, Equatable {
+    case failed(Int32)
+
+    var errorDescription: String? {
+        switch self {
+        case let .failed(status): "xcodebuild exited with status \(status)."
+        }
     }
 }
