@@ -67,12 +67,13 @@ public actor StorageBackedACPRunConfigurationResolver: ACPRunConfigurationResolv
                 .appendingPathComponent(context.spaceID.description, isDirectory: true)
                 .appendingPathComponent(context.id.description, isDirectory: true)
                 .path
-        } else if context.kind == .localFolder,
+        } else if (context.kind == .localFolder || context.kind == .repositoryCheckout),
             let resourceID = context.resourceID,
             let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == run.spaceID }),
             case .hostPrivate(let reference) = resource.details,
-            reference.rawValue.hasPrefix("local-folder:") {
-            let path = String(reference.rawValue.dropFirst("local-folder:".count))
+            let prefix = context.kind == .localFolder ? "local-folder:" : "local-repository:",
+            reference.rawValue.hasPrefix(prefix) {
+            let path = String(reference.rawValue.dropFirst(prefix.count))
             let directory = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
