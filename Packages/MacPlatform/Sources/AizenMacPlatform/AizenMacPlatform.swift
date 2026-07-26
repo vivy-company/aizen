@@ -37,6 +37,7 @@ public protocol ACPRunDelegateProviding: Sendable {
 /// Narrow external boundary that lets Host tests use fake ACP clients while production uses `ACP.Client`.
 public protocol ACPRunClient: Sendable {
     func start(configuration: ACPRunConfiguration, delegate: (any ClientDelegate)?) async throws -> String
+    func sendPrompt(sessionID: String, text: String) async throws
     func cancel(sessionID: String) async throws
     func terminate() async
 }
@@ -87,6 +88,10 @@ public actor SwiftACPClient: ACPRunClient {
 
     public func cancel(sessionID: String) async throws {
         try await client.sendCancelNotification(sessionId: SessionId(sessionID))
+    }
+
+    public func sendPrompt(sessionID: String, text: String) async throws {
+        _ = try await client.sendPrompt(sessionId: SessionId(sessionID), content: [.text(.init(text: text))])
     }
 
     public func terminate() async {
@@ -140,5 +145,10 @@ public actor ACPRunRuntime: RunRuntime {
             throw error
         }
         await activeRun.client.terminate()
+    }
+
+    public func send(message: String, to runID: RunID) async throws {
+        guard let activeRun = activeRuns[runID] else { throw Error.unknownRun(runID) }
+        try await activeRun.client.sendPrompt(sessionID: activeRun.sessionID, text: message)
     }
 }
