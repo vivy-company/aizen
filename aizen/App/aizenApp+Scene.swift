@@ -11,7 +11,8 @@ extension aizenApp {
     @SceneBuilder
     var appScene: some Scene {
         WindowGroup {
-            ReignitionConversationWindow(host: reignitionHost)
+            RootView(context: persistenceController.container.viewContext)
+                .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .environmentObject(ghosttyApp)
                 .modifier(AppearanceModifier())
                 .task {
@@ -26,10 +27,25 @@ extension aizenApp {
                     ghosttyApp.reloadConfig()
                     await TmuxSessionRuntime.shared.updateConfig()
                 }
+                .task {
+                    await ChatSessionPersistence.shared.backfillSessionMetadata(
+                        in: persistenceController.container.viewContext
+                    )
+                }
+                .task {
+                    await ChatSessionPersistence.shared.recoverDetachedSessionsFromLegacyScope(
+                        in: persistenceController.container.viewContext
+                    )
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified)
         .defaultSize(width: 1200, height: 800)
+        WindowGroup("Reignition Conversations", id: "reignition-conversations") {
+            ReignitionConversationWindow(host: reignitionHost)
+                .modifier(AppearanceModifier())
+        }
+        .defaultSize(width: 1000, height: 700)
         .commands { appCommands }
     }
 }
