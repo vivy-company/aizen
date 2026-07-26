@@ -520,6 +520,24 @@ import AizenWire
     #expect(await runtime.cancelledRunID == run.id)
 }
 
+@Test func clientCancelsXcodeBuildOperationsThroughHostCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder.appendingPathComponent("App.xcodeproj"), withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Xcode")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "folder", details: .hostPrivate(.init(rawValue: "local-folder:\(folder.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let builder = ClientCancellableXcodeBuilder()
+    let host = LocalHost(storage: storage, xcodeProjectInspector: ClientXcodeProjectInspector(), xcodeProjectBuilder: builder)
+    let client = HostClient(transport: InProcessTransport(endpoint: host))
+    let operationID = try await client.buildXcodeProject(resourceID: resource.id, projectID: "App.xcodeproj", scheme: "App")
+    try await client.cancelOperation(id: operationID)
+    #expect(await builder.didCancel)
+    #expect(try await storage.load().operations.first?.lifecycle == .cancelled)
+}
+
 @Test func clientSendsProjectlessConversationsThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -614,6 +632,23 @@ private actor ClientTerminalRuntime: TerminalRuntime {
     ) async throws -> TerminalLaunch {
         TerminalLaunch(tmuxSessionName: "aizen-client", paneID: "%1")
     }
+}
+
+private struct ClientXcodeProjectInspector: XcodeProjectInspecting {
+    func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { ["App"] }
+}
+
+private actor ClientCancellableXcodeBuilder: XcodeProjectBuilding, XcodeBuildRunning {
+    private(set) var didCancel = false
+
+    func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws -> any XcodeBuildRunning { self }
+    func waitForCompletion() async throws {
+        while !didCancel {
+            try await Task.sleep(for: .seconds(1))
+        }
+        throw CancellationError()
+    }
+    func cancel() { didCancel = true }
 }
 
 private actor ClientRepositoryStatusReader: RepositoryStatusReading {

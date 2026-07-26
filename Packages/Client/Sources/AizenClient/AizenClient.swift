@@ -881,6 +881,20 @@ public actor HostClient {
         _ = try CancelRunResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func cancelOperation(id: OperationID) async throws {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(CancelOperationCommandPayload(operationID: id.description))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == CancelOperationResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        _ = try CancelOperationResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func configureAgentLaunch(executablePath: String, arguments: [String], environment: [String: String]) async throws {
         let response = try await send(.init(
             messageID: UUID().uuidString,
