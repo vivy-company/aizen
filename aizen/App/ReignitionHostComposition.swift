@@ -6,6 +6,12 @@ import Foundation
 
 /// The app's local v2 Host composition. Views receive Client projections; they never own Storage or Host state.
 actor ReignitionHostComposition {
+    enum MigrationPreparation: Sendable, Equatable {
+        case noLegacyStore
+        case alreadyInitialized
+        case migrated(MigrationReport)
+    }
+
     let storage: StorageRepository
     let host: LocalHost
     let client: HostClient
@@ -28,5 +34,18 @@ actor ReignitionHostComposition {
 
     func snapshot() async throws -> StorageSnapshot {
         try JSONDecoder().decode(StorageSnapshot.self, from: try await client.snapshotData())
+    }
+
+    func prepareLegacyMigration(legacyStoreURL: URL?, legacyModelURL: URL?, fileManager: FileManager = .default) async throws -> MigrationPreparation {
+        guard let legacyStoreURL, fileManager.fileExists(atPath: legacyStoreURL.path) else { return .noLegacyStore }
+        guard let legacyModelURL else { throw CocoaError(.fileNoSuchFile) }
+        guard try await storage.load().isEmpty else { return .alreadyInitialized }
+        let report = try await LegacyCoreDataMigration.migrate(
+            sourceStoreURL: legacyStoreURL,
+            legacyModelURL: legacyModelURL,
+            destination: storage,
+            backupDirectory: legacyStoreURL.deletingLastPathComponent().appendingPathComponent("Reignition Backups", isDirectory: true)
+        )
+        return .migrated(report)
     }
 }

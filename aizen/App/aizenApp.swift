@@ -9,6 +9,7 @@ import SwiftUI
 import CoreData
 import Sparkle
 import AppKit
+import os
 
 @main
 struct aizenApp: App {
@@ -38,6 +39,17 @@ struct aizenApp: App {
         updaterController = Self.makeUpdaterController()
         configureStartup()
         _ = shortcutMonitor
+        let host = reignitionHost
+        let legacyStoreURL = persistenceController.container.persistentStoreCoordinator.persistentStores.first?.url
+        let legacyModelURL = Bundle.main.url(forResource: "aizen", withExtension: "momd")
+        Task { [host, legacyStoreURL, legacyModelURL] in
+            do {
+                _ = try await host.prepareLegacyMigration(legacyStoreURL: legacyStoreURL, legacyModelURL: legacyModelURL)
+            } catch {
+                Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "ReignitionMigration")
+                    .error("Legacy migration failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     var body: some Scene {
