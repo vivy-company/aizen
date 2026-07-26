@@ -507,50 +507,28 @@ private extension AizenCLI {
             throw CLIError.invalidArguments("status does not take arguments")
         }
 
-        let store = try CLIStore()
-        let context = store.container.viewContext
         let filters = workspaceFilters(from: parsed)
-
-        let filteredWorkspaces = try fetchWorkspaces(in: context, filters: filters)
-        let workspaceCount = filteredWorkspaces.count
-
-        let repoFilters = RepositoryFilters(
-            includeWorkspaces: filters.includeWorkspaces,
-            excludeWorkspaces: filters.excludeWorkspaces,
-            nameContains: nil,
-            pathContains: nil
-        )
-        let filteredRepos = try fetchRepositories(in: context, filters: repoFilters)
-        let repoCount = filteredRepos.count
-        let worktreeCount = filteredRepos.reduce(0) { count, repo in
-            count + ((repo.worktrees as? Set<Worktree>)?.count ?? 0)
-        }
-
-        let activeWorkspaceName = resolveActiveWorkspaceName(in: context)
-
-        let includeSet = Set(filters.includeWorkspaces.map { $0.lowercased() })
-        let excludeSet = Set(filters.excludeWorkspaces.map { $0.lowercased() })
-        let recentRepos = fetchRecentRepositories(in: context, limit: 5)
-            .filter { repo in
-                guard let workspaceName = repo.workspace?.name else { return false }
-                let lower = workspaceName.lowercased()
-                if !includeSet.isEmpty, !includeSet.contains(lower) {
-                    return false
-                }
-                if excludeSet.contains(lower) {
-                    return false
-                }
-                return true
-            }
+        let spaces = try await v2Workspaces(filters: filters)
+        let spaceIDs = Set(spaces.map(\.id))
+        let client = V2CLIClient()
+        async let resources = client.resources()
+        async let contexts = client.executionContexts()
+        async let conversations = client.conversations()
+        async let runs = client.runs()
+        let (allResources, allContexts, allConversations, allRuns) = try await (resources, contexts, conversations, runs)
+        let resourceCount = allResources.count(where: { spaceIDs.contains($0.spaceID) })
+        let contextCount = allContexts.count(where: { spaceIDs.contains($0.spaceID) })
+        let conversationCount = allConversations.count(where: { spaceIDs.contains($0.spaceID) })
+        let runCount = allRuns.count(where: { spaceIDs.contains($0.spaceID) })
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
 
         if parsed.flags.contains("json") {
             let payload = StatusPayload(
-                workspaces: workspaceCount,
-                repositories: repoCount,
-                worktrees: worktreeCount,
-                activeWorkspace: activeWorkspaceName,
-                recentRepositories: recentRepos.map(repositoryOutput),
+                spaces: spaces.count,
+                resources: resourceCount,
+                executionContexts: contextCount,
+                conversations: conversationCount,
+                runs: runCount,
                 filters: filters
             )
             printJSON(payload)
@@ -558,20 +536,11 @@ private extension AizenCLI {
         }
 
         printSectionTitle("Status", style: style)
-        printKeyValue("Workspaces", "\(workspaceCount)", style: style)
-        printKeyValue("Repositories", "\(repoCount)", style: style)
-        printKeyValue("Worktrees", "\(worktreeCount)", style: style)
-        printKeyValue("Active workspace", activeWorkspaceName ?? "-", style: style)
-
-        if !recentRepos.isEmpty {
-            print("")
-            printSectionTitle("Recent repositories", style: style)
-            for repo in recentRepos {
-                let name = repo.name ?? ""
-                let path = repo.path ?? ""
-                print("- \(name) (\(path))")
-            }
-        }
+        printKeyValue("Spaces", "\(spaces.count)", style: style)
+        printKeyValue("Resources", "\(resourceCount)", style: style)
+        printKeyValue("Contexts", "\(contextCount)", style: style)
+        printKeyValue("Conversations", "\(conversationCount)", style: style)
+        printKeyValue("Runs", "\(runCount)", style: style)
     }
 
     static func handleAttach(_ args: [String]) throws {
@@ -1421,11 +1390,11 @@ private extension AizenCLI {
     }
 
     struct StatusPayload: Encodable {
-        let workspaces: Int
-        let repositories: Int
-        let worktrees: Int
-        let activeWorkspace: String?
-        let recentRepositories: [RepositoryOutput]
+        let spaces: Int
+        let resources: Int
+        let executionContexts: Int
+        let conversations: Int
+        let runs: Int
         let filters: WorkspaceFilters
     }
 
@@ -1717,7 +1686,7 @@ Rescans worktrees for a repository and updates the database.
 Usage:
   aizen status
 
-Shows overview of Aizen's current state.
+Shows a v2 Host overview of Spaces, Resources, Contexts, Conversations, and Runs.
 
 Options:
   -w, --workspace <name>         Limit counts to workspace(s) (comma-separated)
