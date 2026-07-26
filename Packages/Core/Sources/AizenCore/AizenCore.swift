@@ -296,6 +296,11 @@ public struct Resource: Codable, Sendable, Hashable, Identifiable {
 }
 
 /// Client-safe Xcode project metadata discovered by the Host for a repository or folder Resource.
+public enum XcodeProjectAction: String, Codable, Sendable, Hashable {
+    case build
+    case test
+}
+
 public struct XcodeProjectDescriptor: Codable, Sendable, Hashable, Identifiable {
     public enum Kind: String, Codable, Sendable, Hashable {
         case project

@@ -52,6 +52,7 @@ import Testing
     #expect(descriptor.kind == .project)
     #expect(descriptor.schemes == ["App"])
     #expect(descriptor.configurations == ["Debug", "Release"])
+    #expect(XcodeProjectAction.test.rawValue == "test")
 }
 
 @Test func operationRejectsInvalidDurableState() {
