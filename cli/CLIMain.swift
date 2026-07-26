@@ -205,38 +205,34 @@ private extension AizenCLI {
             throw CLIError.invalidArguments("Too many arguments for list")
         }
 
-        let store = try CLIStore()
-        let context = store.container.viewContext
-
         let workspaceFilter = parsed.positionals.first
         let filters = repositoryFilters(from: parsed, positionalWorkspace: workspaceFilter)
-        let repositories = try fetchRepositories(in: context, filters: filters)
+        guard filters.pathContains == nil else {
+            throw CLIError.invalidArguments("--path is unavailable because v2 Resources do not expose host paths")
+        }
+        let resources = try await v2Resources(filters: filters)
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
 
         if parsed.flags.contains("json") {
-            let payload = RepositoryListPayload(
-                filters: filters,
-                repositories: repositories.map(repositoryOutput)
-            )
-            printJSON(payload)
+            printJSON(ResourceListPayload(filters: filters, resources: resources.map(resourceOutput)))
             return
         }
 
-        if repositories.isEmpty {
+        if resources.isEmpty {
             if !filters.includeWorkspaces.isEmpty {
                 let names = filters.includeWorkspaces.sorted().joined(separator: ", ")
-                print("No repositories found in workspace(s): \(names)")
+                print("No resources found in workspace(s): \(names)")
             } else {
-                print("No repositories found")
+                print("No resources found")
             }
             return
         }
 
         let title = filters.includeWorkspaces.isEmpty
-            ? "Repositories (\(repositories.count))"
-            : "Repositories (\(repositories.count)) in \(filters.includeWorkspaces.joined(separator: ", "))"
+            ? "Resources (\(resources.count))"
+            : "Resources (\(resources.count)) in \(filters.includeWorkspaces.joined(separator: ", "))"
         printSectionTitle(title, style: style)
-        printRepositoryTable(repositories, style: style)
+        printResourceTable(resources, style: style)
     }
 
     static func handleWorkspace(_ args: [String]) async throws {
@@ -1358,6 +1354,18 @@ private extension AizenCLI {
         let repositories: [RepositoryOutput]
     }
 
+    struct ResourceOutput: Encodable {
+        let id: String
+        let kind: String
+        let title: String
+        let space: String
+    }
+
+    struct ResourceListPayload: Encodable {
+        let filters: RepositoryFilters
+        let resources: [ResourceOutput]
+    }
+
     struct WorkspaceOutput: Encodable {
         let name: String
         let color: String?
@@ -1398,6 +1406,20 @@ private extension AizenCLI {
         }
     }
 
+    static func v2Resources(filters: RepositoryFilters) async throws -> [Resource] {
+        let spaces = try await v2Workspaces(filters: WorkspaceFilters(
+            includeWorkspaces: filters.includeWorkspaces,
+            excludeWorkspaces: filters.excludeWorkspaces,
+            nameContains: nil
+        ))
+        let namesByID = Dictionary(uniqueKeysWithValues: spaces.map { ($0.id, $0.name) })
+        let nameContains = filters.nameContains?.lowercased()
+        return try await V2CLIClient().resources().filter { resource in
+            guard namesByID[resource.spaceID] != nil else { return false }
+            return nameContains.map { resource.title.lowercased().contains($0) } ?? true
+        }
+    }
+
     struct StatusPayload: Encodable {
         let workspaces: Int
         let repositories: Int
@@ -1431,6 +1453,14 @@ private extension AizenCLI {
             rows.append([name, path, workspace, worktreeCount, updated])
         }
         printTable(headers: headers, rows: rows, style: style)
+    }
+
+    static func printResourceTable(_ resources: [Resource], style: OutputStyle) {
+        let spaces = Dictionary(uniqueKeysWithValues: resources.map { ($0.spaceID, $0.spaceID.description) })
+        let rows = resources.map { resource in
+            [resource.title, resource.kind.rawValue, spaces[resource.spaceID] ?? "-", resource.id.description]
+        }
+        printTable(headers: ["Resource", "Kind", "Space ID", "ID"], rows: rows, style: style)
     }
 
     static func printWorkspaceTable(_ workspaces: [Workspace], style: OutputStyle) {
@@ -1500,6 +1530,15 @@ private extension AizenCLI {
             workspace: repo.workspace?.name,
             worktrees: (repo.worktrees as? Set<Worktree>)?.count ?? 0,
             updated: updated
+        )
+    }
+
+    static func resourceOutput(_ resource: Resource) -> ResourceOutput {
+        ResourceOutput(
+            id: resource.id.description,
+            kind: resource.kind.rawValue,
+            title: resource.title,
+            space: resource.spaceID.description
         )
     }
 
@@ -1577,7 +1616,7 @@ Usage:
   aizen open [path]               Open path in Aizen (adds to workspace if not tracked)
   aizen add [path|url]            Add repository to workspace
   aizen remove <path>             Remove repository from tracking
-  aizen list [workspace]          List repositories
+  aizen list [space]              List v2 resources
   aizen workspace <command>       Manage workspaces
   aizen sync [path]               Rescan worktrees
   aizen status                    Show overview
@@ -1613,13 +1652,13 @@ Usage:
   aizen list [workspace]
   aizen ls [workspace]
 
-Lists tracked repositories.
+Lists v2 Resources without exposing Host-owned paths.
 
 Options:
   -w, --workspace <name>         Filter by workspace (comma-separated)
   --exclude-workspace <name>     Exclude workspace(s) (comma-separated)
-  --name <text>                  Filter by repository name
-  --path <text>                  Filter by repository path
+  --name <text>                  Filter by resource title
+  --path <text>                  Unavailable for v2 Resources
   --json                         Output JSON
   --no-color                     Disable colored output
 """
