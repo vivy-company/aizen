@@ -16,6 +16,9 @@ public enum AuthenticatedRemoteWireTransportError: Swift.Error, Sendable, Equata
 /// A raw binary request/reply exchange used only while establishing a secure Aizen channel.
 public typealias RemoteFrameExchange = @Sendable (Data) async throws -> Data
 
+/// The post-authentication send half of a full-duplex secure route.
+public typealias RemoteFrameSender = @Sendable (Data) async throws -> Void
+
 /// Establishes a Host-pinned, mutually authenticated channel for any user-managed route.
 /// Network reachability, TLS hostnames, and third-party access layers are intentionally not trust.
 public struct RemoteClientAuthenticator: Sendable {
@@ -41,6 +44,28 @@ public struct RemoteClientAuthenticator: Sendable {
     }
 
     public func authenticate(using exchange: @escaping RemoteFrameExchange) async throws -> AuthenticatedRemoteWireTransport {
+        try await authenticate(using: exchange) { channel in
+            AuthenticatedRemoteWireTransport(channel: channel, exchange: exchange)
+        }
+    }
+
+    /// Completes authentication, then upgrades the same route to a full-duplex Wire transport.
+    public func authenticate(
+        using exchange: @escaping RemoteFrameExchange,
+        frameSender: @escaping RemoteFrameSender,
+        frames: AsyncThrowingStream<Data, Error>
+    ) async throws -> AuthenticatedRemoteWireTransport {
+        let transport = try await authenticate(using: exchange) { channel in
+            AuthenticatedRemoteWireTransport(channel: channel, frameSender: frameSender)
+        }
+        await transport.startReceiving(frames)
+        return transport
+    }
+
+    private func authenticate(
+        using exchange: @escaping RemoteFrameExchange,
+        makeTransport: (AuthenticatedWireChannel) -> AuthenticatedRemoteWireTransport
+    ) async throws -> AuthenticatedRemoteWireTransport {
         let connectionID = UUID()
         let ephemeralKey = ConnectionEphemeralKey()
         let clientNonce = try randomNonce()
@@ -114,7 +139,7 @@ public struct RemoteClientAuthenticator: Sendable {
         guard readyEnvelope.kind == .capabilities else {
             throw RemoteClientAuthenticationError.malformedHandshake
         }
-        return AuthenticatedRemoteWireTransport(channel: channel, exchange: exchange)
+        return makeTransport(channel)
     }
 
     private func randomNonce() throws -> Data {
@@ -128,20 +153,37 @@ public struct RemoteClientAuthenticator: Sendable {
 }
 
 /// Turns a Host-pinned authenticated channel into the common Wire transport contract.
-public actor AuthenticatedRemoteWireTransport: WireTransport {
+public actor AuthenticatedRemoteWireTransport: WireTransport, RunEventTransport {
     private struct PendingRequest: Sendable {
         let envelope: ProtocolEnvelope
         let continuation: CheckedContinuation<ProtocolEnvelope, Error>
     }
 
     private let channel: AuthenticatedWireChannel
-    private let exchange: RemoteFrameExchange
+    private let exchange: RemoteFrameExchange?
+    private let frameSender: RemoteFrameSender?
     private var pending: [WireChannel: [PendingRequest]] = [:]
+    private var responseContinuations: [String: CheckedContinuation<ProtocolEnvelope, Error>] = [:]
+    private var eventContinuations: [UUID: AsyncStream<HostEvent>.Continuation] = [:]
+    private var receiveTask: Task<Void, Never>?
     private var isDraining = false
 
     public init(channel: AuthenticatedWireChannel, exchange: @escaping RemoteFrameExchange) {
         self.channel = channel
         self.exchange = exchange
+        frameSender = nil
+    }
+
+    /// Creates a transport over a full-duplex route. Call `startReceiving(_:)` exactly once after
+    /// the authentication handshake has completed.
+    public init(channel: AuthenticatedWireChannel, frameSender: @escaping RemoteFrameSender) {
+        self.channel = channel
+        exchange = nil
+        self.frameSender = frameSender
+    }
+
+    deinit {
+        receiveTask?.cancel()
     }
 
     public func send(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
@@ -156,6 +198,34 @@ public actor AuthenticatedRemoteWireTransport: WireTransport {
         }
     }
 
+    public func runEvents() async throws -> AsyncStream<HostEvent> {
+        guard receiveTask != nil else { throw TransportError.eventStreamingUnavailable }
+        let subscriberID = UUID()
+        let stream = AsyncStream.makeStream(of: HostEvent.self, bufferingPolicy: .bufferingNewest(100))
+        eventContinuations[subscriberID] = stream.continuation
+        stream.continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeEventSubscriber(subscriberID) }
+        }
+        return stream.stream
+    }
+
+    /// Starts the one receive loop for a full-duplex route. Each frame is decrypted in transport
+    /// order, then dispatched either to its request continuation or to Host-event subscribers.
+    public func startReceiving(_ frames: AsyncThrowingStream<Data, Error>) {
+        precondition(receiveTask == nil, "A remote transport has one receive loop")
+        receiveTask = Task { [weak self] in
+            do {
+                for try await frame in frames {
+                    guard !Task.isCancelled else { return }
+                    await self?.receive(frame)
+                }
+                await self?.finishReceiving(nil)
+            } catch {
+                await self?.finishReceiving(error)
+            }
+        }
+    }
+
     private func startDrainingIfNeeded() {
         guard !isDraining else { return }
         isDraining = true
@@ -166,8 +236,19 @@ public actor AuthenticatedRemoteWireTransport: WireTransport {
         while let request = dequeueNext() {
             do {
                 let frame = try await channel.seal(request.envelope)
-                let response = try await channel.open(try await exchange(frame))
-                request.continuation.resume(returning: response)
+                if let exchange {
+                    let response = try await channel.open(try await exchange(frame))
+                    request.continuation.resume(returning: response)
+                } else if let frameSender {
+                    responseContinuations[request.envelope.messageID] = request.continuation
+                    do {
+                        try await frameSender(frame)
+                    } catch {
+                        responseContinuations.removeValue(forKey: request.envelope.messageID)?.resume(throwing: error)
+                    }
+                } else {
+                    request.continuation.resume(throwing: TransportError.eventStreamingUnavailable)
+                }
             } catch {
                 request.continuation.resume(throwing: error)
             }
@@ -183,6 +264,48 @@ public actor AuthenticatedRemoteWireTransport: WireTransport {
             return next
         }
         return nil
+    }
+
+    private func receive(_ frame: Data) async {
+        do {
+            let envelope = try await channel.open(frame)
+            switch envelope.payload.identifier {
+            case RunEventPayload.identifier:
+                let event = try RunEventPayload(protobufBytes: envelope.payload.protobufBytes).event
+                eventContinuations.values.forEach { $0.yield(.run(event)) }
+            case TerminalOutputEventPayload.identifier:
+                let event = try TerminalOutputEventPayload(protobufBytes: envelope.payload.protobufBytes).event
+                eventContinuations.values.forEach { $0.yield(.terminalOutput(event)) }
+            default:
+                let requestID = envelope.correlationID ?? envelope.messageID
+                responseContinuations.removeValue(forKey: requestID)?.resume(returning: envelope)
+            }
+        } catch {
+            finishReceiving(error)
+        }
+    }
+
+    private func finishReceiving(_ error: Error?) {
+        receiveTask?.cancel()
+        receiveTask = nil
+        for continuation in responseContinuations.values {
+            if let error { continuation.resume(throwing: error) }
+            else { continuation.resume(throwing: TransportError.eventStreamingUnavailable) }
+        }
+        responseContinuations.removeAll()
+        for requests in pending.values {
+            for request in requests {
+                if let error { request.continuation.resume(throwing: error) }
+                else { request.continuation.resume(throwing: TransportError.eventStreamingUnavailable) }
+            }
+        }
+        pending.removeAll()
+        eventContinuations.values.forEach { $0.finish() }
+        eventContinuations.removeAll()
+    }
+
+    private func removeEventSubscriber(_ id: UUID) {
+        eventContinuations.removeValue(forKey: id)
     }
 
     private static let priorityOrder: [WireChannel] = [.control, .terminal, .state, .runStream, .blob]
