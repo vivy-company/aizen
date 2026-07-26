@@ -201,6 +201,10 @@ public actor LocalHost: WireEndpoint {
             throw HostProtocolError.unknownSession(sessionID)
         }
         if let executionContextID = session.executionContextID {
+            if let context = snapshot.executionContexts.first(where: { $0.id == executionContextID }),
+                context.kind == .managedTemporarySandbox || context.kind == .managedPersistentSandbox {
+                try await managedSandboxes?.touch(context)
+            }
             return executionContextID
         }
         guard let managedSandboxes else { throw HostProtocolError.runtimeUnavailable }

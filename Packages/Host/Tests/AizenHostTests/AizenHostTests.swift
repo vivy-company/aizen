@@ -232,6 +232,64 @@ import AizenWire
     #expect(permissions?.intValue == 0o700)
 }
 
+@Test func temporarySandboxCleanupSkipsActiveRunsAndClearsExpiredContexts() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+    }
+    let sandboxes = ManagedSandboxService(storage: storage, rootURL: root.appendingPathComponent("sandboxes", isDirectory: true))
+    let context = try await sandboxes.provision(for: session.id, persistence: .temporary)
+    let directory = await sandboxes.directoryURL(for: context)
+    let run = Run(spaceID: space.id, sessionID: session.id, executionContextID: context.id, lifecycle: .running)
+    _ = try await storage.transact { $0.runs.append(run) }
+
+    #expect(try await sandboxes.cleanupTemporarySandboxes(lastUsedBefore: .distantFuture).isEmpty)
+    _ = try await storage.transact { $0.runs[0].lifecycle = .succeeded }
+    #expect(try await sandboxes.cleanupTemporarySandboxes(lastUsedBefore: .distantFuture) == [context.id])
+    #expect(try await storage.load().executionContexts.isEmpty)
+    #expect(try await storage.load().sessions.first?.executionContextID == nil)
+    #expect(try await storage.load().runs.first?.executionContextID == nil)
+    #expect(!FileManager.default.fileExists(atPath: directory.path))
+}
+
+@Test func sandboxTouchUpgradesMetadataCreatedBeforeRetentionTracking() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+    }
+    let sandboxes = ManagedSandboxService(storage: storage, rootURL: root.appendingPathComponent("sandboxes", isDirectory: true))
+    let context = try await sandboxes.provision(for: session.id, persistence: .temporary)
+    let metadataURL = await sandboxes.directoryURL(for: context).appendingPathComponent("metadata.json")
+    var legacyMetadata = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as? [String: Any])
+    legacyMetadata.removeValue(forKey: "lastUsedAt")
+    try JSONSerialization.data(withJSONObject: legacyMetadata).write(to: metadataURL)
+
+    try await sandboxes.touch(context)
+    #expect(String(decoding: try Data(contentsOf: metadataURL), as: UTF8.self).contains("lastUsedAt"))
+}
+
+@Test func sandboxCleanupRemovesOnlyUnownedUUIDDirectories() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let orphan = root.appendingPathComponent(UUID().uuidString, isDirectory: true).appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: orphan, withIntermediateDirectories: true)
+    let sandboxes = ManagedSandboxService(storage: storage, rootURL: root)
+
+    #expect(try await sandboxes.cleanupOrphanedDirectories() == [orphan.standardizedFileURL])
+    #expect(!FileManager.default.fileExists(atPath: orphan.path))
+}
+
 @Test func conversationRunCoordinatorPersistsThenPromptsExactlyOneRun() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
