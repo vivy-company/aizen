@@ -17,6 +17,10 @@ public protocol AgentLaunchConfigurationUpdating: Sendable {
     func updateAgentLaunchConfiguration(_ configuration: ConfigureAgentLaunchCommandPayload) async throws
 }
 
+public protocol LinkedWorktreeCreating: Sendable {
+    func createLinkedWorktree(source: URL, destination: URL, branch: String, createBranch: Bool, baseBranch: String?) async throws
+}
+
 /// Explicit local Host composition. It owns Storage but exposes only Wire envelopes and Core snapshots.
 public actor LocalHost: WireEndpoint {
     private let storage: StorageRepository
@@ -26,6 +30,7 @@ public actor LocalHost: WireEndpoint {
     private let terminalRuntime: (any TerminalRuntime)?
     private let agentLaunchConfiguration: (any AgentLaunchConfigurationUpdating)?
     private let pairingRegistry: PairingRequestRegistry?
+    private let linkedWorktrees: (any LinkedWorktreeCreating)?
 
     public init(
         storage: StorageRepository,
@@ -34,7 +39,8 @@ public actor LocalHost: WireEndpoint {
         runEventPublisher: RunEventPublisher? = nil,
         terminalRuntime: (any TerminalRuntime)? = nil,
         agentLaunchConfiguration: (any AgentLaunchConfigurationUpdating)? = nil,
-        pairingRegistry: PairingRequestRegistry? = nil
+        pairingRegistry: PairingRequestRegistry? = nil,
+        linkedWorktrees: (any LinkedWorktreeCreating)? = nil
     ) {
         self.storage = storage
         self.conversationRuns = conversationRuns
@@ -43,6 +49,7 @@ public actor LocalHost: WireEndpoint {
         self.terminalRuntime = terminalRuntime
         self.agentLaunchConfiguration = agentLaunchConfiguration
         self.pairingRegistry = pairingRegistry
+        self.linkedWorktrees = linkedWorktrees
     }
 
     public func runEvents() async -> AsyncStream<RunEvent> {
@@ -109,6 +116,8 @@ public actor LocalHost: WireEndpoint {
                 CreateLocalFolderContextResultPayload.identifier,
                 CreateRepositoryCheckoutContextCommandPayload.identifier,
                 CreateRepositoryCheckoutContextResultPayload.identifier,
+                CreateLinkedWorktreeContextCommandPayload.identifier,
+                CreateLinkedWorktreeContextResultPayload.identifier,
                 AttachExecutionContextCommandPayload.identifier,
                 DetachExecutionContextCommandPayload.identifier,
                 RemoveExecutionContextCommandPayload.identifier,
@@ -492,6 +501,41 @@ public actor LocalHost: WireEndpoint {
                     snapshot.executionContexts.append(context)
                 }
                 return try TypedPayload(CreateRepositoryCheckoutContextResultPayload(contextID: context.id.description))
+            }
+            kind = .commandResult
+        case .command where envelope.payload.identifier == CreateLinkedWorktreeContextCommandPayload.identifier:
+            guard let linkedWorktrees else { throw HostProtocolError.runtimeUnavailable }
+            let command = try CreateLinkedWorktreeContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try Self.spaceID(from: command.spaceID)
+            let resourceID = try Self.resourceID(from: command.resourceID)
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                let snapshot = try await self.storage.load()
+                guard let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == spaceID }),
+                      resource.kind == .repository,
+                      case let .hostPrivate(reference) = resource.details,
+                      reference.rawValue.hasPrefix("local-repository:") else { throw HostProtocolError.unknownResource(resourceID) }
+                let source = try Self.localDirectory(from: String(reference.rawValue.dropFirst("local-repository:".count)))
+                let destination = URL(fileURLWithPath: command.destinationPath).standardizedFileURL
+                guard !FileManager.default.fileExists(atPath: destination.path) else { throw HostProtocolError.invalidResourcePath(command.destinationPath) }
+                let operation = Operation(spaceID: spaceID, lifecycle: .running, progress: 0)
+                _ = try await self.storage.transact { $0.operations.append(operation) }
+                do {
+                    try await linkedWorktrees.createLinkedWorktree(source: source, destination: destination, branch: command.branch, createBranch: command.createBranch, baseBranch: command.baseBranch)
+                    let context = ExecutionContext(spaceID: spaceID, kind: .gitWorktree, resourceID: resourceID, hostReference: .init(rawValue: "local-worktree:\(destination.path)"))
+                    _ = try await self.storage.transact { snapshot in
+                        guard !snapshot.executionContexts.contains(where: { $0.hostReference == context.hostReference }) else { throw HostProtocolError.resourceInUse(resourceID) }
+                        snapshot.executionContexts.append(context)
+                        guard let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) else { return }
+                        snapshot.operations[index].lifecycle = .completed; snapshot.operations[index].progress = 1
+                    }
+                    return try TypedPayload(CreateLinkedWorktreeContextResultPayload(contextID: context.id.description, operationID: operation.id.description))
+                } catch {
+                    _ = try? await self.storage.transact { snapshot in
+                        guard let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) else { return }
+                        snapshot.operations[index].lifecycle = .failed; snapshot.operations[index].failureDescription = error.localizedDescription
+                    }
+                    throw error
+                }
             }
             kind = .commandResult
         case .command where envelope.payload.identifier == RemoveExecutionContextCommandPayload.identifier:

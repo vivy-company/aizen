@@ -1632,6 +1632,29 @@ public struct CreateRepositoryCheckoutContextResultPayload: WirePayload, Sendabl
     public func protobufBytes() throws -> Data { var m = AizenWireV1_CreateRepositoryCheckoutContextResult(); m.executionContextID = contextID; return try m.serializedData() }
 }
 
+public struct CreateLinkedWorktreeContextCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.execution-context.create-linked-worktree@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let spaceID: String; public let resourceID: String; public let destinationPath: String; public let branch: String; public let createBranch: Bool; public let baseBranch: String?
+    public init(spaceID: String, resourceID: String, destinationPath: String, branch: String, createBranch: Bool, baseBranch: String? = nil) {
+        precondition(!spaceID.isEmpty && !resourceID.isEmpty && destinationPath.hasPrefix("/") && !branch.isEmpty, "Linked worktree creation needs valid identities, destination, and branch")
+        self.spaceID = spaceID; self.resourceID = resourceID; self.destinationPath = destinationPath; self.branch = branch; self.createBranch = createBranch; self.baseBranch = baseBranch
+    }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_CreateLinkedWorktreeContextCommand(serializedBytes: protobufBytes); self.init(spaceID: m.spaceID, resourceID: m.resourceID, destinationPath: m.destinationPath, branch: m.branch, createBranch: m.createBranch, baseBranch: m.hasBaseBranch ? m.baseBranch : nil) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_CreateLinkedWorktreeContextCommand(); m.spaceID = spaceID; m.resourceID = resourceID; m.destinationPath = destinationPath; m.branch = branch; m.createBranch = createBranch; if let baseBranch { m.baseBranch = baseBranch }; return try m.serializedData() }
+}
+
+public struct CreateLinkedWorktreeContextResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.execution-context.create-linked-worktree@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let contextID: String; public let operationID: String
+    public init(contextID: String, operationID: String) { self.contextID = contextID; self.operationID = operationID }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_CreateLinkedWorktreeContextResult(serializedBytes: protobufBytes); self.init(contextID: m.executionContextID, operationID: m.operationID) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_CreateLinkedWorktreeContextResult(); m.executionContextID = contextID; m.operationID = operationID; return try m.serializedData() }
+}
+
 public struct AttachExecutionContextCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.session.attach-execution-context@1")
     public static let schemaVersion: UInt32 = 1

@@ -415,6 +415,20 @@ message CreateRepositoryCheckoutContextResult {
   string execution_context_id = 1;
 }
 
+message CreateLinkedWorktreeContextCommand {
+  string space_id = 1;
+  string resource_id = 2;
+  string destination_path = 3;
+  string branch = 4;
+  bool create_branch = 5;
+  optional string base_branch = 6;
+}
+
+message CreateLinkedWorktreeContextResult {
+  string execution_context_id = 1;
+  string operation_id = 2;
+}
+
 message AttachExecutionContextCommand {
   string session_id = 1;
   string execution_context_id = 2;

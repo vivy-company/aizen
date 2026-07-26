@@ -1294,6 +1294,51 @@ nonisolated struct AizenWireV1_CreateRepositoryCheckoutContextResult: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_CreateLinkedWorktreeContextCommand: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var spaceID: String = String()
+
+  var resourceID: String = String()
+
+  var destinationPath: String = String()
+
+  var branch: String = String()
+
+  var createBranch: Bool = false
+
+  var baseBranch: String {
+    get {_baseBranch ?? String()}
+    set {_baseBranch = newValue}
+  }
+  /// Returns true if `baseBranch` has been explicitly set.
+  var hasBaseBranch: Bool {self._baseBranch != nil}
+  /// Clears the value of `baseBranch`. Subsequent reads from it will return its default value.
+  mutating func clearBaseBranch() {self._baseBranch = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _baseBranch: String? = nil
+}
+
+nonisolated struct AizenWireV1_CreateLinkedWorktreeContextResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var executionContextID: String = String()
+
+  var operationID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_AttachExecutionContextCommand: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -4083,6 +4128,100 @@ nonisolated extension AizenWireV1_CreateRepositoryCheckoutContextResult: SwiftPr
 
   static func ==(lhs: AizenWireV1_CreateRepositoryCheckoutContextResult, rhs: AizenWireV1_CreateRepositoryCheckoutContextResult) -> Bool {
     if lhs.executionContextID != rhs.executionContextID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_CreateLinkedWorktreeContextCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".CreateLinkedWorktreeContextCommand"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}space_id\0\u{3}resource_id\0\u{3}destination_path\0\u{1}branch\0\u{3}create_branch\0\u{3}base_branch\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.destinationPath) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.branch) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.createBranch) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._baseBranch) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 1)
+    }
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 2)
+    }
+    if !self.destinationPath.isEmpty {
+      try visitor.visitSingularStringField(value: self.destinationPath, fieldNumber: 3)
+    }
+    if !self.branch.isEmpty {
+      try visitor.visitSingularStringField(value: self.branch, fieldNumber: 4)
+    }
+    if self.createBranch != false {
+      try visitor.visitSingularBoolField(value: self.createBranch, fieldNumber: 5)
+    }
+    try { if let v = self._baseBranch {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_CreateLinkedWorktreeContextCommand, rhs: AizenWireV1_CreateLinkedWorktreeContextCommand) -> Bool {
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.destinationPath != rhs.destinationPath {return false}
+    if lhs.branch != rhs.branch {return false}
+    if lhs.createBranch != rhs.createBranch {return false}
+    if lhs._baseBranch != rhs._baseBranch {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_CreateLinkedWorktreeContextResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".CreateLinkedWorktreeContextResult"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}execution_context_id\0\u{3}operation_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.executionContextID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.operationID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.executionContextID.isEmpty {
+      try visitor.visitSingularStringField(value: self.executionContextID, fieldNumber: 1)
+    }
+    if !self.operationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.operationID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_CreateLinkedWorktreeContextResult, rhs: AizenWireV1_CreateLinkedWorktreeContextResult) -> Bool {
+    if lhs.executionContextID != rhs.executionContextID {return false}
+    if lhs.operationID != rhs.operationID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

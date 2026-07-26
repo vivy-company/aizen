@@ -901,9 +901,38 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     ))
 }
 
+@Test func hostCreatesLinkedWorktreeContextsThroughAHostOperation() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let source = root.appendingPathComponent("source", isDirectory: true)
+    try FileManager.default.createDirectory(at: source.appendingPathComponent(".git"), withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Worktrees")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Source", details: .hostPrivate(.init(rawValue: "local-repository:\(source.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let worktrees = RecordingLinkedWorktrees()
+    let host = LocalHost(storage: storage, linkedWorktrees: worktrees)
+    let destination = root.appendingPathComponent("feature", isDirectory: true)
+
+    let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(CreateLinkedWorktreeContextCommandPayload(spaceID: space.id.description, resourceID: resource.id.description, destinationPath: destination.path, branch: "feature/test", createBranch: true, baseBranch: "main"))))
+    let result = try CreateLinkedWorktreeContextResultPayload(protobufBytes: response.payload.protobufBytes)
+    let snapshot = try await storage.load()
+    #expect(snapshot.executionContexts.first?.id.description == result.contextID)
+    #expect(snapshot.executionContexts.first?.hostReference == .init(rawValue: "local-worktree:\(destination.path)"))
+    #expect(snapshot.operations.first?.id.description == result.operationID)
+    #expect(snapshot.operations.first?.lifecycle == .completed)
+    let createdDestination = await worktrees.destination
+    #expect(createdDestination == destination)
+}
+
 private actor RecordingRuntime: RunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
+}
+
+private actor RecordingLinkedWorktrees: LinkedWorktreeCreating {
+    private(set) var destination: URL?
+    func createLinkedWorktree(source: URL, destination: URL, branch: String, createBranch: Bool, baseBranch: String?) async throws { self.destination = destination }
 }
 
 private actor RecordingAgentLaunchUpdater: AgentLaunchConfigurationUpdating {

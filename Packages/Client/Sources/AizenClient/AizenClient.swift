@@ -551,6 +551,14 @@ public actor HostClient {
         return ExecutionContextID(rawValue: id)
     }
 
+    public func createLinkedWorktreeContext(spaceID: SpaceID, resourceID: ResourceID, destinationPath: String, branch: String, createBranch: Bool, baseBranch: String? = nil) async throws -> (contextID: ExecutionContextID, operationID: OperationID) {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(CreateLinkedWorktreeContextCommandPayload(spaceID: spaceID.description, resourceID: resourceID.description, destinationPath: destinationPath, branch: branch, createBranch: createBranch, baseBranch: baseBranch))))
+        guard response.kind == .commandResult, response.payload.identifier == CreateLinkedWorktreeContextResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        let result = try CreateLinkedWorktreeContextResultPayload(protobufBytes: response.payload.protobufBytes)
+        guard let context = UUID(uuidString: result.contextID), let operation = UUID(uuidString: result.operationID) else { throw Error.invalidIdentity("Linked worktree result") }
+        return (.init(rawValue: context), .init(rawValue: operation))
+    }
+
     public func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {
         let response = try await send(.init(
             messageID: UUID().uuidString,

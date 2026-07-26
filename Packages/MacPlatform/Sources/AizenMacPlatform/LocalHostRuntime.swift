@@ -47,7 +47,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
             runEventPublisher: runEvents,
             terminalRuntime: TmuxTerminalRuntime(),
             agentLaunchConfiguration: agentLaunchConfiguration,
-            pairingRegistry: pairing
+            pairingRegistry: pairing,
+            linkedWorktrees: GitLinkedWorktreeService()
         )
         self.host = host
         migrationGate = HostMigrationGate(
