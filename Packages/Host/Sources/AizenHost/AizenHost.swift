@@ -13,10 +13,16 @@ public enum AizenHostModule {
 public actor LocalHost: WireEndpoint {
     private let storage: StorageRepository
     private let conversationRuns: ConversationRunCoordinator?
+    private let managedSandboxes: ManagedSandboxService?
 
-    public init(storage: StorageRepository, conversationRuns: ConversationRunCoordinator? = nil) {
+    public init(
+        storage: StorageRepository,
+        conversationRuns: ConversationRunCoordinator? = nil,
+        managedSandboxes: ManagedSandboxService? = nil
+    ) {
         self.storage = storage
         self.conversationRuns = conversationRuns
+        self.managedSandboxes = managedSandboxes
     }
 
     public func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
@@ -113,7 +119,11 @@ public actor LocalHost: WireEndpoint {
                 role: .user,
                 content: command.content
             )
-            try await conversationRuns.submit(message: message, run: Run(id: runID, spaceID: spaceID, sessionID: sessionID))
+            let executionContextID = try await executionContext(for: sessionID, in: spaceID)
+            try await conversationRuns.submit(
+                message: message,
+                run: Run(id: runID, spaceID: spaceID, sessionID: sessionID, executionContextID: executionContextID)
+            )
             kind = .commandResult
             payload = try TypedPayload(SendConversationResultPayload(runID: runID.description))
         default:
@@ -134,12 +144,32 @@ public actor LocalHost: WireEndpoint {
         guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
         return SpaceID(rawValue: rawValue)
     }
+
+    private func executionContext(for sessionID: SessionID, in spaceID: SpaceID) async throws -> ExecutionContextID {
+        let snapshot = try await storage.load()
+        guard let session = snapshot.sessions.first(where: { $0.id == sessionID && $0.spaceID == spaceID }) else {
+            throw HostProtocolError.unknownSession(sessionID)
+        }
+        if let executionContextID = session.executionContextID {
+            return executionContextID
+        }
+        guard let managedSandboxes else { throw HostProtocolError.runtimeUnavailable }
+        do {
+            return try await managedSandboxes.provision(for: sessionID, persistence: .temporary).id
+        } catch ManagedSandboxService.Error.sessionAlreadyHasExecutionContext {
+            guard let executionContextID = try await storage.load().sessions.first(where: { $0.id == sessionID })?.executionContextID else {
+                throw HostProtocolError.unknownSession(sessionID)
+            }
+            return executionContextID
+        }
+    }
 }
 
 public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case unsupportedRequest(kind: WireMessageKind, payload: PayloadIdentifier)
     case invalidIdentity(String)
     case unknownSpace(SpaceID)
+    case unknownSession(SessionID)
     case spaceNotEmpty(SpaceID)
     case runtimeUnavailable
 }

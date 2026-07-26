@@ -153,7 +153,8 @@ import AizenWire
     }
     let runtime = PromptRecordingRuntime()
     let coordinator = ConversationRunCoordinator(storage: storage, runtime: runtime)
-    let transport = InProcessTransport(endpoint: LocalHost(storage: storage, conversationRuns: coordinator))
+    let sandboxes = ManagedSandboxService(storage: storage, rootURL: root.appendingPathComponent("sandboxes", isDirectory: true))
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage, conversationRuns: coordinator, managedSandboxes: sandboxes))
     let runID = RunID()
     let response = try await transport.send(.init(
         messageID: "send-conversation",
@@ -169,7 +170,10 @@ import AizenWire
         ))
     ))
     #expect(try SendConversationResultPayload(protobufBytes: response.payload.protobufBytes).runID == runID.description)
-    #expect(try await storage.load().runs.first?.lifecycle == .completed)
+    let snapshot = try await storage.load()
+    #expect(snapshot.runs.first?.lifecycle == .completed)
+    #expect(snapshot.runs.first?.executionContextID == snapshot.sessions.first?.executionContextID)
+    #expect(snapshot.executionContexts.first?.kind == .managedTemporarySandbox)
     #expect((await runtime.prompted).first?.1 == "Make a plan")
 }
 
