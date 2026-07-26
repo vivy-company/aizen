@@ -25,4 +25,9 @@ actor ReignitionHostComposition {
             .appendingPathComponent("Reignition", isDirectory: true)
             .appendingPathComponent("storage-v2.json")
     }
+
+    func snapshot() async throws -> StorageSnapshot {
+        let response = try await client.snapshot()
+        return try JSONDecoder().decode(StorageSnapshot.self, from: response.snapshot)
+    }
 }

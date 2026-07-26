@@ -1,6 +1,7 @@
 import AizenCore
 import AizenTransport
 import AizenWire
+import Foundation
 
 /// Client synchronisation and projections shared by Mac, Mobile, and CLI.
 public enum AizenClientModule {
@@ -29,7 +30,13 @@ public struct SpaceProjection: Sendable, Hashable {
 }
 
 public actor HostClient {
+    public enum Error: Swift.Error, Sendable, Equatable {
+        case sequenceExhausted
+        case unexpectedPayload(PayloadIdentifier)
+    }
+
     private let transport: any WireTransport
+    private var nextSequence: UInt64 = 1
     public private(set) var connectionState: ClientConnectionState = .disconnected
 
     public init(transport: any WireTransport) {
@@ -44,5 +51,22 @@ public actor HostClient {
 
     public func disconnect() {
         connectionState = .disconnected
+    }
+
+    public func snapshot(scope: String = "host") async throws -> SnapshotResponsePayload {
+        guard nextSequence < UInt64.max else { throw Error.sequenceExhausted }
+        let sequence = nextSequence
+        nextSequence += 1
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: sequence,
+            kind: .query,
+            channel: .state,
+            payload: try .init(SnapshotRequestPayload(scope: scope))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == SnapshotResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try SnapshotResponsePayload(protobufBytes: response.payload.protobufBytes)
     }
 }

@@ -1,5 +1,7 @@
 import Foundation
 import AizenCore
+import AizenHost
+import AizenStorage
 import AizenTransport
 import Testing
 @testable import AizenClient
@@ -28,6 +30,17 @@ import AizenWire
     let projection = SpaceProjection(spaces: [first, second]).selecting(second.id)
     #expect(projection.activeSpaceID == second.id)
     #expect(projection.spaces.map(\.name) == ["Personal", "Work"])
+}
+
+@Test func clientDecodesTypedHostSnapshots() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    _ = try await storage.transact { $0.spaces.append(.init(name: "Vivy")) }
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+    let response = try await client.snapshot()
+    let snapshot = try JSONDecoder().decode(StorageSnapshot.self, from: response.snapshot)
+    #expect(snapshot.spaces.map(\.name) == ["Vivy"])
 }
 
 private struct EchoHost: WireEndpoint {

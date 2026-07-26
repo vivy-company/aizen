@@ -5,7 +5,7 @@ let package = Package(
     name: "AizenClient",
     platforms: [.macOS(.v13), .iOS(.v17)],
     products: [.library(name: "AizenClient", targets: ["AizenClient"])],
-    dependencies: [.package(path: "../Core"), .package(path: "../Wire"), .package(path: "../Transport")],
+    dependencies: [.package(path: "../Core"), .package(path: "../Wire"), .package(path: "../Transport"), .package(path: "../Storage"), .package(path: "../Host")],
     targets: [
         .target(name: "AizenClient", dependencies: [
             .product(name: "AizenCore", package: "Core"),
@@ -15,7 +15,9 @@ let package = Package(
         .testTarget(name: "AizenClientTests", dependencies: [
             "AizenClient",
             .product(name: "AizenTransport", package: "Transport"),
-            .product(name: "AizenWire", package: "Wire")
+            .product(name: "AizenWire", package: "Wire"),
+            .product(name: "AizenHost", package: "Host"),
+            .product(name: "AizenStorage", package: "Storage")
         ])
     ]
 )
