@@ -870,6 +870,37 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(await updater.configuration == command)
 }
 
+@Test func repositoryRefreshReportsMissingPathsAsRecoverableState() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Repository")
+    let resource = Resource(
+        spaceID: space.id,
+        kind: .repository,
+        title: "Moved repository",
+        details: .hostPrivate(.init(rawValue: "local-repository:/definitely-not-aizen"))
+    )
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.resources.append(resource)
+    }
+    let host = LocalHost(storage: storage)
+
+    let response = try await host.receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(RefreshRepositoryResourceCommandPayload(resourceID: resource.id.description))
+    ))
+
+    #expect(try RefreshRepositoryResourceResultPayload(protobufBytes: response.payload.protobufBytes) == .init(
+        resourceID: resource.id.description,
+        availability: .missing
+    ))
+}
+
 private actor RecordingRuntime: RunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}

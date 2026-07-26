@@ -1081,9 +1081,30 @@ nonisolated struct AizenWireV1_RefreshRepositoryResourceResult: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  var resourceID: String = String()
+
+  var availability: String = String()
+
+  var branch: String {
+    get {_branch ?? String()}
+    set {_branch = newValue}
+  }
+  /// Returns true if `branch` has been explicitly set.
+  var hasBranch: Bool {self._branch != nil}
+  /// Clears the value of `branch`. Subsequent reads from it will return its default value.
+  mutating func clearBranch() {self._branch = nil}
+
+  var isDetached: Bool = false
+
+  var hasSubmodules_p: Bool = false
+
+  var isRebaseInProgress: Bool = false
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
+
+  fileprivate var _branch: String? = nil
 }
 
 nonisolated struct AizenWireV1_ListExecutionContextsQuery: Sendable {
@@ -3561,18 +3582,58 @@ nonisolated extension AizenWireV1_RefreshRepositoryResourceCommand: SwiftProtobu
 
 nonisolated extension AizenWireV1_RefreshRepositoryResourceResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".RefreshRepositoryResourceResult"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{1}availability\0\u{1}branch\0\u{3}is_detached\0\u{3}has_submodules\0\u{3}is_rebase_in_progress\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.availability) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._branch) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.isDetached) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.hasSubmodules_p) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.isRebaseInProgress) }()
+      default: break
+      }
+    }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 1)
+    }
+    if !self.availability.isEmpty {
+      try visitor.visitSingularStringField(value: self.availability, fieldNumber: 2)
+    }
+    try { if let v = self._branch {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    if self.isDetached != false {
+      try visitor.visitSingularBoolField(value: self.isDetached, fieldNumber: 4)
+    }
+    if self.hasSubmodules_p != false {
+      try visitor.visitSingularBoolField(value: self.hasSubmodules_p, fieldNumber: 5)
+    }
+    if self.isRebaseInProgress != false {
+      try visitor.visitSingularBoolField(value: self.isRebaseInProgress, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: AizenWireV1_RefreshRepositoryResourceResult, rhs: AizenWireV1_RefreshRepositoryResourceResult) -> Bool {
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.availability != rhs.availability {return false}
+    if lhs._branch != rhs._branch {return false}
+    if lhs.isDetached != rhs.isDetached {return false}
+    if lhs.hasSubmodules_p != rhs.hasSubmodules_p {return false}
+    if lhs.isRebaseInProgress != rhs.isRebaseInProgress {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

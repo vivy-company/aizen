@@ -1321,16 +1321,63 @@ public struct RefreshRepositoryResourceCommandPayload: WirePayload, Sendable, Ha
     }
 }
 
+public enum RepositoryResourceAvailability: String, Sendable, Hashable {
+    case available
+    case missing
+    case notRepository
+}
+
+/// Safe, derived repository state returned by the Host. It intentionally contains no filesystem path.
 public struct RefreshRepositoryResourceResultPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.resource.refresh-repository@1")
     public static let schemaVersion: UInt32 = 1
     public static let stateAffecting = true
-    public init() {}
+    public let resourceID: String
+    public let availability: RepositoryResourceAvailability
+    public let branch: String?
+    public let isDetached: Bool
+    public let hasSubmodules: Bool
+    public let isRebaseInProgress: Bool
+
+    public init(
+        resourceID: String,
+        availability: RepositoryResourceAvailability,
+        branch: String? = nil,
+        isDetached: Bool = false,
+        hasSubmodules: Bool = false,
+        isRebaseInProgress: Bool = false
+    ) {
+        precondition(!resourceID.isEmpty, "Repository state needs a resource identity")
+        self.resourceID = resourceID
+        self.availability = availability
+        self.branch = branch?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? branch : nil
+        self.isDetached = isDetached
+        self.hasSubmodules = hasSubmodules
+        self.isRebaseInProgress = isRebaseInProgress
+    }
     public init(protobufBytes: Data) throws {
-        _ = try AizenWireV1_RefreshRepositoryResourceResult(serializedBytes: protobufBytes)
+        let message = try AizenWireV1_RefreshRepositoryResourceResult(serializedBytes: protobufBytes)
+        guard let availability = RepositoryResourceAvailability(rawValue: message.availability) else {
+            throw WireCodecError.invalidRepositoryAvailability(message.availability)
+        }
+        self.init(
+            resourceID: message.resourceID,
+            availability: availability,
+            branch: message.branch,
+            isDetached: message.isDetached,
+            hasSubmodules: message.hasSubmodules_p,
+            isRebaseInProgress: message.isRebaseInProgress
+        )
     }
     public func protobufBytes() throws -> Data {
-        try AizenWireV1_RefreshRepositoryResourceResult().serializedData()
+        var message = AizenWireV1_RefreshRepositoryResourceResult()
+        message.resourceID = resourceID
+        message.availability = availability.rawValue
+        if let branch { message.branch = branch }
+        message.isDetached = isDetached
+        message.hasSubmodules_p = hasSubmodules
+        message.isRebaseInProgress = isRebaseInProgress
+        return try message.serializedData()
     }
 }
 
@@ -1819,6 +1866,7 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidIdentity(String)
     case invalidLifecycle(String)
     case invalidAuthenticationPayload
+    case invalidRepositoryAvailability(String)
 }
 
 private extension ProtocolEnvelope {

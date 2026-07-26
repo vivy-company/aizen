@@ -337,6 +337,11 @@ import AizenWire
     #expect(resource.id == resourceID)
     #expect(resource.kind == .repository)
     #expect(resource.details == .hostPrivate(.init(rawValue: "local-repository:\(repository.resolvingSymlinksInPath().path)")))
+    #expect(try await client.refreshRepositoryResource(id: resourceID) == .init(
+        resourceID: resourceID.description,
+        availability: .available,
+        branch: "main"
+    ))
     let contextID = try await client.createRepositoryCheckoutContext(spaceID: spaceID, resourceID: resourceID)
     let context = try #require(try await client.executionContexts(spaceID: spaceID, resourceID: resourceID).first)
     #expect(context.id == contextID)

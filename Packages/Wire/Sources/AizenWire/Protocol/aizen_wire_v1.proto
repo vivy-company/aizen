@@ -341,7 +341,14 @@ message RefreshRepositoryResourceCommand {
   string resource_id = 1;
 }
 
-message RefreshRepositoryResourceResult {}
+message RefreshRepositoryResourceResult {
+  string resource_id = 1;
+  string availability = 2;
+  optional string branch = 3;
+  bool is_detached = 4;
+  bool has_submodules = 5;
+  bool is_rebase_in_progress = 6;
+}
 
 message ListExecutionContextsQuery {
   string space_id = 1;

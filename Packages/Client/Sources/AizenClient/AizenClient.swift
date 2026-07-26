@@ -459,7 +459,7 @@ public actor HostClient {
         _ = try ResourceMutationResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
-    public func refreshRepositoryResource(id: ResourceID) async throws {
+    public func refreshRepositoryResource(id: ResourceID) async throws -> RefreshRepositoryResourceResultPayload {
         let response = try await send(.init(
             messageID: UUID().uuidString,
             connectionSequence: try nextConnectionSequence(),
@@ -470,7 +470,7 @@ public actor HostClient {
         guard response.kind == .commandResult, response.payload.identifier == RefreshRepositoryResourceResultPayload.identifier else {
             throw Error.unexpectedPayload(response.payload.identifier)
         }
-        _ = try RefreshRepositoryResourceResultPayload(protobufBytes: response.payload.protobufBytes)
+        return try RefreshRepositoryResourceResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
     public func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {

@@ -423,9 +423,15 @@ public actor LocalHost: WireEndpoint {
                     throw HostProtocolError.invalidResourcePath(resource.title)
                 }
                 let path = String(reference.rawValue.dropFirst("local-repository:".count))
-                let directory = try Self.localDirectory(from: path)
-                guard Self.isGitRepository(directory) else { throw HostProtocolError.invalidResourcePath(directory.path) }
-                return try TypedPayload(RefreshRepositoryResourceResultPayload())
+                let state = Self.repositoryState(at: path)
+                return try TypedPayload(RefreshRepositoryResourceResultPayload(
+                    resourceID: resourceID.description,
+                    availability: state.availability,
+                    branch: state.branch,
+                    isDetached: state.isDetached,
+                    hasSubmodules: state.hasSubmodules,
+                    isRebaseInProgress: state.isRebaseInProgress
+                ))
             }
             kind = .commandResult
         case .command where envelope.payload.identifier == CreateLocalFolderContextCommandPayload.identifier:
@@ -653,6 +659,53 @@ public actor LocalHost: WireEndpoint {
 
     private static func isGitRepository(_ directory: URL) -> Bool {
         FileManager.default.fileExists(atPath: directory.appendingPathComponent(".git").path)
+    }
+
+    private static func repositoryState(at path: String) -> RepositoryFilesystemState {
+        guard path.hasPrefix("/") else { return .notRepository }
+        let directory = URL(fileURLWithPath: path).standardizedFileURL
+        var isDirectory = ObjCBool(false)
+        guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return .missing
+        }
+        let git = directory.appendingPathComponent(".git")
+        guard FileManager.default.fileExists(atPath: git.path) else { return .notRepository }
+        let gitDirectory = resolvedGitDirectory(git)
+        let head = (try? String(contentsOf: gitDirectory.appendingPathComponent("HEAD"), encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let branchPrefix = "ref: refs/heads/"
+        let branch = head?.hasPrefix(branchPrefix) == true
+            ? String(head!.dropFirst(branchPrefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            : nil
+        return .init(
+            availability: .available,
+            branch: branch,
+            isDetached: head?.hasPrefix(branchPrefix) == false,
+            hasSubmodules: FileManager.default.fileExists(atPath: directory.appendingPathComponent(".gitmodules").path),
+            isRebaseInProgress: FileManager.default.fileExists(atPath: gitDirectory.appendingPathComponent("rebase-merge").path) ||
+                FileManager.default.fileExists(atPath: gitDirectory.appendingPathComponent("rebase-apply").path)
+        )
+    }
+
+    private static func resolvedGitDirectory(_ git: URL) -> URL {
+        var isDirectory = ObjCBool(false)
+        guard FileManager.default.fileExists(atPath: git.path, isDirectory: &isDirectory), !isDirectory.boolValue,
+              let value = try? String(contentsOf: git, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              value.hasPrefix("gitdir: ") else { return git }
+        let location = String(value.dropFirst("gitdir: ".count))
+        return URL(fileURLWithPath: location, relativeTo: git.deletingLastPathComponent()).standardizedFileURL
+    }
+
+    private struct RepositoryFilesystemState {
+        let availability: RepositoryResourceAvailability
+        let branch: String?
+        let isDetached: Bool
+        let hasSubmodules: Bool
+        let isRebaseInProgress: Bool
+
+        static let missing = Self(availability: .missing, branch: nil, isDetached: false, hasSubmodules: false, isRebaseInProgress: false)
+        static let notRepository = Self(availability: .notRepository, branch: nil, isDetached: false, hasSubmodules: false, isRebaseInProgress: false)
     }
 
     private func executionContext(for sessionID: SessionID, in spaceID: SpaceID) async throws -> ExecutionContextID {
