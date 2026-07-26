@@ -805,6 +805,16 @@ private extension AizenCLI {
     }
 
     static func handleTerminal(_ args: [String]) async throws {
+        switch args.first {
+        case "list":
+            try await handleSessions(Array(args.dropFirst()))
+            return
+        case "attach":
+            try await handleAttach(Array(args.dropFirst()))
+            return
+        default:
+            break
+        }
         let parsed = try parseArguments(args)
         if parsed.flags.contains("help") {
             print(terminalHelpText())
@@ -1132,9 +1142,11 @@ Usage:
   aizen sync [path]               Rescan worktrees
   aizen status                    Show overview
   aizen operation list|show|watch Inspect Host operations
-  aizen terminal [path]           Create persistent terminal session
-  aizen attach [project]          Attach to tmux terminal session
-  aizen sessions                  List active terminal sessions
+  aizen terminal list             List Host-owned terminal sessions
+  aizen terminal attach [id]      Attach to a Host-owned tmux terminal
+  aizen terminal [path]           Create a persistent terminal session
+  aizen attach [project]          Deprecated alias for terminal attach
+  aizen sessions                  Deprecated alias for terminal list
 
 Run 'aizen <command> --help' for more details.
 """
@@ -1313,6 +1325,8 @@ List all active terminal sessions with their tmux panes.
     static func terminalHelpText() -> String {
         return """
 Usage:
+  aizen terminal list [--workspace <space>] [--json]
+  aizen terminal attach [id|title] [--workspace <space>]
   aizen terminal [path]                                Create detached terminal session
   aizen terminal . --attach                            Create and attach
   aizen terminal . -c "npm run dev"                   Run command in session
@@ -1325,7 +1339,7 @@ Options:
   -w, --workspace <name>    Space for the Host-owned repository terminal
   --no-color                Disable colored output
 
-Create a new Host-owned terminal session that persists via tmux.
+List, attach to, or create Host-owned terminal sessions that persist via tmux.
 When a repository is not tracked yet, it is imported into the selected Space.
 """
     }
