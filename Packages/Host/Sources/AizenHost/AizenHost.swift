@@ -208,9 +208,15 @@ public actor LocalHost: WireEndpoint {
             guard let conversationRuns else { throw HostProtocolError.runtimeUnavailable }
             let command = try CancelRunCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             guard let rawRunID = UUID(uuidString: command.runID) else { throw HostProtocolError.invalidIdentity(command.runID) }
-            try await conversationRuns.cancel(runID: RunID(rawValue: rawRunID))
+            let runID = RunID(rawValue: rawRunID)
+            guard let spaceID = try await storage.load().runs.first(where: { $0.id == runID })?.spaceID else {
+                throw HostProtocolError.unknownRun(runID)
+            }
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                try await conversationRuns.cancel(runID: runID)
+                return try TypedPayload(CancelRunResultPayload())
+            }
             kind = .commandResult
-            payload = try TypedPayload(CancelRunResultPayload())
         case .command where envelope.payload.identifier == ImportLocalFolderCommandPayload.identifier:
             let command = try ImportLocalFolderCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
@@ -486,6 +492,7 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case invalidIdentity(String)
     case unknownSpace(SpaceID)
     case unknownSession(SessionID)
+    case unknownRun(RunID)
     case unknownResource(ResourceID)
     case unknownExecutionContext(ExecutionContextID)
     case duplicateResource(ResourceID)

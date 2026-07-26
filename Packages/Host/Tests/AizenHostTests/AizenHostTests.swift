@@ -313,6 +313,34 @@ import AizenWire
     #expect(snapshot.commands.count == 1)
 }
 
+@Test func hostReplaysRunCancellationCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    let run = Run(spaceID: space.id, sessionID: session.id, lifecycle: .running)
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+        $0.runs.append(run)
+    }
+    let coordinator = ConversationRunCoordinator(storage: storage, runtime: PromptRecordingRuntime())
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage, conversationRuns: coordinator))
+    let envelope = ProtocolEnvelope(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(CancelRunCommandPayload(runID: run.id.description))
+    )
+    let first = try await transport.send(envelope)
+    let replay = try await transport.send(envelope)
+    #expect(first.payload == replay.payload)
+    #expect(try await storage.load().runs.first?.lifecycle == .cancelled)
+    #expect(try await storage.load().commands.count == 1)
+}
+
 @Test func managedSandboxProvisioningLinksAProjectlessConversation() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
