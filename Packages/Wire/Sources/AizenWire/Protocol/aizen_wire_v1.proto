@@ -652,6 +652,23 @@ message ListContextFilesResponse {
   repeated ContextFileEntryRecord entries = 1;
 }
 
+message SearchContextFilesQuery {
+  string execution_context_id = 1;
+  string query = 2;
+  uint32 maximum_matches = 3;
+}
+
+message ContextFileSearchMatchRecord {
+  string relative_path = 1;
+  uint32 line_number = 2;
+  string preview = 3;
+}
+
+message SearchContextFilesResponse {
+  repeated ContextFileSearchMatchRecord matches = 1;
+  bool truncated = 2;
+}
+
 message ReadContextTextFileQuery {
   string execution_context_id = 1;
   string relative_path = 2;

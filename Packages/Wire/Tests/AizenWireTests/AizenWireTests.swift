@@ -252,6 +252,18 @@ import Testing
     #expect(try ListOperationsResponsePayload(protobufBytes: payload.protobufBytes()).operations == [operation])
 }
 
+@Test func contextFileSearchPayloadsKeepRelativeBoundedMatches() throws {
+    let contextID = UUID().uuidString
+    let query = SearchContextFilesQueryPayload(executionContextID: contextID, query: "reignition", maximumMatches: 25)
+    let response = SearchContextFilesResponsePayload(result: .init(
+        matches: [.init(relativePath: "Sources/App.swift", lineNumber: 8, preview: "let title = \\\"Reignition\\\"")],
+        truncated: false
+    ))
+
+    #expect(try SearchContextFilesQueryPayload(protobufBytes: query.protobufBytes()) == query)
+    #expect(try SearchContextFilesResponsePayload(protobufBytes: response.protobufBytes()) == response)
+}
+
 @Test func xcodeProjectDiscoveryCarriesBuildConfigurations() throws {
     let descriptor = XcodeProjectDescriptor(resourceID: ResourceID(), id: "App.xcodeproj", name: "App", kind: .project, schemes: ["App"], configurations: ["Debug", "Release"])
     let payload = DiscoverXcodeProjectResponsePayload(project: descriptor)

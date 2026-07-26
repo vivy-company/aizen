@@ -2259,6 +2259,88 @@ public struct ListContextFilesResponsePayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct SearchContextFilesQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.context-files.search@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public static let defaultMaximumMatches = 50
+    public static let maximumAllowedMatches = 100
+
+    public let executionContextID: String
+    public let query: String
+    public let maximumMatches: Int
+
+    public init(executionContextID: String, query: String, maximumMatches: Int = Self.defaultMaximumMatches) {
+        self.executionContextID = executionContextID
+        self.query = query
+        self.maximumMatches = maximumMatches
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_SearchContextFilesQuery(serializedBytes: protobufBytes)
+        guard UUID(uuidString: message.executionContextID) != nil,
+              !message.query.isEmpty,
+              message.query.utf8.count <= 256,
+              (1...Self.maximumAllowedMatches).contains(Int(message.maximumMatches)) else {
+            throw WireCodecError.invalidIdentity("context file search")
+        }
+        self.init(executionContextID: message.executionContextID, query: message.query, maximumMatches: Int(message.maximumMatches))
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_SearchContextFilesQuery()
+        message.executionContextID = executionContextID
+        message.query = query
+        message.maximumMatches = UInt32(maximumMatches)
+        return try message.serializedData()
+    }
+}
+
+public struct SearchContextFilesResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.context-files.search@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let result: ContextFileSearchResult
+
+    public init(result: ContextFileSearchResult) {
+        self.result = result
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_SearchContextFilesResponse(serializedBytes: protobufBytes)
+        let matches = try message.matches.map { record in
+            guard !record.relativePath.isEmpty,
+                  !record.relativePath.hasPrefix("/"),
+                  !record.relativePath.contains("\\0"),
+                  record.lineNumber > 0,
+                  !record.preview.isEmpty,
+                  record.preview.utf8.count <= ContextFileSearchMatch.maximumPreviewUTF8Count else {
+                throw WireCodecError.invalidIdentity("context file search match")
+            }
+            return ContextFileSearchMatch(
+                relativePath: record.relativePath,
+                lineNumber: Int(record.lineNumber),
+                preview: record.preview
+            )
+        }
+        result = ContextFileSearchResult(matches: matches, truncated: message.truncated)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_SearchContextFilesResponse()
+        message.matches = result.matches.map { match in
+            var record = AizenWireV1_ContextFileSearchMatchRecord()
+            record.relativePath = match.relativePath
+            record.lineNumber = UInt32(match.lineNumber)
+            record.preview = match.preview
+            return record
+        }
+        message.truncated = result.truncated
+        return try message.serializedData()
+    }
+}
+
 public struct ReadContextTextFileQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.context-files.read-text@1")
     public static let schemaVersion: UInt32 = 1
