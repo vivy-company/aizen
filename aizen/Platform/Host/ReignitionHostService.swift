@@ -78,4 +78,27 @@ nonisolated enum ReignitionHostService {
             try service.register()
         }
     }
+
+    /// Re-registers the bundled LaunchAgent so launchd starts a fresh Host process.
+    ///
+    /// The active Host owns long-lived state, so this deliberately does not attempt to
+    /// terminate it from the app. Unregistering and registering its service lets launchd
+    /// perform the handoff while the Host's startup recovery marks interrupted work.
+    nonisolated static func repair() throws {
+        switch status {
+        case .missing:
+            throw Error.missingBundledService
+        case .requiresApproval:
+            throw Error.requiresApproval
+        case .enabled:
+            try service.unregister()
+            try service.register()
+        case .notRegistered, .unknown:
+            try service.register()
+        }
+
+        if service.status == .requiresApproval {
+            throw Error.requiresApproval
+        }
+    }
 }

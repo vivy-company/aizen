@@ -7,6 +7,7 @@ struct HostServiceSettingsView: View {
     @State private var productVersion: String?
     @State private var protocolRange: String?
     @State private var error: String?
+    @State private var isRepairing = false
     @State private var pendingPairings: [PendingPairingRequestRecordPayload] = []
     private let host = ReignitionHostComposition()
 
@@ -27,10 +28,10 @@ struct HostServiceSettingsView: View {
             }
 
             Section {
-                Button("Repair Host Service") {
-                    repair()
+                Button(status == .enabled ? "Restart Host Service" : "Repair Host Service") {
+                    Task { await repair() }
                 }
-                .disabled(status == .enabled)
+                .disabled(isRepairing)
 
                 Button("Refresh Status") {
                     Task { await refresh() }
@@ -65,11 +66,13 @@ struct HostServiceSettingsView: View {
         Binding(get: { error != nil }, set: { if !$0 { error = nil } })
     }
 
-    private func repair() {
+    private func repair() async {
+        isRepairing = true
+        defer { isRepairing = false }
         do {
-            try ReignitionHostService.registerIfNeeded()
+            try ReignitionHostService.repair()
             status = ReignitionHostService.status
-            Task { await refresh() }
+            await refresh()
         } catch {
             status = ReignitionHostService.status
             self.error = error.localizedDescription
