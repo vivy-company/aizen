@@ -152,3 +152,5 @@ public actor ACPRunRuntime: RunRuntime {
         try await activeRun.client.sendPrompt(sessionID: activeRun.sessionID, text: message)
     }
 }
+
+extension ACPRunRuntime: PromptRunRuntime {}

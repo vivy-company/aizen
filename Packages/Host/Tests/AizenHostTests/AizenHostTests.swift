@@ -165,6 +165,33 @@ import AizenWire
     #expect(permissions?.intValue == 0o700)
 }
 
+@Test func conversationRunCoordinatorPersistsThenPromptsExactlyOneRun() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+    }
+    let runtime = PromptRecordingRuntime()
+    let coordinator = ConversationRunCoordinator(storage: storage, runtime: runtime)
+    let run = Run(spaceID: space.id, sessionID: session.id)
+    let message = ConversationMessage(spaceID: space.id, sessionID: session.id, role: .user, content: "Make a plan")
+
+    try await coordinator.submit(message: message, run: run)
+
+    let snapshot = try await storage.load()
+    #expect(snapshot.conversationMessages == [message])
+    #expect(snapshot.runs.first?.id == run.id)
+    #expect(snapshot.runs.first?.lifecycle == .completed)
+    let prompted = await runtime.prompted
+    #expect(prompted.count == 1)
+    #expect(prompted.first?.0 == run.id)
+    #expect(prompted.first?.1 == "Make a plan")
+}
+
 @Test func coordinatorRejectsUnknownRunWithoutTouchingRuntime() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -178,4 +205,14 @@ import AizenWire
 private actor RecordingRuntime: RunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
+}
+
+private actor PromptRecordingRuntime: PromptRunRuntime {
+    private(set) var prompted: [(RunID, String)] = []
+
+    func start(run: Run) async throws {}
+    func cancel(runID: RunID) async throws {}
+    func send(message: String, to runID: RunID) async throws {
+        prompted.append((runID, message))
+    }
 }

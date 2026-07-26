@@ -123,6 +123,10 @@ public protocol RunRuntime: Sendable {
     func cancel(runID: RunID) async throws
 }
 
+public protocol PromptRunRuntime: RunRuntime {
+    func send(message: String, to runID: RunID) async throws
+}
+
 public actor RunCoordinator {
     public enum Error: Swift.Error, Sendable, Equatable {
         case duplicateRun(RunID)
@@ -151,6 +155,22 @@ public actor RunCoordinator {
             try? await updateLifecycle(.failed, for: run.id)
             throw error
         }
+    }
+
+    /// Starts a Run that was atomically persisted with another Host-owned command.
+    public func startPersisted(_ run: Run) async throws {
+        guard try await self.run(for: run.id)?.lifecycle == .queued else { throw Error.invalidTransition(from: run.lifecycle, to: .running) }
+        do {
+            try await runtime.start(run: run)
+            try await updateLifecycle(.running, for: run.id)
+        } catch {
+            try? await updateLifecycle(.failed, for: run.id)
+            throw error
+        }
+    }
+
+    public func complete(_ runID: RunID) async throws {
+        try await updateLifecycle(.completed, for: runID)
     }
 
     public func cancel(_ runID: RunID) async throws {
