@@ -857,6 +857,68 @@ public actor HostClient {
         return try CreateTerminalSessionResultPayload(protobufBytes: response.payload.protobufBytes).session
     }
 
+    public func attachTerminal(
+        id: SessionID,
+        after sequence: UInt64 = 0,
+        scrollbackBytes: UInt32 = 65_536,
+        columns: UInt32 = 0,
+        rows: UInt32 = 0
+    ) async throws -> AttachTerminalResponsePayload {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .terminal,
+            payload: try .init(AttachTerminalQueryPayload(
+                terminalSessionID: id.description,
+                afterSequence: sequence,
+                scrollbackBytes: scrollbackBytes,
+                columns: columns,
+                rows: rows
+            ))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == AttachTerminalResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try AttachTerminalResponsePayload(protobufBytes: response.payload.protobufBytes)
+    }
+
+    public func acquireTerminalControl(id: SessionID, leaseSeconds: UInt32 = 60) async throws -> TerminalControlLeaseResultPayload {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .terminal,
+            payload: try .init(AcquireTerminalControlCommandPayload(terminalSessionID: id.description, leaseSeconds: leaseSeconds))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == TerminalControlLeaseResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try TerminalControlLeaseResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
+    public func releaseTerminalControl(id: SessionID) async throws {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .terminal,
+            payload: try .init(ReleaseTerminalControlCommandPayload(terminalSessionID: id.description))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == TerminalOperationResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        _ = try TerminalOperationResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
+    public func sendTerminalInput(id: SessionID, sequence: UInt64, input: Data) async throws -> TerminalOperationResultPayload {
+        try await terminalOperation(TerminalInputCommandPayload(terminalSessionID: id.description, sequence: sequence, input: input))
+    }
+
+    public func resizeTerminal(id: SessionID, sequence: UInt64, columns: UInt32, rows: UInt32) async throws -> TerminalOperationResultPayload {
+        try await terminalOperation(TerminalResizeCommandPayload(terminalSessionID: id.description, sequence: sequence, columns: columns, rows: rows))
+    }
+
     public func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
         let response = try await send(.init(
             messageID: UUID().uuidString,
@@ -1017,6 +1079,20 @@ public actor HostClient {
         guard nextSequence < UInt64.max else { throw Error.sequenceExhausted }
         defer { nextSequence += 1 }
         return nextSequence
+    }
+
+    private func terminalOperation(_ command: some WirePayload) async throws -> TerminalOperationResultPayload {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .terminal,
+            payload: try .init(command)
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == TerminalOperationResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try TerminalOperationResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
     private func mutateSpace(_ command: some WirePayload) async throws {

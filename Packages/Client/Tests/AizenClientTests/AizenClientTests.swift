@@ -292,6 +292,32 @@ import AizenWire
     #expect(session.tmuxSessionName == "aizen-client")
 }
 
+@Test func clientAttachesAndControlsHostOwnedTerminalSessions() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "Project", details: .hostPrivate(.init(rawValue: "local-folder:/tmp/project")))
+    let context = ExecutionContext(spaceID: space.id, kind: .localFolder, resourceID: resource.id)
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.resources.append(resource)
+        $0.executionContexts.append(context)
+    }
+    let runtime = ClientTerminalRuntime()
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, terminalRuntime: runtime)))
+    let session = try await client.createTerminalSession(spaceID: space.id, executionContextID: context.id)
+
+    let attached = try await client.attachTerminal(id: session.id, columns: 120, rows: 40)
+    #expect(attached.output == Data("ready\\n".utf8))
+    #expect(attached.sequence == 1)
+    #expect(try await client.sendTerminalInput(id: session.id, sequence: 1, input: Data("echo hi\\n".utf8)).sequence == 1)
+    #expect(try await client.resizeTerminal(id: session.id, sequence: 2, columns: 100, rows: 30).sequence == 2)
+    #expect(await runtime.inputs == [Data("echo hi\\n".utf8)])
+    #expect(await runtime.lastColumns == 100)
+    #expect(await runtime.lastRows == 30)
+}
+
 @Test func clientCreatesSpacesThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -690,6 +716,10 @@ private actor RecordingJournalCursorStore: JournalCursorStore {
 }
 
 private actor ClientTerminalRuntime: TerminalRuntime {
+    private(set) var inputs: [Data] = []
+    private(set) var lastColumns: Int?
+    private(set) var lastRows: Int?
+
     func createTerminal(
         id: SessionID,
         spaceID: SpaceID,
@@ -699,6 +729,19 @@ private actor ClientTerminalRuntime: TerminalRuntime {
         initialCommand: String?
     ) async throws -> TerminalLaunch {
         TerminalLaunch(tmuxSessionName: "aizen-client", paneID: "%1")
+    }
+
+    func sendInput(to session: TerminalSession, input: Data) async throws {
+        inputs.append(input)
+    }
+
+    func resize(session: TerminalSession, columns: Int, rows: Int) async throws {
+        lastColumns = columns
+        lastRows = rows
+    }
+
+    func captureOutput(for session: TerminalSession, maximumBytes: Int) async throws -> Data {
+        Data("ready\\n".utf8)
     }
 }
 
