@@ -369,6 +369,28 @@ public actor StorageRepository {
         }
     }
 
+    /// Verifies an invitation proof without consuming it so the Host can show only valid pairing requests.
+    public func validatePairingToken(tokenID: UUID, secret: Data, now: Date = Date()) throws {
+        enum Result { case valid, unknown, expired, rejected }
+        var result: Result = .unknown
+        _ = try transact { snapshot in
+            guard let index = snapshot.pairingTokens.firstIndex(where: { $0.tokenID == tokenID }) else { return }
+            let token = snapshot.pairingTokens[index]
+            guard token.expiresAt > now else {
+                snapshot.pairingTokens.remove(at: index)
+                result = .expired
+                return
+            }
+            result = token.proof.matches(secret) ? .valid : .rejected
+        }
+        switch result {
+        case .valid: return
+        case .unknown: throw SecurityError.pairingTokenUnknown
+        case .expired: throw SecurityError.invitationExpired
+        case .rejected: throw SecurityError.pairingTokenRejected
+        }
+    }
+
     /// Atomically consumes a valid invitation proof and makes its authorization effective.
     public func approvePairing(
         tokenID: UUID,

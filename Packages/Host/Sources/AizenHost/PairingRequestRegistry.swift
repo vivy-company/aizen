@@ -40,11 +40,12 @@ public actor PairingRequestRegistry {
         self.lifetime = lifetime
     }
 
-    public func submit(_ request: PairingRequestPayload, now: Date = Date()) throws -> PendingPairingRequest {
+    public func submit(_ request: PairingRequestPayload, now: Date = Date()) async throws -> PendingPairingRequest {
         prune(now: now)
         guard request.hostID == hostID else { throw PairingRequestError.wrongHost }
         guard request.route == ConnectionRoute.lan.rawValue else { throw PairingRequestError.unsupportedRoute }
         guard requests[request.tokenID] == nil else { throw PairingRequestError.alreadyPending }
+        try await approval.validate(tokenID: request.tokenID, secret: request.pairingSecret)
         let device = DevicePublicIdentity(
             deviceID: request.deviceID,
             displayName: request.deviceDisplayName,

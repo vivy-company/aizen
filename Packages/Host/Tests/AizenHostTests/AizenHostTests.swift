@@ -68,6 +68,12 @@ import AizenWire
     let request = PairingRequestPayload(tokenID: invitation.tokenID, pairingSecret: secret, hostID: host.hostID, deviceID: DeviceID(), deviceDisplayName: "Phone", devicePlatform: "iOS", deviceSigningPublicKey: deviceIdentity.publicIdentity().signingPublicKey, deviceKeyAgreementPublicKey: deviceIdentity.publicIdentity().keyAgreementPublicKey, route: "lan")
     let registry = PairingRequestRegistry(hostID: host.hostID, approval: approval)
 
+    let invalidProof = PairingRequestPayload(tokenID: invitation.tokenID, pairingSecret: Data(repeating: 8, count: 32), hostID: host.hostID, deviceID: request.deviceID, deviceDisplayName: request.deviceDisplayName, devicePlatform: request.devicePlatform, deviceSigningPublicKey: request.deviceSigningPublicKey, deviceKeyAgreementPublicKey: request.deviceKeyAgreementPublicKey, route: request.route)
+    await #expect(throws: SecurityError.pairingTokenRejected) {
+        try await registry.submit(invalidProof)
+    }
+    #expect(await registry.pending().isEmpty)
+
     let pending = try await registry.submit(request)
     #expect(pending.device.displayName == "Phone")
     #expect(try await storage.deviceAuthorizations().isEmpty)

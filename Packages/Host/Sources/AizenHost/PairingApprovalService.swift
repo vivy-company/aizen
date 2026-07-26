@@ -15,6 +15,11 @@ public actor PairingApprovalService {
         try await storage.issuePairingToken(PairingTokenRecord(invitation: invitation))
     }
 
+    /// Checks a QR proof before it is surfaced for local approval without consuming it.
+    public func validate(tokenID: UUID, secret: Data) async throws {
+        try await storage.validatePairingToken(tokenID: tokenID, secret: secret)
+    }
+
     public func approve(
         device: DevicePublicIdentity,
         tokenID: UUID,
