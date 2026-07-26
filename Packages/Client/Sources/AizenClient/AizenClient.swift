@@ -592,6 +592,25 @@ public actor HostClient {
         return try ReadRepositoryHistoryResponsePayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func updateRepositoryIndex(id: ResourceID, relativePaths: [String], expectedIndexRevision: String, stage: Bool) async throws -> UpdateRepositoryIndexResultPayload {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(UpdateRepositoryIndexCommandPayload(
+                resourceID: id.description,
+                relativePaths: relativePaths,
+                expectedIndexRevision: expectedIndexRevision,
+                stage: stage
+            ))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == UpdateRepositoryIndexResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try UpdateRepositoryIndexResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
         let response = try await send(.init(
             messageID: UUID().uuidString,

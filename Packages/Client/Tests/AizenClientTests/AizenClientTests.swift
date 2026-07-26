@@ -443,7 +443,8 @@ import AizenWire
     let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)")))
     _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
     let reader = ClientRepositoryStatusReader()
-    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, repositoryStatusReader: reader, repositoryDiffReader: ClientRepositoryDiffReader())))
+    let updater = ClientRepositoryIndexUpdater()
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, repositoryStatusReader: reader, repositoryDiffReader: ClientRepositoryDiffReader(), repositoryIndexUpdater: updater)))
 
     #expect(try await client.repositoryStatus(id: resource.id, maximumEntries: 1) == .init(
         resourceID: resource.id.description,
@@ -453,6 +454,15 @@ import AizenWire
         truncated: false
     ))
     #expect(try await client.repositoryDiff(id: resource.id, relativePath: "README.md", maximumBytes: 64) == .init(resourceID: resource.id.description, repositoryRevision: "revision", indexRevision: "index", unifiedDiff: Data("diff".utf8), truncated: false))
+    let update = try await client.updateRepositoryIndex(
+        id: resource.id,
+        relativePaths: ["README.md"],
+        expectedIndexRevision: String(repeating: "a", count: 64),
+        stage: true
+    )
+    #expect(update.indexRevision == String(repeating: "b", count: 64))
+    #expect(UUID(uuidString: update.operationID) != nil)
+    #expect(await updater.requestedPaths == ["README.md"])
 }
 
 @Test func clientImportsWebResourcesThroughHost() async throws {
@@ -604,6 +614,15 @@ private actor ClientRepositoryStatusReader: RepositoryStatusReading {
 private actor ClientRepositoryDiffReader: RepositoryDiffReading {
     func diff(at repositoryURL: URL, relativePath: String, maximumBytes: Int) async throws -> RepositoryDiffSnapshot {
         .init(repositoryRevision: "revision", indexRevision: "index", unifiedDiff: Data("diff".utf8), truncated: false)
+    }
+}
+
+private actor ClientRepositoryIndexUpdater: RepositoryIndexUpdating {
+    private(set) var requestedPaths: [String] = []
+
+    func updateIndex(at repositoryURL: URL, relativePaths: [String], expectedIndexRevision: String, stage: Bool) async throws -> String {
+        requestedPaths = relativePaths
+        return String(repeating: "b", count: 64)
     }
 }
 
