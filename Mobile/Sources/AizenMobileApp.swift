@@ -124,6 +124,10 @@ private struct MobileRootView: View {
                         .disabled(composer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     .padding()
+                    if pairing.activeRunID != nil {
+                        Button("Cancel active Run", role: .destructive) { Task { await pairing.cancelActiveRun() } }
+                            .padding(.bottom)
+                    }
                 }
                 .navigationTitle(pairing.sessions.first(where: { $0.id == sessionID })?.title ?? "Conversation")
             } else {

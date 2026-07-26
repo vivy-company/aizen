@@ -24,7 +24,9 @@ final class MobilePairingStore: ObservableObject {
     @Published var selectedSpaceID: SpaceID?
     @Published var selectedSessionID: SessionID?
     @Published private(set) var messages: [ConversationMessage] = []
+    @Published private(set) var activeRunID: RunID?
     private var client: HostClient?
+    private var eventsTask: Task<Void, Never>?
 
     func submit(invitationText: String) async {
         do {
@@ -77,6 +79,7 @@ final class MobilePairingStore: ObservableObject {
             self.spaces = spaces
             selectedSpaceID = spaces.first?.id
             sessions = try await client.conversations(spaceID: selectedSpaceID)
+            subscribe(to: client)
             state = .ready(hostName: pairedHost.host.displayName, spaceCount: spaces.count)
         } catch {
             state = .failed(error.localizedDescription)
@@ -114,9 +117,36 @@ final class MobilePairingStore: ObservableObject {
         guard let client, let spaceID = selectedSpaceID, let sessionID = selectedSessionID,
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         do {
-            _ = try await client.sendConversation(spaceID: spaceID, sessionID: sessionID, content: content)
+            activeRunID = try await client.sendConversation(spaceID: spaceID, sessionID: sessionID, content: content)
             messages = try await client.conversationTimeline(sessionID: sessionID)
         } catch { state = .failed(error.localizedDescription) }
+    }
+
+    func cancelActiveRun() async {
+        guard let client, let activeRunID else { return }
+        do {
+            try await client.cancelRun(id: activeRunID)
+            self.activeRunID = nil
+        } catch { state = .failed(error.localizedDescription) }
+    }
+
+    private func subscribe(to client: HostClient) {
+        eventsTask?.cancel()
+        eventsTask = Task { [weak self] in
+            guard let self else { return }
+            guard let events = try? await client.runEvents() else { return }
+            for await event in events {
+                guard !Task.isCancelled else { return }
+                guard case let .run(run) = event else { continue }
+                if run.sessionID == self.selectedSessionID, case .lifecycle(let lifecycle) = run.kind,
+                   lifecycle == .completed || lifecycle == .failed || lifecycle == .cancelled {
+                    self.activeRunID = nil
+                    if let client = self.client, let sessionID = self.selectedSessionID {
+                        self.messages = (try? await client.conversationTimeline(sessionID: sessionID)) ?? self.messages
+                    }
+                }
+            }
+        }
     }
 }
 
