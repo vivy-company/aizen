@@ -1,4 +1,5 @@
 import AizenCore
+import AppKit
 import SwiftUI
 
 /// A complete Mac Client path for projectless Reignition conversations.
@@ -66,6 +67,22 @@ struct ReignitionConversationWindow: View {
         if let conversationID = store.selectedConversationID,
             let conversation = store.conversations.first(where: { $0.id == conversationID }) {
             VStack(spacing: 0) {
+                HStack {
+                    if let resource = store.folderResource(for: conversation) {
+                        Label(resource.title, systemImage: "folder")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Label("No folder attached", systemImage: "folder")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    folderMenu(for: conversation)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                Divider()
                 List(store.messages) { message in
                     VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
                         Text(message.role.rawValue.capitalized)
@@ -134,5 +151,35 @@ struct ReignitionConversationWindow: View {
         newConversationTitle = ""
         guard !title.isEmpty else { return }
         Task { await store.createConversation(spaceID: selectedSpaceID, title: title) }
+    }
+
+    @ViewBuilder
+    private func folderMenu(for conversation: Session) -> some View {
+        Menu("Attach Folder", systemImage: "folder.badge.plus") {
+            let folderResources = store.resources.filter { $0.kind == .folder }
+            if !folderResources.isEmpty {
+                Section("Existing Folders") {
+                    ForEach(folderResources) { resource in
+                        Button(resource.title) {
+                            Task { await store.attach(resourceID: resource.id, to: conversation.id) }
+                        }
+                    }
+                }
+            }
+            Button("Choose Folder\u{2026}") {
+                chooseFolder(for: conversation.id)
+            }
+        }
+        .disabled(store.isSynchronizing)
+    }
+
+    private func chooseFolder(for sessionID: SessionID) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Attach Folder"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task { await store.importAndAttachFolder(at: url, to: sessionID) }
     }
 }

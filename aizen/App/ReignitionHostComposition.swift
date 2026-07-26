@@ -64,6 +64,26 @@ actor ReignitionHostComposition {
         try await client.conversations(spaceID: spaceID)
     }
 
+    func resources(spaceID: SpaceID? = nil) async throws -> [Resource] {
+        try await client.resources(spaceID: spaceID)
+    }
+
+    func executionContexts(spaceID: SpaceID? = nil) async throws -> [ExecutionContext] {
+        try await client.executionContexts(spaceID: spaceID)
+    }
+
+    func importLocalFolder(spaceID: SpaceID, path: String, title: String?) async throws -> ResourceID {
+        try await client.importLocalFolder(spaceID: spaceID, path: path, title: title)
+    }
+
+    func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
+        try await client.createLocalFolderContext(spaceID: spaceID, resourceID: resourceID)
+    }
+
+    func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {
+        try await client.attachExecutionContext(sessionID: sessionID, contextID: contextID)
+    }
+
     func conversationTimeline(sessionID: SessionID) async throws -> [ConversationMessage] {
         try await client.conversationTimeline(sessionID: sessionID)
     }

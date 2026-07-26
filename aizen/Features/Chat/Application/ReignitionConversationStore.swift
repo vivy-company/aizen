@@ -8,6 +8,8 @@ import Foundation
 final class ReignitionConversationStore: ObservableObject {
     @Published private(set) var spaces: [Space] = []
     @Published private(set) var conversations: [Session] = []
+    @Published private(set) var resources: [Resource] = []
+    @Published private(set) var executionContexts: [ExecutionContext] = []
     @Published private(set) var selectedConversationID: SessionID?
     @Published private(set) var messages: [ConversationMessage] = []
     @Published private(set) var activeRunLifecycles: [RunID: RunLifecycle] = [:]
@@ -39,13 +41,7 @@ final class ReignitionConversationStore: ObservableObject {
 
     func refresh(spaceID: SpaceID? = nil) async {
         await perform {
-            let conversations = try await self.host.conversations(spaceID: spaceID)
-            self.conversations = conversations
-            if let selectedConversationID = self.selectedConversationID,
-                !conversations.contains(where: { $0.id == selectedConversationID }) {
-                self.selectedConversationID = nil
-                self.messages = []
-            }
+            try await self.refreshProjection(spaceID: spaceID)
         }
     }
 
@@ -59,8 +55,9 @@ final class ReignitionConversationStore: ObservableObject {
     func createConversation(spaceID: SpaceID, title: String) async {
         await perform {
             let sessionID = try await self.host.createConversation(spaceID: spaceID, title: title)
-            self.conversations = try await self.host.conversations(spaceID: spaceID)
-            await self.select(sessionID)
+            try await self.refreshProjection(spaceID: spaceID)
+            self.selectedConversationID = sessionID
+            self.messages = try await self.host.conversationTimeline(sessionID: sessionID)
         }
     }
 
@@ -71,6 +68,35 @@ final class ReignitionConversationStore: ObservableObject {
         await perform {
             _ = try await self.host.sendConversation(spaceID: session.spaceID, sessionID: sessionID, content: content)
             self.messages = try await self.host.conversationTimeline(sessionID: sessionID)
+        }
+    }
+
+    func attach(resourceID: ResourceID, to sessionID: SessionID) async {
+        guard let session = conversations.first(where: { $0.id == sessionID }),
+            let resource = resources.first(where: { $0.id == resourceID && $0.spaceID == session.spaceID }) else { return }
+        await perform {
+            let contextID: ExecutionContextID
+            if let existing = self.executionContexts.first(where: { $0.resourceID == resource.id }) {
+                contextID = existing.id
+            } else {
+                contextID = try await self.host.createLocalFolderContext(spaceID: session.spaceID, resourceID: resource.id)
+            }
+            try await self.host.attachExecutionContext(sessionID: session.id, contextID: contextID)
+            try await self.refreshProjection(spaceID: session.spaceID)
+        }
+    }
+
+    func importAndAttachFolder(at url: URL, to sessionID: SessionID) async {
+        guard let session = conversations.first(where: { $0.id == sessionID }) else { return }
+        await perform {
+            let resourceID = try await self.host.importLocalFolder(
+                spaceID: session.spaceID,
+                path: url.path,
+                title: url.lastPathComponent
+            )
+            let contextID = try await self.host.createLocalFolderContext(spaceID: session.spaceID, resourceID: resourceID)
+            try await self.host.attachExecutionContext(sessionID: session.id, contextID: contextID)
+            try await self.refreshProjection(spaceID: session.spaceID)
         }
     }
 
@@ -88,9 +114,30 @@ final class ReignitionConversationStore: ObservableObject {
         return activeRunIDs.compactMap { assistantTextByRun[$0] }.joined().nonEmpty
     }
 
+    func folderResource(for session: Session) -> Resource? {
+        guard let contextID = session.executionContextID,
+            let resourceID = executionContexts.first(where: { $0.id == contextID })?.resourceID else { return nil }
+        return resources.first(where: { $0.id == resourceID })
+    }
+
     private func refreshTimeline(sessionID: SessionID) async {
         await perform {
             self.messages = try await self.host.conversationTimeline(sessionID: sessionID)
+        }
+    }
+
+    private func refreshProjection(spaceID: SpaceID?) async throws {
+        async let conversations = host.conversations(spaceID: spaceID)
+        async let resources = host.resources(spaceID: spaceID)
+        async let executionContexts = host.executionContexts(spaceID: spaceID)
+        let (loadedConversations, loadedResources, loadedContexts) = try await (conversations, resources, executionContexts)
+        self.conversations = loadedConversations
+        self.resources = loadedResources
+        self.executionContexts = loadedContexts
+        if let selectedConversationID,
+            !loadedConversations.contains(where: { $0.id == selectedConversationID }) {
+            self.selectedConversationID = nil
+            messages = []
         }
     }
 
