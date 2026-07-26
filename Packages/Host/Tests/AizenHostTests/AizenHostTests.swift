@@ -1646,6 +1646,25 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(try await storage.load().operations.first?.lifecycle == .completed)
 }
 
+@Test func hostCancelsRunningXcodeBuildOperations() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder.appendingPathComponent("App.xcodeproj"), withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Xcode")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "folder", details: .hostPrivate(.init(rawValue: "local-folder:\(folder.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let builder = ControlledXcodeProjectBuilder()
+    let host = LocalHost(storage: storage, xcodeProjectInspector: StaticXcodeProjectInspector(schemes: ["App"]), xcodeProjectBuilder: builder)
+    let buildResponse = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(BuildXcodeProjectCommandPayload(resourceID: resource.id.description, projectID: "App.xcodeproj", scheme: "App", destination: "platform=macOS"))))
+    let build = try BuildXcodeProjectResultPayload(protobufBytes: buildResponse.payload.protobufBytes)
+    let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 2, kind: .command, channel: .state, payload: try .init(CancelOperationCommandPayload(operationID: build.operationID))))
+    #expect(try CancelOperationResultPayload(protobufBytes: response.payload.protobufBytes).operationID == build.operationID)
+    #expect(await builder.didCancel)
+    #expect(try await storage.load().operations.first?.lifecycle == .cancelled)
+}
+
 private actor RecordingRuntime: RunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
@@ -1758,17 +1777,32 @@ private struct StaticXcodeProjectInspector: XcodeProjectInspecting {
     func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { schemes }
 }
 
-private actor ControlledXcodeProjectBuilder: XcodeProjectBuilding {
+private actor ControlledXcodeProjectBuilder: XcodeProjectBuilding, XcodeBuildRunning {
     private(set) var projectURL: URL?
-    private var continuation: CheckedContinuation<Void, Never>?
+    private(set) var didCancel = false
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var completed = false
 
-    func buildXcodeProject(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws {
+    func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws -> any XcodeBuildRunning {
         projectURL = url
-        await withCheckedContinuation { continuation = $0 }
+        return self
+    }
+
+    func waitForCompletion() async throws {
+        if completed { return }
+        if didCancel { throw CancellationError() }
+        try await withCheckedThrowingContinuation { continuation = $0 }
     }
 
     func complete() {
+        completed = true
         continuation?.resume()
+        continuation = nil
+    }
+
+    func cancel() {
+        didCancel = true
+        continuation?.resume(throwing: CancellationError())
         continuation = nil
     }
 }

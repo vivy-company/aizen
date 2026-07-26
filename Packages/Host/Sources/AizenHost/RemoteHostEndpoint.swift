@@ -155,6 +155,10 @@ public struct RemoteHostEndpoint: WireEndpoint {
             let request = try BuildXcodeProjectCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let resource = try await requiredResource(request.resourceID)
             return .init(capability: .xcodeBuild, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil)
+        case CancelOperationCommandPayload.identifier:
+            let request = try CancelOperationCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let operation = try await requiredOperation(request.operationID)
+            return .init(capability: .xcodeBuild, spaceID: operation.spaceID, resourceID: operation.resourceID, rateLimitKind: nil)
         case ListExecutionContextsQueryPayload.identifier:
             let request = try ListExecutionContextsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             if let rawResourceID = request.resourceID {
@@ -334,6 +338,15 @@ public struct RemoteHostEndpoint: WireEndpoint {
             throw RemoteHostAuthorizationError.malformedReference(rawID)
         }
         return resource
+    }
+
+    private func requiredOperation(_ rawID: String) async throws -> AizenCore.Operation {
+        guard let value = UUID(uuidString: rawID) else { throw RemoteHostAuthorizationError.malformedReference(rawID) }
+        let id = OperationID(rawValue: value)
+        guard let operation = try await storage.load().operations.first(where: { $0.id == id }) else {
+            throw RemoteHostAuthorizationError.malformedReference(rawID)
+        }
+        return operation
     }
 
     private func requiredExecutionContext(_ rawID: String) async throws -> ExecutionContext {

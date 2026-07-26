@@ -180,8 +180,13 @@ public protocol XcodeProjectInspecting: Sendable {
     func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String]
 }
 
+public protocol XcodeBuildRunning: Sendable {
+    func waitForCompletion() async throws
+    func cancel() async
+}
+
 public protocol XcodeProjectBuilding: Sendable {
-    func buildXcodeProject(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws
+    func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws -> any XcodeBuildRunning
 }
 
 /// Explicit local Host composition. It owns Storage but exposes only Wire envelopes and Core snapshots.
@@ -210,6 +215,7 @@ public actor LocalHost: WireEndpoint {
     private let xcodeProjectInspector: (any XcodeProjectInspecting)?
     private let xcodeProjectBuilder: (any XcodeProjectBuilding)?
     private let contextFiles: ExecutionContextFileService
+    private var xcodeBuilds: [OperationID: any XcodeBuildRunning] = [:]
 
     public init(
         storage: StorageRepository,
@@ -303,6 +309,8 @@ public actor LocalHost: WireEndpoint {
                 OpenXcodeProjectResultPayload.identifier,
                 BuildXcodeProjectCommandPayload.identifier,
                 BuildXcodeProjectResultPayload.identifier,
+                CancelOperationCommandPayload.identifier,
+                CancelOperationResultPayload.identifier,
                 ListExecutionContextsQueryPayload.identifier,
                 ListExecutionContextsResponsePayload.identifier,
                 ListTerminalSessionsQueryPayload.identifier,
@@ -493,19 +501,35 @@ public actor LocalHost: WireEndpoint {
             payload = try await executeDurably(envelope: envelope, spaceID: resource.spaceID) {
                 guard let project = try await self.xcodeProject(for: resource), project.id == command.projectID, project.schemes.contains(command.scheme),
                       let directory = try Self.localResourceDirectory(for: resource) else { throw HostProtocolError.unknownResource(resourceID) }
-                let operation = Operation(spaceID: resource.spaceID, lifecycle: .running, progress: 0)
+                let operation = Operation(spaceID: resource.spaceID, resourceID: resource.id, lifecycle: .running, progress: 0)
                 _ = try await self.storage.transact { $0.operations.append(operation) }
-                Task { [weak self, xcodeProjectBuilder] in
+                let build = try await xcodeProjectBuilder.startXcodeProjectBuild(
+                    at: directory.appendingPathComponent(project.id),
+                    kind: project.kind,
+                    scheme: command.scheme,
+                    destination: command.destination
+                )
+                self.xcodeBuilds[operation.id] = build
+                Task { [weak self] in
                     await self?.runXcodeProjectBuild(
                         operationID: operation.id,
-                        projectURL: directory.appendingPathComponent(project.id),
-                        kind: project.kind,
-                        scheme: command.scheme,
-                        destination: command.destination,
-                        builder: xcodeProjectBuilder
+                        build: build
                     )
                 }
                 return try TypedPayload(BuildXcodeProjectResultPayload(operationID: operation.id.description))
+            }
+            kind = .commandResult
+        case .command where envelope.payload.identifier == CancelOperationCommandPayload.identifier:
+            let command = try CancelOperationCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let operationID = try Self.operationID(from: command.operationID)
+            payload = try await executeDurably(envelope: envelope, spaceID: nil) {
+                guard let build = self.xcodeBuilds[operationID] else { throw HostProtocolError.unknownOperation(operationID) }
+                await build.cancel()
+                _ = try await self.storage.transact { snapshot in
+                    guard let index = snapshot.operations.firstIndex(where: { $0.id == operationID }), snapshot.operations[index].lifecycle == .running else { return }
+                    snapshot.operations[index].lifecycle = .cancelled
+                }
+                return try TypedPayload(CancelOperationResultPayload(operationID: operationID.description))
             }
             kind = .commandResult
         case .query where envelope.payload.identifier == ListExecutionContextsQueryPayload.identifier:
@@ -1357,26 +1381,25 @@ public actor LocalHost: WireEndpoint {
 
     private func runXcodeProjectBuild(
         operationID: OperationID,
-        projectURL: URL,
-        kind: XcodeProjectDescriptor.Kind,
-        scheme: String,
-        destination: String,
-        builder: any XcodeProjectBuilding
+        build: any XcodeBuildRunning
     ) async {
         do {
-            try await builder.buildXcodeProject(at: projectURL, kind: kind, scheme: scheme, destination: destination)
+            try await build.waitForCompletion()
             _ = try await storage.transact { snapshot in
                 guard let index = snapshot.operations.firstIndex(where: { $0.id == operationID }) else { return }
+                guard snapshot.operations[index].lifecycle == .running else { return }
                 snapshot.operations[index].lifecycle = .completed
                 snapshot.operations[index].progress = 1
             }
         } catch {
             _ = try? await storage.transact { snapshot in
                 guard let index = snapshot.operations.firstIndex(where: { $0.id == operationID }) else { return }
+                guard snapshot.operations[index].lifecycle == .running else { return }
                 snapshot.operations[index].lifecycle = .failed
                 snapshot.operations[index].failureDescription = error.localizedDescription
             }
         }
+        xcodeBuilds.removeValue(forKey: operationID)
     }
 
     private func xcodeProject(for resource: Resource) async throws -> XcodeProjectDescriptor? {
@@ -1477,6 +1500,7 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case unknownRun(RunID)
     case unknownResource(ResourceID)
     case unknownExecutionContext(ExecutionContextID)
+    case unknownOperation(OperationID)
     case duplicateTerminalSession(SessionID)
     case duplicateResource(ResourceID)
     case resourceInUse(ResourceID)
@@ -1505,6 +1529,8 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
             .unknownResource
         case .unknownExecutionContext:
             .unknownExecutionContext
+        case .unknownOperation:
+            .unknownOperation
         case .duplicateTerminalSession, .duplicateResource, .resourceInUse, .executionContextInUse, .commandIDConflict, .spaceNotEmpty:
             .conflict
         case .commandIncomplete:
