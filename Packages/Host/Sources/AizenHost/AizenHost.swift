@@ -155,7 +155,7 @@ public actor LocalHost: WireEndpoint {
             payload = try TypedPayload(SnapshotResponsePayload(
                 scope: request.scope,
                 cursor: snapshot.journalEvents.last?.cursor ?? 0,
-                snapshot: JSONEncoder().encode(snapshot)
+                snapshot: JSONEncoder().encode(Self.clientProjection(from: snapshot))
             ))
         case .query where envelope.payload.identifier == ReadJournalEventsQueryPayload.identifier:
             let query = try ReadJournalEventsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
@@ -629,6 +629,19 @@ public actor LocalHost: WireEndpoint {
             channel: .state,
             correlationID: envelope.correlationID,
             payload: payload
+        )
+    }
+
+    private static func clientProjection(from snapshot: StorageSnapshot) -> HostProjectionSnapshot {
+        HostProjectionSnapshot(
+            spaces: snapshot.spaces,
+            sessions: snapshot.sessions,
+            resources: snapshot.resources.map {
+                Resource(id: $0.id, spaceID: $0.spaceID, kind: $0.kind, title: $0.title)
+            },
+            executionContexts: snapshot.executionContexts.map {
+                ExecutionContext(id: $0.id, spaceID: $0.spaceID, kind: $0.kind, resourceID: $0.resourceID)
+            }
         )
     }
 

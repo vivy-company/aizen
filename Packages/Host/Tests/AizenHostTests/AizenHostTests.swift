@@ -243,16 +243,25 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     return AuthenticatedRemoteSession(connectionID: binding.connectionID, deviceID: deviceID, route: .lan, binding: binding, keys: keys)
 }
 
-@Test func localHostReturnsTheStorageSnapshotThroughWire() async throws {
+@Test func localHostReturnsTheClientProjectionSnapshotThroughWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
     let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
-    _ = try await storage.transact { $0.spaces.append(.init(name: "Vivy")) }
+    let space = Space(name: "Vivy")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:/private/repository")))
+    let context = ExecutionContext(spaceID: space.id, kind: .repositoryCheckout, resourceID: resource.id, hostReference: .init(rawValue: "local-checkout:/private/repository"))
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.resources.append(resource)
+        $0.executionContexts.append(context)
+    }
     let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
     let response = try await transport.send(.init(messageID: "spaces", connectionSequence: 1, kind: .query, channel: .state, payload: try .init(SnapshotRequestPayload())))
     let wireSnapshot = try SnapshotResponsePayload(protobufBytes: response.payload.protobufBytes)
-    let snapshot = try JSONDecoder().decode(StorageSnapshot.self, from: wireSnapshot.snapshot)
+    let snapshot = try JSONDecoder().decode(HostProjectionSnapshot.self, from: wireSnapshot.snapshot)
     #expect(snapshot.spaces.map(\.name) == ["Vivy"])
+    #expect(snapshot.resources.first?.details == .some(.none))
+    #expect(snapshot.executionContexts.first?.hostReference == nil)
 }
 
 @Test func localHostReplaysJournalEventsOrRequiresASnapshot() async throws {

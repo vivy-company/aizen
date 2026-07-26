@@ -317,6 +317,29 @@ public struct ExecutionContext: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+/// The client-safe, recoverable portion of Host state.
+///
+/// Storage may retain additional operational and security records, but clients rebuild feature
+/// projections only from these stable domain snapshots.
+public struct HostProjectionSnapshot: Codable, Sendable, Hashable {
+    public let spaces: [Space]
+    public let sessions: [Session]
+    public let resources: [Resource]
+    public let executionContexts: [ExecutionContext]
+
+    public init(
+        spaces: [Space] = [],
+        sessions: [Session] = [],
+        resources: [Resource] = [],
+        executionContexts: [ExecutionContext] = []
+    ) {
+        self.spaces = spaces
+        self.sessions = sessions
+        self.resources = resources
+        self.executionContexts = executionContexts
+    }
+}
+
 /// Host-owned metadata for a persistent terminal runtime. The tmux identity is opaque to clients;
 /// they use it only when asking the host/platform adapter to attach.
 public struct TerminalSession: Codable, Sendable, Hashable, Identifiable {

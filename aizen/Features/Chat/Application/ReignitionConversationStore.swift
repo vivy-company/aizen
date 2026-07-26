@@ -1,6 +1,5 @@
 import AizenCore
 import AizenClient
-import AizenStorage
 import AizenWire
 import Combine
 import Foundation
@@ -240,8 +239,8 @@ final class ReignitionConversationStore: ObservableObject {
 
     /// Recovery always begins from one Host consistency point; no UI projection reads Storage directly.
     private func recoverProjection(spaceID: SpaceID?) async throws {
-        let response = try await host.snapshot()
-        let snapshot = try JSONDecoder().decode(StorageSnapshot.self, from: response.snapshot)
+        let response = try await host.projectionSnapshot()
+        let snapshot = response.snapshot
         spaces = snapshot.spaces
         conversations = snapshot.sessions.filter { $0.kind == .conversation && (spaceID == nil || $0.spaceID == spaceID) }
         resources = snapshot.resources.filter { spaceID == nil || $0.spaceID == spaceID }

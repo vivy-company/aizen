@@ -56,8 +56,8 @@ actor ReignitionHostComposition {
         await client.connectionState
     }
 
-    func snapshot() async throws -> SnapshotResponsePayload {
-        try await client.snapshot()
+    func projectionSnapshot() async throws -> HostProjectionSnapshotResponse {
+        try await client.projectionSnapshot()
     }
 
     func journalEvents(after cursor: UInt64) async throws -> ReadJournalEventsResponsePayload {

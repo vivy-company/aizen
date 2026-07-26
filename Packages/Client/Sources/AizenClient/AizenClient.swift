@@ -35,6 +35,17 @@ public struct SpaceProjection: Sendable, Hashable {
     }
 }
 
+/// A Host consistency point used to recover Client feature projections after reconnecting.
+public struct HostProjectionSnapshotResponse: Sendable, Hashable {
+    public let cursor: UInt64
+    public let snapshot: HostProjectionSnapshot
+
+    public init(cursor: UInt64, snapshot: HostProjectionSnapshot) {
+        self.cursor = cursor
+        self.snapshot = snapshot
+    }
+}
+
 // MARK: - Journal synchronization
 
 public protocol JournalCursorStore: Sendable {
@@ -274,7 +285,12 @@ public actor HostClient {
         return try SnapshotResponsePayload(protobufBytes: response.payload.protobufBytes)
     }
 
-    /// Returns the Storage-owned snapshot representation without exposing Wire payload types to UI clients.
+    public func projectionSnapshot(scope: String = "host") async throws -> HostProjectionSnapshotResponse {
+        let response = try await snapshot(scope: scope)
+        return try .init(cursor: response.cursor, snapshot: JSONDecoder().decode(HostProjectionSnapshot.self, from: response.snapshot))
+    }
+
+    /// Returns the Host projection bytes for compatibility with clients that own their decoding.
     public func snapshotData(scope: String = "host") async throws -> Data {
         try await snapshot(scope: scope).snapshot
     }
