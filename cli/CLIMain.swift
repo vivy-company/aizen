@@ -90,8 +90,10 @@ struct AizenCLI {
         case "status":
             try await handleStatus(subArgs)
         case "attach":
+            printError("`attach` is deprecated; use `aizen terminal attach` in 2.0.0.")
             try await handleAttach(subArgs)
         case "sessions":
+            printError("`sessions` is deprecated; use `aizen terminal list` in 2.0.0.")
             try await handleSessions(subArgs)
         case "terminal":
             try await handleTerminal(subArgs)
