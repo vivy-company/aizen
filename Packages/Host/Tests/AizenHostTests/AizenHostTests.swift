@@ -1220,6 +1220,50 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     ))
 }
 
+@Test func hostReturnsBoundedStructuredRepositoryStatusThroughWire() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Repository")
+    let resource = Resource(
+        spaceID: space.id,
+        kind: .repository,
+        title: "Repository",
+        details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)"))
+    )
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.resources.append(resource)
+    }
+    let reader = StaticRepositoryStatusReader(snapshot: .init(
+        repositoryRevision: "repository-revision",
+        indexRevision: "index-revision",
+        entries: [.init(path: "Sources/App.swift", indexStatus: "M", worktreeStatus: " ")],
+        truncated: false
+    ))
+    let host = LocalHost(storage: storage, repositoryStatusReader: reader)
+
+    let response = try await host.receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ReadRepositoryStatusQueryPayload(resourceID: resource.id.description, maximumEntries: 1))
+    ))
+
+    #expect(try ReadRepositoryStatusResponsePayload(protobufBytes: response.payload.protobufBytes) == .init(
+        resourceID: resource.id.description,
+        repositoryRevision: "repository-revision",
+        indexRevision: "index-revision",
+        entries: [.init(path: "Sources/App.swift", indexStatus: "M", worktreeStatus: " ")],
+        truncated: false
+    ))
+    #expect(await reader.requestedURL == repository)
+    #expect(await reader.requestedMaximumEntries == 1)
+}
+
 @Test func localHostListsExecutionContextFilesThroughTypedWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1420,6 +1464,22 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
 private actor RecordingRuntime: RunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
+}
+
+private actor StaticRepositoryStatusReader: RepositoryStatusReading {
+    private let snapshot: RepositoryStatusSnapshot
+    private(set) var requestedURL: URL?
+    private(set) var requestedMaximumEntries: Int?
+
+    init(snapshot: RepositoryStatusSnapshot) {
+        self.snapshot = snapshot
+    }
+
+    func status(at repositoryURL: URL, maximumEntries: Int) async throws -> RepositoryStatusSnapshot {
+        requestedURL = repositoryURL
+        requestedMaximumEntries = maximumEntries
+        return snapshot
+    }
 }
 
 private actor RecordingLinkedWorktrees: LinkedWorktreeCreating {
