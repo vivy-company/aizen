@@ -44,6 +44,7 @@ public enum RunIdentity: DomainIDKind {}
 public enum OperationIdentity: DomainIDKind {}
 public enum ArtifactIdentity: DomainIDKind {}
 public enum CommandIdentity: DomainIDKind {}
+public enum PermissionRequestIdentity: DomainIDKind {}
 
 public typealias AccountID = DomainID<AccountIdentity>
 public typealias HostID = DomainID<HostIdentity>
@@ -57,6 +58,7 @@ public typealias RunID = DomainID<RunIdentity>
 public typealias OperationID = DomainID<OperationIdentity>
 public typealias ArtifactID = DomainID<ArtifactIdentity>
 public typealias CommandID = DomainID<CommandIdentity>
+public typealias PermissionRequestID = DomainID<PermissionRequestIdentity>
 
 /// An opaque identifier to a secret or platform credential held outside Core and Storage snapshots.
 public struct SecureReferenceID: RawRepresentable, Codable, Sendable, Hashable {
@@ -215,6 +217,29 @@ public enum ConversationMessageRole: String, Codable, Sendable, Hashable {
     case assistant
     case system
     case tool
+}
+
+/// A Host-owned approval request. The payload is deliberately compact and client-safe; ACP-specific
+/// request details stay in the macOS runtime that owns the suspended continuation.
+public struct PendingPermissionRequest: Codable, Sendable, Hashable, Identifiable {
+    public let id: PermissionRequestID
+    public let spaceID: SpaceID
+    public let sessionID: SessionID
+    public let runID: RunID
+    public let title: String
+    public let detail: String
+    public let options: [Option]
+
+    public struct Option: Codable, Sendable, Hashable, Identifiable {
+        public let id: String
+        public let title: String
+        public init(id: String, title: String) { self.id = id; self.title = title }
+    }
+
+    public init(id: PermissionRequestID = .init(), spaceID: SpaceID, sessionID: SessionID, runID: RunID, title: String, detail: String, options: [Option]) {
+        precondition(!title.isEmpty && !detail.isEmpty && !options.isEmpty, "Permission requests need content and options")
+        self.id = id; self.spaceID = spaceID; self.sessionID = sessionID; self.runID = runID; self.title = title; self.detail = detail; self.options = options
+    }
 }
 
 /// Canonical durable turn content. Streaming deltas remain Client state until committed as a message.
