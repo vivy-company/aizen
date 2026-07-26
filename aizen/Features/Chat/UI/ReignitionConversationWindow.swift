@@ -15,6 +15,7 @@ struct ReignitionConversationWindow: View {
     @State private var newSpaceName = ""
     @State private var contextCreation: ReignitionContextCreation?
     @State private var terminalPresentation: AizenCore.TerminalSession?
+    @State private var fileBrowserContext: ExecutionContext?
 
     init(host: ReignitionHostComposition) {
         _store = StateObject(wrappedValue: ReignitionConversationStore(host: host))
@@ -88,6 +89,9 @@ struct ReignitionConversationWindow: View {
         .sheet(item: $terminalPresentation) { terminal in
             ReignitionTerminalSheet(terminal: terminal)
         }
+        .sheet(item: $fileBrowserContext) { context in
+            ReignitionContextFilesSheet(store: store, context: context)
+        }
     }
 
     @ViewBuilder
@@ -116,6 +120,12 @@ struct ReignitionConversationWindow: View {
                     Spacer()
                     Button("Open Terminal", systemImage: "terminal") {
                         openTerminal(for: conversation.id)
+                    }
+                    .disabled(conversation.executionContextID == nil || store.isSynchronizing)
+                    Button("Browse Files", systemImage: "folder") {
+                        fileBrowserContext = conversation.executionContextID.flatMap { id in
+                            store.executionContexts.first(where: { $0.id == id })
+                        }
                     }
                     .disabled(conversation.executionContextID == nil || store.isSynchronizing)
                     folderMenu(for: conversation)
@@ -374,6 +384,54 @@ struct ReignitionConversationWindow: View {
 
     private func repositoryStateColor(_ state: RefreshRepositoryResourceResultPayload) -> Color {
         state.availability == .available ? .secondary : .orange
+    }
+}
+
+private struct ReignitionContextFilesSheet: View {
+    @ObservedObject var store: ReignitionConversationStore
+    let context: ExecutionContext
+    @State private var relativePath = ""
+
+    var body: some View {
+        NavigationStack {
+            List(store.contextFiles) { entry in
+                if entry.isDirectory {
+                    Button {
+                        relativePath = entry.relativePath
+                    } label: {
+                        Label(entry.name, systemImage: "folder")
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Label(entry.name, systemImage: "doc")
+                }
+            }
+            .overlay {
+                if store.contextFiles.isEmpty && !store.isSynchronizing {
+                    ContentUnavailableView("No Files", systemImage: "folder")
+                }
+            }
+            .navigationTitle(relativePath.isEmpty ? "Files" : relativePath)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    if !relativePath.isEmpty {
+                        Button("Back", systemImage: "chevron.left") {
+                            relativePath = String(relativePath.split(separator: "/").dropLast().joined(separator: "/"))
+                        }
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Refresh", systemImage: "arrow.clockwise") {
+                        Task { await store.loadContextFiles(contextID: context.id, relativePath: relativePath) }
+                    }
+                    .disabled(store.isSynchronizing)
+                }
+            }
+            .task(id: relativePath) {
+                await store.loadContextFiles(contextID: context.id, relativePath: relativePath)
+            }
+        }
+        .frame(minWidth: 380, minHeight: 440)
     }
 }
 

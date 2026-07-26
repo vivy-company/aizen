@@ -88,6 +88,18 @@ actor ReignitionHostComposition {
         try await client.executionContexts(spaceID: spaceID)
     }
 
+    func contextFiles(
+        executionContextID: ExecutionContextID,
+        relativePath: String = "",
+        includeHidden: Bool = false
+    ) async throws -> [ContextFileEntry] {
+        try await client.contextFiles(
+            executionContextID: executionContextID,
+            relativePath: relativePath,
+            includeHidden: includeHidden
+        )
+    }
+
     func importLocalFolder(spaceID: SpaceID, path: String, title: String?) async throws -> ResourceID {
         try await client.importLocalFolder(spaceID: spaceID, path: path, title: title)
     }
