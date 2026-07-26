@@ -1,6 +1,5 @@
 import AizenCore
 import Foundation
-import CoreData
 import Darwin
 
 @MainActor
@@ -746,18 +745,6 @@ private extension AizenCLI {
 }
 
 private extension AizenCLI {
-    static func defaultCloneDestination() -> String {
-        if let stored = readDefaultSetting(key: "defaultCloneLocation") {
-            return stored
-        }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return (home as NSString).appendingPathComponent(".aizen/repos")
-    }
-
-    static func ensureDirectoryExists(_ path: String) throws {
-        try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
-    }
-
     static func isRemoteURL(_ value: String) -> Bool {
         if value.contains("://") {
             return true
@@ -765,21 +752,6 @@ private extension AizenCLI {
         if value.hasPrefix("git@"){ return true }
         if value.contains(":") && value.contains("@"){ return true }
         return false
-    }
-
-    static func ensureAizenGitignore(at repoPath: String) throws {
-        let gitignorePath = (repoPath as NSString).appendingPathComponent(".gitignore")
-        let entry = ".aizen/"
-        if FileManager.default.fileExists(atPath: gitignorePath) {
-            let contents = (try? String(contentsOfFile: gitignorePath, encoding: .utf8)) ?? ""
-            if contents.split(separator: "\n").contains(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines) == entry }) {
-                return
-            }
-            let updated = contents.hasSuffix("\n") || contents.isEmpty ? contents + entry + "\n" : contents + "\n" + entry + "\n"
-            try updated.write(toFile: gitignorePath, atomically: true, encoding: .utf8)
-        } else {
-            try (entry + "\n").write(toFile: gitignorePath, atomically: true, encoding: .utf8)
-        }
     }
 
     static func openApp(path: String? = nil) throws {
@@ -816,290 +788,11 @@ private extension AizenCLI {
 }
 
 private extension AizenCLI {
-    static func fetchWorkspaces(in context: NSManagedObjectContext) throws -> [Workspace] {
-        let request: NSFetchRequest<Workspace> = Workspace.fetchRequest()
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Workspace.order, ascending: true)]
-        return try context.fetch(request)
-    }
-
-    static func fetchWorkspaces(in context: NSManagedObjectContext, filters: WorkspaceFilters) throws -> [Workspace] {
-        let all = try fetchWorkspaces(in: context)
-        let includeList = filters.includeWorkspaces
-        let excludeList = filters.excludeWorkspaces
-        let include = Set(includeList.map { $0.lowercased() })
-        let exclude = Set(excludeList.map { $0.lowercased() })
-
-        for name in includeList {
-            if !all.contains(where: { ($0.name ?? "").lowercased() == name.lowercased() }) {
-                throw CLIError.workspaceNotFound(name)
-            }
-        }
-        for name in excludeList {
-            if !all.contains(where: { ($0.name ?? "").lowercased() == name.lowercased() }) {
-                throw CLIError.workspaceNotFound(name)
-            }
-        }
-
-        let nameContains = filters.nameContains?.lowercased()
-        return all.filter { workspace in
-            let name = (workspace.name ?? "")
-            let lower = name.lowercased()
-            if !include.isEmpty && !include.contains(lower) {
-                return false
-            }
-            if exclude.contains(lower) {
-                return false
-            }
-            if let nameContains = nameContains, !name.lowercased().contains(nameContains) {
-                return false
-            }
-            return true
-        }
-    }
-
-    static func findWorkspace(named name: String, in context: NSManagedObjectContext) -> Workspace? {
-        let request: NSFetchRequest<Workspace> = Workspace.fetchRequest()
-        request.predicate = NSPredicate(format: "name ==[c] %@", name)
-        request.fetchLimit = 1
-        return try? context.fetch(request).first
-    }
-
-    static func selectWorkspace(
-        in context: NSManagedObjectContext,
-        preferredName: String?,
-        defaultWorkspaceId: String?
-    ) throws -> Workspace {
-        let workspaces = try fetchWorkspaces(in: context)
-        if workspaces.isEmpty {
-            let manager = CLIRepositoryManager(context: context)
-            return try manager.createWorkspace(name: "Personal")
-        }
-
-        if let preferredName = preferredName {
-            if let workspace = findWorkspace(named: preferredName, in: context) {
-                return workspace
-            }
-            throw CLIError.workspaceNotFound(preferredName)
-        }
-
-        if let defaultWorkspaceId = defaultWorkspaceId,
-           let uuid = UUID(uuidString: defaultWorkspaceId) {
-            if let workspace = workspaces.first(where: { $0.id == uuid }) {
-                return workspace
-            }
-        }
-
-        if workspaces.count == 1 {
-            return workspaces[0]
-        }
-
-        guard isTTY() else {
-            throw CLIError.invalidArguments("Workspace is required when running non-interactively")
-        }
-
-        print("Select workspace:")
-        for (index, workspace) in workspaces.enumerated() {
-            let name = workspace.name ?? ""
-            print("  [\(index + 1)] \(name)")
-        }
-
-        let selection = prompt("Enter number: ")
-        if let selection = selection, let index = Int(selection), index > 0, index <= workspaces.count {
-            return workspaces[index - 1]
-        }
-
-        throw CLIError.invalidArguments("Invalid workspace selection")
-    }
-
-    static func isCrossProjectRepository(_ repository: Repository) -> Bool {
-        repository.isCrossProject || repository.note == CLIRepositoryManager.crossProjectRepositoryMarker
-    }
-
-    static func fetchRepositories(in context: NSManagedObjectContext, filters: RepositoryFilters) throws -> [Repository] {
-        let request: NSFetchRequest<Repository> = Repository.fetchRequest()
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Repository.name, ascending: true)]
-        let all = try context.fetch(request)
-        let includeList = filters.includeWorkspaces
-        let excludeList = filters.excludeWorkspaces
-        let include = Set(includeList.map { $0.lowercased() })
-        let exclude = Set(excludeList.map { $0.lowercased() })
-        let nameContains = filters.nameContains?.lowercased()
-        let pathContains = filters.pathContains?.lowercased()
-
-        if !include.isEmpty || !exclude.isEmpty {
-            let workspaces = try fetchWorkspaces(in: context)
-            let workspaceNames = Set(workspaces.compactMap { $0.name?.lowercased() })
-            for name in includeList where !workspaceNames.contains(name.lowercased()) {
-                throw CLIError.workspaceNotFound(name)
-            }
-            for name in excludeList where !workspaceNames.contains(name.lowercased()) {
-                throw CLIError.workspaceNotFound(name)
-            }
-        }
-
-        return all.filter { repo in
-            if isCrossProjectRepository(repo) {
-                return false
-            }
-
-            let workspaceName = repo.workspace?.name?.lowercased() ?? ""
-            if !include.isEmpty && !include.contains(workspaceName) {
-                return false
-            }
-            if exclude.contains(workspaceName) {
-                return false
-            }
-            if let nameContains = nameContains {
-                let name = (repo.name ?? "").lowercased()
-                if !name.contains(nameContains) {
-                    return false
-                }
-            }
-            if let pathContains = pathContains {
-                let path = (repo.path ?? "").lowercased()
-                if !path.contains(pathContains) {
-                    return false
-                }
-            }
-            return true
-        }
-    }
-
-    static func findRepository(for path: String, in context: NSManagedObjectContext) -> Repository? {
-        let normalized = normalizePath(path)
-
-        let worktreeRequest: NSFetchRequest<Worktree> = Worktree.fetchRequest()
-        worktreeRequest.predicate = NSPredicate(format: "path == %@", normalized)
-        worktreeRequest.fetchLimit = 1
-        if let worktree = try? context.fetch(worktreeRequest).first,
-           let repository = worktree.repository,
-           !isCrossProjectRepository(repository) {
-            return repository
-        }
-
-        let repoRequest: NSFetchRequest<Repository> = Repository.fetchRequest()
-        repoRequest.predicate = NSPredicate(format: "path == %@", normalized)
-        repoRequest.fetchLimit = 1
-        if let repo = try? context.fetch(repoRequest).first,
-           !isCrossProjectRepository(repo) {
-            return repo
-        }
-
-        let allRequest: NSFetchRequest<Repository> = Repository.fetchRequest()
-        guard let allRepos = try? context.fetch(allRequest) else {
-            return nil
-        }
-
-        var bestMatch: Repository?
-        var bestLength = 0
-        for repo in allRepos {
-            if isCrossProjectRepository(repo) {
-                continue
-            }
-
-            guard let repoPath = repo.path else { continue }
-            if normalized == repoPath || normalized.hasPrefix(repoPath + "/") {
-                if repoPath.count > bestLength {
-                    bestLength = repoPath.count
-                    bestMatch = repo
-                }
-            }
-        }
-
-        return bestMatch
-    }
-
-    static func resolveActiveWorkspaceName(in context: NSManagedObjectContext) -> String? {
-        let bundleIds = ["win.aizen.app", "win.aizen.app.nightly"]
-        for bundleId in bundleIds {
-            let defaults = UserDefaults(suiteName: bundleId)
-            guard let idString = defaults?.string(forKey: "selectedWorkspaceId"),
-                  let uuid = UUID(uuidString: idString) else {
-                continue
-            }
-            let request: NSFetchRequest<Workspace> = Workspace.fetchRequest()
-            request.predicate = NSPredicate(format: "id == %@", uuid as CVarArg)
-            request.fetchLimit = 1
-            if let workspace = (try? context.fetch(request))?.first,
-               let name = workspace.name {
-                return name
-            }
-        }
-        return nil
-    }
-
-    static func readDefaultSetting(key: String) -> String? {
-        let bundleIds = ["win.aizen.app", "win.aizen.app.nightly"]
-        for bundleId in bundleIds {
-            if let value = UserDefaults(suiteName: bundleId)?.string(forKey: key),
-               !value.isEmpty {
-                return value
-            }
-            if let value = readContainerPreference(bundleId: bundleId, key: key),
-               !value.isEmpty {
-                return value
-            }
-        }
-        return nil
-    }
-
-    static func readContainerPreference(bundleId: String, key: String) -> String? {
-        let fileManager = FileManager.default
-        let plistURL = fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Containers")
-            .appendingPathComponent(bundleId)
-            .appendingPathComponent("Data/Library/Preferences")
-            .appendingPathComponent("\(bundleId).plist")
-        guard let data = try? Data(contentsOf: plistURL) else { return nil }
-        guard let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else {
-            return nil
-        }
-        return plist[key] as? String
-    }
-
-    static func fetchRecentRepositories(in context: NSManagedObjectContext, limit: Int) -> [Repository] {
-        let request: NSFetchRequest<Worktree> = Worktree.fetchRequest()
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Worktree.lastAccessed, ascending: false)]
-        request.fetchLimit = 50
-
-        guard let worktrees = try? context.fetch(request) else { return [] }
-
-        var seen = Set<NSManagedObjectID>()
-        var repos: [Repository] = []
-
-        for worktree in worktrees {
-            guard let repo = worktree.repository else { continue }
-            if isCrossProjectRepository(repo) { continue }
-            let id = repo.objectID
-            if seen.contains(id) { continue }
-            seen.insert(id)
-            repos.append(repo)
-            if repos.count >= limit { break }
-        }
-
-        return repos
-    }
-}
-
-private extension AizenCLI {
-    struct RepositoryOutput: Encodable {
-        let name: String
-        let path: String
-        let workspace: String?
-        let worktrees: Int
-        let updated: String?
-    }
-
     struct RepositoryFilters: Encodable {
         let includeWorkspaces: [String]
         let excludeWorkspaces: [String]
         let nameContains: String?
         let pathContains: String?
-    }
-
-    struct RepositoryListPayload: Encodable {
-        let filters: RepositoryFilters
-        let repositories: [RepositoryOutput]
     }
 
     struct ResourceOutput: Encodable {
@@ -1189,39 +882,12 @@ private extension AizenCLI {
         let sessions: [TerminalSessionOutput]
     }
 
-    static func printRepositoryTable(_ repositories: [Repository], style: OutputStyle) {
-        let headers = ["Repository", "Path", "Workspace", "Worktrees", "Updated"]
-        var rows: [[String]] = []
-        for repo in repositories {
-            let name = repo.name ?? ""
-            let path = repo.path ?? ""
-            let workspace = repo.workspace?.name ?? "-"
-            let worktreeCount = String((repo.worktrees as? Set<Worktree>)?.count ?? 0)
-            let updated = formatDate(repo.lastUpdated)
-            rows.append([name, path, workspace, worktreeCount, updated])
-        }
-        printTable(headers: headers, rows: rows, style: style)
-    }
-
     static func printResourceTable(_ resources: [Resource], style: OutputStyle) {
         let spaces = Dictionary(uniqueKeysWithValues: resources.map { ($0.spaceID, $0.spaceID.description) })
         let rows = resources.map { resource in
             [resource.title, resource.kind.rawValue, spaces[resource.spaceID] ?? "-", resource.id.description]
         }
         printTable(headers: ["Resource", "Kind", "Space ID", "ID"], rows: rows, style: style)
-    }
-
-    static func printWorkspaceTable(_ workspaces: [Workspace], style: OutputStyle) {
-        let headers = ["Workspace", "Color", "Repositories", "Order"]
-        var rows: [[String]] = []
-        for workspace in workspaces {
-            let name = workspace.name ?? ""
-            let color = workspace.colorHex ?? "-"
-            let repoCount = String(((workspace.repositories as? Set<Repository>)?.filter { !isCrossProjectRepository($0) }.count) ?? 0)
-            let order = String(workspace.order)
-            rows.append([name, color, repoCount, order])
-        }
-        printTable(headers: headers, rows: rows, style: style)
     }
 
     static func printWorkspaceTable(_ spaces: [Space], style: OutputStyle) {
@@ -1270,17 +936,6 @@ private extension AizenCLI {
         print("\(style.label(paddedKey)) \(value)")
     }
 
-    static func repositoryOutput(_ repo: Repository) -> RepositoryOutput {
-        let updated = iso8601Date(repo.lastUpdated)
-        return RepositoryOutput(
-            name: repo.name ?? "",
-            path: repo.path ?? "",
-            workspace: repo.workspace?.name,
-            worktrees: (repo.worktrees as? Set<Worktree>)?.count ?? 0,
-            updated: updated
-        )
-    }
-
     static func resourceOutput(_ resource: Resource) -> ResourceOutput {
         ResourceOutput(
             id: resource.id.description,
@@ -1290,24 +945,8 @@ private extension AizenCLI {
         )
     }
 
-    static func workspaceOutput(_ workspace: Workspace) -> WorkspaceOutput {
-        WorkspaceOutput(
-            name: workspace.name ?? "",
-            color: workspace.colorHex,
-            repositories: ((workspace.repositories as? Set<Repository>)?.filter { !isCrossProjectRepository($0) }.count) ?? 0,
-            order: Int(workspace.order)
-        )
-    }
-
     static func workspaceOutput(_ space: (offset: Int, element: Space)) -> WorkspaceOutput {
         WorkspaceOutput(name: space.element.name, color: space.element.icon, repositories: 0, order: space.offset)
-    }
-
-    static func iso8601Date(_ date: Date?) -> String? {
-        guard let date = date else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.string(from: date)
     }
 
     static func printJSON<T: Encodable>(_ payload: T) {
