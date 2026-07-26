@@ -796,23 +796,28 @@ public struct ListResourcesResponsePayload: WirePayload, Sendable, Hashable {
             guard let resourceUUID = UUID(uuidString: record.resourceID), let spaceUUID = UUID(uuidString: record.spaceID) else {
                 throw WireCodecError.invalidIdentity(record.resourceID)
             }
+            let details = record.detailsJson.isEmpty
+                ? ResourceDetails.none
+                : try JSONDecoder().decode(ResourceDetails.self, from: record.detailsJson)
             return Resource(
                 id: ResourceID(rawValue: resourceUUID),
                 spaceID: SpaceID(rawValue: spaceUUID),
                 kind: ResourceKind(rawValue: record.kind),
-                title: record.title
+                title: record.title,
+                details: details
             )
         }
     }
 
     public func protobufBytes() throws -> Data {
         var message = AizenWireV1_ListResourcesResponse()
-        message.resources = resources.map { resource in
+        message.resources = try resources.map { resource in
             var record = AizenWireV1_ResourceRecord()
             record.resourceID = resource.id.description
             record.spaceID = resource.spaceID.description
             record.kind = resource.kind.rawValue
             record.title = resource.title
+            record.detailsJson = try JSONEncoder().encode(resource.details)
             return record
         }
         return try message.serializedData()

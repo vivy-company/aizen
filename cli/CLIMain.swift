@@ -143,43 +143,31 @@ private extension AizenCLI {
             throw CLIError.invalidArguments("Too many arguments for add")
         }
 
-        let store = try CLIStore()
-        let manager = CLIRepositoryManager(context: store.container.viewContext)
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
 
-        let target = parsed.positionals.first
-        let workspace = try selectWorkspace(
-            in: store.container.viewContext,
-            preferredName: parsed.options["workspace"],
-            defaultWorkspaceId: readDefaultSetting(key: "defaultWorkspaceId")
-        )
-
-        if let target = target {
-            if isRemoteURL(target) {
-                let destination = parsed.options["destination"] ?? defaultCloneDestination()
-                let destinationPath = normalizePath(destination)
-                try ensureDirectoryExists(destinationPath)
-                let repository = try await manager.cloneRepository(
-                    url: target,
-                    destinationPath: destinationPath,
-                    workspace: workspace
-                )
-                if let repoPath = repository.path {
-                    try ensureAizenGitignore(at: repoPath)
-                }
-                print(style.success("Added repository: \(repository.name ?? "")"))
-                return
-            }
-
-            let path = normalizePath(target)
-            let repository = try await manager.addExistingRepository(path: path, workspace: workspace)
-            print(style.success("Added repository: \(repository.name ?? "")"))
-            return
+        let target = parsed.positionals.first ?? FileManager.default.currentDirectoryPath
+        guard !isRemoteURL(target) else {
+            throw CLIError.invalidArguments("Remote clone is not available through the v2 Host yet; clone locally, then run 'aizen resource add-repository'.")
         }
+        let path = normalizePath(target)
+        guard FileManager.default.fileExists(atPath: path) else { throw CLIError.pathNotFound(path) }
+        guard await GitUtils.isGitRepository(at: path) else { throw CLIError.notGitRepository(path) }
 
-        let cwd = FileManager.default.currentDirectoryPath
-        let repository = try await manager.addExistingRepository(path: cwd, workspace: workspace)
-        print(style.success("Added repository: \(repository.name ?? "")"))
+        let client = V2CLIClient()
+        let spaces = try await client.spaces()
+        let space: Space
+        if let name = parsed.options["workspace"] {
+            guard let match = spaces.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                throw CLIError.workspaceNotFound(name)
+            }
+            space = match
+        } else if spaces.count == 1, let onlySpace = spaces.first {
+            space = onlySpace
+        } else {
+            throw CLIError.invalidArguments("Specify --workspace <space>; v2 does not use a hidden default workspace.")
+        }
+        _ = try await client.importLocalRepository(spaceID: space.id, path: path)
+        print(style.success("Added repository: \(URL(fileURLWithPath: path).lastPathComponent)"))
     }
 
     static func handleRemove(_ args: [String]) async throws {
@@ -192,18 +180,20 @@ private extension AizenCLI {
             throw CLIError.invalidArguments("remove requires a path argument")
         }
 
-        let store = try CLIStore()
-        let context = store.container.viewContext
-        let manager = CLIRepositoryManager(context: context)
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
 
         let path = normalizePath(parsed.positionals[0])
-        guard let repository = findRepository(for: path, in: context) else {
+        let canonicalPath = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+        let client = V2CLIClient()
+        guard let resource = try await client.resources().first(where: {
+            guard case let .hostPrivate(reference) = $0.details else { return false }
+            return reference.rawValue == "local-repository:\(canonicalPath)"
+        }) else {
             throw CLIError.repositoryNotFound(path)
         }
 
-        try manager.deleteRepository(repository)
-        print(style.success("Removed repository: \(repository.name ?? "")"))
+        try await client.removeResource(id: resource.id)
+        print(style.success("Removed repository: \(resource.title)"))
     }
 
     static func handleList(_ args: [String]) async throws {

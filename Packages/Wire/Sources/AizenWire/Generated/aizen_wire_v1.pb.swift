@@ -691,6 +691,8 @@ nonisolated struct AizenWireV1_ResourceRecord: Sendable {
 
   var title: String = String()
 
+  var detailsJson: Data = Data()
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -2256,7 +2258,7 @@ nonisolated extension AizenWireV1_ListResourcesQuery: SwiftProtobuf.Message, Swi
 
 nonisolated extension AizenWireV1_ResourceRecord: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".ResourceRecord"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{3}space_id\0\u{1}kind\0\u{1}title\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{3}space_id\0\u{1}kind\0\u{1}title\0\u{3}details_json\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2268,6 +2270,7 @@ nonisolated extension AizenWireV1_ResourceRecord: SwiftProtobuf.Message, SwiftPr
       case 2: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.kind) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.title) }()
+      case 5: try { try decoder.decodeSingularBytesField(value: &self.detailsJson) }()
       default: break
       }
     }
@@ -2286,6 +2289,9 @@ nonisolated extension AizenWireV1_ResourceRecord: SwiftProtobuf.Message, SwiftPr
     if !self.title.isEmpty {
       try visitor.visitSingularStringField(value: self.title, fieldNumber: 4)
     }
+    if !self.detailsJson.isEmpty {
+      try visitor.visitSingularBytesField(value: self.detailsJson, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2294,6 +2300,7 @@ nonisolated extension AizenWireV1_ResourceRecord: SwiftProtobuf.Message, SwiftPr
     if lhs.spaceID != rhs.spaceID {return false}
     if lhs.kind != rhs.kind {return false}
     if lhs.title != rhs.title {return false}
+    if lhs.detailsJson != rhs.detailsJson {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

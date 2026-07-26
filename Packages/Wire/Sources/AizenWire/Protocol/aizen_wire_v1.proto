@@ -207,6 +207,7 @@ message ResourceRecord {
   string space_id = 2;
   string kind = 3;
   string title = 4;
+  bytes details_json = 5;
 }
 
 message ListResourcesResponse {

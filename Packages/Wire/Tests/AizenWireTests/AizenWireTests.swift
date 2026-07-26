@@ -67,6 +67,17 @@ import Testing
     #expect(decoded == payload)
 }
 
+@Test func resourceRecordsPreserveHostPrivateDetails() throws {
+    let resource = Resource(
+        spaceID: SpaceID(),
+        kind: .repository,
+        title: "Aizen",
+        details: .hostPrivate(.init(rawValue: "local-repository:/tmp/aizen"))
+    )
+    let payload = ListResourcesResponsePayload(resources: [resource])
+    #expect(try ListResourcesResponsePayload(protobufBytes: payload.protobufBytes()).resources == [resource])
+}
+
 @Test func journalReplayPayloadRoundTripsTypedEvents() throws {
     let space = SpaceID()
     let event = JournalEvent(
