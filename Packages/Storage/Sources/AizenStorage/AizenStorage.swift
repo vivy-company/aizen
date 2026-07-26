@@ -18,6 +18,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
     public var conversationMessages: [ConversationMessage]
     public var resources: [Resource]
     public var executionContexts: [ExecutionContext]
+    public var terminalSessions: [TerminalSession]
     public var runs: [Run]
     public var operations: [AizenCore.Operation]
     public var artifacts: [Artifact]
@@ -27,7 +28,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
     public init(
         schemaVersion: Int = Self.schemaVersion,
         spaces: [Space] = [], sessions: [Session] = [], conversationMessages: [ConversationMessage] = [], resources: [Resource] = [],
-        executionContexts: [ExecutionContext] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = [], journalEvents: [JournalEvent] = []
+        executionContexts: [ExecutionContext] = [], terminalSessions: [TerminalSession] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = [], journalEvents: [JournalEvent] = []
     ) {
         precondition(schemaVersion == Self.schemaVersion, "Storage snapshots must use schema v2")
         self.schemaVersion = schemaVersion
@@ -36,6 +37,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         self.conversationMessages = conversationMessages
         self.resources = resources
         self.executionContexts = executionContexts
+        self.terminalSessions = terminalSessions
         self.runs = runs
         self.operations = operations
         self.artifacts = artifacts
@@ -45,11 +47,11 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
 
     public var isEmpty: Bool {
         spaces.isEmpty && sessions.isEmpty && conversationMessages.isEmpty && resources.isEmpty && executionContexts.isEmpty &&
-            runs.isEmpty && operations.isEmpty && artifacts.isEmpty && commands.isEmpty && journalEvents.isEmpty
+            terminalSessions.isEmpty && runs.isEmpty && operations.isEmpty && artifacts.isEmpty && commands.isEmpty && journalEvents.isEmpty
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, runs, operations, artifacts, commands, journalEvents
+        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, terminalSessions, runs, operations, artifacts, commands, journalEvents
     }
 
     public init(from decoder: Decoder) throws {
@@ -60,6 +62,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         conversationMessages = try values.decodeIfPresent([ConversationMessage].self, forKey: .conversationMessages) ?? []
         resources = try values.decode([Resource].self, forKey: .resources)
         executionContexts = try values.decode([ExecutionContext].self, forKey: .executionContexts)
+        terminalSessions = try values.decodeIfPresent([TerminalSession].self, forKey: .terminalSessions) ?? []
         runs = try values.decode([Run].self, forKey: .runs)
         operations = try values.decode([AizenCore.Operation].self, forKey: .operations)
         artifacts = try values.decode([Artifact].self, forKey: .artifacts)
@@ -75,6 +78,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         try values.encode(conversationMessages, forKey: .conversationMessages)
         try values.encode(resources, forKey: .resources)
         try values.encode(executionContexts, forKey: .executionContexts)
+        try values.encode(terminalSessions, forKey: .terminalSessions)
         try values.encode(runs, forKey: .runs)
         try values.encode(operations, forKey: .operations)
         try values.encode(artifacts, forKey: .artifacts)
@@ -337,12 +341,14 @@ public actor StorageRepository {
         guard Set(snapshot.conversationMessages.map(\.id)).count == snapshot.conversationMessages.count else { throw StorageError.duplicateIdentity("conversation message") }
         guard Set(snapshot.resources.map(\.id)).count == snapshot.resources.count else { throw StorageError.duplicateIdentity("resource") }
         guard Set(snapshot.executionContexts.map(\.id)).count == snapshot.executionContexts.count else { throw StorageError.duplicateIdentity("execution context") }
+        guard Set(snapshot.terminalSessions.map(\.id)).count == snapshot.terminalSessions.count else { throw StorageError.duplicateIdentity("terminal session") }
         guard Set(snapshot.runs.map(\.id)).count == snapshot.runs.count else { throw StorageError.duplicateIdentity("run") }
         guard Set(snapshot.commands.map(\.id)).count == snapshot.commands.count else { throw StorageError.duplicateIdentity("command") }
         guard Set(snapshot.journalEvents.map(\.id)).count == snapshot.journalEvents.count else { throw StorageError.duplicateIdentity("journal event") }
         guard zip(snapshot.journalEvents, snapshot.journalEvents.dropFirst()).allSatisfy({ $0.cursor < $1.cursor }) else { throw StorageError.duplicateIdentity("journal cursor") }
         guard snapshot.resources.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
         guard snapshot.executionContexts.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
+        guard snapshot.terminalSessions.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
 
         let sessions = Dictionary(uniqueKeysWithValues: snapshot.sessions.map { ($0.id, $0) })
         let resources = Dictionary(uniqueKeysWithValues: snapshot.resources.map { ($0.id, $0) })
@@ -353,6 +359,11 @@ public actor StorageRepository {
             return resource.spaceID == context.spaceID
         }) else { throw StorageError.missingResource }
         guard snapshot.sessions.allSatisfy({ session in
+            guard let contextID = session.executionContextID else { return true }
+            guard let context = contexts[contextID] else { return false }
+            return context.spaceID == session.spaceID
+        }) else { throw StorageError.missingExecutionContext }
+        guard snapshot.terminalSessions.allSatisfy({ session in
             guard let contextID = session.executionContextID else { return true }
             guard let context = contexts[contextID] else { return false }
             return context.spaceID == session.spaceID

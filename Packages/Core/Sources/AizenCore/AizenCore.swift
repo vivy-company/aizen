@@ -317,6 +317,40 @@ public struct ExecutionContext: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+/// Host-owned metadata for a persistent terminal runtime. The tmux identity is opaque to clients;
+/// they use it only when asking the host/platform adapter to attach.
+public struct TerminalSession: Codable, Sendable, Hashable, Identifiable {
+    public let id: SessionID
+    public let spaceID: SpaceID
+    public let executionContextID: ExecutionContextID?
+    public var title: String?
+    public let tmuxSessionName: String
+    public let paneID: String
+    public var initialCommand: String?
+    public let createdAt: Date
+
+    public init(
+        id: SessionID = SessionID(),
+        spaceID: SpaceID,
+        executionContextID: ExecutionContextID? = nil,
+        title: String? = nil,
+        tmuxSessionName: String,
+        paneID: String,
+        initialCommand: String? = nil,
+        createdAt: Date = Date()
+    ) {
+        precondition(!tmuxSessionName.isEmpty && !paneID.isEmpty, "Terminal sessions require tmux and pane identities")
+        self.id = id
+        self.spaceID = spaceID
+        self.executionContextID = executionContextID
+        self.title = title
+        self.tmuxSessionName = tmuxSessionName
+        self.paneID = paneID
+        self.initialCommand = initialCommand
+        self.createdAt = createdAt
+    }
+}
+
 // MARK: - Host work
 
 public enum RunLifecycle: String, Codable, Sendable, Hashable {

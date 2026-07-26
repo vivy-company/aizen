@@ -18,6 +18,24 @@ import AizenCore
     #expect(try await repository.load() == saved)
 }
 
+@Test func repositoryPersistsHostOwnedTerminalSessions() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = StorageRepository(url: directory.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Personal")
+    let terminal = TerminalSession(
+        spaceID: space.id,
+        title: "Shell",
+        tmuxSessionName: "aizen-pane",
+        paneID: "pane"
+    )
+    _ = try await repository.transact {
+        $0.spaces.append(space)
+        $0.terminalSessions.append(terminal)
+    }
+    #expect(try await repository.load().terminalSessions == [terminal])
+}
+
 @Test func repositoryPersistsCanonicalConversationMessages() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: directory) }
