@@ -436,6 +436,19 @@ import Testing
     #expect(try RunEventPayload(protobufBytes: payload.protobufBytes()) == payload)
 }
 
+@Test func terminalOutputEventPayloadRoundTripsAsBoundedBinary() throws {
+    let event = TerminalOutputEvent(
+        sequence: 1,
+        spaceID: SpaceID(),
+        terminalSessionID: SessionID(),
+        terminalSequence: 4,
+        output: Data("ready\\n".utf8),
+        truncated: false
+    )
+    let payload = TerminalOutputEventPayload(event: event)
+    #expect(try TerminalOutputEventPayload(protobufBytes: payload.protobufBytes()) == payload)
+}
+
 @Test func journalReplayPayloadRoundTripsTypedEvents() throws {
     let space = SpaceID()
     let event = JournalEvent(

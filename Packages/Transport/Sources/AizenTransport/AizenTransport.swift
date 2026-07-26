@@ -12,14 +12,14 @@ public protocol WireTransport: Sendable {
     func send(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope
 }
 
-/// Optional transient run-event capability. Durable state remains available through normal queries
+/// Optional transient Host-event capability. Durable state remains available through normal queries
 /// after a reconnect, so transports need not buffer these events forever.
 public protocol RunEventEndpoint: WireEndpoint {
-    func runEvents() async -> AsyncStream<RunEvent>
+    func runEvents() async -> AsyncStream<HostEvent>
 }
 
 public protocol RunEventTransport: WireTransport {
-    func runEvents() async throws -> AsyncStream<RunEvent>
+    func runEvents() async throws -> AsyncStream<HostEvent>
 }
 
 public enum TransportError: Swift.Error, Sendable, Equatable {
@@ -40,7 +40,7 @@ public struct InProcessTransport: RunEventTransport {
         return try ProtocolEnvelope(serializedData: response.serializedData())
     }
 
-    public func runEvents() async throws -> AsyncStream<RunEvent> {
+    public func runEvents() async throws -> AsyncStream<HostEvent> {
         guard let eventEndpoint = endpoint as? any RunEventEndpoint else {
             throw TransportError.eventStreamingUnavailable
         }

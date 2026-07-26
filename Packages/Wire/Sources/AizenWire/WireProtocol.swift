@@ -946,6 +946,47 @@ public struct RunEventPayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct TerminalOutputEventPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.event.terminal-output@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let event: TerminalOutputEvent
+
+    public init(event: TerminalOutputEvent) { self.event = event }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_TerminalOutputEvent(serializedBytes: protobufBytes)
+        guard let eventID = UUID(uuidString: message.eventID),
+              let spaceID = UUID(uuidString: message.spaceID),
+              let terminalID = UUID(uuidString: message.terminalSessionID),
+              message.sequence > 0, message.terminalSequence > 0,
+              message.output.count <= 64 * 1_024 else {
+            throw WireCodecError.invalidTerminalOutputEvent
+        }
+        event = .init(
+            id: eventID,
+            sequence: message.sequence,
+            spaceID: .init(rawValue: spaceID),
+            terminalSessionID: .init(rawValue: terminalID),
+            terminalSequence: message.terminalSequence,
+            output: message.output,
+            truncated: message.truncated
+        )
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_TerminalOutputEvent()
+        message.eventID = event.id.uuidString
+        message.sequence = event.sequence
+        message.spaceID = event.spaceID.description
+        message.terminalSessionID = event.terminalSessionID.description
+        message.terminalSequence = event.terminalSequence
+        message.output = event.output
+        message.truncated = event.truncated
+        return try message.serializedData()
+    }
+}
+
 public struct ListSpacesQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.space.list@1")
     public static let schemaVersion: UInt32 = 1
@@ -3276,6 +3317,7 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidXcodeBuildCommand
     case invalidXcodeDestinationQuery
     case invalidXcodeDestinationResponse
+    case invalidTerminalOutputEvent
 }
 
 private extension ProtocolEnvelope {

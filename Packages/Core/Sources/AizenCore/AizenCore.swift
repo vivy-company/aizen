@@ -599,6 +599,62 @@ public struct RunEvent: Sendable, Hashable, Identifiable {
     }
 }
 
+/// An ordered, bounded delta from a Host-owned terminal. Terminal bytes remain ephemeral;
+/// reconnecting clients resume from the Host transcript cursor rather than relying on this stream.
+public struct TerminalOutputEvent: Sendable, Hashable, Identifiable {
+    public let id: UUID
+    public let sequence: UInt64
+    public let spaceID: SpaceID
+    public let terminalSessionID: SessionID
+    public let terminalSequence: UInt64
+    public let output: Data
+    public let truncated: Bool
+
+    public init(
+        id: UUID = UUID(),
+        sequence: UInt64,
+        spaceID: SpaceID,
+        terminalSessionID: SessionID,
+        terminalSequence: UInt64,
+        output: Data,
+        truncated: Bool
+    ) {
+        precondition(sequence > 0 && terminalSequence > 0, "Terminal events require ordered cursors")
+        precondition(output.count <= 64 * 1_024, "Terminal event payloads must remain bounded")
+        self.id = id
+        self.sequence = sequence
+        self.spaceID = spaceID
+        self.terminalSessionID = terminalSessionID
+        self.terminalSequence = terminalSequence
+        self.output = output
+        self.truncated = truncated
+    }
+}
+
+public enum HostEvent: Sendable, Hashable, Identifiable {
+    case run(RunEvent)
+    case terminalOutput(TerminalOutputEvent)
+
+    public var id: UUID {
+        switch self {
+        case let .run(event): event.id
+        case let .terminalOutput(event): event.id
+        }
+    }
+
+    public var sequence: UInt64 {
+        switch self {
+        case let .run(event): event.sequence
+        case let .terminalOutput(event): event.sequence
+        }
+    }
+
+    public var runEvent: RunEvent? {
+        guard case let .run(event) = self else { return nil }
+        return event
+    }
+}
+
 // MARK: - Durable event journal
 
 public enum EventDurability: String, Codable, Sendable, Hashable {

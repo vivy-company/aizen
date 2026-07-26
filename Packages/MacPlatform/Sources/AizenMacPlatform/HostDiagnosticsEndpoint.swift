@@ -37,7 +37,7 @@ final class HostDiagnosticsEndpoint: @unchecked Sendable, RunEventEndpoint {
         )
     }
 
-    func runEvents() async -> AsyncStream<RunEvent> {
+    func runEvents() async -> AsyncStream<HostEvent> {
         await endpoint.runEvents()
     }
 }

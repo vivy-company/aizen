@@ -8,11 +8,13 @@ public actor TerminalTranscriptRegistry {
         public let sequence: UInt64
         public let bytes: Data
         public let truncated: Bool
+        public let delta: Data
 
-        public init(sequence: UInt64, bytes: Data, truncated: Bool) {
+        public init(sequence: UInt64, bytes: Data, truncated: Bool, delta: Data = .init()) {
             self.sequence = sequence
             self.bytes = bytes
             self.truncated = truncated
+            self.delta = delta
         }
     }
 
@@ -102,7 +104,7 @@ public actor TerminalTranscriptRegistry {
             transcript.trim(to: maximumBytes)
         }
         transcripts[terminalID] = transcript
-        return Snapshot(sequence: transcript.sequence, bytes: transcript.retained, truncated: transcript.didTruncate)
+        return Snapshot(sequence: transcript.sequence, bytes: transcript.retained, truncated: transcript.didTruncate, delta: next)
     }
 
     public func snapshot(terminalID: SessionID, after sequence: UInt64) -> Snapshot {

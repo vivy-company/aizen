@@ -238,6 +238,16 @@ message RunEvent {
   }
 }
 
+message TerminalOutputEvent {
+  string event_id = 1;
+  uint64 sequence = 2;
+  string space_id = 3;
+  string terminal_session_id = 4;
+  uint64 terminal_sequence = 5;
+  bytes output = 6;
+  bool truncated = 7;
+}
+
 message ListSpacesQuery {}
 
 message SpaceRecord {

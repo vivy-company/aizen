@@ -815,6 +815,30 @@ nonisolated struct AizenWireV1_RunEvent: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_TerminalOutputEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var eventID: String = String()
+
+  var sequence: UInt64 = 0
+
+  var spaceID: String = String()
+
+  var terminalSessionID: String = String()
+
+  var terminalSequence: UInt64 = 0
+
+  var output: Data = Data()
+
+  var truncated: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_ListSpacesQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -4211,6 +4235,66 @@ nonisolated extension AizenWireV1_RunEvent: SwiftProtobuf.Message, SwiftProtobuf
     if lhs.sessionID != rhs.sessionID {return false}
     if lhs.runID != rhs.runID {return false}
     if lhs.kind != rhs.kind {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_TerminalOutputEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".TerminalOutputEvent"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}event_id\0\u{1}sequence\0\u{3}space_id\0\u{3}terminal_session_id\0\u{3}terminal_sequence\0\u{1}output\0\u{1}truncated\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.eventID) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.sequence) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.terminalSessionID) }()
+      case 5: try { try decoder.decodeSingularUInt64Field(value: &self.terminalSequence) }()
+      case 6: try { try decoder.decodeSingularBytesField(value: &self.output) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.truncated) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.eventID.isEmpty {
+      try visitor.visitSingularStringField(value: self.eventID, fieldNumber: 1)
+    }
+    if self.sequence != 0 {
+      try visitor.visitSingularUInt64Field(value: self.sequence, fieldNumber: 2)
+    }
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 3)
+    }
+    if !self.terminalSessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.terminalSessionID, fieldNumber: 4)
+    }
+    if self.terminalSequence != 0 {
+      try visitor.visitSingularUInt64Field(value: self.terminalSequence, fieldNumber: 5)
+    }
+    if !self.output.isEmpty {
+      try visitor.visitSingularBytesField(value: self.output, fieldNumber: 6)
+    }
+    if self.truncated != false {
+      try visitor.visitSingularBoolField(value: self.truncated, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_TerminalOutputEvent, rhs: AizenWireV1_TerminalOutputEvent) -> Bool {
+    if lhs.eventID != rhs.eventID {return false}
+    if lhs.sequence != rhs.sequence {return false}
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.terminalSessionID != rhs.terminalSessionID {return false}
+    if lhs.terminalSequence != rhs.terminalSequence {return false}
+    if lhs.output != rhs.output {return false}
+    if lhs.truncated != rhs.truncated {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

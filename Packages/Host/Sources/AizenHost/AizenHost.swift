@@ -294,7 +294,7 @@ public actor LocalHost: WireEndpoint {
         )
     }
 
-    public func runEvents() async -> AsyncStream<RunEvent> {
+    public func runEvents() async -> AsyncStream<HostEvent> {
         guard let runEventPublisher else { return AsyncStream { $0.finish() } }
         return await runEventPublisher.events()
     }
@@ -630,7 +630,16 @@ public actor LocalHost: WireEndpoint {
                 try await terminalRuntime.resize(session: session, columns: columns, rows: rows)
             }
             let capture = try await terminalRuntime.captureOutput(for: session, maximumBytes: Int(query.scrollbackBytes))
-            _ = await terminalTranscripts.record(terminalID: terminalSessionID, capture: capture)
+            let recorded = await terminalTranscripts.record(terminalID: terminalSessionID, capture: capture)
+            if let runEventPublisher, !recorded.delta.isEmpty {
+                await runEventPublisher.publishTerminalOutput(
+                    spaceID: session.spaceID,
+                    terminalSessionID: terminalSessionID,
+                    terminalSequence: recorded.sequence,
+                    output: recorded.delta,
+                    truncated: recorded.truncated
+                )
+            }
             let transcript = await terminalTranscripts.snapshot(terminalID: terminalSessionID, after: query.afterSequence)
             kind = .queryResponse
             payload = try TypedPayload(AttachTerminalResponsePayload(terminalSessionID: query.terminalSessionID, sequence: transcript.sequence, output: transcript.bytes, truncated: transcript.truncated))

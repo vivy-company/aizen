@@ -86,7 +86,7 @@ final class HostMigrationGate: @unchecked Sendable, RunEventEndpoint {
         return try await host.receive(envelope)
     }
 
-    func runEvents() async -> AsyncStream<RunEvent> {
+    func runEvents() async -> AsyncStream<HostEvent> {
         await host.runEvents()
     }
 }

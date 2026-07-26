@@ -425,7 +425,7 @@ import AizenWire
     }
 
     await publisher.publish(for: run, kind: .assistantTextDelta("Hello"))
-    let event = try #require(await eventTask.value)
+    let event = try #require((await eventTask.value)?.runEvent)
     #expect(event.runID == run.id)
     #expect(event.kind == .assistantTextDelta("Hello"))
 }

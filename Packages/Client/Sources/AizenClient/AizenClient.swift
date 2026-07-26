@@ -269,7 +269,7 @@ public actor HostClient {
         }
     }
 
-    public func runEvents() async throws -> AsyncStream<RunEvent> {
+    public func runEvents() async throws -> AsyncStream<HostEvent> {
         guard let eventTransport else { throw Error.eventStreamingUnavailable }
         return try await eventTransport.runEvents()
     }

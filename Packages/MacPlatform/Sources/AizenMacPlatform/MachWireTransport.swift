@@ -122,7 +122,7 @@ public final class MachWireTransport: @unchecked Sendable, RunEventTransport {
         return try ProtocolEnvelope(serializedData: response)
     }
 
-    public func runEvents() async throws -> AsyncStream<RunEvent> {
+    public func runEvents() async throws -> AsyncStream<HostEvent> {
         await events.stream()
     }
 }
@@ -234,13 +234,14 @@ private final class MachWireService: @unchecked Sendable {
                 let stream = await eventEndpoint.runEvents()
                 for await event in stream {
                     guard !Task.isCancelled else { return }
-                    guard let envelope = try? ProtocolEnvelope(
-                        messageID: UUID().uuidString,
-                        connectionSequence: event.sequence,
-                        kind: .event,
-                        channel: .runStream,
-                        payload: TypedPayload(RunEventPayload(event: event))
-                    ).serializedData() else { continue }
+                    let envelope: Data?
+                    switch event {
+                    case let .run(run):
+                        envelope = try? ProtocolEnvelope(messageID: UUID().uuidString, connectionSequence: run.sequence, kind: .event, channel: .runStream, payload: TypedPayload(RunEventPayload(event: run))).serializedData()
+                    case let .terminalOutput(output):
+                        envelope = try? ProtocolEnvelope(messageID: UUID().uuidString, connectionSequence: output.sequence, kind: .event, channel: .terminal, payload: TypedPayload(TerminalOutputEventPayload(event: output))).serializedData()
+                    }
+                    guard let envelope else { continue }
                     peer.sendEvent(envelope)
                 }
             })
@@ -345,11 +346,11 @@ private final class MachConnection: @unchecked Sendable {
 }
 
 actor MachRunEventHub {
-    private var continuations: [UUID: AsyncStream<RunEvent>.Continuation] = [:]
+    private var continuations: [UUID: AsyncStream<HostEvent>.Continuation] = [:]
 
-    func stream() -> AsyncStream<RunEvent> {
+    func stream() -> AsyncStream<HostEvent> {
         let identifier = UUID()
-        let stream = AsyncStream<RunEvent>.makeStream(bufferingPolicy: .bufferingNewest(100))
+        let stream = AsyncStream<HostEvent>.makeStream(bufferingPolicy: .bufferingNewest(100))
         continuations[identifier] = stream.continuation
         stream.continuation.onTermination = { [weak self] _ in
             Task { await self?.remove(identifier) }
@@ -358,11 +359,18 @@ actor MachRunEventHub {
     }
 
     func receive(_ data: Data) {
-        guard let envelope = try? ProtocolEnvelope(serializedData: data),
-              envelope.kind == .event,
-              envelope.channel == .runStream,
-              envelope.payload.identifier == RunEventPayload.identifier,
-              let event = try? RunEventPayload(protobufBytes: envelope.payload.protobufBytes).event else { return }
+        guard let envelope = try? ProtocolEnvelope(serializedData: data), envelope.kind == .event else { return }
+        let event: HostEvent
+        switch (envelope.channel, envelope.payload.identifier) {
+        case (.runStream, RunEventPayload.identifier):
+            guard let value = try? RunEventPayload(protobufBytes: envelope.payload.protobufBytes).event else { return }
+            event = .run(value)
+        case (.terminal, TerminalOutputEventPayload.identifier):
+            guard let value = try? TerminalOutputEventPayload(protobufBytes: envelope.payload.protobufBytes).event else { return }
+            event = .terminalOutput(value)
+        default:
+            return
+        }
         for continuation in continuations.values { continuation.yield(event) }
     }
 

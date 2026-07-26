@@ -37,14 +37,31 @@ import AizenWire
     let terminal = TerminalSession(spaceID: space.id, executionContextID: nil, title: nil, tmuxSessionName: "test", paneID: "%1", initialCommand: nil)
     _ = try await storage.transact { $0.spaces.append(space); $0.terminalSessions.append(terminal) }
     let runtime = RecordingTerminalRuntime()
+    let publisher = RunEventPublisher()
+    let stream = await publisher.events()
+    let eventTask = Task {
+        var iterator = stream.makeAsyncIterator()
+        return await iterator.next()
+    }
     await runtime.setCapture(Data("abcdef".utf8))
-    let host = LocalHost(storage: storage, terminalRuntime: runtime, terminalTranscripts: .init(maximumBytes: 4))
+    let host = LocalHost(storage: storage, runEventPublisher: publisher, terminalRuntime: runtime, terminalTranscripts: .init(maximumBytes: 4))
     let request = ProtocolEnvelope(messageID: "attach", connectionSequence: 1, kind: .query, channel: .terminal, payload: try .init(AttachTerminalQueryPayload(terminalSessionID: terminal.id.description, scrollbackBytes: 4)))
     let response = try await host.receive(request)
     let attached = try AttachTerminalResponsePayload(protobufBytes: response.payload.protobufBytes)
     #expect(attached.sequence == 1)
     #expect(attached.output == Data("cdef".utf8))
     #expect(!attached.truncated)
+    let event = try #require(await eventTask.value)
+    guard case let .terminalOutput(output) = event else {
+        Issue.record("Expected terminal output event")
+        return
+    }
+    #expect(output.sequence == 1)
+    #expect(output.spaceID == space.id)
+    #expect(output.terminalSessionID == terminal.id)
+    #expect(output.terminalSequence == 1)
+    #expect(output.output == Data("cdef".utf8))
+    #expect(!output.truncated)
     let replay = ProtocolEnvelope(messageID: "attach-replay", connectionSequence: 2, kind: .query, channel: .terminal, payload: try .init(AttachTerminalQueryPayload(terminalSessionID: terminal.id.description, afterSequence: attached.sequence, scrollbackBytes: 4)))
     let replayResponse = try await host.receive(replay)
     #expect(try AttachTerminalResponsePayload(protobufBytes: replayResponse.payload.protobufBytes).output.isEmpty)
@@ -771,7 +788,7 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
         var iterator = stream.makeAsyncIterator()
         var events: [RunEvent] = []
         while events.count < 5, let event = await iterator.next() {
-            events.append(event)
+            if let event = event.runEvent { events.append(event) }
         }
         return events
     }
@@ -1232,7 +1249,7 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
         var iterator = stream.makeAsyncIterator()
         var events: [RunEvent] = []
         while events.count < 5, let event = await iterator.next() {
-            events.append(event)
+            if let event = event.runEvent { events.append(event) }
         }
         return events
     }
