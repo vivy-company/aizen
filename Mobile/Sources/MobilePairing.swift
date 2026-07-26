@@ -42,6 +42,10 @@ final class MobilePairingStore: ObservableObject {
             state = .failed(error.localizedDescription)
         }
     }
+
+    func recordScannerFailure(_ message: String) {
+        state = .failed(message)
+    }
 }
 
 private enum MobilePairingInvitation {

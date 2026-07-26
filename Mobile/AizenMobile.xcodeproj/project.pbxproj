@@ -11,6 +11,7 @@
 		171D76207A7CD00FE5FD8F8A /* AizenMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA06BE12AD3BA3EB9552B6C6 /* AizenMobileApp.swift */; };
 		6EE66BB31FDA3C4FA87D75E4 /* MobilePairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB03383835C6DA031EA3ABC /* MobilePairing.swift */; };
 		8B790E5EFEFE4C98750A47FC /* AizenCore in Frameworks */ = {isa = PBXBuildFile; productRef = 54F48D1FAB1B75CB71ECDD97 /* AizenCore */; };
+		8BC71D02E0C2C61324D2F97D /* PairingQRScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DD2157875963BB839FAC50D /* PairingQRScanner.swift */; };
 		AD130E2F89C153531D09E3AD /* AizenTransport in Frameworks */ = {isa = PBXBuildFile; productRef = BFEF27BE37BB92379B72B12C /* AizenTransport */; };
 		AE6ADAEC1A2A6D76746B4ABD /* AizenSecurity in Frameworks */ = {isa = PBXBuildFile; productRef = 404E1B2BCCB2D2969928FB3C /* AizenSecurity */; };
 		E20F71192DEA8625080DC45C /* AizenWire in Frameworks */ = {isa = PBXBuildFile; productRef = C0A3D792BEC31BF0AA01E57D /* AizenWire */; };
@@ -22,6 +23,7 @@
 		1D0433D03A6FA4290163D805 /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = ../Packages/Core; sourceTree = SOURCE_ROOT; };
 		342D8946D4A54621D0A944EA /* Client */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Client; path = ../Packages/Client; sourceTree = SOURCE_ROOT; };
 		64B5DB681DCFC4E6EEB5A27D /* AizenMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AizenMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6DD2157875963BB839FAC50D /* PairingQRScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingQRScanner.swift; sourceTree = "<group>"; };
 		CA06BE12AD3BA3EB9552B6C6 /* AizenMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AizenMobileApp.swift; sourceTree = "<group>"; };
 		DFB03383835C6DA031EA3ABC /* MobilePairing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobilePairing.swift; sourceTree = "<group>"; };
 		F31F8117B8DE250DBB7FD0E3 /* Transport */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Transport; path = ../Packages/Transport; sourceTree = SOURCE_ROOT; };
@@ -56,6 +58,7 @@
 			children = (
 				CA06BE12AD3BA3EB9552B6C6 /* AizenMobileApp.swift */,
 				DFB03383835C6DA031EA3ABC /* MobilePairing.swift */,
+				6DD2157875963BB839FAC50D /* PairingQRScanner.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -151,6 +154,7 @@
 			files = (
 				171D76207A7CD00FE5FD8F8A /* AizenMobileApp.swift in Sources */,
 				6EE66BB31FDA3C4FA87D75E4 /* MobilePairing.swift in Sources */,
+				8BC71D02E0C2C61324D2F97D /* PairingQRScanner.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -291,6 +295,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Aizen;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Aizen uses the camera only to scan a Host pairing QR code.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -312,6 +317,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Aizen;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Aizen uses the camera only to scan a Host pairing QR code.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (

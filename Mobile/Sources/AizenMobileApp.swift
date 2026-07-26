@@ -4,6 +4,7 @@ import AizenSecurity
 import AizenTransport
 import AizenWire
 import SwiftUI
+import VisionKit
 
 @main
 struct AizenMobileApp: App {
@@ -17,6 +18,7 @@ struct AizenMobileApp: App {
 private struct MobileRootView: View {
     @StateObject private var pairing = MobilePairingStore()
     @State private var invitation = ""
+    @State private var showsScanner = false
 
     var body: some View {
         NavigationSplitView {
@@ -34,6 +36,8 @@ private struct MobileRootView: View {
         } content: {
             Form {
                 Section("Pair a Host") {
+                    Button("Scan pairing QR code") { showsScanner = true }
+                        .disabled(!DataScannerViewController.isSupported || !DataScannerViewController.isAvailable)
                     TextField("Pairing invitation", text: $invitation, axis: .vertical)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -47,6 +51,20 @@ private struct MobileRootView: View {
                 }
             }
             .navigationTitle("Pair a Host")
+            .sheet(isPresented: $showsScanner) {
+                PairingQRScanner(
+                    didScan: { value in
+                        invitation = value
+                        showsScanner = false
+                        Task { await pairing.submit(invitationText: value) }
+                    },
+                    didFail: { message in
+                        showsScanner = false
+                        pairing.recordScannerFailure(message)
+                    }
+                )
+                .ignoresSafeArea()
+            }
         } detail: {
             ContentUnavailableView(
                 "Choose a Session",
@@ -60,7 +78,7 @@ private struct MobileRootView: View {
     private var pairingStatus: some View {
         switch pairing.state {
         case .unpaired:
-            Text("Paste the pairing invitation shown by Aizen on your Mac.")
+            Text("Scan or paste the pairing invitation shown by Aizen on your Mac.")
         case .pairing:
             ProgressView("Submitting secure pairing request…")
         case .awaitingApproval(let hostName):

@@ -35,6 +35,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Aizen
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_NSCameraUsageDescription: Aizen uses the camera only to scan a Host pairing QR code.
         SUPPORTS_MACCATALYST: NO
     dependencies:
       - package: AizenCore
