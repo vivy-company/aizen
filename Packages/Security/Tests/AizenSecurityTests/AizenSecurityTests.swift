@@ -164,6 +164,41 @@ import Testing
     #expect(try await transport.send(request) == request)
 }
 
+@Test func authenticatedRemoteTransportPrioritizesControlAheadOfQueuedBlobChunks() async throws {
+    let hostEphemeral = ConnectionEphemeralKey()
+    let deviceEphemeral = ConnectionEphemeralKey()
+    let binding = try ConnectionAuthenticationBinding(
+        protocolGeneration: 1,
+        hostID: HostID(),
+        deviceID: DeviceID(),
+        connectionID: UUID(),
+        clientNonce: Data(repeating: 1, count: 32),
+        serverNonce: Data(repeating: 2, count: 32),
+        clientEphemeralPublicKey: deviceEphemeral.publicKey,
+        serverEphemeralPublicKey: hostEphemeral.publicKey,
+        route: .lan
+    )
+    let server = AuthenticatedWireChannel(keys: try ConnectionAuthenticator.deriveKeys(participant: .host, ephemeralKey: hostEphemeral, peerEphemeralPublicKey: deviceEphemeral.publicKey, binding: binding), binding: binding)
+    let client = AuthenticatedWireChannel(keys: try ConnectionAuthenticator.deriveKeys(participant: .device, ephemeralKey: deviceEphemeral, peerEphemeralPublicKey: hostEphemeral.publicKey, binding: binding), binding: binding)
+    let gate = SchedulerGate()
+    let recorder = ChannelRecorder()
+    let transport = AuthenticatedRemoteWireTransport(channel: client) { frame in
+        let request = try await server.open(frame)
+        await recorder.append(request.channel)
+        if request.messageID == "blob-first" { await gate.wait() }
+        return try await server.seal(request)
+    }
+    let first = Task { try await transport.send(testEnvelope(messageID: "blob-first", channel: .blob)) }
+    await recorder.waitForCount(1)
+    let second = Task { try await transport.send(testEnvelope(messageID: "blob-second", channel: .blob)) }
+    let control = Task { try await transport.send(testEnvelope(messageID: "control", channel: .control)) }
+    await gate.open()
+    _ = try await first.value
+    _ = try await second.value
+    _ = try await control.value
+    #expect(await recorder.channels == [.blob, .control, .blob])
+}
+
 private actor AuthenticatedTestServer {
     private let host: HostPublicIdentity
     private let hostIdentity: LocalCryptographicIdentity
@@ -202,6 +237,26 @@ private actor AuthenticatedTestServer {
         self.channel = channel
         return try await channel.seal(ProtocolEnvelope(messageID: "ready", connectionID: binding.connectionID.uuidString, connectionSequence: 1, kind: .capabilities, channel: .control, correlationID: envelope.messageID, payload: .init(CapabilitiesPayload(identifiers: []))))
     }
+}
+
+private actor SchedulerGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    func wait() async { await withCheckedContinuation { continuation = $0 } }
+    func open() { continuation?.resume(); continuation = nil }
+}
+
+private actor ChannelRecorder {
+    private(set) var channels: [WireChannel] = []
+    private var continuation: CheckedContinuation<Void, Never>?
+    func append(_ channel: WireChannel) { channels.append(channel); continuation?.resume(); continuation = nil }
+    func waitForCount(_ count: Int) async {
+        guard channels.count < count else { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+}
+
+private func testEnvelope(messageID: String, channel: WireChannel) throws -> ProtocolEnvelope {
+    try .init(messageID: messageID, connectionSequence: 1, kind: .command, channel: channel, payload: .init(HelloPayload(minimumProtocolGeneration: 1, maximumProtocolGeneration: 1, productVersion: "2.0.0")))
 }
 
 private func tlsPSKSalt(hostID: HostID, deviceID: DeviceID) -> Data {

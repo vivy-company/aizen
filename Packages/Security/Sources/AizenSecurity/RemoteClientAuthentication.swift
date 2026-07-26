@@ -9,6 +9,10 @@ public enum RemoteClientAuthenticationError: Swift.Error, Sendable, Equatable {
     case hostIdentityMismatch
 }
 
+public enum AuthenticatedRemoteWireTransportError: Swift.Error, Sendable, Equatable {
+    case queueFull(WireChannel)
+}
+
 /// A raw binary request/reply exchange used only while establishing a secure Aizen channel.
 public typealias RemoteFrameExchange = @Sendable (Data) async throws -> Data
 
@@ -125,8 +129,15 @@ public struct RemoteClientAuthenticator: Sendable {
 
 /// Turns a Host-pinned authenticated channel into the common Wire transport contract.
 public actor AuthenticatedRemoteWireTransport: WireTransport {
+    private struct PendingRequest: Sendable {
+        let envelope: ProtocolEnvelope
+        let continuation: CheckedContinuation<ProtocolEnvelope, Error>
+    }
+
     private let channel: AuthenticatedWireChannel
     private let exchange: RemoteFrameExchange
+    private var pending: [WireChannel: [PendingRequest]] = [:]
+    private var isDraining = false
 
     public init(channel: AuthenticatedWireChannel, exchange: @escaping RemoteFrameExchange) {
         self.channel = channel
@@ -134,7 +145,54 @@ public actor AuthenticatedRemoteWireTransport: WireTransport {
     }
 
     public func send(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
-        let frame = try await channel.seal(envelope)
-        return try await channel.open(try await exchange(frame))
+        try await withCheckedThrowingContinuation { continuation in
+            let requests = pending[envelope.channel, default: []]
+            guard requests.count < Self.maximumPendingRequests(for: envelope.channel) else {
+                continuation.resume(throwing: AuthenticatedRemoteWireTransportError.queueFull(envelope.channel))
+                return
+            }
+            pending[envelope.channel] = requests + [.init(envelope: envelope, continuation: continuation)]
+            startDrainingIfNeeded()
+        }
+    }
+
+    private func startDrainingIfNeeded() {
+        guard !isDraining else { return }
+        isDraining = true
+        Task { await drain() }
+    }
+
+    private func drain() async {
+        while let request = dequeueNext() {
+            do {
+                let frame = try await channel.seal(request.envelope)
+                let response = try await channel.open(try await exchange(frame))
+                request.continuation.resume(returning: response)
+            } catch {
+                request.continuation.resume(throwing: error)
+            }
+        }
+        isDraining = false
+    }
+
+    private func dequeueNext() -> PendingRequest? {
+        for channel in Self.priorityOrder {
+            guard var requests = pending[channel], !requests.isEmpty else { continue }
+            let next = requests.removeFirst()
+            pending[channel] = requests
+            return next
+        }
+        return nil
+    }
+
+    private static let priorityOrder: [WireChannel] = [.control, .terminal, .state, .runStream, .blob]
+
+    private static func maximumPendingRequests(for channel: WireChannel) -> Int {
+        switch channel {
+        case .blob: 8
+        case .runStream: 16
+        case .terminal, .state: 32
+        case .control: 64
+        }
     }
 }
