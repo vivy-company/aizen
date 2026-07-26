@@ -256,6 +256,9 @@ public enum SecurityAuditKind: String, Codable, Sendable, Hashable {
     case authorizationDenied
     case authorizationChanged
     case authenticationFailed
+    case ownerConfirmationApproved
+    case ownerConfirmationDenied
+    case ownerConfirmationUnavailable
 }
 
 public struct SecurityAuditRecord: Codable, Sendable, Hashable, Identifiable {

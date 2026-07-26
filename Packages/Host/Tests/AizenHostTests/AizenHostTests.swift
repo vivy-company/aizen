@@ -391,6 +391,7 @@ import AizenWire
         endpoint: LocalHost(storage: storage, terminalRuntime: runtime),
         storage: storage,
         authorization: DeviceAuthorizationGate(storage: storage),
+        ownerConfirmation: OwnerConfirmationGate(storage: storage, authority: ApprovingOwnerConfirmationAuthority()),
         rateLimiter: RemoteRequestRateLimiter(),
         terminalControl: TerminalControlLeaseRegistry(),
         session: try authenticatedSession(for: device.deviceID),
@@ -460,6 +461,32 @@ import AizenWire
     )
     let releaseResponse = try await endpoint.receive(release)
     #expect(try TerminalOperationResultPayload(protobufBytes: releaseResponse.payload.protobufBytes).sequence == 0)
+}
+
+@Test func remoteTerminalControlFailsClosedWithoutAPlatformOwnerConfirmationAuthority() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Private")
+    let terminal = TerminalSession(spaceID: space.id, tmuxSessionName: "aizen-test", paneID: "%1")
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: LocalCryptographicIdentity().publicIdentity())
+    _ = try await storage.transact { $0.spaces.append(space); $0.terminalSessions.append(terminal) }
+    try await storage.saveDeviceAuthorization(.init(device: device, grants: [.init(capability: .terminalControl, spaceIDs: [space.id])]))
+    let endpoint = RemoteHostEndpoint(
+        endpoint: LocalHost(storage: storage),
+        storage: storage,
+        authorization: DeviceAuthorizationGate(storage: storage),
+        rateLimiter: RemoteRequestRateLimiter(),
+        terminalControl: TerminalControlLeaseRegistry(),
+        session: try authenticatedSession(for: device.deviceID),
+        source: RemoteRequestSource("192.168.1.20")
+    )
+    let acquire = ProtocolEnvelope(messageID: "acquire", connectionSequence: 1, kind: .command, channel: .terminal, payload: try .init(AcquireTerminalControlCommandPayload(terminalSessionID: terminal.id.description)))
+
+    await #expect(throws: OwnerConfirmationError.unavailable(.terminalControl)) {
+        try await endpoint.receive(acquire)
+    }
+    #expect(try await storage.load().securityAuditRecords.last?.kind == .ownerConfirmationUnavailable)
 }
 
 private func authenticatedSession(for deviceID: DeviceID) throws -> AuthenticatedRemoteSession {
@@ -1937,6 +1964,12 @@ private actor RecordingAgentLaunchUpdater: AgentLaunchConfigurationUpdating {
 
     func updateAgentLaunchConfiguration(_ configuration: ConfigureAgentLaunchCommandPayload) async throws {
         self.configuration = configuration
+    }
+}
+
+private struct ApprovingOwnerConfirmationAuthority: OwnerConfirmationAuthority {
+    func confirm(_ request: OwnerConfirmationRequest) async -> OwnerConfirmationDecision {
+        .approved
     }
 }
 

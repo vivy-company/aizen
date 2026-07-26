@@ -22,6 +22,7 @@ public final class HostLANWebSocketListener {
     private let endpoint: any WireEndpoint
     private let authenticator: RemoteSessionAuthenticator
     private let authorization: DeviceAuthorizationGate
+    private let ownerConfirmation: OwnerConfirmationGate
     private let rateLimiter: RemoteRequestRateLimiter
     private let pairing: PairingRequestRegistry
     private let terminalControl: TerminalControlLeaseRegistry
@@ -31,7 +32,7 @@ public final class HostLANWebSocketListener {
     private var connections: [UUID: HostLANWebSocketConnection] = [:]
     public private(set) var port: UInt16?
 
-    public init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, storage: StorageRepository, endpoint: any WireEndpoint, pairing: PairingRequestRegistry, terminalControl: TerminalControlLeaseRegistry) {
+    public init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, storage: StorageRepository, endpoint: any WireEndpoint, pairing: PairingRequestRegistry, terminalControl: TerminalControlLeaseRegistry, ownerConfirmationAuthority: any OwnerConfirmationAuthority = MacOwnerConfirmationAuthority()) {
         self.host = host
         self.hostIdentity = hostIdentity
         self.storage = storage
@@ -40,6 +41,7 @@ public final class HostLANWebSocketListener {
         self.rateLimiter = rateLimiter
         authenticator = RemoteSessionAuthenticator(host: host, hostIdentity: hostIdentity, storage: storage, rateLimiter: rateLimiter)
         authorization = DeviceAuthorizationGate(storage: storage)
+        ownerConfirmation = OwnerConfirmationGate(storage: storage, authority: ownerConfirmationAuthority)
         self.pairing = pairing
         self.terminalControl = terminalControl
     }
@@ -112,6 +114,7 @@ public final class HostLANWebSocketListener {
                 endpoint: endpoint,
                 storage: storage,
                 authorization: authorization,
+                ownerConfirmation: ownerConfirmation,
                 rateLimiter: rateLimiter,
                 pairing: pairing,
                 terminalControl: terminalControl,
@@ -145,6 +148,7 @@ actor HostLANWebSocketProcessor {
     private let endpoint: any WireEndpoint
     private let storage: StorageRepository
     private let authorization: DeviceAuthorizationGate
+    private let ownerConfirmation: OwnerConfirmationGate
     private let rateLimiter: RemoteRequestRateLimiter
     private let pairing: PairingRequestRegistry
     private let terminalControl: TerminalControlLeaseRegistry
@@ -152,11 +156,12 @@ actor HostLANWebSocketProcessor {
     private let source: RemoteRequestSource
     private var phase = Phase.awaitingStart
 
-    init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, authenticator: RemoteSessionAuthenticator, endpoint: any WireEndpoint, storage: StorageRepository, authorization: DeviceAuthorizationGate, rateLimiter: RemoteRequestRateLimiter, pairing: PairingRequestRegistry, terminalControl: TerminalControlLeaseRegistry, source: RemoteRequestSource) {
+    init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, authenticator: RemoteSessionAuthenticator, endpoint: any WireEndpoint, storage: StorageRepository, authorization: DeviceAuthorizationGate, ownerConfirmation: OwnerConfirmationGate? = nil, rateLimiter: RemoteRequestRateLimiter, pairing: PairingRequestRegistry, terminalControl: TerminalControlLeaseRegistry, source: RemoteRequestSource) {
         self.authenticator = authenticator
         self.endpoint = endpoint
         self.storage = storage
         self.authorization = authorization
+        self.ownerConfirmation = ownerConfirmation ?? OwnerConfirmationGate(storage: storage)
         self.rateLimiter = rateLimiter
         self.pairing = pairing
         self.terminalControl = terminalControl
@@ -187,7 +192,7 @@ actor HostLANWebSocketProcessor {
             case .paired:
                 let session = try await authenticator.finish(try AuthenticationProofPayload(protobufBytes: envelope.payload.protobufBytes))
                 let channel = AuthenticatedWireChannel(keys: session.keys, binding: session.binding)
-                let endpoint = RemoteHostEndpoint(endpoint: endpoint, storage: storage, authorization: authorization, rateLimiter: rateLimiter, terminalControl: terminalControl, session: session, source: source)
+                let endpoint = RemoteHostEndpoint(endpoint: endpoint, storage: storage, authorization: authorization, ownerConfirmation: ownerConfirmation, rateLimiter: rateLimiter, terminalControl: terminalControl, session: session, source: source)
                 phase = .authenticated(channel, endpoint)
                 return try await channel.seal(ProtocolEnvelope(messageID: UUID().uuidString, connectionID: session.connectionID.uuidString, connectionSequence: 1, kind: .capabilities, channel: .control, correlationID: envelope.messageID, payload: .init(CapabilitiesPayload(identifiers: [HelloPayload.identifier, CapabilitiesPayload.identifier]))))
             case .pairing:

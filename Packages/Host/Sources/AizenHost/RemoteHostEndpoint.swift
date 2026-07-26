@@ -18,11 +18,21 @@ public struct RemoteHostEndpoint: WireEndpoint {
         let spaceID: SpaceID?
         let resourceID: ResourceID?
         let rateLimitKind: RemoteRequestKind?
+        let ownerConfirmationAction: OwnerConfirmationAction?
+
+        init(capability: HostCapability, spaceID: SpaceID?, resourceID: ResourceID?, rateLimitKind: RemoteRequestKind?, ownerConfirmationAction: OwnerConfirmationAction? = nil) {
+            self.capability = capability
+            self.spaceID = spaceID
+            self.resourceID = resourceID
+            self.rateLimitKind = rateLimitKind
+            self.ownerConfirmationAction = ownerConfirmationAction
+        }
     }
 
     private let endpoint: any WireEndpoint
     private let storage: StorageRepository
     private let authorization: DeviceAuthorizationGate
+    private let ownerConfirmation: OwnerConfirmationGate
     private let rateLimiter: RemoteRequestRateLimiter
     private let terminalControl: TerminalControlLeaseRegistry
     private let session: AuthenticatedRemoteSession
@@ -32,6 +42,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
         endpoint: any WireEndpoint,
         storage: StorageRepository,
         authorization: DeviceAuthorizationGate,
+        ownerConfirmation: OwnerConfirmationGate? = nil,
         rateLimiter: RemoteRequestRateLimiter,
         terminalControl: TerminalControlLeaseRegistry,
         session: AuthenticatedRemoteSession,
@@ -40,6 +51,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
         self.endpoint = endpoint
         self.storage = storage
         self.authorization = authorization
+        self.ownerConfirmation = ownerConfirmation ?? OwnerConfirmationGate(storage: storage)
         self.rateLimiter = rateLimiter
         self.terminalControl = terminalControl
         self.session = session
@@ -62,6 +74,16 @@ public struct RemoteHostEndpoint: WireEndpoint {
         } catch {
             try await rateLimiter.require(kind: .unauthorizedCommand, source: source, deviceID: session.deviceID)
             throw error
+        }
+        if let action = requirement.ownerConfirmationAction {
+            try await ownerConfirmation.require(.init(
+                deviceID: session.deviceID,
+                action: action,
+                capability: requirement.capability,
+                spaceID: requirement.spaceID,
+                resourceID: requirement.resourceID,
+                route: session.route.rawValue
+            ))
         }
         switch envelope.payload.identifier {
         case HelloPayload.identifier:
@@ -120,7 +142,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
     private func requirement(for envelope: ProtocolEnvelope) async throws -> Requirement {
         switch envelope.payload.identifier {
         case HelloPayload.identifier, CapabilitiesPayload.identifier:
-            return .init(capability: .hostRead, spaceID: nil, resourceID: nil, rateLimitKind: nil)
+            return .init(capability: .hostRead, spaceID: nil, resourceID: nil, rateLimitKind: nil, ownerConfirmationAction: nil)
         case SnapshotRequestPayload.identifier:
             return .init(capability: .hostRead, spaceID: nil, resourceID: nil, rateLimitKind: .snapshot)
         case ReadJournalEventsQueryPayload.identifier:
@@ -158,7 +180,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
         case BuildXcodeProjectCommandPayload.identifier:
             let request = try BuildXcodeProjectCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let resource = try await requiredResource(request.resourceID)
-            return .init(capability: .xcodeBuild, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil)
+            return .init(capability: .xcodeBuild, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil, ownerConfirmationAction: .xcodeBuild)
         case CancelOperationCommandPayload.identifier:
             let request = try CancelOperationCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let operation = try await requiredOperation(request.operationID)
@@ -201,7 +223,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
         case ReplaceContextTextFileCommandPayload.identifier:
             let command = try ReplaceContextTextFileCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let context = try await requiredExecutionContext(command.executionContextID)
-            return .init(capability: .fileWrite, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil)
+            return .init(capability: .fileWrite, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil, ownerConfirmationAction: .fileWrite)
         case GetConversationTimelineQueryPayload.identifier:
             let request = try GetConversationTimelineQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let conversation = try await requiredSession(request.sessionID)
@@ -237,7 +259,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
         case RemoveResourceCommandPayload.identifier:
             let request = try RemoveResourceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let resource = try await requiredResource(request.resourceID)
-            return .init(capability: .fileWrite, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil)
+            return .init(capability: .fileWrite, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil, ownerConfirmationAction: .fileWrite)
         case RefreshRepositoryResourceCommandPayload.identifier:
             let request = try RefreshRepositoryResourceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let resource = try await requiredResource(request.resourceID)
@@ -265,11 +287,11 @@ public struct RemoteHostEndpoint: WireEndpoint {
         case CommitRepositoryCommandPayload.identifier:
             let request = try CommitRepositoryCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let resource = try await requiredResource(request.resourceID)
-            return .init(capability: .gitCommit, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil)
+            return .init(capability: .gitCommit, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil, ownerConfirmationAction: .repositoryCommit)
         case UpdateRepositoryBranchCommandPayload.identifier:
             let request = try UpdateRepositoryBranchCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let resource = try await requiredResource(request.resourceID)
-            return .init(capability: .gitCommit, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil)
+            return .init(capability: .gitCommit, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil, ownerConfirmationAction: .repositoryCommit)
         case FetchRepositoryCommandPayload.identifier:
             let request = try FetchRepositoryCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let resource = try await requiredResource(request.resourceID)
@@ -281,7 +303,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
         case PushRepositoryCommandPayload.identifier:
             let request = try PushRepositoryCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let resource = try await requiredResource(request.resourceID)
-            return .init(capability: .gitPush, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil)
+            return .init(capability: .gitPush, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil, ownerConfirmationAction: .repositoryPush)
         case CreateTerminalSessionCommandPayload.identifier:
             let request = try CreateTerminalSessionCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let requestedSpaceID = try spaceID(request.spaceID)
@@ -290,7 +312,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
             return .init(capability: .terminalCreate, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil)
         case AcquireTerminalControlCommandPayload.identifier:
             let command = try AcquireTerminalControlCommandPayload(protobufBytes: envelope.payload.protobufBytes)
-            return try await terminalControlRequirement(for: command.terminalSessionID)
+            return try await terminalControlRequirement(for: command.terminalSessionID, ownerConfirmationAction: .terminalControl)
         case ReleaseTerminalControlCommandPayload.identifier:
             let command = try ReleaseTerminalControlCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             return try await terminalControlRequirement(for: command.terminalSessionID)
@@ -374,7 +396,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
         return terminal
     }
 
-    private func terminalControlRequirement(for rawTerminalID: String) async throws -> Requirement {
+    private func terminalControlRequirement(for rawTerminalID: String, ownerConfirmationAction: OwnerConfirmationAction? = nil) async throws -> Requirement {
         let terminal = try await requiredTerminal(rawTerminalID)
         let resourceID: ResourceID?
         if let executionContextID = terminal.executionContextID {
@@ -382,7 +404,7 @@ public struct RemoteHostEndpoint: WireEndpoint {
         } else {
             resourceID = nil
         }
-        return .init(capability: .terminalControl, spaceID: terminal.spaceID, resourceID: resourceID, rateLimitKind: nil)
+        return .init(capability: .terminalControl, spaceID: terminal.spaceID, resourceID: resourceID, rateLimitKind: nil, ownerConfirmationAction: ownerConfirmationAction)
     }
 
     private func response(to request: ProtocolEnvelope, payload: some WirePayload) throws -> ProtocolEnvelope {
