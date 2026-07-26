@@ -1263,7 +1263,9 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
         ))
     ))
     #expect(textResponse.payload.identifier == ReadContextTextFileResponsePayload.identifier)
-    #expect(try ReadContextTextFileResponsePayload(protobufBytes: textResponse.payload.protobufBytes).text == "readme")
+    let text = try ReadContextTextFileResponsePayload(protobufBytes: textResponse.payload.protobufBytes)
+    #expect(text.text == "readme")
+    #expect(text.contentHash.count == 64)
 }
 
 @Test func hostCreatesLinkedWorktreeContextsThroughAHostOperation() async throws {

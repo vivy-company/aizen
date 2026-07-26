@@ -1478,6 +1478,8 @@ nonisolated struct AizenWireV1_ReadContextTextFileResponse: Sendable {
 
   var text: String = String()
 
+  var contentHash: String = String()
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -4989,7 +4991,7 @@ nonisolated extension AizenWireV1_ReadContextTextFileQuery: SwiftProtobuf.Messag
 
 nonisolated extension AizenWireV1_ReadContextTextFileResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".ReadContextTextFileResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}relative_path\0\u{1}text\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}relative_path\0\u{1}text\0\u{3}content_hash\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4999,6 +5001,7 @@ nonisolated extension AizenWireV1_ReadContextTextFileResponse: SwiftProtobuf.Mes
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.relativePath) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.text) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.contentHash) }()
       default: break
       }
     }
@@ -5011,12 +5014,16 @@ nonisolated extension AizenWireV1_ReadContextTextFileResponse: SwiftProtobuf.Mes
     if !self.text.isEmpty {
       try visitor.visitSingularStringField(value: self.text, fieldNumber: 2)
     }
+    if !self.contentHash.isEmpty {
+      try visitor.visitSingularStringField(value: self.contentHash, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: AizenWireV1_ReadContextTextFileResponse, rhs: AizenWireV1_ReadContextTextFileResponse) -> Bool {
     if lhs.relativePath != rhs.relativePath {return false}
     if lhs.text != rhs.text {return false}
+    if lhs.contentHash != rhs.contentHash {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

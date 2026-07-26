@@ -354,7 +354,8 @@ public actor LocalHost: WireEndpoint {
             let contextID = try Self.executionContextID(from: query.executionContextID)
             let text = try await contextFiles.readTextFile(contextID: contextID, relativePath: query.relativePath)
             kind = .queryResponse
-            payload = try TypedPayload(ReadContextTextFileResponsePayload(relativePath: query.relativePath, text: text))
+            let contentHash = SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+            payload = try TypedPayload(ReadContextTextFileResponsePayload(relativePath: query.relativePath, text: text, contentHash: contentHash))
         case .command where envelope.payload.identifier == TerminalInputCommandPayload.identifier:
             let command = try TerminalInputCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)

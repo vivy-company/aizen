@@ -479,6 +479,7 @@ message ReadContextTextFileQuery {
 message ReadContextTextFileResponse {
   string relative_path = 1;
   string text = 2;
+  string content_hash = 3;
 }
 
 message CreateTerminalSessionCommand {

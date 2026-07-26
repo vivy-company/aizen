@@ -1833,9 +1833,10 @@ public struct ReadContextTextFileResponsePayload: WirePayload, Sendable, Hashabl
     public static let stateAffecting = false
     public let relativePath: String
     public let text: String
-    public init(relativePath: String, text: String) { self.relativePath = relativePath; self.text = text }
-    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReadContextTextFileResponse(serializedBytes: protobufBytes); guard !m.relativePath.isEmpty else { throw WireCodecError.invalidIdentity("context text file") }; self.init(relativePath: m.relativePath, text: m.text) }
-    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadContextTextFileResponse(); m.relativePath = relativePath; m.text = text; return try m.serializedData() }
+    public let contentHash: String
+    public init(relativePath: String, text: String, contentHash: String) { self.relativePath = relativePath; self.text = text; self.contentHash = contentHash }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReadContextTextFileResponse(serializedBytes: protobufBytes); guard !m.relativePath.isEmpty, m.contentHash.count == 64 else { throw WireCodecError.invalidIdentity("context text file") }; self.init(relativePath: m.relativePath, text: m.text, contentHash: m.contentHash) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadContextTextFileResponse(); m.relativePath = relativePath; m.text = text; m.contentHash = contentHash; return try m.serializedData() }
 }
 
 public struct CreateTerminalSessionCommandPayload: WirePayload, Sendable, Hashable {
