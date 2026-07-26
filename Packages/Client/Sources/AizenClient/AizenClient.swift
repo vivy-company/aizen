@@ -293,6 +293,24 @@ public actor HostClient {
         return try ListSpacesResponsePayload(protobufBytes: response.payload.protobufBytes).spaces
     }
 
+    public func pendingPairingRequests() async throws -> [PendingPairingRequestRecordPayload] {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .query, channel: .control, payload: try .init(ListPendingPairingRequestsQueryPayload())))
+        guard response.kind == .queryResponse, response.payload.identifier == ListPendingPairingRequestsResponsePayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try ListPendingPairingRequestsResponsePayload(protobufBytes: response.payload.protobufBytes).requests
+    }
+
+    public func approvePairingRequest(tokenID: UUID, capabilities: Set<String>) async throws {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .control, payload: try .init(ApprovePairingRequestCommandPayload(tokenID: tokenID, capabilities: capabilities))))
+        guard response.kind == .commandResult, response.payload.identifier == PairingApprovalResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        _ = try PairingApprovalResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
+    public func rejectPairingRequest(tokenID: UUID) async throws {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .control, payload: try .init(RejectPairingRequestCommandPayload(tokenID: tokenID))))
+        guard response.kind == .commandResult, response.payload.identifier == PairingApprovalResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        _ = try PairingApprovalResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func createSpace(name: String, icon: String? = nil, summary: String? = nil) async throws -> SpaceID {
         let response = try await send(.init(
             messageID: UUID().uuidString,

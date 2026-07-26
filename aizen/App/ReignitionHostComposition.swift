@@ -51,6 +51,10 @@ actor ReignitionHostComposition {
         try await client.spaces()
     }
 
+    func pendingPairingRequests() async throws -> [PendingPairingRequestRecordPayload] { try await client.pendingPairingRequests() }
+    func approvePairingRequest(tokenID: UUID) async throws { try await client.approvePairingRequest(tokenID: tokenID, capabilities: ["host.read", "space.read", "session.read", "resource.read"]) }
+    func rejectPairingRequest(tokenID: UUID) async throws { try await client.rejectPairingRequest(tokenID: tokenID) }
+
     func createSpace(name: String) async throws -> SpaceID {
         try await client.createSpace(name: name)
     }
