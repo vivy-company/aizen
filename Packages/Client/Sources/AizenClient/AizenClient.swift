@@ -446,6 +446,28 @@ public actor HostClient {
         return try ListOperationsResponsePayload(protobufBytes: response.payload.protobufBytes).operations
     }
 
+    public func operationLog(
+        operationID: OperationID,
+        afterSequence: UInt64 = 0,
+        maximumBytes: Int = ReadOperationLogQueryPayload.defaultMaximumBytes
+    ) async throws -> ReadOperationLogResponsePayload {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(ReadOperationLogQueryPayload(
+                operationID: operationID.description,
+                afterSequence: afterSequence,
+                maximumBytes: maximumBytes
+            ))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == ReadOperationLogResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try ReadOperationLogResponsePayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func resources(spaceID: SpaceID? = nil) async throws -> [Resource] {
         let response = try await send(.init(
             messageID: UUID().uuidString,

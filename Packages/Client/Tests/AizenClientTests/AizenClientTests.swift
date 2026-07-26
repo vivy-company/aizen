@@ -541,6 +541,21 @@ import AizenWire
     #expect(try await storage.load().operations.first?.lifecycle == .cancelled)
 }
 
+@Test func clientReadsBoundedXcodeOperationLogsThroughHost() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Xcode")
+    let operation = Operation(spaceID: space.id, lifecycle: .completed, progress: 1, result: .init(summary: "Xcode build completed successfully."))
+    _ = try await storage.transact { $0.spaces.append(space); $0.operations.append(operation) }
+    _ = try await storage.appendOperationLogChunk(operationID: operation.id, stream: .standardOutput, text: "CompileSwift App.swift\\n")
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+
+    let log = try await client.operationLog(operationID: operation.id, maximumBytes: 64 * 1_024)
+    #expect(log.chunks.map(\.text) == ["CompileSwift App.swift\\n"])
+    #expect(!log.truncated)
+}
+
 @Test func clientSendsProjectlessConversationsThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
