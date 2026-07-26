@@ -485,6 +485,25 @@ message UpdateRepositoryIndexResult {
   string operation_id = 2;
 }
 
+message ReadRepositoryBranchesQuery {
+  string resource_id = 1;
+  uint32 maximum_branches = 2;
+}
+
+message RepositoryBranchRecord {
+  string name = 1;
+  string revision = 2;
+  bool is_current = 3;
+}
+
+message ReadRepositoryBranchesResponse {
+  string resource_id = 1;
+  string repository_revision = 2;
+  string index_revision = 3;
+  repeated RepositoryBranchRecord branches = 4;
+  bool truncated = 5;
+}
+
 message ListExecutionContextsQuery {
   string space_id = 1;
   string resource_id = 2;

@@ -130,6 +130,20 @@ import Testing
     #expect(try UpdateRepositoryIndexResultPayload(protobufBytes: result.protobufBytes()) == result)
 }
 
+@Test func repositoryBranchesPayloadsRoundTripWithBounds() throws {
+    let resourceID = UUID().uuidString
+    let query = ReadRepositoryBranchesQueryPayload(resourceID: resourceID, maximumBranches: 2)
+    let response = ReadRepositoryBranchesResponsePayload(
+        resourceID: resourceID,
+        repositoryRevision: "head",
+        indexRevision: "index",
+        branches: [.init(name: "main", revision: "abc", isCurrent: true)],
+        truncated: false
+    )
+    #expect(try ReadRepositoryBranchesQueryPayload(protobufBytes: query.protobufBytes()) == query)
+    #expect(try ReadRepositoryBranchesResponsePayload(protobufBytes: response.protobufBytes()) == response)
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")

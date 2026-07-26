@@ -1871,6 +1871,29 @@ public struct UpdateRepositoryIndexResultPayload: WirePayload, Sendable, Hashabl
     public func protobufBytes() throws -> Data { var m = AizenWireV1_UpdateRepositoryIndexResult(); m.indexRevision = indexRevision; m.operationID = operationID; return try m.serializedData() }
 }
 
+public struct ReadRepositoryBranchesQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.repository.branches@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = false; public static let maximumBranchLimit: UInt32 = 200
+    public let resourceID: String; public let maximumBranches: UInt32
+    public init(resourceID: String, maximumBranches: UInt32 = 50) { precondition(!resourceID.isEmpty && (1...Self.maximumBranchLimit).contains(maximumBranches)); self.resourceID = resourceID; self.maximumBranches = maximumBranches }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReadRepositoryBranchesQuery(serializedBytes: protobufBytes); guard !m.resourceID.isEmpty, (1...Self.maximumBranchLimit).contains(m.maximumBranches) else { throw WireCodecError.invalidRepositoryBranchesQuery }; self.init(resourceID: m.resourceID, maximumBranches: m.maximumBranches) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadRepositoryBranchesQuery(); m.resourceID = resourceID; m.maximumBranches = maximumBranches; return try m.serializedData() }
+}
+
+public struct RepositoryBranchRecordPayload: Sendable, Hashable {
+    public let name: String; public let revision: String; public let isCurrent: Bool
+    public init(name: String, revision: String, isCurrent: Bool) { precondition(!name.isEmpty && !name.contains("\0") && !revision.isEmpty); self.name = name; self.revision = revision; self.isCurrent = isCurrent }
+    fileprivate init(protobuf m: AizenWireV1_RepositoryBranchRecord) throws { guard !m.name.isEmpty, !m.name.contains("\0"), !m.revision.isEmpty else { throw WireCodecError.invalidRepositoryBranchesResponse }; self.init(name: m.name, revision: m.revision, isCurrent: m.isCurrent) }
+    fileprivate var protobuf: AizenWireV1_RepositoryBranchRecord { get { var m = AizenWireV1_RepositoryBranchRecord(); m.name = name; m.revision = revision; m.isCurrent = isCurrent; return m } }
+}
+
+public struct ReadRepositoryBranchesResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.repository.branches@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = false
+    public let resourceID: String; public let repositoryRevision: String; public let indexRevision: String; public let branches: [RepositoryBranchRecordPayload]; public let truncated: Bool
+    public init(resourceID: String, repositoryRevision: String, indexRevision: String, branches: [RepositoryBranchRecordPayload], truncated: Bool) { precondition(!resourceID.isEmpty && !repositoryRevision.isEmpty && !indexRevision.isEmpty && branches.count <= Int(ReadRepositoryBranchesQueryPayload.maximumBranchLimit)); self.resourceID = resourceID; self.repositoryRevision = repositoryRevision; self.indexRevision = indexRevision; self.branches = branches; self.truncated = truncated }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReadRepositoryBranchesResponse(serializedBytes: protobufBytes); guard !m.resourceID.isEmpty, !m.repositoryRevision.isEmpty, !m.indexRevision.isEmpty, m.branches.count <= Int(ReadRepositoryBranchesQueryPayload.maximumBranchLimit) else { throw WireCodecError.invalidRepositoryBranchesResponse }; try self.init(resourceID: m.resourceID, repositoryRevision: m.repositoryRevision, indexRevision: m.indexRevision, branches: m.branches.map(RepositoryBranchRecordPayload.init(protobuf:)), truncated: m.truncated) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadRepositoryBranchesResponse(); m.resourceID = resourceID; m.repositoryRevision = repositoryRevision; m.indexRevision = indexRevision; m.branches = branches.map(\.protobuf); m.truncated = truncated; return try m.serializedData() }
+}
+
 public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.execution-context.list@1")
     public static let schemaVersion: UInt32 = 1
@@ -2658,6 +2681,8 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidRepositoryDiffResponse
     case invalidRepositoryHistoryQuery
     case invalidRepositoryHistoryResponse
+    case invalidRepositoryBranchesQuery
+    case invalidRepositoryBranchesResponse
     case invalidRepositoryIndexCommand
 }
 
