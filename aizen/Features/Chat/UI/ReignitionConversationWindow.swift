@@ -76,6 +76,18 @@ struct ReignitionConversationWindow: View {
                     }
                     .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
                 }
+                if let liveAssistantText = store.liveAssistantText {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Assistant")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(liveAssistantText)
+                            .textSelection(.enabled)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                }
                 Divider()
                 HStack(alignment: .bottom) {
                     TextField("Message", text: $draft, axis: .vertical)
