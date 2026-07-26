@@ -239,6 +239,19 @@ import Testing
     #expect(try ReadOperationLogResponsePayload(protobufBytes: response.protobufBytes()) == response)
 }
 
+@Test func operationRecordsPreserveResourceAndFinalResults() throws {
+    let operation = Operation(
+        spaceID: SpaceID(),
+        resourceID: ResourceID(),
+        lifecycle: .completed,
+        progress: 1,
+        result: .init(summary: "Xcode tests completed successfully.", artifactIDs: [ArtifactID()])
+    )
+    let payload = ListOperationsResponsePayload(operations: [operation])
+
+    #expect(try ListOperationsResponsePayload(protobufBytes: payload.protobufBytes()).operations == [operation])
+}
+
 @Test func xcodeProjectDiscoveryCarriesBuildConfigurations() throws {
     let descriptor = XcodeProjectDescriptor(resourceID: ResourceID(), id: "App.xcodeproj", name: "App", kind: .project, schemes: ["App"], configurations: ["Debug", "Release"])
     let payload = DiscoverXcodeProjectResponsePayload(project: descriptor)

@@ -313,6 +313,9 @@ message OperationRecord {
   double progress = 5;
   bool has_progress = 6;
   string failure_description = 7;
+  string resource_id = 8;
+  string result_summary = 9;
+  repeated string artifact_ids = 10;
 }
 
 message ListOperationsResponse {

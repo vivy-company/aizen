@@ -1239,12 +1239,20 @@ public struct ListOperationsResponsePayload: WirePayload, Sendable, Hashable {
                 throw WireCodecError.invalidIdentity(record.operationID)
             }
             let sessionID = record.sessionID.isEmpty ? nil : UUID(uuidString: record.sessionID).map(SessionID.init(rawValue:))
+            let resourceID = record.resourceID.isEmpty ? nil : UUID(uuidString: record.resourceID).map(ResourceID.init(rawValue:))
             guard record.sessionID.isEmpty || sessionID != nil,
+                  record.resourceID.isEmpty || resourceID != nil,
                   !record.hasProgress_p || (0...1).contains(record.progress) else {
                 throw WireCodecError.invalidIdentity(record.operationID)
             }
             let failureDescription = record.failureDescription.isEmpty ? nil : record.failureDescription
-            return AizenCore.Operation(id: .init(rawValue: operationUUID), spaceID: .init(rawValue: spaceUUID), sessionID: sessionID, lifecycle: lifecycle, progress: record.hasProgress_p ? record.progress : nil, failureDescription: failureDescription)
+            let artifactIDs = try record.artifactIds.map {
+                guard let uuid = UUID(uuidString: $0) else { throw WireCodecError.invalidIdentity($0) }
+                return ArtifactID(rawValue: uuid)
+            }
+            let result = record.resultSummary.isEmpty ? nil : OperationResult(summary: record.resultSummary, artifactIDs: artifactIDs)
+            guard result != nil || artifactIDs.isEmpty else { throw WireCodecError.invalidIdentity("operation artifact result") }
+            return AizenCore.Operation(id: .init(rawValue: operationUUID), spaceID: .init(rawValue: spaceUUID), sessionID: sessionID, resourceID: resourceID, lifecycle: lifecycle, progress: record.hasProgress_p ? record.progress : nil, failureDescription: failureDescription, result: result)
         }
     }
 
@@ -1255,9 +1263,12 @@ public struct ListOperationsResponsePayload: WirePayload, Sendable, Hashable {
             record.operationID = operation.id.description
             record.spaceID = operation.spaceID.description
             record.sessionID = operation.sessionID?.description ?? ""
+            record.resourceID = operation.resourceID?.description ?? ""
             record.lifecycle = operation.lifecycle.rawValue
             if let progress = operation.progress { record.progress = progress; record.hasProgress_p = true }
             record.failureDescription = operation.failureDescription ?? ""
+            record.resultSummary = operation.result?.summary ?? ""
+            record.artifactIds = operation.result?.artifactIDs.map(\.description) ?? []
             return record
         }
         return try message.serializedData()

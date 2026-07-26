@@ -980,6 +980,12 @@ nonisolated struct AizenWireV1_OperationRecord: Sendable {
 
   var failureDescription: String = String()
 
+  var resourceID: String = String()
+
+  var resultSummary: String = String()
+
+  var artifactIds: [String] = []
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -4312,7 +4318,7 @@ nonisolated extension AizenWireV1_ListOperationsQuery: SwiftProtobuf.Message, Sw
 
 nonisolated extension AizenWireV1_OperationRecord: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".OperationRecord"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}operation_id\0\u{3}space_id\0\u{3}session_id\0\u{1}lifecycle\0\u{1}progress\0\u{3}has_progress\0\u{3}failure_description\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}operation_id\0\u{3}space_id\0\u{3}session_id\0\u{1}lifecycle\0\u{1}progress\0\u{3}has_progress\0\u{3}failure_description\0\u{3}resource_id\0\u{3}result_summary\0\u{3}artifact_ids\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4327,6 +4333,9 @@ nonisolated extension AizenWireV1_OperationRecord: SwiftProtobuf.Message, SwiftP
       case 5: try { try decoder.decodeSingularDoubleField(value: &self.progress) }()
       case 6: try { try decoder.decodeSingularBoolField(value: &self.hasProgress_p) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self.failureDescription) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.resultSummary) }()
+      case 10: try { try decoder.decodeRepeatedStringField(value: &self.artifactIds) }()
       default: break
       }
     }
@@ -4354,6 +4363,15 @@ nonisolated extension AizenWireV1_OperationRecord: SwiftProtobuf.Message, SwiftP
     if !self.failureDescription.isEmpty {
       try visitor.visitSingularStringField(value: self.failureDescription, fieldNumber: 7)
     }
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 8)
+    }
+    if !self.resultSummary.isEmpty {
+      try visitor.visitSingularStringField(value: self.resultSummary, fieldNumber: 9)
+    }
+    if !self.artifactIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.artifactIds, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4365,6 +4383,9 @@ nonisolated extension AizenWireV1_OperationRecord: SwiftProtobuf.Message, SwiftP
     if lhs.progress != rhs.progress {return false}
     if lhs.hasProgress_p != rhs.hasProgress_p {return false}
     if lhs.failureDescription != rhs.failureDescription {return false}
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.resultSummary != rhs.resultSummary {return false}
+    if lhs.artifactIds != rhs.artifactIds {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
