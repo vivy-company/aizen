@@ -29,6 +29,10 @@ public protocol XcodeProjectOpening: Sendable {
     func openXcodeProject(at url: URL) async throws
 }
 
+public protocol XcodeProjectInspecting: Sendable {
+    func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String]
+}
+
 /// Explicit local Host composition. It owns Storage but exposes only Wire envelopes and Core snapshots.
 public actor LocalHost: WireEndpoint {
     private let storage: StorageRepository
@@ -41,6 +45,7 @@ public actor LocalHost: WireEndpoint {
     private let linkedWorktrees: (any LinkedWorktreeCreating)?
     private let independentContexts: (any IndependentContextCreating)?
     private let xcodeProjectOpener: (any XcodeProjectOpening)?
+    private let xcodeProjectInspector: (any XcodeProjectInspecting)?
     private let contextFiles: ExecutionContextFileService
 
     public init(
@@ -53,7 +58,8 @@ public actor LocalHost: WireEndpoint {
         pairingRegistry: PairingRequestRegistry? = nil,
         linkedWorktrees: (any LinkedWorktreeCreating)? = nil,
         independentContexts: (any IndependentContextCreating)? = nil,
-        xcodeProjectOpener: (any XcodeProjectOpening)? = nil
+        xcodeProjectOpener: (any XcodeProjectOpening)? = nil,
+        xcodeProjectInspector: (any XcodeProjectInspecting)? = nil
     ) {
         self.storage = storage
         self.conversationRuns = conversationRuns
@@ -65,6 +71,7 @@ public actor LocalHost: WireEndpoint {
         self.linkedWorktrees = linkedWorktrees
         self.independentContexts = independentContexts
         self.xcodeProjectOpener = xcodeProjectOpener
+        self.xcodeProjectInspector = xcodeProjectInspector
         self.contextFiles = .init(storage: storage)
     }
 
@@ -241,7 +248,7 @@ public actor LocalHost: WireEndpoint {
                 throw HostProtocolError.unknownResource(resourceID)
             }
             kind = .queryResponse
-            payload = try TypedPayload(DiscoverXcodeProjectResponsePayload(project: try Self.discoverXcodeProject(for: resource)))
+            payload = try TypedPayload(DiscoverXcodeProjectResponsePayload(project: try await xcodeProject(for: resource)))
         case .command where envelope.payload.identifier == OpenXcodeProjectCommandPayload.identifier:
             guard let xcodeProjectOpener else { throw HostProtocolError.runtimeUnavailable }
             let command = try OpenXcodeProjectCommandPayload(protobufBytes: envelope.payload.protobufBytes)
@@ -253,7 +260,7 @@ public actor LocalHost: WireEndpoint {
             payload = try await executeDurably(envelope: envelope, spaceID: resource.spaceID) {
                 let snapshot = try await self.storage.load()
                 guard let resource = snapshot.resources.first(where: { $0.id == resourceID }),
-                      let project = try Self.discoverXcodeProject(for: resource), project.id == command.projectID,
+                      let project = try await self.xcodeProject(for: resource), project.id == command.projectID,
                       let directory = try Self.localResourceDirectory(for: resource) else {
                     throw HostProtocolError.unknownResource(resourceID)
                 }
@@ -882,6 +889,14 @@ public actor LocalHost: WireEndpoint {
         }
         guard let candidate = candidates.first else { return nil }
         return XcodeProjectDescriptor(resourceID: resource.id, id: candidate.url.lastPathComponent, name: candidate.url.deletingPathExtension().lastPathComponent, kind: candidate.kind, schemes: [])
+    }
+
+    private func xcodeProject(for resource: Resource) async throws -> XcodeProjectDescriptor? {
+        guard let project = try Self.discoverXcodeProject(for: resource) else { return nil }
+        guard let xcodeProjectInspector,
+              let directory = try Self.localResourceDirectory(for: resource) else { return project }
+        let schemes = try await xcodeProjectInspector.schemes(for: directory.appendingPathComponent(project.id), kind: project.kind)
+        return .init(resourceID: project.resourceID, id: project.id, name: project.name, kind: project.kind, schemes: schemes)
     }
 
     private static func localResourceDirectory(for resource: Resource) throws -> URL? {

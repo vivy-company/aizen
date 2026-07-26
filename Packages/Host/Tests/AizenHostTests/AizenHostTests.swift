@@ -259,7 +259,7 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
         $0.terminalSessions.append(terminal)
         $0.operations.append(operation)
     }
-    let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage, xcodeProjectInspector: StaticXcodeProjectInspector(schemes: ["App", "AppTests"])))
     let response = try await transport.send(.init(messageID: "spaces", connectionSequence: 1, kind: .query, channel: .state, payload: try .init(SnapshotRequestPayload())))
     let wireSnapshot = try SnapshotResponsePayload(protobufBytes: response.payload.protobufBytes)
     let snapshot = try JSONDecoder().decode(HostProjectionSnapshot.self, from: wireSnapshot.snapshot)
@@ -595,7 +595,7 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
     let space = Space(name: "Vivy")
     _ = try await storage.transact { $0.spaces.append(space) }
-    let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage, xcodeProjectInspector: StaticXcodeProjectInspector(schemes: ["App", "AppTests"])))
     let imported = try await transport.send(.init(
         messageID: UUID().uuidString,
         connectionSequence: 1,
@@ -616,6 +616,7 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(project.id == "App.xcworkspace")
     #expect(project.name == "App")
     #expect(project.kind == .workspace)
+    #expect(project.schemes == ["App", "AppTests"])
     #expect(!project.id.contains(folder.path))
 }
 
@@ -1207,6 +1208,11 @@ private actor RecordingIndependentContexts: IndependentContextCreating {
 private actor RecordingXcodeProjectOpener: XcodeProjectOpening {
     private(set) var openedURL: URL?
     func openXcodeProject(at url: URL) async throws { openedURL = url }
+}
+
+private struct StaticXcodeProjectInspector: XcodeProjectInspecting {
+    let schemes: [String]
+    func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { schemes }
 }
 
 private actor RecordingAgentLaunchUpdater: AgentLaunchConfigurationUpdating {
