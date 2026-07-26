@@ -63,6 +63,32 @@ public struct TypedPayload: Codable, Sendable, Hashable {
     }
 }
 
+public struct HostErrorPayload: Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.error@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let code: String
+    public let message: String
+
+    public init(code: String, message: String) {
+        precondition(!code.isEmpty && !message.isEmpty, "Host errors require a code and message")
+        self.code = code
+        self.message = message
+    }
+
+    public init(protobufBytes: Data) throws {
+        let value = try AizenWireV1_HostError(serializedBytes: protobufBytes)
+        self.init(code: value.code, message: value.message)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var value = AizenWireV1_HostError()
+        value.code = code
+        value.message = message
+        return try value.serializedData()
+    }
+}
+
 public struct ProtocolEnvelope: Codable, Sendable, Hashable {
     public let protocolGeneration: UInt32
     public let messageID: String
@@ -120,6 +146,8 @@ public protocol WirePayload: Sendable {
     init(protobufBytes: Data) throws
     func protobufBytes() throws -> Data
 }
+
+extension HostErrorPayload: WirePayload {}
 
 public extension TypedPayload {
     init<P: WirePayload>(_ payload: P) throws {

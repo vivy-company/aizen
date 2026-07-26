@@ -434,8 +434,21 @@ import AizenWire
     #expect(try await storage.load().runs.first?.lifecycle == .succeeded)
 }
 
+@Test func clientSurfacesTypedHostFailures() async throws {
+    let client = HostClient(transport: InProcessTransport(endpoint: FailingHost()))
+    await #expect(throws: HostClient.Error.hostFailure(code: "invalid-resource", message: "Resource is unavailable")) {
+        _ = try await client.spaces()
+    }
+}
+
 private struct EchoHost: WireEndpoint {
     func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope { envelope }
+}
+
+private struct FailingHost: WireEndpoint {
+    func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
+        try .init(messageID: envelope.messageID, connectionSequence: envelope.connectionSequence, kind: .error, channel: .control, payload: .init(HostErrorPayload(code: "invalid-resource", message: "Resource is unavailable")))
+    }
 }
 
 private actor ReceiptDroppingTransport: WireTransport {

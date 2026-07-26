@@ -171,12 +171,20 @@ private final class MachWireService: @unchecked Sendable {
             }
             let request = Data(bytes: bytes, count: length)
             Task { [endpoint, peer, replyMessage] in
-                guard let envelope = try? ProtocolEnvelope(serializedData: request),
-                      let response = try? await endpoint.receive(envelope),
-                      let data = try? response.serializedData() else {
-                    peer.send(replyMessage)
-                    return
+                let response: ProtocolEnvelope?
+                do {
+                    let envelope = try ProtocolEnvelope(serializedData: request)
+                    response = try await endpoint.receive(envelope)
+                } catch {
+                    response = try? ProtocolEnvelope(
+                        messageID: UUID().uuidString,
+                        connectionSequence: 0,
+                        kind: .error,
+                        channel: .control,
+                        payload: TypedPayload(HostErrorPayload(code: String(reflecting: type(of: error)), message: error.localizedDescription))
+                    )
                 }
+                guard let response, let data = try? response.serializedData() else { peer.send(replyMessage); return }
                 data.withUnsafeBytes { bytes in
                     xpc_dictionary_set_data(replyMessage.value, "response", bytes.baseAddress, bytes.count)
                 }

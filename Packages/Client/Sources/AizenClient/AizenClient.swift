@@ -171,6 +171,7 @@ public actor HostClient {
         case unexpectedPayload(PayloadIdentifier)
         case invalidIdentity(String)
         case eventStreamingUnavailable
+        case hostFailure(code: String, message: String)
         case incompatibleHost(
             cliProductVersion: String,
             hostProductVersion: String,
@@ -188,6 +189,8 @@ public actor HostClient {
                 "Aizen Host returned an invalid identity: \(value)."
             case .eventStreamingUnavailable:
                 "This Aizen Host connection does not support run event streaming."
+            case let .hostFailure(code, message):
+                "Aizen Host failed [\(code)]: \(message)"
             case let .incompatibleHost(cliProductVersion, hostProductVersion, hostProtocolRange, minimumCompatibleProductVersion):
                 "Aizen CLI \(cliProductVersion) is incompatible with Host \(hostProductVersion). Host supports protocol generation \(hostProtocolRange.lowerBound)...\(hostProtocolRange.upperBound) and requires Client version \(minimumCompatibleProductVersion) or newer."
             }
@@ -796,6 +799,10 @@ public actor HostClient {
     private func transmit(_ envelope: ProtocolEnvelope, acknowledgingCommand: Bool) async throws -> ProtocolEnvelope {
         do {
             let response = try await transport.send(envelope)
+            if response.kind == .error, response.payload.identifier == HostErrorPayload.identifier {
+                let failure = try HostErrorPayload(protobufBytes: response.payload.protobufBytes)
+                throw Error.hostFailure(code: failure.code, message: failure.message)
+            }
             connectionState = .ready(protocolGeneration: response.protocolGeneration)
             if acknowledgingCommand, envelope.kind == .command, response.kind == .commandResult {
                 try await commandOutbox?.acknowledge(commandID: envelope.messageID)
