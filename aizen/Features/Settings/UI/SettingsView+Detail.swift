@@ -32,6 +32,10 @@ extension SettingsView {
             EditorSettingsView()
                 .navigationTitle("Editor")
                 .navigationSubtitle("Editor behavior and file browser options")
+        case .host:
+            HostServiceSettingsView()
+                .navigationTitle("Aizen Host")
+                .navigationSubtitle("Local service lifecycle and diagnostics")
         case .agent(let agentId):
             if let index = agents.firstIndex(where: { $0.id == agentId }) {
                 AgentDetailView(

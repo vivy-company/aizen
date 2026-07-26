@@ -22,6 +22,9 @@ extension SettingsView {
                 Label("Editor", systemImage: "doc.text")
                     .tag(SettingsSelection.editor)
 
+                Label("Aizen Host", systemImage: "server.rack")
+                    .tag(SettingsSelection.host)
+
                 Section("Agents") {
                     ForEach(agents, id: \.id) { agent in
                         agentRow(for: agent)

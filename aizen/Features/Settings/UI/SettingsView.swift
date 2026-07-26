@@ -28,6 +28,7 @@ enum SettingsSelection: Hashable {
     case git
     case terminal
     case editor
+    case host
     case agent(String) // agent id
 }
 
