@@ -1,4 +1,5 @@
 import Foundation
+import AizenCore
 import AizenTransport
 import Testing
 @testable import AizenClient
@@ -19,6 +20,14 @@ import AizenWire
     ))
     #expect(response.messageID == "hello")
     #expect(await client.connectionState == .connected(protocolGeneration: 1))
+}
+
+@Test func selectingSpaceIsAnExplicitProjectionTransition() {
+    let first = Space(name: "Personal")
+    let second = Space(name: "Work")
+    let projection = SpaceProjection(spaces: [first, second]).selecting(second.id)
+    #expect(projection.activeSpaceID == second.id)
+    #expect(projection.spaces.map(\.name) == ["Personal", "Work"])
 }
 
 private struct EchoHost: WireEndpoint {
