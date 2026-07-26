@@ -789,6 +789,12 @@ public actor HostClient {
         return try ReadContextTextFileResponsePayload(protobufBytes: response.payload.protobufBytes).text
     }
 
+    public func applyContextTextPatch(executionContextID: ExecutionContextID, relativePath: String, expectedContentHash: String, kind: ContextTextPatchKind, startLine: UInt32, endLineExclusive: UInt32, replacementText: String) async throws -> String {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(ApplyContextTextPatchCommandPayload(executionContextID: executionContextID.description, relativePath: relativePath, expectedContentHash: expectedContentHash, kind: kind, startLine: startLine, endLineExclusive: endLineExclusive, replacementText: replacementText))))
+        guard response.kind == .commandResult, response.payload.identifier == ApplyContextTextPatchResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try ApplyContextTextPatchResultPayload(protobufBytes: response.payload.protobufBytes).contentHash
+    }
+
     public func createTerminalSession(
         id: SessionID = SessionID(),
         spaceID: SpaceID,
