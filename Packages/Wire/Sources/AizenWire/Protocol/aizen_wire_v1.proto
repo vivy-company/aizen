@@ -262,6 +262,25 @@ message ListExecutionContextsResponse {
   repeated ExecutionContextRecord contexts = 1;
 }
 
+message ListTerminalSessionsQuery {
+  string space_id = 1;
+}
+
+message TerminalSessionRecord {
+  string session_id = 1;
+  string space_id = 2;
+  string execution_context_id = 3;
+  string title = 4;
+  string tmux_session_name = 5;
+  string pane_id = 6;
+  string initial_command = 7;
+  int64 created_at_millis = 8;
+}
+
+message ListTerminalSessionsResponse {
+  repeated TerminalSessionRecord sessions = 1;
+}
+
 message CreateLocalFolderContextCommand {
   string space_id = 1;
   string resource_id = 2;

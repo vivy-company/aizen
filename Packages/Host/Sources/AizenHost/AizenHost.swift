@@ -65,6 +65,8 @@ public actor LocalHost: WireEndpoint {
                 ListResourcesResponsePayload.identifier,
                 ListExecutionContextsQueryPayload.identifier,
                 ListExecutionContextsResponsePayload.identifier,
+                ListTerminalSessionsQueryPayload.identifier,
+                ListTerminalSessionsResponsePayload.identifier,
                 CreateSpaceCommandPayload.identifier,
                 CreateSpaceResultPayload.identifier,
                 RenameSpaceCommandPayload.identifier,
@@ -157,6 +159,12 @@ public actor LocalHost: WireEndpoint {
             }
             kind = .queryResponse
             payload = try TypedPayload(ListExecutionContextsResponsePayload(contexts: contexts))
+        case .query where envelope.payload.identifier == ListTerminalSessionsQueryPayload.identifier:
+            let query = try ListTerminalSessionsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try query.spaceID.map(Self.spaceID(from:))
+            let sessions = try await storage.load().terminalSessions.filter { spaceID == nil || $0.spaceID == spaceID }
+            kind = .queryResponse
+            payload = try TypedPayload(ListTerminalSessionsResponsePayload(sessions: sessions))
         case .command where envelope.payload.identifier == CreateSpaceCommandPayload.identifier:
             let command = try CreateSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             payload = try await executeDurably(envelope: envelope, spaceID: nil) {

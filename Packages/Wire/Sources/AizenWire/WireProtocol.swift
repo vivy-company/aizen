@@ -1011,6 +1011,68 @@ public struct ListExecutionContextsResponsePayload: WirePayload, Sendable, Hasha
     }
 }
 
+public struct ListTerminalSessionsQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.terminal-session.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let spaceID: String?
+    public init(spaceID: String? = nil) { self.spaceID = spaceID }
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListTerminalSessionsQuery(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID.isEmpty ? nil : message.spaceID)
+    }
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListTerminalSessionsQuery()
+        message.spaceID = spaceID ?? ""
+        return try message.serializedData()
+    }
+}
+
+public struct ListTerminalSessionsResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.terminal-session.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let sessions: [TerminalSession]
+    public init(sessions: [TerminalSession]) { self.sessions = sessions }
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListTerminalSessionsResponse(serializedBytes: protobufBytes)
+        sessions = try message.sessions.map { record in
+            guard let sessionUUID = UUID(uuidString: record.sessionID),
+                  let spaceUUID = UUID(uuidString: record.spaceID) else {
+                throw WireCodecError.invalidIdentity(record.sessionID)
+            }
+            let contextID = record.executionContextID.isEmpty ? nil : UUID(uuidString: record.executionContextID).map(ExecutionContextID.init(rawValue:))
+            guard record.executionContextID.isEmpty || contextID != nil else { throw WireCodecError.invalidIdentity(record.executionContextID) }
+            return TerminalSession(
+                id: SessionID(rawValue: sessionUUID),
+                spaceID: SpaceID(rawValue: spaceUUID),
+                executionContextID: contextID,
+                title: record.title.isEmpty ? nil : record.title,
+                tmuxSessionName: record.tmuxSessionName,
+                paneID: record.paneID,
+                initialCommand: record.initialCommand.isEmpty ? nil : record.initialCommand,
+                createdAt: Date(timeIntervalSince1970: TimeInterval(record.createdAtMillis) / 1_000)
+            )
+        }
+    }
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListTerminalSessionsResponse()
+        message.sessions = sessions.map { session in
+            var record = AizenWireV1_TerminalSessionRecord()
+            record.sessionID = session.id.description
+            record.spaceID = session.spaceID.description
+            record.executionContextID = session.executionContextID?.description ?? ""
+            record.title = session.title ?? ""
+            record.tmuxSessionName = session.tmuxSessionName
+            record.paneID = session.paneID
+            record.initialCommand = session.initialCommand ?? ""
+            record.createdAtMillis = Int64((session.createdAt.timeIntervalSince1970 * 1_000).rounded())
+            return record
+        }
+        return try message.serializedData()
+    }
+}
+
 public struct CreateLocalFolderContextCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.execution-context.create-local-folder@1")
     public static let schemaVersion: UInt32 = 1
