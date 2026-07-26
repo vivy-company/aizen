@@ -160,6 +160,7 @@ import AizenWire
     #expect(first.payload == replay.payload)
     #expect(try await storage.load().resources.count == 1)
     #expect(try await storage.load().commands.count == 1)
+    #expect(try await storage.load().journalEvents.map(\.cursor) == [1])
 
     let resourceID = try ImportLocalFolderResultPayload(protobufBytes: first.payload.protobufBytes).resourceID
     let contextEnvelope = ProtocolEnvelope(
@@ -228,6 +229,7 @@ import AizenWire
     #expect(removeResourceFirst.payload == removeResourceReplay.payload)
     #expect(try await storage.load().resources.isEmpty)
     #expect(try await storage.load().commands.count == 6)
+    #expect(try await storage.load().journalEvents.map(\.cursor) == [1, 2, 3, 4, 5, 6])
 }
 
 @Test func hostRenamesAndDeletesEmptySpacesThroughTypedCommands() async throws {

@@ -87,7 +87,11 @@ public actor LocalHost: WireEndpoint {
             let request = try SnapshotRequestPayload(protobufBytes: envelope.payload.protobufBytes)
             let snapshot = try await storage.load()
             kind = .queryResponse
-            payload = try TypedPayload(SnapshotResponsePayload(scope: request.scope, cursor: 0, snapshot: JSONEncoder().encode(snapshot)))
+            payload = try TypedPayload(SnapshotResponsePayload(
+                scope: request.scope,
+                cursor: snapshot.journalEvents.last?.cursor ?? 0,
+                snapshot: JSONEncoder().encode(snapshot)
+            ))
         case .query where envelope.payload.identifier == ListSpacesQueryPayload.identifier:
             _ = try ListSpacesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaces = try await storage.load().spaces
@@ -430,6 +434,16 @@ public actor LocalHost: WireEndpoint {
                     protobufBytes: payload.protobufBytes
                 )
                 _ = try await storage.transitionCommand(id: command.id, to: .succeeded, result: result)
+                _ = try await storage.appendJournalEvent(
+                    spaceID: spaceID,
+                    aggregateID: command.id.description,
+                    aggregateType: "command",
+                    aggregateRevision: 1,
+                    payloadIdentifier: result.payloadIdentifier,
+                    payloadSchemaVersion: result.schemaVersion,
+                    payloadBytes: result.protobufBytes,
+                    durability: .durable
+                )
                 return payload
             } catch {
                 _ = try? await storage.transitionCommand(id: command.id, to: .failed)
