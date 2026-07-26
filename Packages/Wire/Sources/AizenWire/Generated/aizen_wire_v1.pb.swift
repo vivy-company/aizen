@@ -1401,6 +1401,62 @@ nonisolated struct AizenWireV1_ReadRepositoryDiffResponse: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_ReadRepositoryHistoryQuery: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var resourceID: String = String()
+
+  var maximumCommits: UInt32 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_RepositoryCommitRecord: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var revision: String = String()
+
+  var subject: String = String()
+
+  var authorName: String = String()
+
+  var authoredAtUnixMilliseconds: Int64 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_ReadRepositoryHistoryResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var resourceID: String = String()
+
+  var repositoryRevision: String = String()
+
+  var indexRevision: String = String()
+
+  var branch: String = String()
+
+  var isDetached: Bool = false
+
+  var commits: [AizenWireV1_RepositoryCommitRecord] = []
+
+  var truncated: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_ListExecutionContextsQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -4936,6 +4992,146 @@ nonisolated extension AizenWireV1_ReadRepositoryDiffResponse: SwiftProtobuf.Mess
     if lhs.repositoryRevision != rhs.repositoryRevision {return false}
     if lhs.indexRevision != rhs.indexRevision {return false}
     if lhs.unifiedDiff != rhs.unifiedDiff {return false}
+    if lhs.truncated != rhs.truncated {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ReadRepositoryHistoryQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ReadRepositoryHistoryQuery"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{3}maximum_commits\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.maximumCommits) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 1)
+    }
+    if self.maximumCommits != 0 {
+      try visitor.visitSingularUInt32Field(value: self.maximumCommits, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ReadRepositoryHistoryQuery, rhs: AizenWireV1_ReadRepositoryHistoryQuery) -> Bool {
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.maximumCommits != rhs.maximumCommits {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_RepositoryCommitRecord: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".RepositoryCommitRecord"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}revision\0\u{1}subject\0\u{3}author_name\0\u{3}authored_at_unix_milliseconds\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.revision) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.subject) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.authorName) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.authoredAtUnixMilliseconds) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.revision.isEmpty {
+      try visitor.visitSingularStringField(value: self.revision, fieldNumber: 1)
+    }
+    if !self.subject.isEmpty {
+      try visitor.visitSingularStringField(value: self.subject, fieldNumber: 2)
+    }
+    if !self.authorName.isEmpty {
+      try visitor.visitSingularStringField(value: self.authorName, fieldNumber: 3)
+    }
+    if self.authoredAtUnixMilliseconds != 0 {
+      try visitor.visitSingularInt64Field(value: self.authoredAtUnixMilliseconds, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_RepositoryCommitRecord, rhs: AizenWireV1_RepositoryCommitRecord) -> Bool {
+    if lhs.revision != rhs.revision {return false}
+    if lhs.subject != rhs.subject {return false}
+    if lhs.authorName != rhs.authorName {return false}
+    if lhs.authoredAtUnixMilliseconds != rhs.authoredAtUnixMilliseconds {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ReadRepositoryHistoryResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ReadRepositoryHistoryResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{3}repository_revision\0\u{3}index_revision\0\u{1}branch\0\u{3}is_detached\0\u{1}commits\0\u{1}truncated\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.repositoryRevision) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.indexRevision) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.branch) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.isDetached) }()
+      case 6: try { try decoder.decodeRepeatedMessageField(value: &self.commits) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.truncated) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 1)
+    }
+    if !self.repositoryRevision.isEmpty {
+      try visitor.visitSingularStringField(value: self.repositoryRevision, fieldNumber: 2)
+    }
+    if !self.indexRevision.isEmpty {
+      try visitor.visitSingularStringField(value: self.indexRevision, fieldNumber: 3)
+    }
+    if !self.branch.isEmpty {
+      try visitor.visitSingularStringField(value: self.branch, fieldNumber: 4)
+    }
+    if self.isDetached != false {
+      try visitor.visitSingularBoolField(value: self.isDetached, fieldNumber: 5)
+    }
+    if !self.commits.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.commits, fieldNumber: 6)
+    }
+    if self.truncated != false {
+      try visitor.visitSingularBoolField(value: self.truncated, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ReadRepositoryHistoryResponse, rhs: AizenWireV1_ReadRepositoryHistoryResponse) -> Bool {
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.repositoryRevision != rhs.repositoryRevision {return false}
+    if lhs.indexRevision != rhs.indexRevision {return false}
+    if lhs.branch != rhs.branch {return false}
+    if lhs.isDetached != rhs.isDetached {return false}
+    if lhs.commits != rhs.commits {return false}
     if lhs.truncated != rhs.truncated {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

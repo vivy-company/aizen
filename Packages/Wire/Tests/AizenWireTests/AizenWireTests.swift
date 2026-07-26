@@ -108,6 +108,14 @@ import Testing
     }
 }
 
+@Test func repositoryHistoryPayloadsRoundTrip() throws {
+    let resourceID = UUID().uuidString
+    let query = ReadRepositoryHistoryQueryPayload(resourceID: resourceID, maximumCommits: 2)
+    #expect(try ReadRepositoryHistoryQueryPayload(protobufBytes: query.protobufBytes()) == query)
+    let response = ReadRepositoryHistoryResponsePayload(resourceID: resourceID, repositoryRevision: "head", indexRevision: "index", branch: "main", isDetached: false, commits: [.init(revision: "abc", subject: "Seed", authorName: "Aizen", authoredAtUnixMilliseconds: 1)], truncated: false)
+    #expect(try ReadRepositoryHistoryResponsePayload(protobufBytes: response.protobufBytes()) == response)
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")

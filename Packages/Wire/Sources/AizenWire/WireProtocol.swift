@@ -1831,6 +1831,29 @@ public struct ReadRepositoryDiffResponsePayload: WirePayload, Sendable, Hashable
     }
 }
 
+public struct ReadRepositoryHistoryQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.repository.history@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = false; public static let maximumCommitLimit: UInt32 = 200
+    public let resourceID: String; public let maximumCommits: UInt32
+    public init(resourceID: String, maximumCommits: UInt32 = 50) { precondition(!resourceID.isEmpty && (1...Self.maximumCommitLimit).contains(maximumCommits)); self.resourceID = resourceID; self.maximumCommits = maximumCommits }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReadRepositoryHistoryQuery(serializedBytes: protobufBytes); guard !m.resourceID.isEmpty, (1...Self.maximumCommitLimit).contains(m.maximumCommits) else { throw WireCodecError.invalidRepositoryHistoryQuery }; self.init(resourceID: m.resourceID, maximumCommits: m.maximumCommits) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadRepositoryHistoryQuery(); m.resourceID = resourceID; m.maximumCommits = maximumCommits; return try m.serializedData() }
+}
+
+public struct RepositoryCommitRecordPayload: Sendable, Hashable {
+    public let revision: String; public let subject: String; public let authorName: String; public let authoredAtUnixMilliseconds: Int64
+    public init(revision: String, subject: String, authorName: String, authoredAtUnixMilliseconds: Int64) { precondition(!revision.isEmpty); self.revision = revision; self.subject = subject; self.authorName = authorName; self.authoredAtUnixMilliseconds = authoredAtUnixMilliseconds }
+    fileprivate init(protobuf m: AizenWireV1_RepositoryCommitRecord) throws { guard !m.revision.isEmpty else { throw WireCodecError.invalidRepositoryHistoryResponse }; self.init(revision: m.revision, subject: m.subject, authorName: m.authorName, authoredAtUnixMilliseconds: m.authoredAtUnixMilliseconds) }
+    fileprivate var protobuf: AizenWireV1_RepositoryCommitRecord { get { var m = AizenWireV1_RepositoryCommitRecord(); m.revision = revision; m.subject = subject; m.authorName = authorName; m.authoredAtUnixMilliseconds = authoredAtUnixMilliseconds; return m } }
+}
+
+public struct ReadRepositoryHistoryResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.repository.history@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = false
+    public let resourceID: String; public let repositoryRevision: String; public let indexRevision: String; public let branch: String?; public let isDetached: Bool; public let commits: [RepositoryCommitRecordPayload]; public let truncated: Bool
+    public init(resourceID: String, repositoryRevision: String, indexRevision: String, branch: String? = nil, isDetached: Bool, commits: [RepositoryCommitRecordPayload], truncated: Bool) { precondition(!resourceID.isEmpty && !repositoryRevision.isEmpty && !indexRevision.isEmpty && commits.count <= Int(ReadRepositoryHistoryQueryPayload.maximumCommitLimit)); self.resourceID = resourceID; self.repositoryRevision = repositoryRevision; self.indexRevision = indexRevision; self.branch = branch; self.isDetached = isDetached; self.commits = commits; self.truncated = truncated }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReadRepositoryHistoryResponse(serializedBytes: protobufBytes); guard !m.resourceID.isEmpty, !m.repositoryRevision.isEmpty, !m.indexRevision.isEmpty, m.commits.count <= Int(ReadRepositoryHistoryQueryPayload.maximumCommitLimit) else { throw WireCodecError.invalidRepositoryHistoryResponse }; try self.init(resourceID: m.resourceID, repositoryRevision: m.repositoryRevision, indexRevision: m.indexRevision, branch: m.branch.isEmpty ? nil : m.branch, isDetached: m.isDetached, commits: m.commits.map(RepositoryCommitRecordPayload.init(protobuf:)), truncated: m.truncated) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadRepositoryHistoryResponse(); m.resourceID = resourceID; m.repositoryRevision = repositoryRevision; m.indexRevision = indexRevision; if let branch { m.branch = branch }; m.isDetached = isDetached; m.commits = commits.map(\.protobuf); m.truncated = truncated; return try m.serializedData() }
+}
+
 public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.execution-context.list@1")
     public static let schemaVersion: UInt32 = 1
@@ -2616,6 +2639,8 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidRepositoryStatusResponse
     case invalidRepositoryDiffQuery
     case invalidRepositoryDiffResponse
+    case invalidRepositoryHistoryQuery
+    case invalidRepositoryHistoryResponse
 }
 
 private extension ProtocolEnvelope {

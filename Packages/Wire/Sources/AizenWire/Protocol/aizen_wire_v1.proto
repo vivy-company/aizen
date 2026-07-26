@@ -451,6 +451,28 @@ message ReadRepositoryDiffResponse {
   bool truncated = 5;
 }
 
+message ReadRepositoryHistoryQuery {
+  string resource_id = 1;
+  uint32 maximum_commits = 2;
+}
+
+message RepositoryCommitRecord {
+  string revision = 1;
+  string subject = 2;
+  string author_name = 3;
+  int64 authored_at_unix_milliseconds = 4;
+}
+
+message ReadRepositoryHistoryResponse {
+  string resource_id = 1;
+  string repository_revision = 2;
+  string index_revision = 3;
+  string branch = 4;
+  bool is_detached = 5;
+  repeated RepositoryCommitRecord commits = 6;
+  bool truncated = 7;
+}
+
 message ListExecutionContextsQuery {
   string space_id = 1;
   string resource_id = 2;
