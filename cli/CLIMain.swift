@@ -367,7 +367,7 @@ private extension AizenCLI {
             let spaceID = try await resolveV2Space(rest.first, client: client)
             let operations = try await client.operations(spaceID: spaceID)
             if parsed.flags.contains("json") {
-                printJSON(OperationListPayload(operations: operations.map(operationOutput)))
+                printJSON(OperationListPayload(operations: operations.map(OperationOutput.init)))
             } else {
                 for operation in operations { print(operationLine(operation)) }
             }
@@ -375,7 +375,7 @@ private extension AizenCLI {
             guard rest.count == 1, let rawID = UUID(uuidString: rest[0]) else { throw CLIError.invalidArguments("operation show requires an Operation ID") }
             guard let operation = try await client.operations(operationID: .init(rawValue: rawID)).first else { throw CLIError.invalidArguments("Operation not found: \(rest[0])") }
             if parsed.flags.contains("json") {
-                printJSON(OperationPayload(operation: operationOutput(operation)))
+                printJSON(OperationPayload(operation: .init(operation: operation)))
             } else {
                 print(operationLine(operation))
             }
@@ -396,7 +396,7 @@ private extension AizenCLI {
                 }
                 if operation != last {
                     if parsed.flags.contains("json") {
-                        printJSONLine(OperationPayload(operation: operationOutput(operation)))
+                        printJSONLine(OperationPayload(operation: .init(operation: operation)))
                     } else {
                         print(operationLine(operation))
                     }
@@ -413,17 +413,6 @@ private extension AizenCLI {
     static func operationLine(_ operation: AizenCore.Operation) -> String {
         let progress = operation.progress.map { String(format: "%.0f%%", $0 * 100) } ?? "-"
         return "\(operation.id.description)\t\(operation.lifecycle.rawValue)\t\(progress)\t\(operation.failureDescription ?? "")"
-    }
-
-    static func operationOutput(_ operation: AizenCore.Operation) -> OperationOutput {
-        OperationOutput(
-            id: operation.id.description,
-            spaceID: operation.spaceID.description,
-            sessionID: operation.sessionID?.description,
-            lifecycle: operation.lifecycle.rawValue,
-            progress: operation.progress,
-            failure: operation.failureDescription
-        )
     }
 
     static func handleResource(_ args: [String]) async throws {
@@ -929,23 +918,6 @@ private extension AizenCLI {
     struct WorkspaceListPayload: Encodable {
         let filters: WorkspaceFilters
         let workspaces: [WorkspaceOutput]
-    }
-
-    struct OperationOutput: Encodable {
-        let id: String
-        let spaceID: String
-        let sessionID: String?
-        let lifecycle: String
-        let progress: Double?
-        let failure: String?
-    }
-
-    struct OperationPayload: Encodable {
-        let operation: OperationOutput
-    }
-
-    struct OperationListPayload: Encodable {
-        let operations: [OperationOutput]
     }
 
     static func v2Workspaces(filters: WorkspaceFilters) async throws -> [Space] {
