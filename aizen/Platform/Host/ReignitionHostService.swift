@@ -63,17 +63,18 @@ nonisolated enum ReignitionHostService {
 
     nonisolated static func registerIfNeeded() throws {
         switch status {
-        case .notRegistered:
+        case .notRegistered, .missing:
             try service.register()
             if service.status == .requiresApproval {
                 throw Error.requiresApproval
+            }
+            if service.status == .notFound {
+                throw Error.missingBundledService
             }
         case .enabled:
             break
         case .requiresApproval:
             throw Error.requiresApproval
-        case .missing:
-            throw Error.missingBundledService
         case .unknown:
             try service.register()
         }
@@ -87,7 +88,7 @@ nonisolated enum ReignitionHostService {
     nonisolated static func repair() throws {
         switch status {
         case .missing:
-            throw Error.missingBundledService
+            try service.register()
         case .requiresApproval:
             throw Error.requiresApproval
         case .enabled:
@@ -99,6 +100,9 @@ nonisolated enum ReignitionHostService {
 
         if service.status == .requiresApproval {
             throw Error.requiresApproval
+        }
+        if service.status == .notFound {
+            throw Error.missingBundledService
         }
     }
 }
