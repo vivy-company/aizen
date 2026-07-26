@@ -132,6 +132,36 @@ import AizenWire
     #expect(try await client.spaces().map(\.name) == ["Vivy"])
 }
 
+@Test func clientListsHostOwnedTerminalSessions() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let otherSpace = Space(name: "Other")
+    let terminal = TerminalSession(
+        spaceID: space.id,
+        title: "Server",
+        tmuxSessionName: "aizen-vivy-server",
+        paneID: "%1"
+    )
+    let otherTerminal = TerminalSession(
+        spaceID: otherSpace.id,
+        title: "Other",
+        tmuxSessionName: "aizen-other",
+        paneID: "%2"
+    )
+    _ = try await storage.transact {
+        $0.spaces.append(contentsOf: [space, otherSpace])
+        $0.terminalSessions.append(contentsOf: [terminal, otherTerminal])
+    }
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+
+    let sessions = try await client.terminalSessions(spaceID: space.id)
+    #expect(sessions.map(\.id) == [terminal.id])
+    #expect(sessions.map(\.spaceID) == [space.id])
+    #expect(sessions.map(\.tmuxSessionName) == ["aizen-vivy-server"])
+}
+
 @Test func clientCreatesSpacesThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

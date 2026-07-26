@@ -63,7 +63,7 @@ struct AizenCLI {
         case "attach":
             try handleAttach(subArgs)
         case "sessions":
-            try handleSessions(subArgs)
+            try await handleSessions(subArgs)
         case "terminal":
             try await handleTerminal(subArgs)
         default:
@@ -736,35 +736,38 @@ private extension AizenCLI {
     }
 
 
-    static func handleSessions(_ args: [String]) throws {
+    static func handleSessions(_ args: [String]) async throws {
         let parsed = try parseArguments(args)
         if parsed.flags.contains("help") {
             print(sessionsHelpText())
             return
         }
 
-        let store = try CLIStore()
-        let context = store.container.viewContext
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
-
-        let sessions = try fetchActiveSessions(
-            in: context,
-            workspaceFilter: parsed.options["workspace"],
-            crossProjectOnly: parsed.flags.contains("cross-project")
-        )
+        guard !parsed.flags.contains("cross-project") else {
+            throw CLIError.invalidArguments("Cross-project terminal sessions are not available through the v2 Host yet.")
+        }
+        let client = V2CLIClient()
+        let spaces = try await client.spaces()
+        let spacesByID = Dictionary(uniqueKeysWithValues: spaces.map { ($0.id, $0.name) })
+        let selectedSpace = try parsed.options["workspace"].map { name -> SpaceID in
+            guard let space = spaces.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                throw CLIError.workspaceNotFound(name)
+            }
+            return space.id
+        }
+        let sessions = try await client.terminalSessions(spaceID: selectedSpace)
 
         if parsed.flags.contains("json") {
-            let payload = SessionListPayload(
-                sessions: sessions.map { session in
-                    SessionOutput(
-                        workspace: session.workspaceName,
-                        repository: session.repositoryName,
-                        worktree: session.worktreeBranch,
-                        panes: session.paneCount,
-                        focusedPaneId: session.focusedPaneId ?? ""
-                    )
-                }
-            )
+            let payload = TerminalSessionListPayload(sessions: sessions.map { session in
+                TerminalSessionOutput(
+                    id: session.id.description,
+                    space: spacesByID[session.spaceID] ?? session.spaceID.description,
+                    title: session.title ?? "",
+                    tmuxSession: session.tmuxSessionName,
+                    paneID: session.paneID
+                )
+            })
             printJSON(payload)
             return
         }
@@ -777,19 +780,10 @@ private extension AizenCLI {
             return
         }
 
-        let sessionTitle = parsed.flags.contains("cross-project")
-            ? "Active Cross-Project Sessions (\(sessions.count))"
-            : "Active Sessions (\(sessions.count))"
-        printSectionTitle(sessionTitle, style: style)
-        let headers = ["Workspace", "Repository", "Worktree", "Panes"]
-        var rows: [[String]] = []
-        for session in sessions {
-            rows.append([
-                session.workspaceName,
-                session.repositoryName,
-                session.worktreeBranch,
-                String(session.paneCount)
-            ])
+        printSectionTitle("Terminal Sessions (\(sessions.count))", style: style)
+        let headers = ["Space", "Title", "tmux Session", "Pane"]
+        let rows = sessions.map { session in
+            [spacesByID[session.spaceID] ?? session.spaceID.description, session.title ?? "-", session.tmuxSessionName, session.paneID]
         }
         printTable(headers: headers, rows: rows, style: style)
     }
@@ -1453,6 +1447,18 @@ private extension AizenCLI {
 
     struct SessionListPayload: Encodable {
         let sessions: [SessionOutput]
+    }
+
+    struct TerminalSessionOutput: Encodable {
+        let id: String
+        let space: String
+        let title: String
+        let tmuxSession: String
+        let paneID: String
+    }
+
+    struct TerminalSessionListPayload: Encodable {
+        let sessions: [TerminalSessionOutput]
     }
 
     static func printRepositoryTable(_ repositories: [Repository], style: OutputStyle) {

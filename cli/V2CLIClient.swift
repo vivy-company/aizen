@@ -97,6 +97,11 @@ actor V2CLIClient {
         return try await client.executionContexts(in: spaceID, resourceID: resourceID)
     }
 
+    func terminalSessions(spaceID: SpaceID? = nil) async throws -> [AizenCore.TerminalSession] {
+        try await recoverPendingCommands()
+        return try await client.terminalSessions(in: spaceID)
+    }
+
     func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
         try await recoverPendingCommands()
         return try await client.createLocalFolderContext(spaceID: spaceID, resourceID: resourceID)
