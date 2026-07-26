@@ -489,6 +489,25 @@ import AizenWire
     #expect(try await storage.load().securityAuditRecords.last?.kind == .ownerConfirmationUnavailable)
 }
 
+@Test func blobTransferStoreResumesVerifiesAndCleansUp() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let data = Data("resumable blob".utf8)
+    let store = try BlobTransferStore(directory: root)
+    let descriptor = try await store.begin(byteCount: data.count, sha256: Data(SHA256.hash(data: data)))
+    _ = try await store.append(id: descriptor.id, offset: 0, bytes: data.prefix(4))
+    await #expect(throws: BlobTransferStore.Error.offset(expected: 4)) { try await store.append(id: descriptor.id, offset: 0, bytes: Data()) }
+    _ = try await store.append(id: descriptor.id, offset: 4, bytes: data.dropFirst(4))
+    let file = try await store.finish(id: descriptor.id)
+    #expect(try Data(contentsOf: file) == data)
+    let bad = try await store.begin(byteCount: 1, sha256: Data(repeating: 0, count: 32))
+    _ = try await store.append(id: bad.id, offset: 0, bytes: Data([1]))
+    await #expect(throws: BlobTransferStore.Error.integrity) { _ = try await store.finish(id: bad.id) }
+    let cancelled = try await store.begin(byteCount: 1, sha256: Data(SHA256.hash(data: Data([1]))))
+    await store.cancel(id: cancelled.id)
+    await #expect(throws: BlobTransferStore.Error.unknown) { _ = try await store.append(id: cancelled.id, offset: 0, bytes: Data([1])) }
+}
+
 private func authenticatedSession(for deviceID: DeviceID) throws -> AuthenticatedRemoteSession {
     let hostEphemeral = ConnectionEphemeralKey()
     let deviceEphemeral = ConnectionEphemeralKey()
