@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import AizenCore
 import AizenHost
 import AizenStorage
@@ -194,6 +195,31 @@ import AizenWire
         truncated: false
     ))
     #expect(try await client.contextTextFile(executionContextID: context.id, relativePath: "README.md") == "readme")
+}
+
+@Test func clientResumesAChunkedContextFileUploadThroughTheHost() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let checkout = root.appendingPathComponent("checkout", isDirectory: true)
+    try FileManager.default.createDirectory(at: checkout, withIntermediateDirectories: true)
+    let destination = checkout.appendingPathComponent("attachment.bin")
+    let original = Data("old".utf8)
+    try original.write(to: destination)
+    let replacement = Data(repeating: 7, count: 70_000)
+    let originalHash = SHA256.hash(data: original).map { String(format: "%02x", $0) }.joined()
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Files")
+    let context = ExecutionContext(spaceID: space.id, kind: .repositoryCheckout, hostReference: .init(rawValue: "local-checkout:\(checkout.path)"))
+    _ = try await storage.transact { $0.spaces.append(space); $0.executionContexts.append(context) }
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, blobTransfers: .init(directory: root.appendingPathComponent("uploads", isDirectory: true)))))
+
+    let blobID = try await client.beginContextFileUpload(executionContextID: context.id, relativePath: "attachment.bin", expectedContentHash: originalHash, byteCount: UInt64(replacement.count), sha256: Data(SHA256.hash(data: replacement)))
+    let first = Data(replacement.prefix(AppendBlobUploadCommandPayload.maximumChunkBytes))
+    let remaining = Data(replacement.dropFirst(first.count))
+    #expect(try await client.appendContextFileUpload(blobID: blobID, executionContextID: context.id, offset: 0, bytes: first) == UInt64(first.count))
+    #expect(try await client.appendContextFileUpload(blobID: blobID, executionContextID: context.id, offset: UInt64(first.count), bytes: remaining) == UInt64(replacement.count))
+    try await client.finishContextFileUpload(blobID: blobID, executionContextID: context.id)
+    #expect(try Data(contentsOf: destination) == replacement)
 }
 
 @Test func clientListsHostOwnedTerminalSessions() async throws {

@@ -235,6 +235,7 @@ public actor LocalHost: WireEndpoint {
     private let xcodeProjectInspector: (any XcodeProjectInspecting)?
     private let xcodeProjectBuilder: (any XcodeProjectBuilding)?
     private let contextFiles: ExecutionContextFileService
+    private let blobTransfers: BlobTransferStore
     private var xcodeBuilds: [OperationID: any XcodeBuildRunning] = [:]
 
     public init(
@@ -260,7 +261,8 @@ public actor LocalHost: WireEndpoint {
         repositoryPusher: (any RepositoryPushing)? = nil,
         xcodeProjectOpener: (any XcodeProjectOpening)? = nil,
         xcodeProjectInspector: (any XcodeProjectInspecting)? = nil,
-        xcodeProjectBuilder: (any XcodeProjectBuilding)? = nil
+        xcodeProjectBuilder: (any XcodeProjectBuilding)? = nil,
+        blobTransfers: BlobTransferStore? = nil
     ) {
         self.storage = storage
         self.conversationRuns = conversationRuns
@@ -286,6 +288,9 @@ public actor LocalHost: WireEndpoint {
         self.xcodeProjectInspector = xcodeProjectInspector
         self.xcodeProjectBuilder = xcodeProjectBuilder
         self.contextFiles = .init(storage: storage)
+        self.blobTransfers = blobTransfers ?? .init(
+            directory: FileManager.default.temporaryDirectory.appendingPathComponent("aizen-v2-blob-uploads", isDirectory: true)
+        )
     }
 
     public func runEvents() async -> AsyncStream<RunEvent> {
@@ -651,6 +656,46 @@ public actor LocalHost: WireEndpoint {
             let contentHash = try await contextFiles.applyTextPatch(contextID: contextID, relativePath: command.relativePath, expectedContentHash: command.expectedContentHash, kind: command.kind, startLine: command.startLine, endLineExclusive: command.endLineExclusive, replacementText: command.replacementText)
             kind = .commandResult
             payload = try TypedPayload(ApplyContextTextPatchResultPayload(relativePath: command.relativePath, contentHash: contentHash))
+        case .command where envelope.payload.identifier == BeginBlobUploadCommandPayload.identifier:
+            guard envelope.channel == .blob else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
+            let command = try BeginBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            guard let byteCount = Int(exactly: command.byteCount) else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
+            let descriptor = try await blobTransfers.begin(
+                target: .init(executionContextID: command.executionContextID, relativePath: command.relativePath, expectedContentHash: command.expectedContentHash),
+                byteCount: byteCount,
+                sha256: command.sha256
+            )
+            kind = .commandResult
+            payload = try TypedPayload(BeginBlobUploadResultPayload(blobID: descriptor.id, nextOffset: 0))
+        case .command where envelope.payload.identifier == AppendBlobUploadCommandPayload.identifier:
+            guard envelope.channel == .blob else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
+            let command = try AppendBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            guard let offset = Int(exactly: command.offset) else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
+            let received = try await blobTransfers.append(
+                id: command.blobID,
+                target: try await blobTransfers.target(id: command.blobID, executionContextID: command.executionContextID),
+                offset: offset,
+                bytes: command.bytes
+            )
+            kind = .commandResult
+            payload = try TypedPayload(AppendBlobUploadResultPayload(blobID: command.blobID, nextOffset: UInt64(received)))
+        case .command where envelope.payload.identifier == FinishBlobUploadCommandPayload.identifier:
+            guard envelope.channel == .blob else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
+            let command = try FinishBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let upload = try await blobTransfers.finish(
+                id: command.blobID,
+                target: try await blobTransfers.target(id: command.blobID, executionContextID: command.executionContextID)
+            )
+            defer { Task { await self.blobTransfers.discard(upload) } }
+            _ = try await contextFiles.replaceUploadedFile(upload)
+            kind = .commandResult
+            payload = try TypedPayload(FinishBlobUploadResultPayload(blobID: command.blobID, byteCount: UInt64(upload.descriptor.byteCount), sha256: upload.descriptor.sha256))
+        case .command where envelope.payload.identifier == CancelBlobUploadCommandPayload.identifier:
+            guard envelope.channel == .blob else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
+            let command = try CancelBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            await blobTransfers.cancel(id: command.blobID, target: try await blobTransfers.target(id: command.blobID, executionContextID: command.executionContextID))
+            kind = .commandResult
+            payload = try TypedPayload(CancelBlobUploadResultPayload(blobID: command.blobID))
         case .command where envelope.payload.identifier == TerminalInputCommandPayload.identifier:
             let command = try TerminalInputCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)

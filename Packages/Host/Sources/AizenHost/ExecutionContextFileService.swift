@@ -18,6 +18,7 @@ public actor ExecutionContextFileService {
         case sensitivePath(String)
         case revisionConflict
         case invalidSearchQuery
+        case invalidContextReference(String)
     }
 
     private let storage: StorageRepository
@@ -162,6 +163,32 @@ public actor ExecutionContextFileService {
         return Self.contentHash(replacement)
     }
 
+    /// Atomically installs a Host-verified staged upload over an existing context-relative file.
+    /// The current content hash is checked while this actor owns the operation so an upload cannot
+    /// overwrite an edit made after the client began transferring it.
+    func replaceUploadedFile(_ upload: BlobTransferStore.CompletedUpload) async throws -> String {
+        let target = upload.descriptor.target
+        guard !Self.isSensitive(target.relativePath) else { throw Error.sensitivePath(target.relativePath) }
+        guard let rawContextID = UUID(uuidString: target.executionContextID) else {
+            throw Error.invalidContextReference(target.executionContextID)
+        }
+        let contextID = ExecutionContextID(rawValue: rawContextID)
+        let root = try await contextRoot(contextID)
+        let file = try resolvedChild(target.relativePath, root: root)
+        let values = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true else { throw Error.notFile(target.relativePath) }
+        guard (values.fileSize ?? 0) <= BlobTransferStore.defaultMaximumBytes else { throw Error.fileTooLarge(target.relativePath) }
+        guard try Self.contentHash(of: file) == target.expectedContentHash else { throw Error.revisionConflict }
+        let stagedValues = try upload.url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard stagedValues.isRegularFile == true,
+              stagedValues.fileSize == upload.descriptor.byteCount,
+              try Self.contentHash(of: upload.url) == Self.hexDigest(upload.descriptor.sha256) else {
+            throw Error.invalidText(target.relativePath)
+        }
+        _ = try fileManager.replaceItemAt(file, withItemAt: upload.url)
+        return Self.hexDigest(upload.descriptor.sha256)
+    }
+
     private static let maximumTextFileBytes = 1_048_576
     private static let maximumSearchQueryUTF8Count = 256
     private static let maximumSearchMatches = 100
@@ -172,7 +199,21 @@ public actor ExecutionContextFileService {
     }
 
     private static func contentHash(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        hexDigest(Data(SHA256.hash(data: data)))
+    }
+
+    private static func hexDigest(_ digest: Data) -> String {
+        digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func contentHash(of file: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+        var hash = SHA256()
+        while let chunk = try handle.read(upToCount: 64 * 1_024), !chunk.isEmpty {
+            hash.update(data: chunk)
+        }
+        return hexDigest(Data(hash.finalize()))
     }
 
     private func contextRoot(_ contextID: ExecutionContextID) async throws -> URL {

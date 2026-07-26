@@ -2644,6 +2644,12 @@ nonisolated struct AizenWireV1_BeginBlobUploadCommand: Sendable {
 
   var sha256: Data = Data()
 
+  var executionContextID: String = String()
+
+  var relativePath: String = String()
+
+  var expectedContentHash: String = String()
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -2674,6 +2680,8 @@ nonisolated struct AizenWireV1_AppendBlobUploadCommand: Sendable {
 
   var bytes: Data = Data()
 
+  var executionContextID: String = String()
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -2700,6 +2708,8 @@ nonisolated struct AizenWireV1_FinishBlobUploadCommand: Sendable {
 
   var blobID: String = String()
 
+  var executionContextID: String = String()
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -2722,6 +2732,20 @@ nonisolated struct AizenWireV1_FinishBlobUploadResult: Sendable {
 }
 
 nonisolated struct AizenWireV1_CancelBlobUploadCommand: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var blobID: String = String()
+
+  var executionContextID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_CancelBlobUploadResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -8482,7 +8506,7 @@ nonisolated extension AizenWireV1_BlobChunk: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension AizenWireV1_BeginBlobUploadCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".BeginBlobUploadCommand"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}byte_count\0\u{1}sha256\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}byte_count\0\u{1}sha256\0\u{3}execution_context_id\0\u{3}relative_path\0\u{3}expected_content_hash\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -8492,6 +8516,9 @@ nonisolated extension AizenWireV1_BeginBlobUploadCommand: SwiftProtobuf.Message,
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularUInt64Field(value: &self.byteCount) }()
       case 2: try { try decoder.decodeSingularBytesField(value: &self.sha256) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.executionContextID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.relativePath) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.expectedContentHash) }()
       default: break
       }
     }
@@ -8504,12 +8531,24 @@ nonisolated extension AizenWireV1_BeginBlobUploadCommand: SwiftProtobuf.Message,
     if !self.sha256.isEmpty {
       try visitor.visitSingularBytesField(value: self.sha256, fieldNumber: 2)
     }
+    if !self.executionContextID.isEmpty {
+      try visitor.visitSingularStringField(value: self.executionContextID, fieldNumber: 3)
+    }
+    if !self.relativePath.isEmpty {
+      try visitor.visitSingularStringField(value: self.relativePath, fieldNumber: 4)
+    }
+    if !self.expectedContentHash.isEmpty {
+      try visitor.visitSingularStringField(value: self.expectedContentHash, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: AizenWireV1_BeginBlobUploadCommand, rhs: AizenWireV1_BeginBlobUploadCommand) -> Bool {
     if lhs.byteCount != rhs.byteCount {return false}
     if lhs.sha256 != rhs.sha256 {return false}
+    if lhs.executionContextID != rhs.executionContextID {return false}
+    if lhs.relativePath != rhs.relativePath {return false}
+    if lhs.expectedContentHash != rhs.expectedContentHash {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -8552,7 +8591,7 @@ nonisolated extension AizenWireV1_BeginBlobUploadResult: SwiftProtobuf.Message, 
 
 nonisolated extension AizenWireV1_AppendBlobUploadCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".AppendBlobUploadCommand"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}blob_id\0\u{1}offset\0\u{1}bytes\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}blob_id\0\u{1}offset\0\u{1}bytes\0\u{3}execution_context_id\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -8563,6 +8602,7 @@ nonisolated extension AizenWireV1_AppendBlobUploadCommand: SwiftProtobuf.Message
       case 1: try { try decoder.decodeSingularStringField(value: &self.blobID) }()
       case 2: try { try decoder.decodeSingularUInt64Field(value: &self.offset) }()
       case 3: try { try decoder.decodeSingularBytesField(value: &self.bytes) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.executionContextID) }()
       default: break
       }
     }
@@ -8578,6 +8618,9 @@ nonisolated extension AizenWireV1_AppendBlobUploadCommand: SwiftProtobuf.Message
     if !self.bytes.isEmpty {
       try visitor.visitSingularBytesField(value: self.bytes, fieldNumber: 3)
     }
+    if !self.executionContextID.isEmpty {
+      try visitor.visitSingularStringField(value: self.executionContextID, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -8585,6 +8628,7 @@ nonisolated extension AizenWireV1_AppendBlobUploadCommand: SwiftProtobuf.Message
     if lhs.blobID != rhs.blobID {return false}
     if lhs.offset != rhs.offset {return false}
     if lhs.bytes != rhs.bytes {return false}
+    if lhs.executionContextID != rhs.executionContextID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -8627,7 +8671,7 @@ nonisolated extension AizenWireV1_AppendBlobUploadResult: SwiftProtobuf.Message,
 
 nonisolated extension AizenWireV1_FinishBlobUploadCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".FinishBlobUploadCommand"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}blob_id\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}blob_id\0\u{3}execution_context_id\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -8636,6 +8680,7 @@ nonisolated extension AizenWireV1_FinishBlobUploadCommand: SwiftProtobuf.Message
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.blobID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.executionContextID) }()
       default: break
       }
     }
@@ -8645,11 +8690,15 @@ nonisolated extension AizenWireV1_FinishBlobUploadCommand: SwiftProtobuf.Message
     if !self.blobID.isEmpty {
       try visitor.visitSingularStringField(value: self.blobID, fieldNumber: 1)
     }
+    if !self.executionContextID.isEmpty {
+      try visitor.visitSingularStringField(value: self.executionContextID, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: AizenWireV1_FinishBlobUploadCommand, rhs: AizenWireV1_FinishBlobUploadCommand) -> Bool {
     if lhs.blobID != rhs.blobID {return false}
+    if lhs.executionContextID != rhs.executionContextID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -8697,6 +8746,41 @@ nonisolated extension AizenWireV1_FinishBlobUploadResult: SwiftProtobuf.Message,
 
 nonisolated extension AizenWireV1_CancelBlobUploadCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".CancelBlobUploadCommand"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}blob_id\0\u{3}execution_context_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.blobID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.executionContextID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.blobID.isEmpty {
+      try visitor.visitSingularStringField(value: self.blobID, fieldNumber: 1)
+    }
+    if !self.executionContextID.isEmpty {
+      try visitor.visitSingularStringField(value: self.executionContextID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_CancelBlobUploadCommand, rhs: AizenWireV1_CancelBlobUploadCommand) -> Bool {
+    if lhs.blobID != rhs.blobID {return false}
+    if lhs.executionContextID != rhs.executionContextID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_CancelBlobUploadResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".CancelBlobUploadResult"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}blob_id\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -8718,7 +8802,7 @@ nonisolated extension AizenWireV1_CancelBlobUploadCommand: SwiftProtobuf.Message
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: AizenWireV1_CancelBlobUploadCommand, rhs: AizenWireV1_CancelBlobUploadCommand) -> Bool {
+  static func ==(lhs: AizenWireV1_CancelBlobUploadResult, rhs: AizenWireV1_CancelBlobUploadResult) -> Bool {
     if lhs.blobID != rhs.blobID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

@@ -795,6 +795,30 @@ public actor HostClient {
         return try ApplyContextTextPatchResultPayload(protobufBytes: response.payload.protobufBytes).contentHash
     }
 
+    public func beginContextFileUpload(executionContextID: ExecutionContextID, relativePath: String, expectedContentHash: String, byteCount: UInt64, sha256: Data) async throws -> UUID {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .blob, payload: try .init(BeginBlobUploadCommandPayload(executionContextID: executionContextID.description, relativePath: relativePath, expectedContentHash: expectedContentHash, byteCount: byteCount, sha256: sha256))))
+        guard response.kind == .commandResult, response.payload.identifier == BeginBlobUploadResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try BeginBlobUploadResultPayload(protobufBytes: response.payload.protobufBytes).blobID
+    }
+
+    public func appendContextFileUpload(blobID: UUID, executionContextID: ExecutionContextID, offset: UInt64, bytes: Data) async throws -> UInt64 {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .blob, payload: try .init(AppendBlobUploadCommandPayload(blobID: blobID, executionContextID: executionContextID.description, offset: offset, bytes: bytes))))
+        guard response.kind == .commandResult, response.payload.identifier == AppendBlobUploadResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try AppendBlobUploadResultPayload(protobufBytes: response.payload.protobufBytes).nextOffset
+    }
+
+    public func finishContextFileUpload(blobID: UUID, executionContextID: ExecutionContextID) async throws {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .blob, payload: try .init(FinishBlobUploadCommandPayload(blobID: blobID, executionContextID: executionContextID.description))))
+        guard response.kind == .commandResult, response.payload.identifier == FinishBlobUploadResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        _ = try FinishBlobUploadResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
+    public func cancelContextFileUpload(blobID: UUID, executionContextID: ExecutionContextID) async throws {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .blob, payload: try .init(CancelBlobUploadCommandPayload(blobID: blobID, executionContextID: executionContextID.description))))
+        guard response.kind == .commandResult, response.payload.identifier == CancelBlobUploadResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        _ = try CancelBlobUploadResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func createTerminalSession(
         id: SessionID = SessionID(),
         spaceID: SpaceID,

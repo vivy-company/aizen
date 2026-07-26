@@ -901,10 +901,22 @@ message BlobChunk {
   bool final_chunk = 4;
 }
 
-message BeginBlobUploadCommand { uint64 byte_count = 1; bytes sha256 = 2; }
+message BeginBlobUploadCommand {
+  uint64 byte_count = 1;
+  bytes sha256 = 2;
+  string execution_context_id = 3;
+  string relative_path = 4;
+  string expected_content_hash = 5;
+}
 message BeginBlobUploadResult { string blob_id = 1; uint64 next_offset = 2; }
-message AppendBlobUploadCommand { string blob_id = 1; uint64 offset = 2; bytes bytes = 3; }
+message AppendBlobUploadCommand {
+  string blob_id = 1;
+  uint64 offset = 2;
+  bytes bytes = 3;
+  string execution_context_id = 4;
+}
 message AppendBlobUploadResult { string blob_id = 1; uint64 next_offset = 2; }
-message FinishBlobUploadCommand { string blob_id = 1; }
+message FinishBlobUploadCommand { string blob_id = 1; string execution_context_id = 2; }
 message FinishBlobUploadResult { string blob_id = 1; uint64 byte_count = 2; bytes sha256 = 3; }
-message CancelBlobUploadCommand { string blob_id = 1; }
+message CancelBlobUploadCommand { string blob_id = 1; string execution_context_id = 2; }
+message CancelBlobUploadResult { string blob_id = 1; }

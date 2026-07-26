@@ -227,6 +227,22 @@ public struct RemoteHostEndpoint: WireEndpoint {
             let command = try ApplyContextTextPatchCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let context = try await requiredExecutionContext(command.executionContextID)
             return .init(capability: .fileWrite, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil, ownerConfirmationAction: .fileWrite)
+        case BeginBlobUploadCommandPayload.identifier:
+            let command = try BeginBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let context = try await requiredExecutionContext(command.executionContextID)
+            return .init(capability: .fileWrite, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil, ownerConfirmationAction: .fileWrite)
+        case AppendBlobUploadCommandPayload.identifier:
+            let command = try AppendBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let context = try await requiredExecutionContext(command.executionContextID)
+            return .init(capability: .fileWrite, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil, ownerConfirmationAction: .fileWrite)
+        case FinishBlobUploadCommandPayload.identifier:
+            let command = try FinishBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let context = try await requiredExecutionContext(command.executionContextID)
+            return .init(capability: .fileWrite, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil, ownerConfirmationAction: .fileWrite)
+        case CancelBlobUploadCommandPayload.identifier:
+            let command = try CancelBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let context = try await requiredExecutionContext(command.executionContextID)
+            return .init(capability: .fileWrite, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil, ownerConfirmationAction: .fileWrite)
         case GetConversationTimelineQueryPayload.identifier:
             let request = try GetConversationTimelineQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let conversation = try await requiredSession(request.sessionID)

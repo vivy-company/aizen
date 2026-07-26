@@ -2409,6 +2409,142 @@ public struct ApplyContextTextPatchResultPayload: WirePayload, Sendable, Hashabl
     public func protobufBytes() throws -> Data { var m = AizenWireV1_ApplyContextTextPatchResult(); m.relativePath = relativePath; m.contentHash = contentHash; return try m.serializedData() }
 }
 
+public struct BeginBlobUploadCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.context-files.begin-blob-upload@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let executionContextID: String
+    public let relativePath: String
+    public let expectedContentHash: String
+    public let byteCount: UInt64
+    public let sha256: Data
+
+    public init(executionContextID: String, relativePath: String, expectedContentHash: String, byteCount: UInt64, sha256: Data) {
+        self.executionContextID = executionContextID
+        self.relativePath = relativePath
+        self.expectedContentHash = expectedContentHash
+        self.byteCount = byteCount
+        self.sha256 = sha256
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_BeginBlobUploadCommand(serializedBytes: protobufBytes)
+        guard !message.executionContextID.isEmpty,
+              !message.relativePath.isEmpty,
+              message.expectedContentHash.count == 64,
+              message.byteCount > 0,
+              message.sha256.count == 32 else {
+            throw WireCodecError.invalidIdentity("blob upload")
+        }
+        self.init(executionContextID: message.executionContextID, relativePath: message.relativePath, expectedContentHash: message.expectedContentHash, byteCount: message.byteCount, sha256: message.sha256)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_BeginBlobUploadCommand()
+        message.executionContextID = executionContextID
+        message.relativePath = relativePath
+        message.expectedContentHash = expectedContentHash
+        message.byteCount = byteCount
+        message.sha256 = sha256
+        return try message.serializedData()
+    }
+}
+
+public struct BeginBlobUploadResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.context-files.begin-blob-upload@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let blobID: UUID
+    public let nextOffset: UInt64
+
+    public init(blobID: UUID, nextOffset: UInt64) { self.blobID = blobID; self.nextOffset = nextOffset }
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_BeginBlobUploadResult(serializedBytes: protobufBytes)
+        guard let blobID = UUID(uuidString: message.blobID) else { throw WireCodecError.invalidIdentity("blob upload") }
+        self.init(blobID: blobID, nextOffset: message.nextOffset)
+    }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_BeginBlobUploadResult(); message.blobID = blobID.uuidString; message.nextOffset = nextOffset; return try message.serializedData() }
+}
+
+public struct AppendBlobUploadCommandPayload: WirePayload, Sendable, Hashable {
+    public static let maximumChunkBytes = 64 * 1_024
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.context-files.append-blob-upload@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let blobID: UUID
+    public let executionContextID: String
+    public let offset: UInt64
+    public let bytes: Data
+
+    public init(blobID: UUID, executionContextID: String, offset: UInt64, bytes: Data) { self.blobID = blobID; self.executionContextID = executionContextID; self.offset = offset; self.bytes = bytes }
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_AppendBlobUploadCommand(serializedBytes: protobufBytes)
+        guard let blobID = UUID(uuidString: message.blobID),
+              !message.executionContextID.isEmpty,
+              !message.bytes.isEmpty,
+              message.bytes.count <= Self.maximumChunkBytes else {
+            throw WireCodecError.invalidIdentity("blob upload chunk")
+        }
+        self.init(blobID: blobID, executionContextID: message.executionContextID, offset: message.offset, bytes: message.bytes)
+    }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_AppendBlobUploadCommand(); message.blobID = blobID.uuidString; message.executionContextID = executionContextID; message.offset = offset; message.bytes = bytes; return try message.serializedData() }
+}
+
+public struct AppendBlobUploadResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.context-files.append-blob-upload@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let blobID: UUID
+    public let nextOffset: UInt64
+    public init(blobID: UUID, nextOffset: UInt64) { self.blobID = blobID; self.nextOffset = nextOffset }
+    public init(protobufBytes: Data) throws { let message = try AizenWireV1_AppendBlobUploadResult(serializedBytes: protobufBytes); guard let blobID = UUID(uuidString: message.blobID) else { throw WireCodecError.invalidIdentity("blob upload") }; self.init(blobID: blobID, nextOffset: message.nextOffset) }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_AppendBlobUploadResult(); message.blobID = blobID.uuidString; message.nextOffset = nextOffset; return try message.serializedData() }
+}
+
+public struct FinishBlobUploadCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.context-files.finish-blob-upload@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let blobID: UUID
+    public let executionContextID: String
+    public init(blobID: UUID, executionContextID: String) { self.blobID = blobID; self.executionContextID = executionContextID }
+    public init(protobufBytes: Data) throws { let message = try AizenWireV1_FinishBlobUploadCommand(serializedBytes: protobufBytes); guard let blobID = UUID(uuidString: message.blobID), !message.executionContextID.isEmpty else { throw WireCodecError.invalidIdentity("blob upload") }; self.init(blobID: blobID, executionContextID: message.executionContextID) }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_FinishBlobUploadCommand(); message.blobID = blobID.uuidString; message.executionContextID = executionContextID; return try message.serializedData() }
+}
+
+public struct FinishBlobUploadResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.context-files.finish-blob-upload@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let blobID: UUID
+    public let byteCount: UInt64
+    public let sha256: Data
+    public init(blobID: UUID, byteCount: UInt64, sha256: Data) { self.blobID = blobID; self.byteCount = byteCount; self.sha256 = sha256 }
+    public init(protobufBytes: Data) throws { let message = try AizenWireV1_FinishBlobUploadResult(serializedBytes: protobufBytes); guard let blobID = UUID(uuidString: message.blobID), message.sha256.count == 32 else { throw WireCodecError.invalidIdentity("blob upload") }; self.init(blobID: blobID, byteCount: message.byteCount, sha256: message.sha256) }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_FinishBlobUploadResult(); message.blobID = blobID.uuidString; message.byteCount = byteCount; message.sha256 = sha256; return try message.serializedData() }
+}
+
+public struct CancelBlobUploadCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.context-files.cancel-blob-upload@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let blobID: UUID
+    public let executionContextID: String
+    public init(blobID: UUID, executionContextID: String) { self.blobID = blobID; self.executionContextID = executionContextID }
+    public init(protobufBytes: Data) throws { let message = try AizenWireV1_CancelBlobUploadCommand(serializedBytes: protobufBytes); guard let blobID = UUID(uuidString: message.blobID), !message.executionContextID.isEmpty else { throw WireCodecError.invalidIdentity("blob upload") }; self.init(blobID: blobID, executionContextID: message.executionContextID) }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_CancelBlobUploadCommand(); message.blobID = blobID.uuidString; message.executionContextID = executionContextID; return try message.serializedData() }
+}
+
+public struct CancelBlobUploadResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.context-files.cancel-blob-upload@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let blobID: UUID
+    public init(blobID: UUID) { self.blobID = blobID }
+    public init(protobufBytes: Data) throws { let message = try AizenWireV1_CancelBlobUploadResult(serializedBytes: protobufBytes); guard let blobID = UUID(uuidString: message.blobID) else { throw WireCodecError.invalidIdentity("blob upload") }; self.init(blobID: blobID) }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_CancelBlobUploadResult(); message.blobID = blobID.uuidString; return try message.serializedData() }
+}
+
 public struct CreateTerminalSessionCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.terminal-session.create@1")
     public static let schemaVersion: UInt32 = 1

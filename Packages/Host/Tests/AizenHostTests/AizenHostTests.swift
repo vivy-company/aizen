@@ -489,23 +489,60 @@ import AizenWire
     #expect(try await storage.load().securityAuditRecords.last?.kind == .ownerConfirmationUnavailable)
 }
 
+@Test func remoteBlobUploadsRequireFileWriteAndOwnerConfirmation() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let checkout = root.appendingPathComponent("checkout", isDirectory: true)
+    try FileManager.default.createDirectory(at: checkout, withIntermediateDirectories: true)
+    let destination = checkout.appendingPathComponent("attachment.bin")
+    try Data("old".utf8).write(to: destination)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Private")
+    let context = ExecutionContext(spaceID: space.id, kind: .repositoryCheckout, hostReference: .init(rawValue: "local-checkout:\(checkout.path)"))
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: LocalCryptographicIdentity().publicIdentity())
+    _ = try await storage.transact { $0.spaces.append(space); $0.executionContexts.append(context) }
+    try await storage.saveDeviceAuthorization(.init(device: device, grants: [.init(capability: .fileWrite, spaceIDs: [space.id])]))
+    let endpoint = RemoteHostEndpoint(
+        endpoint: LocalHost(storage: storage),
+        storage: storage,
+        authorization: DeviceAuthorizationGate(storage: storage),
+        rateLimiter: RemoteRequestRateLimiter(),
+        terminalControl: TerminalControlLeaseRegistry(),
+        session: try authenticatedSession(for: device.deviceID),
+        source: RemoteRequestSource("192.168.1.20")
+    )
+    let oldHash = SHA256.hash(data: Data("old".utf8)).map { String(format: "%02x", $0) }.joined()
+    let upload = ProtocolEnvelope(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .blob, payload: try .init(BeginBlobUploadCommandPayload(executionContextID: context.id.description, relativePath: "attachment.bin", expectedContentHash: oldHash, byteCount: 1, sha256: Data(SHA256.hash(data: Data([1]))))))
+
+    await #expect(throws: OwnerConfirmationError.unavailable(.fileWrite)) {
+        try await endpoint.receive(upload)
+    }
+    #expect(try await storage.load().securityAuditRecords.last?.kind == .ownerConfirmationUnavailable)
+}
+
 @Test func blobTransferStoreResumesVerifiesAndCleansUp() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
     let data = Data("resumable blob".utf8)
-    let store = try BlobTransferStore(directory: root)
-    let descriptor = try await store.begin(byteCount: data.count, sha256: Data(SHA256.hash(data: data)))
-    _ = try await store.append(id: descriptor.id, offset: 0, bytes: data.prefix(4))
-    await #expect(throws: BlobTransferStore.Error.offset(expected: 4)) { try await store.append(id: descriptor.id, offset: 0, bytes: Data()) }
-    _ = try await store.append(id: descriptor.id, offset: 4, bytes: data.dropFirst(4))
-    let file = try await store.finish(id: descriptor.id)
-    #expect(try Data(contentsOf: file) == data)
-    let bad = try await store.begin(byteCount: 1, sha256: Data(repeating: 0, count: 32))
-    _ = try await store.append(id: bad.id, offset: 0, bytes: Data([1]))
-    await #expect(throws: BlobTransferStore.Error.integrity) { _ = try await store.finish(id: bad.id) }
-    let cancelled = try await store.begin(byteCount: 1, sha256: Data(SHA256.hash(data: Data([1]))))
-    await store.cancel(id: cancelled.id)
-    await #expect(throws: BlobTransferStore.Error.unknown) { _ = try await store.append(id: cancelled.id, offset: 0, bytes: Data([1])) }
+    let store = BlobTransferStore(directory: root)
+    let target = BlobTransferStore.Target(executionContextID: UUID().uuidString, relativePath: "attachment.bin", expectedContentHash: String(repeating: "0", count: 64))
+    let descriptor = try await store.begin(target: target, byteCount: data.count, sha256: Data(SHA256.hash(data: data)))
+    _ = try await store.append(id: descriptor.id, target: target, offset: 0, bytes: data.prefix(4))
+    #expect(try await store.append(id: descriptor.id, target: target, offset: 0, bytes: data.prefix(4)) == 4)
+    await #expect(throws: BlobTransferStore.Error.offset(expected: 4)) { try await store.append(id: descriptor.id, target: target, offset: 0, bytes: Data("wrong".utf8)) }
+    _ = try await store.append(id: descriptor.id, target: target, offset: 4, bytes: data.dropFirst(4))
+    let upload = try await store.finish(id: descriptor.id, target: target)
+    #expect(try Data(contentsOf: upload.url) == data)
+    await store.discard(upload)
+    let bad = try await store.begin(target: target, byteCount: 1, sha256: Data(repeating: 0, count: 32))
+    _ = try await store.append(id: bad.id, target: target, offset: 0, bytes: Data([1]))
+    await #expect(throws: BlobTransferStore.Error.integrity) { _ = try await store.finish(id: bad.id, target: target) }
+    let cancelled = try await store.begin(target: target, byteCount: 1, sha256: Data(SHA256.hash(data: Data([1]))))
+    await store.cancel(id: cancelled.id, target: target)
+    await #expect(throws: BlobTransferStore.Error.unknown) { _ = try await store.append(id: cancelled.id, target: target, offset: 0, bytes: Data([1])) }
+    let expired = try await store.begin(target: target, byteCount: 1, sha256: Data(SHA256.hash(data: Data([1]))), now: .distantPast)
+    await store.cleanup(now: .distantPast.addingTimeInterval(3_601))
+    await #expect(throws: BlobTransferStore.Error.unknown) { _ = try await store.append(id: expired.id, target: target, offset: 0, bytes: Data([1])) }
 }
 
 private func authenticatedSession(for deviceID: DeviceID) throws -> AuthenticatedRemoteSession {
@@ -1615,6 +1652,35 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(try SearchContextFilesResponsePayload(protobufBytes: searchResponse.payload.protobufBytes).result.matches == [
         .init(relativePath: "README.md", lineNumber: 1, preview: "readme")
     ])
+}
+
+@Test func localHostInstallsVerifiedBlobUploadsIntoTheirBoundContextFile() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let checkout = root.appendingPathComponent("checkout", isDirectory: true)
+    try FileManager.default.createDirectory(at: checkout, withIntermediateDirectories: true)
+    let destination = checkout.appendingPathComponent("attachment.bin")
+    let oldData = Data("old".utf8)
+    try oldData.write(to: destination)
+    let replacement = Data(repeating: 0xAB, count: 100_000)
+    let expectedHash = SHA256.hash(data: oldData).map { String(format: "%02x", $0) }.joined()
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Files")
+    let context = ExecutionContext(spaceID: space.id, kind: .repositoryCheckout, hostReference: .init(rawValue: "local-checkout:\(checkout.path)"))
+    _ = try await storage.transact { $0.spaces.append(space); $0.executionContexts.append(context) }
+    let host = LocalHost(storage: storage, blobTransfers: .init(directory: root.appendingPathComponent("uploads", isDirectory: true)))
+
+    let begin = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .blob, payload: try .init(BeginBlobUploadCommandPayload(executionContextID: context.id.description, relativePath: "attachment.bin", expectedContentHash: expectedHash, byteCount: UInt64(replacement.count), sha256: Data(SHA256.hash(data: replacement))))))
+    let blobID = try BeginBlobUploadResultPayload(protobufBytes: begin.payload.protobufBytes).blobID
+    let firstChunk = Data(replacement.prefix(AppendBlobUploadCommandPayload.maximumChunkBytes))
+    let secondChunk = Data(replacement.dropFirst(firstChunk.count))
+    _ = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 2, kind: .command, channel: .blob, payload: try .init(AppendBlobUploadCommandPayload(blobID: blobID, executionContextID: context.id.description, offset: 0, bytes: firstChunk))))
+    _ = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 3, kind: .command, channel: .blob, payload: try .init(AppendBlobUploadCommandPayload(blobID: blobID, executionContextID: context.id.description, offset: UInt64(firstChunk.count), bytes: secondChunk))))
+    let finish = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 4, kind: .command, channel: .blob, payload: try .init(FinishBlobUploadCommandPayload(blobID: blobID, executionContextID: context.id.description))))
+    let result = try FinishBlobUploadResultPayload(protobufBytes: finish.payload.protobufBytes)
+    #expect(result.blobID == blobID)
+    #expect(result.sha256 == Data(SHA256.hash(data: replacement)))
+    #expect(try Data(contentsOf: destination) == replacement)
 }
 
 @Test func hostCreatesLinkedWorktreeContextsThroughAHostOperation() async throws {
