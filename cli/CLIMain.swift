@@ -42,6 +42,12 @@ struct AizenCLI {
             try await handleList(subArgs)
         case "workspace", "ws":
             try await handleWorkspace(subArgs)
+        case "space":
+            try await handleWorkspace(subArgs)
+        case "conversation":
+            try await handleConversation(subArgs)
+        case "session":
+            try await handleConversation(subArgs)
         case "sync":
             try await handleSync(subArgs)
         case "status":
@@ -252,6 +258,41 @@ private extension AizenCLI {
         default:
             throw CLIError.invalidArguments("Unknown workspace command: \(subcommand)")
         }
+    }
+
+    static func handleConversation(_ args: [String]) async throws {
+        guard let subcommand = args.first else {
+            throw CLIError.invalidArguments("conversation requires list or new")
+        }
+        let rest = Array(args.dropFirst())
+        switch subcommand {
+        case "list":
+            guard rest.count <= 1 else { throw CLIError.invalidArguments("conversation list accepts at most one space") }
+            let client = V2CLIClient()
+            let spaceID = try await resolveV2Space(rest.first, client: client)
+            for conversation in try await client.conversations(spaceID: spaceID) {
+                print("\(conversation.id.description)\t\(conversation.title)")
+            }
+        case "new":
+            guard rest.count >= 2 else { throw CLIError.invalidArguments("conversation new requires a space and title") }
+            let client = V2CLIClient()
+            let spaceID = try await resolveV2Space(rest[0], client: client)
+            guard let spaceID else { throw CLIError.invalidArguments("conversation new requires a space") }
+            let title = rest.dropFirst().joined(separator: " ")
+            let sessionID = try await client.createConversation(spaceID: spaceID, title: title)
+            print(sessionID.description)
+        default:
+            throw CLIError.invalidArguments("Unknown conversation command: \(subcommand)")
+        }
+    }
+
+    static func resolveV2Space(_ value: String?, client: V2CLIClient) async throws -> SpaceID? {
+        guard let value else { return nil }
+        if let uuid = UUID(uuidString: value) { return SpaceID(rawValue: uuid) }
+        guard let space = try await client.spaces().first(where: { $0.name.caseInsensitiveCompare(value) == .orderedSame }) else {
+            throw CLIError.workspaceNotFound(value)
+        }
+        return space.id
     }
 
     static func handleWorkspaceList(_ args: [String]) async throws {
