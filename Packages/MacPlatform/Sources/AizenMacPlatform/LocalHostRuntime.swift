@@ -58,6 +58,7 @@ public final class LocalHostRuntime: @unchecked Sendable {
             pairingRegistry: pairing,
             linkedWorktrees: worktrees,
             independentContexts: worktrees,
+            repositoryStatusReader: GitRepositoryStatusReader(),
             xcodeProjectOpener: MacXcodeProjectOpener(),
             xcodeProjectInspector: MacXcodeProjectInspector(),
             xcodeProjectBuilder: MacXcodeProjectBuilder()

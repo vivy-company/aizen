@@ -125,6 +125,28 @@ import Testing
     #expect(HostStartupStatusStore.consecutiveFailureCount(storageURL: storageURL) == 0)
 }
 
+@Test func gitRepositoryStatusReaderParsesRealBoundedPorcelainStatus() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try runGit(["init", "--initial-branch=main", root.path])
+    try Data("staged".utf8).write(to: root.appendingPathComponent("staged.swift"))
+    try runGit(["-C", root.path, "add", "staged.swift"])
+    try Data("modified".utf8).write(to: root.appendingPathComponent("modified.swift"))
+
+    let reader = GitRepositoryStatusReader()
+    let first = try await reader.status(at: root, maximumEntries: 1)
+    #expect(first.entries.count == 1)
+    #expect(first.truncated)
+    #expect(first.repositoryRevision == "unborn:main")
+    #expect(first.indexRevision.count == 64)
+
+    let full = try await reader.status(at: root, maximumEntries: 10)
+    #expect(full.entries.contains(.init(path: "staged.swift", indexStatus: "A", worktreeStatus: ".")))
+    #expect(full.entries.contains(.init(path: "modified.swift", indexStatus: "?", worktreeStatus: "?")))
+    #expect(!full.truncated)
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")
@@ -635,6 +657,15 @@ private func gitOutput(_ arguments: [String]) throws -> String {
     }
     let resolver = StorageBackedACPRunConfigurationResolver(storage: storage, agentConfiguration: StaticAgentConfigurationResolver(), managedSandboxRoot: root.appendingPathComponent("sandboxes", isDirectory: true))
     #expect(try await resolver.configuration(for: Run(spaceID: space.id, sessionID: session.id, executionContextID: context.id)).workingDirectory == independentContext.path)
+}
+
+private func runGit(_ arguments: [String]) throws {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    process.arguments = arguments
+    try process.run()
+    process.waitUntilExit()
+    #expect(process.terminationStatus == 0)
 }
 
 private struct StaticConfigurationResolver: ACPRunConfigurationResolving {
