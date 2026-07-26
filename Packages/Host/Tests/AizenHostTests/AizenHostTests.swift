@@ -11,6 +11,32 @@ import AizenWire
     #expect(AizenHostModule.protocolGeneration == 1)
 }
 
+@Test func terminalControlLeasesExpireAndDeduplicateDeviceInput() async throws {
+    let clock = TerminalLeaseTestClock(Date(timeIntervalSince1970: 1_000))
+    let registry = TerminalControlLeaseRegistry(now: { clock.now })
+    let terminalID = SessionID()
+    let firstDevice = DeviceID()
+    let secondDevice = DeviceID()
+
+    let firstLease = try await registry.acquire(terminalID: terminalID, deviceID: firstDevice, duration: 30)
+    #expect(firstLease.deviceID == firstDevice)
+    await #expect(throws: TerminalControlLeaseRegistry.Error.controlledByAnotherDevice(firstDevice)) {
+        _ = try await registry.acquire(terminalID: terminalID, deviceID: secondDevice)
+    }
+    try await registry.acceptInput(terminalID: terminalID, deviceID: firstDevice, sequence: 1)
+    await #expect(throws: TerminalControlLeaseRegistry.Error.replayedInputSequence) {
+        try await registry.acceptInput(terminalID: terminalID, deviceID: firstDevice, sequence: 1)
+    }
+
+    clock.advance(by: 31)
+    #expect(await registry.currentLease(for: terminalID) == nil)
+    let secondLease = try await registry.acquire(terminalID: terminalID, deviceID: secondDevice)
+    #expect(secondLease.deviceID == secondDevice)
+    await #expect(throws: TerminalControlLeaseRegistry.Error.notController) {
+        try await registry.acceptInput(terminalID: terminalID, deviceID: firstDevice, sequence: 2)
+    }
+}
+
 @Test func deviceAuthorizationGateDeniesUnpairedAndRevokedDevices() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1319,5 +1345,26 @@ private actor PromptRecordingRuntime: PromptRunRuntime {
         prompted.append((runID, message))
         if let assistantReply { await onAssistantTextDelta(assistantReply) }
         return assistantReply
+    }
+}
+
+private final class TerminalLeaseTestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Date
+
+    init(_ value: Date) {
+        self.value = value
+    }
+
+    var now: Date {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+
+    func advance(by interval: TimeInterval) {
+        lock.lock()
+        value = value.addingTimeInterval(interval)
+        lock.unlock()
     }
 }
