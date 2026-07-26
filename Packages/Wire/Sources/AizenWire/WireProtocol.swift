@@ -1655,6 +1655,114 @@ public struct RefreshRepositoryResourceResultPayload: WirePayload, Sendable, Has
     }
 }
 
+/// A bounded status request scoped to an already-authorized repository Resource.
+public struct ReadRepositoryStatusQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.repository.status@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public static let maximumEntryLimit: UInt32 = 1_000
+
+    public let resourceID: String
+    public let maximumEntries: UInt32
+
+    public init(resourceID: String, maximumEntries: UInt32 = 200) {
+        precondition(!resourceID.isEmpty, "Repository status needs a resource identity")
+        precondition((1...Self.maximumEntryLimit).contains(maximumEntries), "Repository status entry limit is out of bounds")
+        self.resourceID = resourceID
+        self.maximumEntries = maximumEntries
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ReadRepositoryStatusQuery(serializedBytes: protobufBytes)
+        guard !message.resourceID.isEmpty, (1...Self.maximumEntryLimit).contains(message.maximumEntries) else {
+            throw WireCodecError.invalidRepositoryStatusQuery
+        }
+        self.init(resourceID: message.resourceID, maximumEntries: message.maximumEntries)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ReadRepositoryStatusQuery()
+        message.resourceID = resourceID
+        message.maximumEntries = maximumEntries
+        return try message.serializedData()
+    }
+}
+
+/// One porcelain-v2 status entry. The two status columns stay explicit so clients do not infer mutations.
+public struct RepositoryStatusEntryPayload: Sendable, Hashable {
+    public let path: String
+    public let indexStatus: String
+    public let worktreeStatus: String
+
+    public init(path: String, indexStatus: String, worktreeStatus: String) {
+        precondition(!path.isEmpty && !path.hasPrefix("/"), "Repository status paths must be relative")
+        precondition(indexStatus.count == 1 && worktreeStatus.count == 1, "Git status columns are single characters")
+        self.path = path
+        self.indexStatus = indexStatus
+        self.worktreeStatus = worktreeStatus
+    }
+
+    fileprivate init(protobuf message: AizenWireV1_RepositoryStatusEntry) throws {
+        guard !message.path.isEmpty, !message.path.hasPrefix("/"), message.indexStatus.count == 1, message.worktreeStatus.count == 1 else {
+            throw WireCodecError.invalidRepositoryStatusEntry
+        }
+        self.init(path: message.path, indexStatus: message.indexStatus, worktreeStatus: message.worktreeStatus)
+    }
+
+    fileprivate var protobuf: AizenWireV1_RepositoryStatusEntry {
+        get throws {
+            var message = AizenWireV1_RepositoryStatusEntry()
+            message.path = path
+            message.indexStatus = indexStatus
+            message.worktreeStatus = worktreeStatus
+            return message
+        }
+    }
+}
+
+/// A real Git snapshot. Revisions let later mutations reject stale status or index state.
+public struct ReadRepositoryStatusResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.repository.status@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let resourceID: String
+    public let repositoryRevision: String
+    public let indexRevision: String
+    public let entries: [RepositoryStatusEntryPayload]
+    public let truncated: Bool
+
+    public init(resourceID: String, repositoryRevision: String, indexRevision: String, entries: [RepositoryStatusEntryPayload], truncated: Bool) {
+        precondition(!resourceID.isEmpty, "Repository status needs a resource identity")
+        precondition(!repositoryRevision.isEmpty && !indexRevision.isEmpty, "Repository status needs revisions")
+        precondition(entries.count <= Int(ReadRepositoryStatusQueryPayload.maximumEntryLimit), "Repository status exceeded its protocol bound")
+        self.resourceID = resourceID
+        self.repositoryRevision = repositoryRevision
+        self.indexRevision = indexRevision
+        self.entries = entries
+        self.truncated = truncated
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ReadRepositoryStatusResponse(serializedBytes: protobufBytes)
+        guard !message.resourceID.isEmpty, !message.repositoryRevision.isEmpty, !message.indexRevision.isEmpty,
+              message.entries.count <= Int(ReadRepositoryStatusQueryPayload.maximumEntryLimit) else {
+            throw WireCodecError.invalidRepositoryStatusResponse
+        }
+        try self.init(resourceID: message.resourceID, repositoryRevision: message.repositoryRevision, indexRevision: message.indexRevision, entries: message.entries.map(RepositoryStatusEntryPayload.init(protobuf:)), truncated: message.truncated)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ReadRepositoryStatusResponse()
+        message.resourceID = resourceID
+        message.repositoryRevision = repositoryRevision
+        message.indexRevision = indexRevision
+        message.entries = try entries.map { try $0.protobuf }
+        message.truncated = truncated
+        return try message.serializedData()
+    }
+}
+
 public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.execution-context.list@1")
     public static let schemaVersion: UInt32 = 1
@@ -2435,6 +2543,9 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidLifecycle(String)
     case invalidAuthenticationPayload
     case invalidRepositoryAvailability(String)
+    case invalidRepositoryStatusQuery
+    case invalidRepositoryStatusEntry
+    case invalidRepositoryStatusResponse
 }
 
 private extension ProtocolEnvelope {

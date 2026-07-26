@@ -67,6 +67,31 @@ import Testing
     #expect(decoded == payload)
 }
 
+@Test func repositoryStatusPayloadsRoundTripWithBoundedEntries() throws {
+    let resourceID = UUID().uuidString
+    let query = ReadRepositoryStatusQueryPayload(resourceID: resourceID, maximumEntries: 2)
+    #expect(try ReadRepositoryStatusQueryPayload(protobufBytes: query.protobufBytes()) == query)
+
+    let response = ReadRepositoryStatusResponsePayload(
+        resourceID: resourceID,
+        repositoryRevision: "a".padding(toLength: 40, withPad: "a", startingAt: 0),
+        indexRevision: "b".padding(toLength: 64, withPad: "b", startingAt: 0),
+        entries: [
+            .init(path: "Sources/App.swift", indexStatus: "M", worktreeStatus: " "),
+            .init(path: "README.md", indexStatus: "?", worktreeStatus: "?")
+        ],
+        truncated: false
+    )
+    #expect(try ReadRepositoryStatusResponsePayload(protobufBytes: response.protobufBytes()) == response)
+
+    var malformed = AizenWireV1_ReadRepositoryStatusQuery()
+    malformed.resourceID = resourceID
+    malformed.maximumEntries = ReadRepositoryStatusQueryPayload.maximumEntryLimit + 1
+    #expect(throws: WireCodecError.invalidRepositoryStatusQuery) {
+        try ReadRepositoryStatusQueryPayload(protobufBytes: malformed.serializedData())
+    }
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")

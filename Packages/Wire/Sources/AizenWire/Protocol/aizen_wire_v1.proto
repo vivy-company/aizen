@@ -418,6 +418,25 @@ message RefreshRepositoryResourceResult {
   bool is_rebase_in_progress = 6;
 }
 
+message ReadRepositoryStatusQuery {
+  string resource_id = 1;
+  uint32 maximum_entries = 2;
+}
+
+message RepositoryStatusEntry {
+  string path = 1;
+  string index_status = 2;
+  string worktree_status = 3;
+}
+
+message ReadRepositoryStatusResponse {
+  string resource_id = 1;
+  string repository_revision = 2;
+  string index_revision = 3;
+  repeated RepositoryStatusEntry entries = 4;
+  bool truncated = 5;
+}
+
 message ListExecutionContextsQuery {
   string space_id = 1;
   string resource_id = 2;
