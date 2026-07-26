@@ -23,6 +23,7 @@ protocol ReignitionConversationClient: Sendable {
     func contextTextFile(executionContextID: ExecutionContextID, relativePath: String) async throws -> String
     func importLocalFolder(spaceID: SpaceID, path: String, title: String?) async throws -> ResourceID
     func importLocalRepository(spaceID: SpaceID, path: String, title: String?) async throws -> ResourceID
+    func importWebResource(spaceID: SpaceID, url: URL, title: String?) async throws -> ResourceID
     func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID
     func createRepositoryCheckoutContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID
     func createLinkedWorktreeContext(

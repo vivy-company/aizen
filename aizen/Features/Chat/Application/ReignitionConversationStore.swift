@@ -145,6 +145,16 @@ final class ReignitionConversationStore: ObservableObject {
         }
     }
 
+    func importWebResource(spaceID: SpaceID, url: URL, title: String? = nil) async -> Resource? {
+        var imported: Resource?
+        await perform {
+            let resourceID = try await self.host.importWebResource(spaceID: spaceID, url: url, title: title)
+            try await self.refreshProjection(spaceID: spaceID)
+            imported = self.resources.first(where: { $0.id == resourceID })
+        }
+        return imported
+    }
+
     /// Opens an external local path through Host ownership, reusing an attached conversation when possible.
     func openLocalPath(_ url: URL, preferredSpaceID: SpaceID?) async -> SpaceID? {
         var openedSpaceID: SpaceID?

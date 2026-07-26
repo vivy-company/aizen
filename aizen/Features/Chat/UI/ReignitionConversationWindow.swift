@@ -5,6 +5,7 @@ import AppKit
 import Combine
 import GhosttyKit
 import SwiftUI
+import WebKit
 
 /// A complete Mac Client path for projectless Reignition conversations.
 /// It is intentionally independent from the legacy worktree/Core Data navigation tree.
@@ -18,6 +19,8 @@ struct ReignitionConversationWindow: View {
     @State private var terminalPresentation: ReignitionTerminalPresentation?
     @State private var fileBrowserContext: ExecutionContext?
     @State private var showingLicenseDeepLinkSheet = false
+    @State private var webBrowserResource: Resource?
+    @State private var newWebURL = ""
 
     init(host: ReignitionHostComposition) {
         let cursorURL = ReignitionHostComposition.defaultStorageURL()
@@ -98,6 +101,11 @@ struct ReignitionConversationWindow: View {
             Button("Create") { createSpace() }
             Button("Cancel", role: .cancel) { newSpaceName = "" }
         }
+        .alert("Open Web Resource", isPresented: newWebResourceAlert) {
+            TextField("https://example.com", text: $newWebURL)
+            Button("Open") { openWebResource() }
+            Button("Cancel", role: .cancel) { newWebURL = "" }
+        }
         .sheet(item: $contextCreation) { creation in
             ReignitionContextCreationSheet(creation: creation) { destinationPath, branch in
                 contextCreation = nil
@@ -111,6 +119,9 @@ struct ReignitionConversationWindow: View {
         }
         .sheet(item: $fileBrowserContext) { context in
             ReignitionContextFilesSheet(store: store, context: context)
+        }
+        .sheet(item: $webBrowserResource) { resource in
+            ReignitionWebBrowserSheet(resource: resource)
         }
         .sheet(isPresented: $showingLicenseDeepLinkSheet) {
             LicenseDeepLinkSheet(
@@ -154,6 +165,7 @@ struct ReignitionConversationWindow: View {
                         }
                     }
                     .disabled(conversation.executionContextID == nil || store.isSynchronizing)
+                    webResourceMenu(for: conversation)
                     folderMenu(for: conversation)
                 }
                 .padding(.horizontal)
@@ -221,6 +233,13 @@ struct ReignitionConversationWindow: View {
         )
     }
 
+    private var newWebResourceAlert: Binding<Bool> {
+        Binding(
+            get: { !newWebURL.isEmpty },
+            set: { if !$0 { newWebURL = "" } }
+        )
+    }
+
     private var errorAlert: Binding<Bool> {
         Binding(
             get: { store.lastError != nil },
@@ -276,6 +295,40 @@ struct ReignitionConversationWindow: View {
             if let spaceID = await store.createSpace(name: name) {
                 selectedSpaceID = spaceID
             }
+        }
+    }
+
+    @ViewBuilder
+    private func webResourceMenu(for conversation: Session) -> some View {
+        Menu("Web", systemImage: "globe") {
+            let webResources = store.resources.filter {
+                $0.spaceID == conversation.spaceID && $0.kind == .webSource
+            }
+            if !webResources.isEmpty {
+                ForEach(webResources) { resource in
+                    Button(resource.title) { webBrowserResource = resource }
+                }
+                Divider()
+            }
+            Button("Open URL…", systemImage: "plus") {
+                newWebURL = "https://"
+            }
+        }
+        .disabled(store.isSynchronizing)
+    }
+
+    private func openWebResource() {
+        let input = newWebURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        newWebURL = ""
+        guard let url = URL(string: input),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host != nil else { return }
+        guard let conversation = store.conversations.first(where: { $0.id == store.selectedConversationID }) else {
+            return
+        }
+        Task {
+            webBrowserResource = await store.importWebResource(spaceID: conversation.spaceID, url: url)
         }
     }
 
@@ -512,6 +565,53 @@ private struct ReignitionContextTextFileSheet: View {
             await store.loadContextTextFile(contextID: context.id, relativePath: file.relativePath)
         }
         .frame(minWidth: 620, minHeight: 460)
+    }
+}
+
+private struct ReignitionWebBrowserSheet: View {
+    let resource: Resource
+    @State private var url: String
+    @State private var canGoBack = false
+    @State private var canGoForward = false
+    @State private var isLoading = false
+    @State private var loadingProgress = 0.0
+    @State private var webView: WKWebView?
+
+    init(resource: Resource) {
+        self.resource = resource
+        guard case let .web(details) = resource.details else {
+            preconditionFailure("Web browser presentation requires a web resource")
+        }
+        _url = State(initialValue: details.url.absoluteString)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            BrowserControlBar(
+                url: $url,
+                canGoBack: $canGoBack,
+                canGoForward: $canGoForward,
+                isLoading: $isLoading,
+                loadingProgress: $loadingProgress,
+                onBack: { webView?.goBack() },
+                onForward: { webView?.goForward() },
+                onReload: { webView?.reload() },
+                onNavigate: { url = $0 }
+            )
+            Divider()
+            WebViewWrapper(
+                url: url,
+                canGoBack: $canGoBack,
+                canGoForward: $canGoForward,
+                onURLChange: { url = $0 },
+                onTitleChange: { _ in },
+                isLoading: $isLoading,
+                loadingProgress: $loadingProgress,
+                onWebViewCreated: { webView = $0 }
+            )
+        }
+        .navigationTitle(resource.title)
+        .frame(minWidth: 760, minHeight: 520)
     }
 }
 

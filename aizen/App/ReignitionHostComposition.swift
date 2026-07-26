@@ -112,6 +112,10 @@ actor ReignitionHostComposition: ReignitionConversationClient {
         try await client.importLocalRepository(spaceID: spaceID, path: path, title: title)
     }
 
+    func importWebResource(spaceID: SpaceID, url: URL, title: String?) async throws -> ResourceID {
+        try await client.importWebResource(spaceID: spaceID, url: url, title: title)
+    }
+
     func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
         try await client.createLocalFolderContext(spaceID: spaceID, resourceID: resourceID)
     }
