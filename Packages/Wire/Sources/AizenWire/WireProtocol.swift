@@ -387,6 +387,66 @@ public struct CreateConversationResultPayload: WirePayload, Sendable, Hashable {
 
 /// `snapshot` is a versioned Storage representation whose internal encoding is owned by Storage,
 /// while this enclosing payload remains an actual protobuf message on every transport.
+public struct SendConversationCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.conversation.send@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let spaceID: String
+    public let sessionID: String
+    public let messageID: String
+    public let runID: String
+    public let content: String
+
+    public init(spaceID: String, sessionID: String, messageID: String, runID: String, content: String) {
+        precondition(!spaceID.isEmpty && !sessionID.isEmpty && !messageID.isEmpty && !runID.isEmpty, "Conversation sends require identities")
+        precondition(!content.isEmpty, "Conversation sends require content")
+        self.spaceID = spaceID
+        self.sessionID = sessionID
+        self.messageID = messageID
+        self.runID = runID
+        self.content = content
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_SendConversationCommand(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID, sessionID: message.sessionID, messageID: message.messageID, runID: message.runID, content: message.content)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_SendConversationCommand()
+        message.spaceID = spaceID
+        message.sessionID = sessionID
+        message.messageID = messageID
+        message.runID = runID
+        message.content = content
+        return try message.serializedData()
+    }
+}
+
+public struct SendConversationResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.conversation.send@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let runID: String
+
+    public init(runID: String) {
+        precondition(!runID.isEmpty, "Conversation sends require a Run identity")
+        self.runID = runID
+    }
+
+    public init(protobufBytes: Data) throws {
+        self.init(runID: try AizenWireV1_SendConversationResult(serializedBytes: protobufBytes).runID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_SendConversationResult()
+        message.runID = runID
+        return try message.serializedData()
+    }
+}
+
 public struct ListSpacesQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.space.list@1")
     public static let schemaVersion: UInt32 = 1

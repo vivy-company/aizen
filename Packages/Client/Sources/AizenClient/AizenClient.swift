@@ -127,6 +127,34 @@ public actor HostClient {
         return SessionID(rawValue: uuid)
     }
 
+    public func sendConversation(
+        spaceID: SpaceID,
+        sessionID: SessionID,
+        content: String,
+        messageID: ConversationMessageID = ConversationMessageID(),
+        runID: RunID = RunID()
+    ) async throws -> RunID {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(SendConversationCommandPayload(
+                spaceID: spaceID.description,
+                sessionID: sessionID.description,
+                messageID: messageID.description,
+                runID: runID.description,
+                content: content
+            ))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == SendConversationResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        let result = try SendConversationResultPayload(protobufBytes: response.payload.protobufBytes)
+        guard let uuid = UUID(uuidString: result.runID) else { throw Error.invalidIdentity(result.runID) }
+        return RunID(rawValue: uuid)
+    }
+
     private func nextConnectionSequence() throws -> UInt64 {
         guard nextSequence < UInt64.max else { throw Error.sequenceExhausted }
         defer { nextSequence += 1 }

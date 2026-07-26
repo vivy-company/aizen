@@ -141,6 +141,38 @@ import AizenWire
     #expect(snapshot.sessions == [Session(id: SessionID(rawValue: UUID(uuidString: result.sessionID)!), spaceID: space.id, kind: .conversation, title: "Plan")])
 }
 
+@Test func hostSendsConversationThroughTheConfiguredRuntime() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+    }
+    let runtime = PromptRecordingRuntime()
+    let coordinator = ConversationRunCoordinator(storage: storage, runtime: runtime)
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage, conversationRuns: coordinator))
+    let runID = RunID()
+    let response = try await transport.send(.init(
+        messageID: "send-conversation",
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(SendConversationCommandPayload(
+            spaceID: space.id.description,
+            sessionID: session.id.description,
+            messageID: ConversationMessageID().description,
+            runID: runID.description,
+            content: "Make a plan"
+        ))
+    ))
+    #expect(try SendConversationResultPayload(protobufBytes: response.payload.protobufBytes).runID == runID.description)
+    #expect(try await storage.load().runs.first?.lifecycle == .completed)
+    #expect((await runtime.prompted).first?.1 == "Make a plan")
+}
+
 @Test func managedSandboxProvisioningLinksAProjectlessConversation() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

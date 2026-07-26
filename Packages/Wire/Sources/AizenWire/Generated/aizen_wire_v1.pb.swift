@@ -430,6 +430,38 @@ nonisolated struct AizenWireV1_CreateConversationResult: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_SendConversationCommand: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var spaceID: String = String()
+
+  var sessionID: String = String()
+
+  var messageID: String = String()
+
+  var runID: String = String()
+
+  var content: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_SendConversationResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var runID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_ListSpacesQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1108,6 +1140,86 @@ nonisolated extension AizenWireV1_CreateConversationResult: SwiftProtobuf.Messag
 
   static func ==(lhs: AizenWireV1_CreateConversationResult, rhs: AizenWireV1_CreateConversationResult) -> Bool {
     if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_SendConversationCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".SendConversationCommand"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}space_id\0\u{3}session_id\0\u{3}message_id\0\u{3}run_id\0\u{1}content\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.messageID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.runID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.content) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 1)
+    }
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 2)
+    }
+    if !self.messageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.messageID, fieldNumber: 3)
+    }
+    if !self.runID.isEmpty {
+      try visitor.visitSingularStringField(value: self.runID, fieldNumber: 4)
+    }
+    if !self.content.isEmpty {
+      try visitor.visitSingularStringField(value: self.content, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_SendConversationCommand, rhs: AizenWireV1_SendConversationCommand) -> Bool {
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.messageID != rhs.messageID {return false}
+    if lhs.runID != rhs.runID {return false}
+    if lhs.content != rhs.content {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_SendConversationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".SendConversationResult"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}run_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.runID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.runID.isEmpty {
+      try visitor.visitSingularStringField(value: self.runID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_SendConversationResult, rhs: AizenWireV1_SendConversationResult) -> Bool {
+    if lhs.runID != rhs.runID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

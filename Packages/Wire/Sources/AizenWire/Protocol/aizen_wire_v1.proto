@@ -114,6 +114,18 @@ message CreateConversationResult {
   string session_id = 1;
 }
 
+message SendConversationCommand {
+  string space_id = 1;
+  string session_id = 2;
+  string message_id = 3;
+  string run_id = 4;
+  string content = 5;
+}
+
+message SendConversationResult {
+  string run_id = 1;
+}
+
 message ListSpacesQuery {}
 
 message SpaceRecord {

@@ -12,9 +12,11 @@ public enum AizenHostModule {
 /// Explicit local Host composition. It owns Storage but exposes only Wire envelopes and Core snapshots.
 public actor LocalHost: WireEndpoint {
     private let storage: StorageRepository
+    private let conversationRuns: ConversationRunCoordinator?
 
-    public init(storage: StorageRepository) {
+    public init(storage: StorageRepository, conversationRuns: ConversationRunCoordinator? = nil) {
         self.storage = storage
+        self.conversationRuns = conversationRuns
     }
 
     public func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
@@ -36,7 +38,9 @@ public actor LocalHost: WireEndpoint {
                 DeleteSpaceCommandPayload.identifier,
                 SpaceMutationResultPayload.identifier,
                 CreateConversationCommandPayload.identifier,
-                CreateConversationResultPayload.identifier
+                CreateConversationResultPayload.identifier,
+                SendConversationCommandPayload.identifier,
+                SendConversationResultPayload.identifier
             ]))
         case .query where envelope.payload.identifier == SnapshotRequestPayload.identifier:
             let request = try SnapshotRequestPayload(protobufBytes: envelope.payload.protobufBytes)
@@ -90,6 +94,28 @@ public actor LocalHost: WireEndpoint {
             }
             kind = .commandResult
             payload = try TypedPayload(CreateConversationResultPayload(sessionID: session.id.description))
+        case .command where envelope.payload.identifier == SendConversationCommandPayload.identifier:
+            guard let conversationRuns else { throw HostProtocolError.runtimeUnavailable }
+            let command = try SendConversationCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            guard let rawSpaceID = UUID(uuidString: command.spaceID),
+                let rawSessionID = UUID(uuidString: command.sessionID),
+                let rawMessageID = UUID(uuidString: command.messageID),
+                let rawRunID = UUID(uuidString: command.runID) else {
+                throw HostProtocolError.invalidIdentity("Conversation send")
+            }
+            let spaceID = SpaceID(rawValue: rawSpaceID)
+            let sessionID = SessionID(rawValue: rawSessionID)
+            let runID = RunID(rawValue: rawRunID)
+            let message = ConversationMessage(
+                id: ConversationMessageID(rawValue: rawMessageID),
+                spaceID: spaceID,
+                sessionID: sessionID,
+                role: .user,
+                content: command.content
+            )
+            try await conversationRuns.submit(message: message, run: Run(id: runID, spaceID: spaceID, sessionID: sessionID))
+            kind = .commandResult
+            payload = try TypedPayload(SendConversationResultPayload(runID: runID.description))
         default:
             throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier)
         }
@@ -115,6 +141,7 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case invalidIdentity(String)
     case unknownSpace(SpaceID)
     case spaceNotEmpty(SpaceID)
+    case runtimeUnavailable
 }
 
 /// Host-facing runtime contract. ACP, Process, and UI concerns remain in a macOS adapter.
