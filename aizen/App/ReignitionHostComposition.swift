@@ -56,6 +56,14 @@ actor ReignitionHostComposition {
         await client.connectionState
     }
 
+    func snapshot() async throws -> SnapshotResponsePayload {
+        try await client.snapshot()
+    }
+
+    func journalEvents(after cursor: UInt64) async throws -> ReadJournalEventsResponsePayload {
+        try await client.journalEvents(after: cursor)
+    }
+
     func spaces() async throws -> [Space] {
         try await client.spaces()
     }
