@@ -42,4 +42,8 @@ public actor LocalHostClient {
         let snapshot = try JSONDecoder().decode(StorageSnapshot.self, from: try await client.snapshotData())
         return snapshot.runs.filter { spaceID == nil || $0.spaceID == spaceID }
     }
+
+    public func conversationTimeline(sessionID: SessionID) async throws -> [ConversationMessage] {
+        try await client.conversationTimeline(sessionID: sessionID)
+    }
 }

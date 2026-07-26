@@ -558,6 +558,76 @@ public struct ListConversationsResponsePayload: WirePayload, Sendable, Hashable 
     }
 }
 
+public struct GetConversationTimelineQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.conversation.timeline@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let sessionID: String
+
+    public init(sessionID: String) {
+        precondition(!sessionID.isEmpty, "Conversation timeline queries require a Session identity")
+        self.sessionID = sessionID
+    }
+
+    public init(protobufBytes: Data) throws {
+        self.init(sessionID: try AizenWireV1_GetConversationTimelineQuery(serializedBytes: protobufBytes).sessionID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_GetConversationTimelineQuery()
+        message.sessionID = sessionID
+        return try message.serializedData()
+    }
+}
+
+public struct GetConversationTimelineResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.conversation.timeline@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let messages: [ConversationMessage]
+
+    public init(messages: [ConversationMessage]) { self.messages = messages }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_GetConversationTimelineResponse(serializedBytes: protobufBytes)
+        messages = try message.messages.map { record in
+            guard let messageUUID = UUID(uuidString: record.messageID),
+                let spaceUUID = UUID(uuidString: record.spaceID),
+                let sessionUUID = UUID(uuidString: record.sessionID),
+                let role = ConversationMessageRole(rawValue: record.role) else {
+                throw WireCodecError.invalidIdentity(record.messageID)
+            }
+            let runID = record.runID.isEmpty ? nil : UUID(uuidString: record.runID).map(RunID.init(rawValue:))
+            guard record.runID.isEmpty || runID != nil else { throw WireCodecError.invalidIdentity(record.runID) }
+            return ConversationMessage(
+                id: ConversationMessageID(rawValue: messageUUID),
+                spaceID: SpaceID(rawValue: spaceUUID),
+                sessionID: SessionID(rawValue: sessionUUID),
+                runID: runID,
+                role: role,
+                content: record.content,
+                createdAt: Date(timeIntervalSince1970: Double(record.createdAtMillis) / 1_000)
+            )
+        }
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_GetConversationTimelineResponse()
+        message.messages = messages.map { value in
+            var record = AizenWireV1_ConversationMessageRecord()
+            record.messageID = value.id.description
+            record.spaceID = value.spaceID.description
+            record.sessionID = value.sessionID.description
+            record.runID = value.runID?.description ?? ""
+            record.role = value.role.rawValue
+            record.content = value.content
+            record.createdAtMillis = Int64((value.createdAt.timeIntervalSince1970 * 1_000).rounded(.towardZero))
+            return record
+        }
+        return try message.serializedData()
+    }
+}
+
 public struct SnapshotResponsePayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.snapshot.host@1")
     public static let schemaVersion: UInt32 = 1

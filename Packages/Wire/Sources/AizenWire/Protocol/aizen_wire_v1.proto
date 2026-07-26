@@ -154,6 +154,24 @@ message ListConversationsResponse {
   repeated ConversationRecord conversations = 1;
 }
 
+message GetConversationTimelineQuery {
+  string session_id = 1;
+}
+
+message ConversationMessageRecord {
+  string message_id = 1;
+  string space_id = 2;
+  string session_id = 3;
+  string run_id = 4;
+  string role = 5;
+  string content = 6;
+  int64 created_at_millis = 7;
+}
+
+message GetConversationTimelineResponse {
+  repeated ConversationMessageRecord messages = 1;
+}
+
 message SnapshotRequest {
   string scope = 1;
   uint64 after_cursor = 2;

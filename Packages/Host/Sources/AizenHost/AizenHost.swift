@@ -40,6 +40,8 @@ public actor LocalHost: WireEndpoint {
                 ListSpacesResponsePayload.identifier,
                 ListConversationsQueryPayload.identifier,
                 ListConversationsResponsePayload.identifier,
+                GetConversationTimelineQueryPayload.identifier,
+                GetConversationTimelineResponsePayload.identifier,
                 CreateSpaceCommandPayload.identifier,
                 CreateSpaceResultPayload.identifier,
                 RenameSpaceCommandPayload.identifier,
@@ -68,6 +70,14 @@ public actor LocalHost: WireEndpoint {
             }
             kind = .queryResponse
             payload = try TypedPayload(ListConversationsResponsePayload(conversations: conversations))
+        case .query where envelope.payload.identifier == GetConversationTimelineQueryPayload.identifier:
+            let query = try GetConversationTimelineQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let sessionID = try Self.sessionID(from: query.sessionID)
+            let messages = try await storage.load().conversationMessages
+                .filter { $0.sessionID == sessionID }
+                .sorted { $0.createdAt < $1.createdAt }
+            kind = .queryResponse
+            payload = try TypedPayload(GetConversationTimelineResponsePayload(messages: messages))
         case .command where envelope.payload.identifier == CreateSpaceCommandPayload.identifier:
             let command = try CreateSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let space = Space(name: command.name, icon: command.icon, summary: command.summary)
@@ -153,6 +163,11 @@ public actor LocalHost: WireEndpoint {
     private static func spaceID(from value: String) throws -> SpaceID {
         guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
         return SpaceID(rawValue: rawValue)
+    }
+
+    private static func sessionID(from value: String) throws -> SessionID {
+        guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
+        return SessionID(rawValue: rawValue)
     }
 
     private func executionContext(for sessionID: SessionID, in spaceID: SpaceID) async throws -> ExecutionContextID {
