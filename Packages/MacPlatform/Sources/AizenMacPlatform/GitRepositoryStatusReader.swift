@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Host resolves the repository URL from a Resource before this actor is called; this type never
 /// receives a client-provided command or path fragment.
-public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading {
+public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading {
     private static let maximumStatusBytes = 1_048_576
     private static let maximumIndexBytes = 67_108_864
 
@@ -43,6 +43,23 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
         }
         let output = try runGitData(diffArguments, maximumOutputBytes: maximumBytes)
         return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL), unifiedDiff: output, truncated: false)
+    }
+
+    public func history(at repositoryURL: URL, maximumCommits: Int) async throws -> RepositoryHistorySnapshot {
+        guard maximumCommits > 0, FileManager.default.fileExists(atPath: repositoryURL.appendingPathComponent(".git").path) else { throw Error.notRepository }
+        let revision = try currentRepositoryRevision(at: repositoryURL)
+        let branch = try? runGit(["-C", repositoryURL.path, "symbolic-ref", "--quiet", "--short", "HEAD"], maximumOutputBytes: 512)
+        guard !revision.hasPrefix("unborn:") else { return .init(repositoryRevision: revision, indexRevision: try currentIndexRevision(at: repositoryURL), branch: branch, isDetached: branch == nil, commits: [], truncated: false) }
+        let separator = "\u{1F}"
+        let separatorCharacter = separator.first!
+        let output = try runGit(["-C", repositoryURL.path, "log", "--format=%H\(separator)%s\(separator)%an\(separator)%at", "-n", "\(maximumCommits + 1)"], maximumOutputBytes: 262_144)
+        let records = output.split(separator: "\n", omittingEmptySubsequences: true)
+        let commits = try records.prefix(maximumCommits).map { record -> RepositoryHistorySnapshot.Commit in
+            let fields = record.split(separator: separatorCharacter, maxSplits: 3, omittingEmptySubsequences: false)
+            guard fields.count == 4, let seconds = Int64(fields[3]) else { throw Error.malformedStatus }
+            return .init(revision: String(fields[0]), subject: String(fields[1]), authorName: String(fields[2]), authoredAtUnixMilliseconds: seconds * 1_000)
+        }
+        return .init(repositoryRevision: revision, indexRevision: try currentIndexRevision(at: repositoryURL), branch: branch, isDetached: branch == nil, commits: commits, truncated: records.count > maximumCommits)
     }
 
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {

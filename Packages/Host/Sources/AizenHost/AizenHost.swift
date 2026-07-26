@@ -71,8 +71,9 @@ public protocol RepositoryDiffReading: Sendable {
 }
 
 public struct RepositoryHistorySnapshot: Sendable, Equatable {
-    public struct Commit: Sendable, Equatable { public let revision: String; public let subject: String; public let authorName: String; public let authoredAtUnixMilliseconds: Int64 }
+    public struct Commit: Sendable, Equatable { public let revision: String; public let subject: String; public let authorName: String; public let authoredAtUnixMilliseconds: Int64; public init(revision: String, subject: String, authorName: String, authoredAtUnixMilliseconds: Int64) { self.revision = revision; self.subject = subject; self.authorName = authorName; self.authoredAtUnixMilliseconds = authoredAtUnixMilliseconds } }
     public let repositoryRevision: String; public let indexRevision: String; public let branch: String?; public let isDetached: Bool; public let commits: [Commit]; public let truncated: Bool
+    public init(repositoryRevision: String, indexRevision: String, branch: String?, isDetached: Bool, commits: [Commit], truncated: Bool) { self.repositoryRevision = repositoryRevision; self.indexRevision = indexRevision; self.branch = branch; self.isDetached = isDetached; self.commits = commits; self.truncated = truncated }
 }
 
 public protocol RepositoryHistoryReading: Sendable {
