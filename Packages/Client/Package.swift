@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "AizenClient",
-    platforms: [.macOS(.v14), .iOS(.v17)],
+    platforms: [.macOS(.v13), .iOS(.v17)],
     products: [.library(name: "AizenClient", targets: ["AizenClient"])],
     dependencies: [.package(path: "../Core"), .package(path: "../Wire"), .package(path: "../Transport")],
     targets: [

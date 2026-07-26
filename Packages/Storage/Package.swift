@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "AizenStorage",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v13)],
     products: [.library(name: "AizenStorage", targets: ["AizenStorage"])],
     dependencies: [.package(path: "../Core")],
     targets: [
