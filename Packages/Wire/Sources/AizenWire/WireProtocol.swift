@@ -1894,6 +1894,23 @@ public struct ReadRepositoryBranchesResponsePayload: WirePayload, Sendable, Hash
     public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadRepositoryBranchesResponse(); m.resourceID = resourceID; m.repositoryRevision = repositoryRevision; m.indexRevision = indexRevision; m.branches = branches.map(\.protobuf); m.truncated = truncated; return try m.serializedData() }
 }
 
+public struct CommitRepositoryCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.repository.commit@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true; public static let maximumMessageLength = 10_000
+    public let resourceID: String; public let message: String; public let expectedRepositoryRevision: String; public let expectedIndexRevision: String; public let amend: Bool
+    public init(resourceID: String, message: String, expectedRepositoryRevision: String, expectedIndexRevision: String, amend: Bool) { precondition(!resourceID.isEmpty && Self.validMessage(message) && !expectedRepositoryRevision.isEmpty && expectedRepositoryRevision.utf8.count <= 128 && expectedIndexRevision.count == 64); self.resourceID = resourceID; self.message = message; self.expectedRepositoryRevision = expectedRepositoryRevision; self.expectedIndexRevision = expectedIndexRevision; self.amend = amend }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_CommitRepositoryCommand(serializedBytes: protobufBytes); guard !m.resourceID.isEmpty, Self.validMessage(m.message), !m.expectedRepositoryRevision.isEmpty, m.expectedRepositoryRevision.utf8.count <= 128, m.expectedIndexRevision.count == 64 else { throw WireCodecError.invalidRepositoryCommitCommand }; self.init(resourceID: m.resourceID, message: m.message, expectedRepositoryRevision: m.expectedRepositoryRevision, expectedIndexRevision: m.expectedIndexRevision, amend: m.amend) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_CommitRepositoryCommand(); m.resourceID = resourceID; m.message = message; m.expectedRepositoryRevision = expectedRepositoryRevision; m.expectedIndexRevision = expectedIndexRevision; m.amend = amend; return try m.serializedData() }
+    private static func validMessage(_ message: String) -> Bool { !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && message.utf8.count <= maximumMessageLength && !message.contains("\0") }
+}
+
+public struct CommitRepositoryResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.repository.commit@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let repositoryRevision: String; public let indexRevision: String; public let operationID: String
+    public init(repositoryRevision: String, indexRevision: String, operationID: String) { precondition(!repositoryRevision.isEmpty && indexRevision.count == 64 && UUID(uuidString: operationID) != nil); self.repositoryRevision = repositoryRevision; self.indexRevision = indexRevision; self.operationID = operationID }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_CommitRepositoryResult(serializedBytes: protobufBytes); guard !m.repositoryRevision.isEmpty, m.indexRevision.count == 64, UUID(uuidString: m.operationID) != nil else { throw WireCodecError.invalidRepositoryCommitResult }; self.init(repositoryRevision: m.repositoryRevision, indexRevision: m.indexRevision, operationID: m.operationID) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_CommitRepositoryResult(); m.repositoryRevision = repositoryRevision; m.indexRevision = indexRevision; m.operationID = operationID; return try m.serializedData() }
+}
+
 public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.execution-context.list@1")
     public static let schemaVersion: UInt32 = 1
@@ -2684,6 +2701,8 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidRepositoryBranchesQuery
     case invalidRepositoryBranchesResponse
     case invalidRepositoryIndexCommand
+    case invalidRepositoryCommitCommand
+    case invalidRepositoryCommitResult
 }
 
 private extension ProtocolEnvelope {

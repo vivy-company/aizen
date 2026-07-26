@@ -144,6 +144,23 @@ import Testing
     #expect(try ReadRepositoryBranchesResponsePayload(protobufBytes: response.protobufBytes()) == response)
 }
 
+@Test func repositoryCommitPayloadsCarryBothRevisionPreconditions() throws {
+    let command = CommitRepositoryCommandPayload(
+        resourceID: UUID().uuidString,
+        message: "Ship it",
+        expectedRepositoryRevision: "unborn:main",
+        expectedIndexRevision: String(repeating: "a", count: 64),
+        amend: false
+    )
+    let result = CommitRepositoryResultPayload(
+        repositoryRevision: String(repeating: "c", count: 40),
+        indexRevision: String(repeating: "b", count: 64),
+        operationID: UUID().uuidString
+    )
+    #expect(try CommitRepositoryCommandPayload(protobufBytes: command.protobufBytes()) == command)
+    #expect(try CommitRepositoryResultPayload(protobufBytes: result.protobufBytes()) == result)
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")
