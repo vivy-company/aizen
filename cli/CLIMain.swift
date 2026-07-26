@@ -1437,18 +1437,6 @@ private extension AizenCLI {
         let filters: WorkspaceFilters
     }
 
-    struct SessionOutput: Encodable {
-        let workspace: String
-        let repository: String
-        let worktree: String
-        let panes: Int
-        let focusedPaneId: String
-    }
-
-    struct SessionListPayload: Encodable {
-        let sessions: [SessionOutput]
-    }
-
     struct TerminalSessionOutput: Encodable {
         let id: String
         let space: String
