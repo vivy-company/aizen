@@ -1854,6 +1854,23 @@ public struct ReadRepositoryHistoryResponsePayload: WirePayload, Sendable, Hasha
     public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadRepositoryHistoryResponse(); m.resourceID = resourceID; m.repositoryRevision = repositoryRevision; m.indexRevision = indexRevision; if let branch { m.branch = branch }; m.isDetached = isDetached; m.commits = commits.map(\.protobuf); m.truncated = truncated; return try m.serializedData() }
 }
 
+public struct UpdateRepositoryIndexCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.repository.update-index@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let resourceID: String; public let relativePaths: [String]; public let expectedIndexRevision: String; public let stage: Bool
+    public init(resourceID: String, relativePaths: [String], expectedIndexRevision: String, stage: Bool) { precondition(!resourceID.isEmpty && !relativePaths.isEmpty && relativePaths.count <= 200 && expectedIndexRevision.count == 64 && relativePaths.allSatisfy(Self.validPath)); self.resourceID = resourceID; self.relativePaths = relativePaths; self.expectedIndexRevision = expectedIndexRevision; self.stage = stage }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_UpdateRepositoryIndexCommand(serializedBytes: protobufBytes); guard !m.resourceID.isEmpty, !m.relativePaths.isEmpty, m.relativePaths.count <= 200, m.expectedIndexRevision.count == 64, m.relativePaths.allSatisfy(Self.validPath) else { throw WireCodecError.invalidRepositoryIndexCommand }; self.init(resourceID: m.resourceID, relativePaths: m.relativePaths, expectedIndexRevision: m.expectedIndexRevision, stage: m.stage) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_UpdateRepositoryIndexCommand(); m.resourceID = resourceID; m.relativePaths = relativePaths; m.expectedIndexRevision = expectedIndexRevision; m.stage = stage; return try m.serializedData() }
+    private static func validPath(_ path: String) -> Bool { !path.isEmpty && !path.hasPrefix("/") && !path.contains("\0") && !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) }
+}
+
+public struct UpdateRepositoryIndexResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.repository.update-index@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
+    public let indexRevision: String
+    public init(indexRevision: String) { precondition(indexRevision.count == 64); self.indexRevision = indexRevision }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_UpdateRepositoryIndexResult(serializedBytes: protobufBytes); guard m.indexRevision.count == 64 else { throw WireCodecError.invalidRepositoryIndexCommand }; self.init(indexRevision: m.indexRevision) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_UpdateRepositoryIndexResult(); m.indexRevision = indexRevision; return try m.serializedData() }
+}
+
 public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.execution-context.list@1")
     public static let schemaVersion: UInt32 = 1
@@ -2641,6 +2658,7 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidRepositoryDiffResponse
     case invalidRepositoryHistoryQuery
     case invalidRepositoryHistoryResponse
+    case invalidRepositoryIndexCommand
 }
 
 private extension ProtocolEnvelope {

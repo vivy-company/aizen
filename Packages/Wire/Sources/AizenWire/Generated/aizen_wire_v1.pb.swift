@@ -1457,6 +1457,36 @@ nonisolated struct AizenWireV1_ReadRepositoryHistoryResponse: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_UpdateRepositoryIndexCommand: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var resourceID: String = String()
+
+  var relativePaths: [String] = []
+
+  var expectedIndexRevision: String = String()
+
+  var stage: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_UpdateRepositoryIndexResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var indexRevision: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_ListExecutionContextsQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -5133,6 +5163,81 @@ nonisolated extension AizenWireV1_ReadRepositoryHistoryResponse: SwiftProtobuf.M
     if lhs.isDetached != rhs.isDetached {return false}
     if lhs.commits != rhs.commits {return false}
     if lhs.truncated != rhs.truncated {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_UpdateRepositoryIndexCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".UpdateRepositoryIndexCommand"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{3}relative_paths\0\u{3}expected_index_revision\0\u{1}stage\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.relativePaths) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.expectedIndexRevision) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.stage) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 1)
+    }
+    if !self.relativePaths.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.relativePaths, fieldNumber: 2)
+    }
+    if !self.expectedIndexRevision.isEmpty {
+      try visitor.visitSingularStringField(value: self.expectedIndexRevision, fieldNumber: 3)
+    }
+    if self.stage != false {
+      try visitor.visitSingularBoolField(value: self.stage, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_UpdateRepositoryIndexCommand, rhs: AizenWireV1_UpdateRepositoryIndexCommand) -> Bool {
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.relativePaths != rhs.relativePaths {return false}
+    if lhs.expectedIndexRevision != rhs.expectedIndexRevision {return false}
+    if lhs.stage != rhs.stage {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_UpdateRepositoryIndexResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".UpdateRepositoryIndexResult"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}index_revision\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.indexRevision) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.indexRevision.isEmpty {
+      try visitor.visitSingularStringField(value: self.indexRevision, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_UpdateRepositoryIndexResult, rhs: AizenWireV1_UpdateRepositoryIndexResult) -> Bool {
+    if lhs.indexRevision != rhs.indexRevision {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

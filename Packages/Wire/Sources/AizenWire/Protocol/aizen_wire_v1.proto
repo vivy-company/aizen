@@ -473,6 +473,17 @@ message ReadRepositoryHistoryResponse {
   bool truncated = 7;
 }
 
+message UpdateRepositoryIndexCommand {
+  string resource_id = 1;
+  repeated string relative_paths = 2;
+  string expected_index_revision = 3;
+  bool stage = 4;
+}
+
+message UpdateRepositoryIndexResult {
+  string index_revision = 1;
+}
+
 message ListExecutionContextsQuery {
   string space_id = 1;
   string resource_id = 2;
