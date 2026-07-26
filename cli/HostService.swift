@@ -4,7 +4,7 @@ import Foundation
 
 @MainActor
 enum HostService {
-    static let machServiceName = "win.aizen.host"
+    nonisolated static let machServiceName = "win.aizen.host"
     static let teamIdentifier = "QW4U57CXJX"
 
     static func serve(storageURL: URL) async throws -> Never {
