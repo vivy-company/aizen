@@ -8,7 +8,7 @@
 import Foundation
 
 extension AgentRegistry {
-    func validateAgent(named agentName: String) -> Bool {
+    nonisolated func validateAgent(named agentName: String) -> Bool {
         guard let metadata = getMetadata(for: agentName) else {
             return false
         }

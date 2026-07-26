@@ -3,11 +3,11 @@ import Foundation
 extension AgentRegistry {
     // MARK: - Launch
 
-    func getAgentPath(for agentName: String) -> String? {
+    nonisolated func getAgentPath(for agentName: String) -> String? {
         AgentRegistryQueries.agentPath(for: agentName, from: snapshotValue())
     }
 
-    func getAgentLaunchArgs(for agentName: String) -> [String] {
+    nonisolated func getAgentLaunchArgs(for agentName: String) -> [String] {
         AgentRegistryQueries.launchArguments(for: agentName, from: snapshotValue())
     }
 
