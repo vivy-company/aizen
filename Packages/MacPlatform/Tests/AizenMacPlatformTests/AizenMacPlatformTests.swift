@@ -167,6 +167,10 @@ import Testing
     #expect(text.contains("+after"))
     #expect(diff.repositoryRevision.count == 40)
     #expect(diff.indexRevision.count == 64)
+
+    let bounded = try await reader.diff(at: root, relativePath: "README.md", maximumBytes: 20)
+    #expect(bounded.unifiedDiff.count == 20)
+    #expect(bounded.truncated)
 }
 
 @Test func gitRepositoryStatusReaderReturnsBoundedRealHistory() async throws {

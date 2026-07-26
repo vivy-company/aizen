@@ -41,8 +41,8 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
         } else {
             diffArguments = ["-C", repositoryURL.path, "diff", "--no-ext-diff", "--no-color", "--no-textconv", "--binary", "--cached"] + pathArguments
         }
-        let output = try runGitData(diffArguments, maximumOutputBytes: maximumBytes)
-        return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL), unifiedDiff: output, truncated: false)
+        let output = try runGitDataTruncating(diffArguments, maximumOutputBytes: maximumBytes)
+        return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL), unifiedDiff: output.data, truncated: output.truncated)
     }
 
     public func history(at repositoryURL: URL, maximumCommits: Int) async throws -> RepositoryHistorySnapshot {
@@ -218,6 +218,34 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
             throw Error.gitFailed(String(decoding: error, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
         }
         return output
+    }
+
+    private func runGitDataTruncating(_ arguments: [String], maximumOutputBytes: Int) throws -> (data: Data, truncated: Bool) {
+        let process = Process()
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = arguments
+        process.standardOutput = stdout
+        process.standardError = stderr
+        try process.run()
+        var output = Data()
+        var truncated = false
+        while let chunk = try stdout.fileHandleForReading.read(upToCount: 65_536), !chunk.isEmpty {
+            let remaining = maximumOutputBytes - output.count
+            if remaining > 0 {
+                output.append(chunk.prefix(remaining))
+            }
+            if chunk.count > remaining {
+                truncated = true
+            }
+        }
+        let error = stderr.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw Error.gitFailed(String(decoding: error, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return (output, truncated)
     }
 
     private func digest(_ data: Data) -> String {
