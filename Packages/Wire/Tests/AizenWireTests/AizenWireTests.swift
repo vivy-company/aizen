@@ -222,6 +222,11 @@ import Testing
     }
 }
 
+@Test func xcodeBuildCommandsCarryStructuredTestActions() throws {
+    let command = BuildXcodeProjectCommandPayload(resourceID: UUID().uuidString, projectID: "App.xcodeproj", scheme: "AppTests", destination: "platform=macOS", action: .test)
+    #expect(try BuildXcodeProjectCommandPayload(protobufBytes: command.protobufBytes()) == command)
+}
+
 @Test func xcodeProjectDiscoveryCarriesBuildConfigurations() throws {
     let descriptor = XcodeProjectDescriptor(resourceID: ResourceID(), id: "App.xcodeproj", name: "App", kind: .project, schemes: ["App"], configurations: ["Debug", "Release"])
     let payload = DiscoverXcodeProjectResponsePayload(project: descriptor)

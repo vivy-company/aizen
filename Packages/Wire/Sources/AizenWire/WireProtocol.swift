@@ -1416,13 +1416,13 @@ public struct BuildXcodeProjectCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.xcode-project.build@1")
     public static let schemaVersion: UInt32 = 1
     public static let stateAffecting = true
-    public let resourceID: String; public let projectID: String; public let scheme: String; public let destination: String
-    public init(resourceID: String, projectID: String, scheme: String, destination: String) {
+    public let resourceID: String; public let projectID: String; public let scheme: String; public let destination: String; public let action: XcodeProjectAction
+    public init(resourceID: String, projectID: String, scheme: String, destination: String, action: XcodeProjectAction = .build) {
         precondition(Self.isValid(resourceID: resourceID, projectID: projectID, scheme: scheme, destination: destination), "Xcode builds require bounded identifiers and a supported destination")
-        self.resourceID = resourceID; self.projectID = projectID; self.scheme = scheme; self.destination = destination
+        self.resourceID = resourceID; self.projectID = projectID; self.scheme = scheme; self.destination = destination; self.action = action
     }
-    public init(protobufBytes: Data) throws { let value = try AizenWireV1_BuildXcodeProjectCommand(serializedBytes: protobufBytes); guard Self.isValid(resourceID: value.resourceID, projectID: value.projectID, scheme: value.scheme, destination: value.destination) else { throw WireCodecError.invalidXcodeBuildCommand }; self.init(resourceID: value.resourceID, projectID: value.projectID, scheme: value.scheme, destination: value.destination) }
-    public func protobufBytes() throws -> Data { var value = AizenWireV1_BuildXcodeProjectCommand(); value.resourceID = resourceID; value.projectID = projectID; value.scheme = scheme; value.destination = destination; return try value.serializedData() }
+    public init(protobufBytes: Data) throws { let value = try AizenWireV1_BuildXcodeProjectCommand(serializedBytes: protobufBytes); guard Self.isValid(resourceID: value.resourceID, projectID: value.projectID, scheme: value.scheme, destination: value.destination), let action = XcodeProjectAction(rawValue: value.action.isEmpty ? XcodeProjectAction.build.rawValue : value.action) else { throw WireCodecError.invalidXcodeBuildCommand }; self.init(resourceID: value.resourceID, projectID: value.projectID, scheme: value.scheme, destination: value.destination, action: action) }
+    public func protobufBytes() throws -> Data { var value = AizenWireV1_BuildXcodeProjectCommand(); value.resourceID = resourceID; value.projectID = projectID; value.scheme = scheme; value.destination = destination; value.action = action.rawValue; return try value.serializedData() }
 
     private static func isValid(resourceID: String, projectID: String, scheme: String, destination: String) -> Bool {
         !resourceID.isEmpty && !projectID.isEmpty && projectID.utf8.count <= 255 && !projectID.contains("\0") && !projectID.contains("/") &&

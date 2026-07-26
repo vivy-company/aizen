@@ -364,6 +364,7 @@ message BuildXcodeProjectCommand {
   string project_id = 2;
   string scheme = 3;
   string destination = 4;
+  string action = 5;
 }
 
 message BuildXcodeProjectResult {

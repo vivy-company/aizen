@@ -1133,6 +1133,8 @@ nonisolated struct AizenWireV1_BuildXcodeProjectCommand: Sendable {
 
   var destination: String = String()
 
+  var action: String = String()
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -4635,7 +4637,7 @@ nonisolated extension AizenWireV1_OpenXcodeProjectResult: SwiftProtobuf.Message,
 
 nonisolated extension AizenWireV1_BuildXcodeProjectCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".BuildXcodeProjectCommand"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{3}project_id\0\u{1}scheme\0\u{1}destination\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{3}project_id\0\u{1}scheme\0\u{1}destination\0\u{1}action\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4647,6 +4649,7 @@ nonisolated extension AizenWireV1_BuildXcodeProjectCommand: SwiftProtobuf.Messag
       case 2: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.scheme) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.destination) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.action) }()
       default: break
       }
     }
@@ -4665,6 +4668,9 @@ nonisolated extension AizenWireV1_BuildXcodeProjectCommand: SwiftProtobuf.Messag
     if !self.destination.isEmpty {
       try visitor.visitSingularStringField(value: self.destination, fieldNumber: 4)
     }
+    if !self.action.isEmpty {
+      try visitor.visitSingularStringField(value: self.action, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4673,6 +4679,7 @@ nonisolated extension AizenWireV1_BuildXcodeProjectCommand: SwiftProtobuf.Messag
     if lhs.projectID != rhs.projectID {return false}
     if lhs.scheme != rhs.scheme {return false}
     if lhs.destination != rhs.destination {return false}
+    if lhs.action != rhs.action {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
