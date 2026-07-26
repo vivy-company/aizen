@@ -166,9 +166,18 @@ import AizenWire
     #expect(context.id == contextID)
     #expect(context.kind == .localFolder)
     #expect(context.hostReference == nil)
+    let disposableFolder = root.appendingPathComponent("disposable", isDirectory: true)
+    try FileManager.default.createDirectory(at: disposableFolder, withIntermediateDirectories: true)
+    let disposableResourceID = try await client.importLocalFolder(spaceID: spaceID, path: disposableFolder.path)
+    let disposableContextID = try await client.createLocalFolderContext(spaceID: spaceID, resourceID: disposableResourceID)
+    try await client.removeExecutionContext(id: disposableContextID)
+    #expect(try await client.executionContexts(spaceID: spaceID, resourceID: disposableResourceID).isEmpty)
     let sessionID = try await client.createConversation(spaceID: spaceID, title: "Coding")
     try await client.attachExecutionContext(sessionID: sessionID, contextID: contextID)
     #expect(try await storage.load().sessions.first(where: { $0.id == sessionID })?.executionContextID == contextID)
+    await #expect(throws: HostProtocolError.executionContextInUse(contextID)) {
+        try await client.removeExecutionContext(id: contextID)
+    }
     await #expect(throws: HostProtocolError.resourceInUse(resourceID)) {
         try await client.removeResource(id: resourceID)
     }
