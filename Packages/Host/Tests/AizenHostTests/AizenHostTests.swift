@@ -135,16 +135,20 @@ import AizenWire
     defer { try? FileManager.default.removeItem(at: root) }
     let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
     let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
-    let response = try await transport.send(.init(
-        messageID: "create-space",
+    let envelope = ProtocolEnvelope(
+        messageID: UUID().uuidString,
         connectionSequence: 1,
         kind: .command,
         channel: .state,
         payload: try .init(CreateSpaceCommandPayload(name: "Vivy", icon: "sparkles"))
-    ))
+    )
+    let response = try await transport.send(envelope)
+    let replay = try await transport.send(envelope)
     let result = try CreateSpaceResultPayload(protobufBytes: response.payload.protobufBytes)
+    #expect(response.payload == replay.payload)
     #expect(UUID(uuidString: result.spaceID) != nil)
     #expect(try await storage.load().spaces.map(\.name) == ["Vivy"])
+    #expect(try await storage.load().commands.first?.spaceID == nil)
 }
 
 @Test func hostReplaysSpaceScopedCommands() async throws {

@@ -151,10 +151,12 @@ public actor LocalHost: WireEndpoint {
             payload = try TypedPayload(ListExecutionContextsResponsePayload(contexts: contexts))
         case .command where envelope.payload.identifier == CreateSpaceCommandPayload.identifier:
             let command = try CreateSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
-            let space = Space(name: command.name, icon: command.icon, summary: command.summary)
-            _ = try await storage.transact { $0.spaces.append(space) }
+            payload = try await executeDurably(envelope: envelope, spaceID: nil) {
+                let space = Space(name: command.name, icon: command.icon, summary: command.summary)
+                _ = try await self.storage.transact { $0.spaces.append(space) }
+                return try TypedPayload(CreateSpaceResultPayload(spaceID: space.id.description))
+            }
             kind = .commandResult
-            payload = try TypedPayload(CreateSpaceResultPayload(spaceID: space.id.description))
         case .command where envelope.payload.identifier == RenameSpaceCommandPayload.identifier:
             let command = try RenameSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
@@ -169,20 +171,26 @@ public actor LocalHost: WireEndpoint {
         case .command where envelope.payload.identifier == DeleteSpaceCommandPayload.identifier:
             let command = try DeleteSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
-            _ = try await storage.transact { snapshot in
-                guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
-                guard !snapshot.sessions.contains(where: { $0.spaceID == spaceID }) &&
-                    !snapshot.resources.contains(where: { $0.spaceID == spaceID }) &&
-                    !snapshot.executionContexts.contains(where: { $0.spaceID == spaceID }) &&
-                    !snapshot.runs.contains(where: { $0.spaceID == spaceID }) &&
-                    !snapshot.operations.contains(where: { $0.spaceID == spaceID }) &&
-                    !snapshot.artifacts.contains(where: { $0.spaceID == spaceID }) else {
-                    throw HostProtocolError.spaceNotEmpty(spaceID)
+            if let replayed = try await durableReplayResult(for: envelope) {
+                payload = replayed
+            } else {
+                payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                    _ = try await self.storage.transact { snapshot in
+                        guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
+                        guard !snapshot.sessions.contains(where: { $0.spaceID == spaceID }) &&
+                            !snapshot.resources.contains(where: { $0.spaceID == spaceID }) &&
+                            !snapshot.executionContexts.contains(where: { $0.spaceID == spaceID }) &&
+                            !snapshot.runs.contains(where: { $0.spaceID == spaceID }) &&
+                            !snapshot.operations.contains(where: { $0.spaceID == spaceID }) &&
+                            !snapshot.artifacts.contains(where: { $0.spaceID == spaceID }) else {
+                            throw HostProtocolError.spaceNotEmpty(spaceID)
+                        }
+                        snapshot.spaces.removeAll(where: { $0.id == spaceID })
+                    }
+                    return try TypedPayload(SpaceMutationResultPayload())
                 }
-                snapshot.spaces.removeAll(where: { $0.id == spaceID })
             }
             kind = .commandResult
-            payload = try TypedPayload(SpaceMutationResultPayload())
         case .command where envelope.payload.identifier == CreateConversationCommandPayload.identifier:
             let command = try CreateConversationCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
@@ -424,7 +432,7 @@ public actor LocalHost: WireEndpoint {
 
     private func executeDurably(
         envelope: ProtocolEnvelope,
-        spaceID: SpaceID,
+        spaceID: SpaceID?,
         operation: () async throws -> TypedPayload
     ) async throws -> TypedPayload {
         if let replayed = try await durableReplayResult(for: envelope) {

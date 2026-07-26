@@ -529,7 +529,8 @@ public struct DurableCommandResult: Codable, Sendable, Hashable {
 /// Host-owned command receipt used to make mutating Client requests retry-safe across connections.
 public struct DurableCommand: Codable, Sendable, Hashable, Identifiable {
     public let id: CommandID
-    public let spaceID: SpaceID
+    /// Nil scopes commands that create or administer Host-wide state before a Space exists.
+    public let spaceID: SpaceID?
     public let deviceID: DeviceID?
     public let payloadDigest: String
     public var lifecycle: CommandLifecycle
@@ -542,7 +543,7 @@ public struct DurableCommand: Codable, Sendable, Hashable, Identifiable {
 
     public init(
         id: CommandID = CommandID(),
-        spaceID: SpaceID,
+        spaceID: SpaceID? = nil,
         deviceID: DeviceID? = nil,
         payloadDigest: String,
         lifecycle: CommandLifecycle = .accepted,
@@ -575,7 +576,7 @@ public struct DurableCommand: Codable, Sendable, Hashable, Identifiable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             id: try values.decode(CommandID.self, forKey: .id),
-            spaceID: try values.decode(SpaceID.self, forKey: .spaceID),
+            spaceID: try values.decodeIfPresent(SpaceID.self, forKey: .spaceID),
             deviceID: try values.decodeIfPresent(DeviceID.self, forKey: .deviceID),
             payloadDigest: try values.decode(String.self, forKey: .payloadDigest),
             lifecycle: try values.decode(CommandLifecycle.self, forKey: .lifecycle),
