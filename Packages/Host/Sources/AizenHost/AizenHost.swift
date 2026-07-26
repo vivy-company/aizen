@@ -1138,6 +1138,9 @@ public protocol TerminalRuntime: Sendable {
 
     /// Resizes an existing Host-owned terminal after the Host has validated the requested bounds.
     func resize(session: TerminalSession, columns: Int, rows: Int) async throws
+
+    /// Captures the current bounded terminal scrollback from the Host-owned runtime.
+    func captureOutput(for session: TerminalSession, maximumBytes: Int) async throws -> Data
 }
 
 public enum TerminalRuntimeError: Swift.Error, Sendable, Equatable {
@@ -1155,6 +1158,10 @@ public extension TerminalRuntime {
     }
 
     func resize(session: TerminalSession, columns: Int, rows: Int) async throws {
+        throw TerminalRuntimeError.remoteInteractionUnavailable
+    }
+
+    func captureOutput(for session: TerminalSession, maximumBytes: Int) async throws -> Data {
         throw TerminalRuntimeError.remoteInteractionUnavailable
     }
 }

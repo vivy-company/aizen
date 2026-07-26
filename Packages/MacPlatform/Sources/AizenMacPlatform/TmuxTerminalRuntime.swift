@@ -72,6 +72,14 @@ public actor TmuxTerminalRuntime: TerminalRuntime {
         try run(tmux, arguments: ["resize-pane", "-t", session.paneID, "-x", String(columns), "-y", String(rows)])
     }
 
+    public func captureOutput(for session: TerminalSession, maximumBytes: Int) async throws -> Data {
+        guard maximumBytes > 0 else { throw TerminalRuntimeError.invalidDimensions }
+        let tmux = try tmuxExecutable()
+        let capture = Data(try output(tmux, arguments: ["capture-pane", "-p", "-e", "-t", session.paneID, "-S", "-"]).utf8)
+        guard capture.count > maximumBytes else { return capture }
+        return Data(capture.suffix(maximumBytes))
+    }
+
     private var configurationURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".aizen", isDirectory: true)

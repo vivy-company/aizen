@@ -11,6 +11,23 @@ import AizenWire
     #expect(AizenHostModule.protocolGeneration == 1)
 }
 
+@Test func terminalTranscriptUsesOrderedBoundedRuntimeSnapshots() async {
+    let terminal = SessionID()
+    let transcripts = TerminalTranscriptRegistry(maximumBytes: 5)
+
+    let first = await transcripts.record(terminalID: terminal, capture: Data("abc".utf8))
+    #expect(first.sequence == 1)
+    #expect(first.bytes == Data("abc".utf8))
+    let second = await transcripts.record(terminalID: terminal, capture: Data("abcdef".utf8))
+    #expect(second.sequence == 2)
+    #expect(second.bytes == Data("bcdef".utf8))
+    #expect(second.truncated)
+    #expect(await transcripts.snapshot(terminalID: terminal, after: 2).bytes.isEmpty)
+    let replay = await transcripts.snapshot(terminalID: terminal, after: 1)
+    #expect(replay.sequence == 2)
+    #expect(replay.bytes == Data("bcdef".utf8))
+}
+
 @Test func terminalControlLeasesExpireAndDeduplicateDeviceInput() async throws {
     let clock = TerminalLeaseTestClock(Date(timeIntervalSince1970: 1_000))
     let registry = TerminalControlLeaseRegistry(now: { clock.now })
