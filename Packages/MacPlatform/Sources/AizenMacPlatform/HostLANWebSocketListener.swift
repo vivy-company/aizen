@@ -165,12 +165,14 @@ private final class HostLANWebSocketConnection: @unchecked Sendable {
     }
 
     func start() {
-        connection.start(queue: queue)
-        receiveNext()
+        queue.async { [self] in
+            connection.start(queue: queue)
+            receiveNext()
+        }
     }
 
     func stop() {
-        close()
+        queue.async { [self] in close() }
     }
 
     private func receiveNext() {
