@@ -222,6 +222,12 @@ import Testing
     }
 }
 
+@Test func xcodeProjectDiscoveryCarriesBuildConfigurations() throws {
+    let descriptor = XcodeProjectDescriptor(resourceID: ResourceID(), id: "App.xcodeproj", name: "App", kind: .project, schemes: ["App"], configurations: ["Debug", "Release"])
+    let payload = DiscoverXcodeProjectResponsePayload(project: descriptor)
+    #expect(try DiscoverXcodeProjectResponsePayload(protobufBytes: payload.protobufBytes()) == payload)
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")

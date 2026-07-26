@@ -345,6 +345,7 @@ message XcodeProjectDescriptorRecord {
   string name = 3;
   string kind = 4;
   repeated string schemes = 5;
+  repeated string configurations = 6;
 }
 
 message DiscoverXcodeProjectResponse {

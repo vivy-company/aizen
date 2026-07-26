@@ -1068,6 +1068,8 @@ nonisolated struct AizenWireV1_XcodeProjectDescriptorRecord: Sendable {
 
   var schemes: [String] = []
 
+  var configurations: [String] = []
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -4490,7 +4492,7 @@ nonisolated extension AizenWireV1_DiscoverXcodeProjectQuery: SwiftProtobuf.Messa
 
 nonisolated extension AizenWireV1_XcodeProjectDescriptorRecord: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".XcodeProjectDescriptorRecord"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{1}id\0\u{1}name\0\u{1}kind\0\u{1}schemes\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{1}id\0\u{1}name\0\u{1}kind\0\u{1}schemes\0\u{1}configurations\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4503,6 +4505,7 @@ nonisolated extension AizenWireV1_XcodeProjectDescriptorRecord: SwiftProtobuf.Me
       case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.kind) }()
       case 5: try { try decoder.decodeRepeatedStringField(value: &self.schemes) }()
+      case 6: try { try decoder.decodeRepeatedStringField(value: &self.configurations) }()
       default: break
       }
     }
@@ -4524,6 +4527,9 @@ nonisolated extension AizenWireV1_XcodeProjectDescriptorRecord: SwiftProtobuf.Me
     if !self.schemes.isEmpty {
       try visitor.visitRepeatedStringField(value: self.schemes, fieldNumber: 5)
     }
+    if !self.configurations.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.configurations, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4533,6 +4539,7 @@ nonisolated extension AizenWireV1_XcodeProjectDescriptorRecord: SwiftProtobuf.Me
     if lhs.name != rhs.name {return false}
     if lhs.kind != rhs.kind {return false}
     if lhs.schemes != rhs.schemes {return false}
+    if lhs.configurations != rhs.configurations {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

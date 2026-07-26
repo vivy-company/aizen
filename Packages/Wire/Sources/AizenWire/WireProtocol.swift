@@ -1358,7 +1358,7 @@ public struct DiscoverXcodeProjectResponsePayload: WirePayload, Sendable, Hashab
               let kind = XcodeProjectDescriptor.Kind(rawValue: record.kind) else {
             throw WireCodecError.invalidIdentity(record.resourceID)
         }
-        self.init(project: .init(resourceID: ResourceID(rawValue: resourceUUID), id: record.id, name: record.name, kind: kind, schemes: record.schemes))
+        self.init(project: .init(resourceID: ResourceID(rawValue: resourceUUID), id: record.id, name: record.name, kind: kind, schemes: record.schemes, configurations: record.configurations))
     }
     public func protobufBytes() throws -> Data {
         var message = AizenWireV1_DiscoverXcodeProjectResponse()
@@ -1369,6 +1369,7 @@ public struct DiscoverXcodeProjectResponsePayload: WirePayload, Sendable, Hashab
             record.name = project.name
             record.kind = project.kind.rawValue
             record.schemes = project.schemes
+            record.configurations = project.configurations
             message.project = record
         }
         return try message.serializedData()
