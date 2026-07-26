@@ -10,10 +10,12 @@ actor ReignitionHostComposition {
         case scheduled
     }
 
+    private let storageURL: URL
     let client: HostClient
 
     init(storageURL: URL? = nil) {
         let storageURL = storageURL ?? ReignitionHostComposition.defaultStorageURL()
+        self.storageURL = storageURL
         client = HostClient(
             transport: MachWireTransport(machServiceName: ReignitionHostService.machServiceName),
             commandOutbox: FileCommandOutbox(url: storageURL.deletingLastPathComponent().appendingPathComponent("client-command-outbox.json"))
@@ -119,7 +121,7 @@ actor ReignitionHostComposition {
         try HostLegacyMigrationRequestStore.schedule(
             sourceStoreURL: legacyStoreURL,
             legacyModelURL: legacyModelURL,
-            storageURL: Self.defaultStorageURL(),
+            storageURL: storageURL,
             fileManager: fileManager
         )
         return .scheduled
