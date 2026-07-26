@@ -44,13 +44,17 @@ public struct MacXcodeProjectInspector: XcodeProjectInspecting {
 
 public actor MacXcodeProjectBuilder: XcodeProjectBuilding {
     public init() {}
-    public func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws -> any XcodeBuildRunning {
+    public func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String, action: XcodeProjectAction) async throws -> any XcodeBuildRunning {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
-        process.arguments = [kind == .workspace ? "-workspace" : "-project", url.path, "-scheme", scheme, "-destination", destination, "build"]
+        process.arguments = Self.arguments(projectURL: url, kind: kind, scheme: scheme, destination: destination, action: action)
         process.standardOutput = Pipe(); process.standardError = Pipe()
         try process.run()
         return MacXcodeBuildProcess(process: process)
+    }
+
+    static func arguments(projectURL: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String, action: XcodeProjectAction) -> [String] {
+        [kind == .workspace ? "-workspace" : "-project", projectURL.path, "-scheme", scheme, "-destination", destination, action.rawValue]
     }
 }
 

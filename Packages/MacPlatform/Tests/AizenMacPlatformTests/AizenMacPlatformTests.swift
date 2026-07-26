@@ -409,6 +409,18 @@ import Testing
     }
 }
 
+@Test func macXcodeProjectBuilderUsesTheTypedTestAction() {
+    let arguments = MacXcodeProjectBuilder.arguments(
+        projectURL: URL(fileURLWithPath: "/tmp/App.xcodeproj"),
+        kind: .project,
+        scheme: "AppTests",
+        destination: "platform=macOS",
+        action: .test
+    )
+    #expect(arguments.last == "test")
+    #expect(!arguments.contains("build"))
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")
