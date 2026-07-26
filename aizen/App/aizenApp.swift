@@ -44,8 +44,8 @@ struct aizenApp: App {
         let legacyModelURL = Bundle.main.url(forResource: "aizen", withExtension: "momd")
         Task { [host, legacyStoreURL, legacyModelURL] in
             do {
-                try await host.activate()
                 _ = try await host.prepareLegacyMigration(legacyStoreURL: legacyStoreURL, legacyModelURL: legacyModelURL)
+                try await host.activate()
                 do {
                     let agentConfiguration = try await DefaultACPAgentLaunchConfigurationResolver().launchConfiguration()
                     try await host.configureAgentLaunch(agentConfiguration)

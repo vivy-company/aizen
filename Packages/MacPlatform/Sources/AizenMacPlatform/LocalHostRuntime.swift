@@ -6,6 +6,7 @@ import Foundation
 public final class LocalHostRuntime: @unchecked Sendable {
     public let host: LocalHost
     public let agentLaunchConfiguration: HostAgentLaunchConfigurationStore
+    private let migrationGate: HostMigrationGate
 
     public init(storageURL: URL) {
         let storage = StorageRepository(url: storageURL)
@@ -24,7 +25,7 @@ public final class LocalHostRuntime: @unchecked Sendable {
             delegateProvider: NoACPToolDelegateProvider()
         )
         self.agentLaunchConfiguration = agentLaunchConfiguration
-        host = LocalHost(
+        let host = LocalHost(
             storage: storage,
             conversationRuns: ConversationRunCoordinator(storage: storage, runtime: runtime, eventPublisher: runEvents),
             managedSandboxes: sandboxes,
@@ -32,9 +33,14 @@ public final class LocalHostRuntime: @unchecked Sendable {
             terminalRuntime: TmuxTerminalRuntime(),
             agentLaunchConfiguration: agentLaunchConfiguration
         )
+        self.host = host
+        migrationGate = HostMigrationGate(
+            host: host,
+            migration: HostLegacyMigrationCoordinator(storage: storage, storageURL: storageURL)
+        )
     }
 
     public func makeMachListener(configuration: HostMachServiceConfiguration) throws -> MachWireHostListener {
-        try MachWireHostListener(configuration: configuration, endpoint: host)
+        try MachWireHostListener(configuration: configuration, endpoint: migrationGate)
     }
 }
