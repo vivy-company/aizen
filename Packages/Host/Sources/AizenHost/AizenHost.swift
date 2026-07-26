@@ -80,6 +80,36 @@ public protocol RepositoryHistoryReading: Sendable {
     func history(at repositoryURL: URL, maximumCommits: Int) async throws -> RepositoryHistorySnapshot
 }
 
+public struct RepositoryBranchesSnapshot: Sendable, Equatable {
+    public struct Branch: Sendable, Equatable {
+        public let name: String
+        public let revision: String
+        public let isCurrent: Bool
+
+        public init(name: String, revision: String, isCurrent: Bool) {
+            self.name = name
+            self.revision = revision
+            self.isCurrent = isCurrent
+        }
+    }
+
+    public let repositoryRevision: String
+    public let indexRevision: String
+    public let branches: [Branch]
+    public let truncated: Bool
+
+    public init(repositoryRevision: String, indexRevision: String, branches: [Branch], truncated: Bool) {
+        self.repositoryRevision = repositoryRevision
+        self.indexRevision = indexRevision
+        self.branches = branches
+        self.truncated = truncated
+    }
+}
+
+public protocol RepositoryBranchReading: Sendable {
+    func branches(at repositoryURL: URL, maximumBranches: Int) async throws -> RepositoryBranchesSnapshot
+}
+
 public protocol RepositoryIndexUpdating: Sendable {
     func updateIndex(at repositoryURL: URL, relativePaths: [String], expectedIndexRevision: String, stage: Bool) async throws -> String
 }
@@ -111,6 +141,7 @@ public actor LocalHost: WireEndpoint {
     private let repositoryStatusReader: (any RepositoryStatusReading)?
     private let repositoryDiffReader: (any RepositoryDiffReading)?
     private let repositoryHistoryReader: (any RepositoryHistoryReading)?
+    private let repositoryBranchReader: (any RepositoryBranchReading)?
     private let repositoryIndexUpdater: (any RepositoryIndexUpdating)?
     private let xcodeProjectOpener: (any XcodeProjectOpening)?
     private let xcodeProjectInspector: (any XcodeProjectInspecting)?
@@ -131,6 +162,7 @@ public actor LocalHost: WireEndpoint {
         repositoryStatusReader: (any RepositoryStatusReading)? = nil,
         repositoryDiffReader: (any RepositoryDiffReading)? = nil,
         repositoryHistoryReader: (any RepositoryHistoryReading)? = nil,
+        repositoryBranchReader: (any RepositoryBranchReading)? = nil,
         repositoryIndexUpdater: (any RepositoryIndexUpdating)? = nil,
         xcodeProjectOpener: (any XcodeProjectOpening)? = nil,
         xcodeProjectInspector: (any XcodeProjectInspecting)? = nil,
@@ -149,6 +181,7 @@ public actor LocalHost: WireEndpoint {
         self.repositoryStatusReader = repositoryStatusReader
         self.repositoryDiffReader = repositoryDiffReader
         self.repositoryHistoryReader = repositoryHistoryReader
+        self.repositoryBranchReader = repositoryBranchReader
         self.repositoryIndexUpdater = repositoryIndexUpdater
         self.xcodeProjectOpener = xcodeProjectOpener
         self.xcodeProjectInspector = xcodeProjectInspector
@@ -243,6 +276,8 @@ public actor LocalHost: WireEndpoint {
                 ReadRepositoryDiffResponsePayload.identifier,
                 ReadRepositoryHistoryQueryPayload.identifier,
                 ReadRepositoryHistoryResponsePayload.identifier,
+                ReadRepositoryBranchesQueryPayload.identifier,
+                ReadRepositoryBranchesResponsePayload.identifier,
                 UpdateRepositoryIndexCommandPayload.identifier,
                 UpdateRepositoryIndexResultPayload.identifier,
                 CreateLocalFolderContextCommandPayload.identifier,
@@ -768,6 +803,14 @@ public actor LocalHost: WireEndpoint {
             let history = try await repositoryHistoryReader.history(at: repositoryURL, maximumCommits: Int(query.maximumCommits))
             kind = .queryResponse
             payload = try TypedPayload(ReadRepositoryHistoryResponsePayload(resourceID: resourceID.description, repositoryRevision: history.repositoryRevision, indexRevision: history.indexRevision, branch: history.branch, isDetached: history.isDetached, commits: history.commits.map { .init(revision: $0.revision, subject: $0.subject, authorName: $0.authorName, authoredAtUnixMilliseconds: $0.authoredAtUnixMilliseconds) }, truncated: history.truncated))
+        case .query where envelope.payload.identifier == ReadRepositoryBranchesQueryPayload.identifier:
+            guard let repositoryBranchReader else { throw HostProtocolError.runtimeUnavailable }
+            let query = try ReadRepositoryBranchesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resourceID = try Self.resourceID(from: query.resourceID)
+            guard let resource = try await storage.load().resources.first(where: { $0.id == resourceID }), resource.kind == .repository, let repositoryURL = try Self.localResourceDirectory(for: resource) else { throw HostProtocolError.unknownResource(resourceID) }
+            let branches = try await repositoryBranchReader.branches(at: repositoryURL, maximumBranches: Int(query.maximumBranches))
+            kind = .queryResponse
+            payload = try TypedPayload(ReadRepositoryBranchesResponsePayload(resourceID: resourceID.description, repositoryRevision: branches.repositoryRevision, indexRevision: branches.indexRevision, branches: branches.branches.map { .init(name: $0.name, revision: $0.revision, isCurrent: $0.isCurrent) }, truncated: branches.truncated))
         case .command where envelope.payload.identifier == UpdateRepositoryIndexCommandPayload.identifier:
             guard let repositoryIndexUpdater else { throw HostProtocolError.runtimeUnavailable }
             let command = try UpdateRepositoryIndexCommandPayload(protobufBytes: envelope.payload.protobufBytes)

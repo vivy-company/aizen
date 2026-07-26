@@ -1278,6 +1278,20 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(try ReadRepositoryDiffResponsePayload(protobufBytes: response.payload.protobufBytes) == .init(resourceID: resource.id.description, repositoryRevision: "revision", indexRevision: "index", unifiedDiff: Data("diff".utf8), truncated: false))
 }
 
+@Test func hostReturnsBoundedRepositoryBranchesThroughWire() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Repository")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let host = LocalHost(storage: storage, repositoryBranchReader: StaticRepositoryBranchReader())
+    let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .query, channel: .state, payload: try .init(ReadRepositoryBranchesQueryPayload(resourceID: resource.id.description, maximumBranches: 1))))
+    #expect(try ReadRepositoryBranchesResponsePayload(protobufBytes: response.payload.protobufBytes) == .init(resourceID: resource.id.description, repositoryRevision: "revision", indexRevision: "index", branches: [.init(name: "main", revision: "abc", isCurrent: true)], truncated: false))
+}
+
 @Test func hostRecordsRepositoryIndexUpdatesAsCompletedDurableOperations() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1534,6 +1548,12 @@ private actor StaticRepositoryStatusReader: RepositoryStatusReading {
 private actor StaticRepositoryDiffReader: RepositoryDiffReading {
     func diff(at repositoryURL: URL, relativePath: String, maximumBytes: Int) async throws -> RepositoryDiffSnapshot {
         .init(repositoryRevision: "revision", indexRevision: "index", unifiedDiff: Data("diff".utf8), truncated: false)
+    }
+}
+
+private actor StaticRepositoryBranchReader: RepositoryBranchReading {
+    func branches(at repositoryURL: URL, maximumBranches: Int) async throws -> RepositoryBranchesSnapshot {
+        .init(repositoryRevision: "revision", indexRevision: "index", branches: [.init(name: "main", revision: "abc", isCurrent: true)], truncated: false)
     }
 }
 
