@@ -125,6 +125,17 @@ private struct MobileRootView: View {
                             Text(message.content)
                         }
                     }
+                    if !pairing.streamingText.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Assistant · streaming").font(.caption).foregroundStyle(.secondary)
+                            Text(pairing.streamingText)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                    }
+                    if let session = pairing.sessions.first(where: { $0.id == sessionID }) {
+                        MobileSessionSummary(session: session, pairing: pairing)
+                    }
                     HStack(alignment: .bottom) {
                         TextField("Message", text: $composer, axis: .vertical)
                         Button("Send") {
@@ -162,5 +173,67 @@ private struct MobileRootView: View {
         case .failed(let message):
             Text(message).foregroundStyle(.red)
         }
+    }
+}
+
+private struct MobileSessionSummary: View {
+    let session: Session
+    @ObservedObject var pairing: MobilePairingStore
+
+    private var attachedResources: [Resource] {
+        pairing.resources.filter { session.resourceIDs.contains($0.id) }
+    }
+
+    var body: some View {
+        List {
+            Section("Context") {
+                LabeledContent("Session", value: session.kind.rawValue)
+                LabeledContent("Execution", value: executionLabel)
+                if attachedResources.isEmpty {
+                    Text("No attached resources").foregroundStyle(.secondary)
+                } else {
+                    ForEach(attachedResources) { resource in
+                        LabeledContent(resource.title, value: resource.kind.rawValue)
+                    }
+                }
+            }
+            Section("Runs") {
+                let sessionRuns = pairing.runs.filter { $0.sessionID == session.id }
+                if sessionRuns.isEmpty {
+                    Text("No active or recent Runs").foregroundStyle(.secondary)
+                } else {
+                    ForEach(sessionRuns) { run in
+                        LabeledContent(run.id.description.prefix(8), value: run.lifecycle.rawValue)
+                    }
+                }
+            }
+            Section("Operations") {
+                let sessionOperations = pairing.operations.filter { $0.sessionID == session.id }
+                if sessionOperations.isEmpty {
+                    Text("No active or recent operations").foregroundStyle(.secondary)
+                } else {
+                    ForEach(sessionOperations) { operation in
+                        VStack(alignment: .leading) {
+                            Text(operation.lifecycle.rawValue.capitalized)
+                            if let progress = operation.progress {
+                                ProgressView(value: progress)
+                            }
+                            if let failure = operation.failureDescription {
+                                Text(failure).font(.caption).foregroundStyle(.red)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxHeight: 260)
+    }
+
+    private var executionLabel: String {
+        guard let id = session.executionContextID,
+              let context = pairing.executionContexts.first(where: { $0.id == id }) else {
+            return "Projectless"
+        }
+        return context.kind.rawValue
     }
 }

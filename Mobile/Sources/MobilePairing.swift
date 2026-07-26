@@ -26,6 +26,11 @@ final class MobilePairingStore: ObservableObject {
     @Published private(set) var messages: [ConversationMessage] = []
     @Published private(set) var activeRunID: RunID?
     @Published private(set) var isLive = false
+    @Published private(set) var resources: [Resource] = []
+    @Published private(set) var executionContexts: [ExecutionContext] = []
+    @Published private(set) var runs: [Run] = []
+    @Published private(set) var operations: [AizenCore.Operation] = []
+    @Published private(set) var streamingText = ""
     private var client: HostClient?
     private var eventsTask: Task<Void, Never>?
 
@@ -99,6 +104,7 @@ final class MobilePairingStore: ObservableObject {
             sessions = try await client.conversations(spaceID: selectedSpaceID)
             try MobileProjectionCache.save(.init(spaces: spaces, sessions: sessions))
             try MobilePairedHostStore.save(.init(host: storedHost.host, endpoint: storedHost.endpoint, approvalState: .approved))
+            try await refreshSpaceSummaries(using: client, spaceID: selectedSpaceID)
             isLive = true
             subscribe(to: client)
             state = .ready(hostName: storedHost.host.displayName, spaceCount: spaces.count)
@@ -123,6 +129,7 @@ final class MobilePairingStore: ObservableObject {
             messages = []
             sessions = try await client.conversations(spaceID: id)
             try MobileProjectionCache.save(.init(spaces: spaces, sessions: sessions))
+            try await refreshSpaceSummaries(using: client, spaceID: id)
         } catch { state = .failed(error.localizedDescription) }
     }
 
@@ -142,6 +149,7 @@ final class MobilePairingStore: ObservableObject {
         guard let client else { return }
         do {
             selectedSessionID = id
+            streamingText = ""
             messages = try await client.conversationTimeline(sessionID: id)
         } catch { state = .failed(error.localizedDescription) }
     }
@@ -160,6 +168,7 @@ final class MobilePairingStore: ObservableObject {
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         do {
             activeRunID = try await client.sendConversation(spaceID: spaceID, sessionID: sessionID, content: content)
+            streamingText = ""
             messages = try await client.conversationTimeline(sessionID: sessionID)
         } catch { state = .failed(error.localizedDescription) }
     }
@@ -179,15 +188,39 @@ final class MobilePairingStore: ObservableObject {
             guard let events = try? await client.runEvents() else { return }
             for await event in events {
                 guard !Task.isCancelled else { return }
-                guard case let .run(run) = event else { continue }
-                if run.sessionID == self.selectedSessionID, case .lifecycle(let lifecycle) = run.kind,
-                   lifecycle == .completed || lifecycle == .failed || lifecycle == .cancelled {
-                    self.activeRunID = nil
-                    if let client = self.client, let sessionID = self.selectedSessionID {
-                        self.messages = (try? await client.conversationTimeline(sessionID: sessionID)) ?? self.messages
+                guard case let .run(run) = event, run.sessionID == self.selectedSessionID else { continue }
+                switch run.kind {
+                case let .assistantTextDelta(delta):
+                    self.appendStreamingText(delta)
+                case let .lifecycle(lifecycle):
+                    if lifecycle == .completed || lifecycle == .failed || lifecycle == .cancelled {
+                        self.activeRunID = nil
+                        self.streamingText = ""
+                        if let client = self.client, let sessionID = self.selectedSessionID {
+                            self.messages = (try? await client.conversationTimeline(sessionID: sessionID)) ?? self.messages
+                            try? await self.refreshSpaceSummaries(using: client, spaceID: self.selectedSpaceID)
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private func refreshSpaceSummaries(using client: HostClient, spaceID: SpaceID?) async throws {
+        async let resources = client.resources(spaceID: spaceID)
+        async let contexts = client.executionContexts(spaceID: spaceID)
+        async let runs = client.runs(spaceID: spaceID)
+        async let operations = client.operations(spaceID: spaceID)
+        self.resources = try await resources
+        executionContexts = try await contexts
+        self.runs = try await runs
+        self.operations = try await operations
+    }
+
+    private func appendStreamingText(_ delta: String) {
+        streamingText.append(delta)
+        if streamingText.count > 64_000 {
+            streamingText = String(streamingText.suffix(64_000))
         }
     }
 
@@ -200,6 +233,11 @@ final class MobilePairingStore: ObservableObject {
         selectedSessionID = nil
         messages = []
         activeRunID = nil
+        streamingText = ""
+        resources = []
+        executionContexts = []
+        runs = []
+        operations = []
         state = .failed("This device is no longer authorized. Pair it again from your Mac.")
     }
 }
