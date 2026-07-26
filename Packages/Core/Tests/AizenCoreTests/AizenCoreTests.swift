@@ -45,3 +45,15 @@ import Testing
     #expect(!OperationLifecycle.completed.canTransition(to: .running))
     #expect(!OperationLifecycle.running.canTransition(to: .queued))
 }
+
+@Test func runLifecycleModelsHostPreparationAndCancellation() {
+    #expect(RunLifecycle.queued.canTransition(to: .preparingContext))
+    #expect(RunLifecycle.preparingContext.canTransition(to: .startingAgent))
+    #expect(RunLifecycle.startingAgent.canTransition(to: .running))
+    #expect(RunLifecycle.running.canTransition(to: .waitingForPermission))
+    #expect(RunLifecycle.waitingForPermission.canTransition(to: .running))
+    #expect(RunLifecycle.running.canTransition(to: .cancelling))
+    #expect(RunLifecycle.cancelling.canTransition(to: .cancelled))
+    #expect(RunLifecycle.running.canTransition(to: .succeeded))
+    #expect(!RunLifecycle.succeeded.canTransition(to: .running))
+}

@@ -319,15 +319,26 @@ public struct ExecutionContext: Codable, Sendable, Hashable, Identifiable {
 
 public enum RunLifecycle: String, Codable, Sendable, Hashable {
     case queued
+    case preparingContext
+    case startingAgent
     case running
+    case waitingForPermission
+    case cancelling
     case completed
+    case succeeded
     case failed
     case cancelled
+    case interrupted
 
     public func canTransition(to next: Self) -> Bool {
         switch (self, next) {
-        case (.queued, .running), (.queued, .failed), (.queued, .cancelled),
-             (.running, .completed), (.running, .failed), (.running, .cancelled):
+        case (.queued, .preparingContext), (.queued, .failed), (.queued, .cancelled),
+             (.preparingContext, .startingAgent), (.preparingContext, .failed), (.preparingContext, .cancelling),
+             (.startingAgent, .running), (.startingAgent, .failed), (.startingAgent, .cancelling),
+             (.running, .waitingForPermission), (.running, .cancelling), (.running, .succeeded), (.running, .completed), (.running, .failed), (.running, .interrupted),
+             (.waitingForPermission, .running), (.waitingForPermission, .cancelling), (.waitingForPermission, .failed), (.waitingForPermission, .interrupted),
+             (.cancelling, .cancelled), (.cancelling, .failed),
+             (.interrupted, .preparingContext), (.interrupted, .cancelling), (.interrupted, .failed):
             true
         default:
             false

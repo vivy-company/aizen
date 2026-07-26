@@ -102,7 +102,7 @@ import AizenWire
         runID: runID
     ) == runID)
     #expect(try await storage.load().conversationMessages.map(\.content) == ["Hello"])
-    #expect(try await storage.load().runs.first?.lifecycle == .completed)
+    #expect(try await storage.load().runs.first?.lifecycle == .succeeded)
 }
 
 private struct EchoHost: WireEndpoint {

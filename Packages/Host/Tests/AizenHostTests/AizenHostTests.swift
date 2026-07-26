@@ -171,7 +171,7 @@ import AizenWire
     ))
     #expect(try SendConversationResultPayload(protobufBytes: response.payload.protobufBytes).runID == runID.description)
     let snapshot = try await storage.load()
-    #expect(snapshot.runs.first?.lifecycle == .completed)
+    #expect(snapshot.runs.first?.lifecycle == .succeeded)
     #expect(snapshot.runs.first?.executionContextID == snapshot.sessions.first?.executionContextID)
     #expect(snapshot.executionContexts.first?.kind == .managedTemporarySandbox)
     #expect((await runtime.prompted).first?.1 == "Make a plan")
@@ -221,7 +221,7 @@ import AizenWire
     let snapshot = try await storage.load()
     #expect(snapshot.conversationMessages == [message])
     #expect(snapshot.runs.first?.id == run.id)
-    #expect(snapshot.runs.first?.lifecycle == .completed)
+    #expect(snapshot.runs.first?.lifecycle == .succeeded)
     let prompted = await runtime.prompted
     #expect(prompted.count == 1)
     #expect(prompted.first?.0 == run.id)

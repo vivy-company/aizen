@@ -205,8 +205,10 @@ public actor RunCoordinator {
             guard !snapshot.runs.contains(where: { $0.id == run.id }) else { throw Error.duplicateRun(run.id) }
             snapshot.runs.append(run)
         }
+        try await updateLifecycle(.preparingContext, for: run.id)
         do {
             try await runtime.start(run: run)
+            try await updateLifecycle(.startingAgent, for: run.id)
             try await updateLifecycle(.running, for: run.id)
         } catch {
             try? await updateLifecycle(.failed, for: run.id)
@@ -217,8 +219,10 @@ public actor RunCoordinator {
     /// Starts a Run that was atomically persisted with another Host-owned command.
     public func startPersisted(_ run: Run) async throws {
         guard try await self.run(for: run.id)?.lifecycle == .queued else { throw Error.invalidTransition(from: run.lifecycle, to: .running) }
+        try await updateLifecycle(.preparingContext, for: run.id)
         do {
             try await runtime.start(run: run)
+            try await updateLifecycle(.startingAgent, for: run.id)
             try await updateLifecycle(.running, for: run.id)
         } catch {
             try? await updateLifecycle(.failed, for: run.id)
@@ -227,16 +231,22 @@ public actor RunCoordinator {
     }
 
     public func complete(_ runID: RunID) async throws {
-        try await updateLifecycle(.completed, for: runID)
+        try await updateLifecycle(.succeeded, for: runID)
     }
 
     public func cancel(_ runID: RunID) async throws {
         guard let run = try await run(for: runID) else { throw Error.unknownRun(runID) }
-        guard run.lifecycle.canTransition(to: .cancelled) else {
-            throw Error.invalidTransition(from: run.lifecycle, to: .cancelled)
+        guard run.lifecycle.canTransition(to: .cancelling) else {
+            throw Error.invalidTransition(from: run.lifecycle, to: .cancelling)
         }
-        try await runtime.cancel(runID: runID)
-        try await updateLifecycle(.cancelled, for: runID)
+        try await updateLifecycle(.cancelling, for: runID)
+        do {
+            try await runtime.cancel(runID: runID)
+            try await updateLifecycle(.cancelled, for: runID)
+        } catch {
+            try? await updateLifecycle(.failed, for: runID)
+            throw error
+        }
     }
 
     public func run(for id: RunID) async throws -> Run? {
