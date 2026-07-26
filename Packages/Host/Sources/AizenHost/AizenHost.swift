@@ -178,6 +178,7 @@ public protocol XcodeProjectOpening: Sendable {
 
 public protocol XcodeProjectInspecting: Sendable {
     func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String]
+    func configurations(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String]
 }
 
 public protocol XcodeBuildRunning: Sendable {
@@ -1406,8 +1407,10 @@ public actor LocalHost: WireEndpoint {
         guard let project = try Self.discoverXcodeProject(for: resource) else { return nil }
         guard let xcodeProjectInspector,
               let directory = try Self.localResourceDirectory(for: resource) else { return project }
-        let schemes = try await xcodeProjectInspector.schemes(for: directory.appendingPathComponent(project.id), kind: project.kind)
-        return .init(resourceID: project.resourceID, id: project.id, name: project.name, kind: project.kind, schemes: schemes)
+        let projectURL = directory.appendingPathComponent(project.id)
+        async let schemes = xcodeProjectInspector.schemes(for: projectURL, kind: project.kind)
+        async let configurations = xcodeProjectInspector.configurations(for: projectURL, kind: project.kind)
+        return try await .init(resourceID: project.resourceID, id: project.id, name: project.name, kind: project.kind, schemes: schemes, configurations: configurations)
     }
 
     private static func localResourceDirectory(for resource: Resource) throws -> URL? {

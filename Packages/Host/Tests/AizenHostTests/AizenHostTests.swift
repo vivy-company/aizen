@@ -845,6 +845,7 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(project.name == "App")
     #expect(project.kind == .workspace)
     #expect(project.schemes == ["App", "AppTests"])
+    #expect(project.configurations == ["Debug", "Release"])
     #expect(!project.id.contains(folder.path))
 }
 
@@ -1800,6 +1801,7 @@ private actor RecordingXcodeProjectOpener: XcodeProjectOpening {
 private struct StaticXcodeProjectInspector: XcodeProjectInspecting {
     let schemes: [String]
     func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { schemes }
+    func configurations(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { ["Debug", "Release"] }
 }
 
 private actor ControlledXcodeProjectBuilder: XcodeProjectBuilding, XcodeBuildRunning {
