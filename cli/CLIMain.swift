@@ -1,4 +1,6 @@
+import AizenClient
 import AizenCore
+import AizenMacPlatform
 import Foundation
 import Darwin
 
@@ -9,6 +11,18 @@ struct AizenCLI {
         do {
             try await run()
             exit(ExitCode.success.rawValue)
+        } catch MachWireTransportError.unavailable {
+            printError("Aizen Host is unavailable. Launch Aizen to start or repair the Host service, then retry.")
+            exit(ExitCode.hostUnavailable.rawValue)
+        } catch let error as HostClient.Error {
+            switch error {
+            case .incompatibleHost:
+                printError(error.localizedDescription)
+                exit(ExitCode.incompatibleHost.rawValue)
+            default:
+                printError(error.localizedDescription)
+                exit(ExitCode.generalError.rawValue)
+            }
         } catch let error as CLIError {
             printError(error.localizedDescription)
             exit(error.exitCode.rawValue)

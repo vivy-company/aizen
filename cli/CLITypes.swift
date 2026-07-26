@@ -8,6 +8,8 @@ enum ExitCode: Int32 {
     case notGitRepository = 4
     case workspaceNotFound = 5
     case pathNotFound = 6
+    case hostUnavailable = 7
+    case incompatibleHost = 8
 }
 
 enum CLIError: Error, LocalizedError {
