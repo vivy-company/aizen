@@ -154,7 +154,8 @@ public actor ExecutionContextFileService {
         case .delete: guard start < end, replacementText.isEmpty else { throw Error.invalidText(relativePath) }
         case .replace: guard start < end else { throw Error.invalidText(relativePath) }
         }
-        lines.replaceSubrange(start..<end, with: replacementText.components(separatedBy: "\n"))
+        let replacementLines = kind == .delete ? [] : replacementText.components(separatedBy: "\n")
+        lines.replaceSubrange(start..<end, with: replacementLines)
         let replacement = Data(lines.joined(separator: "\n").utf8)
         guard replacement.count <= Self.maximumTextFileBytes else { throw Error.fileTooLarge(relativePath) }
         try replacement.write(to: file, options: .atomic)

@@ -1672,6 +1672,20 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     await #expect(throws: ExecutionContextFileService.Error.revisionConflict) {
         try await service.replaceTextFile(contextID: context.id, relativePath: "README.md", expectedContentHash: helloHash, text: "stale")
     }
+    let updatedHash = SHA256.hash(data: Data("updated".utf8)).map { String(format: "%02x", $0) }.joined()
+    let insertedHash = try await service.applyTextPatch(contextID: context.id, relativePath: "README.md", expectedContentHash: updatedHash, kind: .insert, startLine: 1, endLineExclusive: 1, replacementText: "second")
+    #expect(try await service.readTextFile(contextID: context.id, relativePath: "README.md") == "updated\nsecond")
+    let replacedHash = try await service.applyTextPatch(contextID: context.id, relativePath: "README.md", expectedContentHash: insertedHash, kind: .replace, startLine: 0, endLineExclusive: 1, replacementText: "first")
+    #expect(try await service.readTextFile(contextID: context.id, relativePath: "README.md") == "first\nsecond")
+    _ = try await service.applyTextPatch(contextID: context.id, relativePath: "README.md", expectedContentHash: replacedHash, kind: .delete, startLine: 1, endLineExclusive: 2, replacementText: "")
+    #expect(try await service.readTextFile(contextID: context.id, relativePath: "README.md") == "first")
+    await #expect(throws: ExecutionContextFileService.Error.revisionConflict) {
+        try await service.applyTextPatch(contextID: context.id, relativePath: "README.md", expectedContentHash: replacedHash, kind: .insert, startLine: 0, endLineExclusive: 0, replacementText: "stale")
+    }
+    let firstHash = SHA256.hash(data: Data("first".utf8)).map { String(format: "%02x", $0) }.joined()
+    await #expect(throws: ExecutionContextFileService.Error.invalidText("README.md")) {
+        try await service.applyTextPatch(contextID: context.id, relativePath: "README.md", expectedContentHash: firstHash, kind: .delete, startLine: 0, endLineExclusive: 0, replacementText: "")
+    }
     #expect(try await service.listDirectory(contextID: context.id, includeHidden: true).map(\.relativePath) == ["Sources", "README.md"])
     await #expect(throws: ExecutionContextFileService.Error.sensitivePath(".env")) {
         try await service.readTextFile(contextID: context.id, relativePath: ".env")
