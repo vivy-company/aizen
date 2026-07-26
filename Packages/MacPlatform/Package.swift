@@ -11,6 +11,7 @@ let package = Package(
         .package(path: "../Host"),
         .package(path: "../Storage"),
         .package(path: "../Transport"),
+        .package(path: "../Wire"),
         .package(url: "https://github.com/wiedymi/swift-acp", revision: "9498537769d1309b6519fbb87d0c22fcf9317f3e")
     ],
     targets: [
@@ -25,6 +26,8 @@ let package = Package(
         .testTarget(name: "AizenMacPlatformTests", dependencies: [
             "AizenMacPlatform",
             .product(name: "AizenHost", package: "Host"),
+            .product(name: "AizenTransport", package: "Transport"),
+            .product(name: "AizenWire", package: "Wire"),
             .product(name: "ACP", package: "swift-acp")
         ])
     ]

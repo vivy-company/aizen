@@ -3,8 +3,35 @@ import AizenCore
 import AizenHost
 import AizenMacPlatform
 import AizenStorage
+import AizenTransport
+import AizenWire
 import Foundation
 import Testing
+
+@Test func xpcWireServiceRoundTripsTheWireEnvelope() async throws {
+    let request = ProtocolEnvelope(
+        messageID: "xpc-round-trip",
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(ListSpacesQueryPayload())
+    )
+    let requestData = try request.serializedData()
+    let service = XPCWireService(endpoint: EchoWireEndpoint())
+    let responseData: Data = try await withCheckedThrowingContinuation { continuation in
+        service.send(requestData) { data, error in
+            if let error {
+                continuation.resume(throwing: error)
+            } else if let data {
+                continuation.resume(returning: data)
+            } else {
+                continuation.resume(throwing: XPCWireTransportError.invalidResponse)
+            }
+        }
+    }
+
+    #expect(try ProtocolEnvelope(serializedData: responseData) == request)
+}
 
 @Test func acpRuntimeOwnsTheClientUntilTheRunIsCancelled() async throws {
     let client = RecordingClient()
@@ -101,6 +128,12 @@ import Testing
 private struct StaticConfigurationResolver: ACPRunConfigurationResolving {
     func configuration(for run: Run) async throws -> ACPRunConfiguration {
         ACPRunConfiguration(executablePath: "/usr/bin/true", workingDirectory: "/tmp/aizen")
+    }
+}
+
+private struct EchoWireEndpoint: WireEndpoint {
+    func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
+        envelope
     }
 }
 
