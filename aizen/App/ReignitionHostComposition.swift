@@ -1,6 +1,7 @@
 import AizenClient
 import AizenCore
 import AizenMacPlatform
+import AizenWire
 import Foundation
 
 /// The app's v2 Host client composition. Views receive Client projections; they never own Host state.
