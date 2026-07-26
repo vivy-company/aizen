@@ -364,7 +364,16 @@ private extension AizenCLI {
             let operationID = OperationID(rawValue: rawID)
             var last: AizenCore.Operation?
             while !Task.isCancelled {
-                guard let operation = try await client.operations(operationID: operationID).first else { throw CLIError.invalidArguments("Operation not found: \(rest[0])") }
+                let operation: AizenCore.Operation
+                do {
+                    guard let value = try await client.operations(operationID: operationID).first else {
+                        throw CLIError.invalidArguments("Operation not found: \(rest[0])")
+                    }
+                    operation = value
+                } catch MachWireTransportError.unavailable {
+                    try await Task.sleep(for: .seconds(1))
+                    continue
+                }
                 if operation != last { print(operationLine(operation)); last = operation }
                 if operation.lifecycle == .completed || operation.lifecycle == .failed || operation.lifecycle == .cancelled { return }
                 try await Task.sleep(for: .milliseconds(500))
