@@ -264,7 +264,7 @@ private extension AizenCLI {
 
     static func handleConversation(_ args: [String]) async throws {
         guard let subcommand = args.first else {
-            throw CLIError.invalidArguments("conversation requires list, new, or show")
+            throw CLIError.invalidArguments("conversation requires list, new, show, or send")
         }
         let rest = Array(args.dropFirst())
         switch subcommand {
@@ -292,6 +292,21 @@ private extension AizenCLI {
             for message in messages {
                 print("\(message.role.rawValue)\t\(message.content)")
             }
+        case "send":
+            guard rest.count >= 2, let sessionUUID = UUID(uuidString: rest[0]) else {
+                throw CLIError.invalidArguments("conversation send requires a Session ID and message")
+            }
+            let client = V2CLIClient()
+            let sessionID = SessionID(rawValue: sessionUUID)
+            guard let conversation = try await client.conversations().first(where: { $0.id == sessionID }) else {
+                throw CLIError.sessionNotFound(rest[0])
+            }
+            let runID = try await client.sendConversation(
+                spaceID: conversation.spaceID,
+                sessionID: sessionID,
+                content: rest.dropFirst().joined(separator: " ")
+            )
+            print(runID.description)
         default:
             throw CLIError.invalidArguments("Unknown conversation command: \(subcommand)")
         }
@@ -307,15 +322,25 @@ private extension AizenCLI {
     }
 
     static func handleRun(_ args: [String]) async throws {
-        guard args.first == "list" else {
-            throw CLIError.invalidArguments("run requires list")
+        guard let subcommand = args.first else {
+            throw CLIError.invalidArguments("run requires list or cancel")
         }
         let rest = Array(args.dropFirst())
-        guard rest.count <= 1 else { throw CLIError.invalidArguments("run list accepts at most one space") }
         let client = V2CLIClient()
-        let spaceID = try await resolveV2Space(rest.first, client: client)
-        for run in try await client.runs(spaceID: spaceID) {
-            print("\(run.id.description)\t\(run.lifecycle.rawValue)\t\(run.sessionID.description)")
+        switch subcommand {
+        case "list":
+            guard rest.count <= 1 else { throw CLIError.invalidArguments("run list accepts at most one space") }
+            let spaceID = try await resolveV2Space(rest.first, client: client)
+            for run in try await client.runs(spaceID: spaceID) {
+                print("\(run.id.description)\t\(run.lifecycle.rawValue)\t\(run.sessionID.description)")
+            }
+        case "cancel":
+            guard rest.count == 1, let runUUID = UUID(uuidString: rest[0]) else {
+                throw CLIError.invalidArguments("run cancel requires a Run ID")
+            }
+            try await client.cancelRun(id: RunID(rawValue: runUUID))
+        default:
+            throw CLIError.invalidArguments("Unknown run command: \(subcommand)")
         }
     }
 

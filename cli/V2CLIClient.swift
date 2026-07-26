@@ -49,9 +49,19 @@ actor V2CLIClient {
         return try await client.conversationTimeline(sessionID: sessionID)
     }
 
+    func sendConversation(spaceID: SpaceID, sessionID: SessionID, content: String) async throws -> RunID {
+        try await recoverPendingCommands()
+        return try await client.sendConversation(spaceID: spaceID, sessionID: sessionID, content: content)
+    }
+
     func runs(spaceID: SpaceID? = nil) async throws -> [Run] {
         try await recoverPendingCommands()
         return try await client.runs(in: spaceID)
+    }
+
+    func cancelRun(id: RunID) async throws {
+        try await recoverPendingCommands()
+        try await client.cancelRun(id: id)
     }
 
     func resources(spaceID: SpaceID? = nil) async throws -> [Resource] {

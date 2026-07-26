@@ -93,6 +93,10 @@ public actor LocalHostClient {
         try await client.conversationTimeline(sessionID: sessionID)
     }
 
+    public func sendConversation(spaceID: SpaceID, sessionID: SessionID, content: String) async throws -> RunID {
+        try await client.sendConversation(spaceID: spaceID, sessionID: sessionID, content: content)
+    }
+
     public func cancelRun(id: RunID) async throws {
         try await client.cancelRun(id: id)
     }
