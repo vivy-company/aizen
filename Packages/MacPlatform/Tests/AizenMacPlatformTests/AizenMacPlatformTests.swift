@@ -338,6 +338,37 @@ import Testing
     #expect(fetched.indexRevision == status.indexRevision)
 }
 
+@Test func gitRepositoryStatusReaderFastForwardsFromOriginAtExpectedRevisions() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let remote = root.appendingPathComponent("remote.git", isDirectory: true)
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    let writer = root.appendingPathComponent("writer", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try runGit(["init", "--bare", remote.path])
+    try runGit(["clone", remote.path, repository.path])
+    try runGit(["-C", repository.path, "config", "user.email", "aizen@example.test"])
+    try runGit(["-C", repository.path, "config", "user.name", "Aizen Test"])
+    try Data("seed\n".utf8).write(to: repository.appendingPathComponent("README.md"))
+    try runGit(["-C", repository.path, "add", "README.md"])
+    try runGit(["-C", repository.path, "commit", "-m", "seed"])
+    try runGit(["-C", repository.path, "push", "-u", "origin", "HEAD:main"])
+    try runGit(["--git-dir", remote.path, "symbolic-ref", "HEAD", "refs/heads/main"])
+    try runGit(["clone", remote.path, writer.path])
+    try runGit(["-C", writer.path, "config", "user.email", "aizen@example.test"])
+    try runGit(["-C", writer.path, "config", "user.name", "Aizen Test"])
+    try Data("remote\n".utf8).write(to: writer.appendingPathComponent("REMOTE.md"))
+    try runGit(["-C", writer.path, "add", "REMOTE.md"])
+    try runGit(["-C", writer.path, "commit", "-m", "remote"])
+    try runGit(["-C", writer.path, "push"])
+
+    let reader = GitRepositoryStatusReader()
+    let before = try await reader.status(at: repository, maximumEntries: 10)
+    let pulled = try await reader.pull(at: repository, expectedRepositoryRevision: before.repositoryRevision, expectedIndexRevision: before.indexRevision)
+    #expect(pulled.repositoryRevision != before.repositoryRevision)
+    #expect(FileManager.default.fileExists(atPath: repository.appendingPathComponent("REMOTE.md").path))
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")

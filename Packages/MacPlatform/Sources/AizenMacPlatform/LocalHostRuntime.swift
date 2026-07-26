@@ -67,6 +67,7 @@ public final class LocalHostRuntime: @unchecked Sendable {
             repositoryCommitter: repositoryReader,
             repositoryBranchUpdater: repositoryReader,
             repositoryFetcher: repositoryReader,
+            repositoryPuller: repositoryReader,
             xcodeProjectOpener: MacXcodeProjectOpener(),
             xcodeProjectInspector: MacXcodeProjectInspector(),
             xcodeProjectBuilder: MacXcodeProjectBuilder()
