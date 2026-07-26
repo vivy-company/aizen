@@ -120,8 +120,13 @@ actor ReignitionHostComposition {
         }
     }
 
-    func prepareLegacyMigration(legacyStoreURL: URL?, legacyModelURL: URL?, fileManager: FileManager = .default) async throws -> MigrationPreparation {
-        guard let legacyStoreURL, fileManager.fileExists(atPath: legacyStoreURL.path) else { return .noLegacyStore }
+    func prepareLegacyMigration(fileManager: FileManager = .default) async throws -> MigrationPreparation {
+        let applicationSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let legacyStoreURL = applicationSupportURL
+            .appendingPathComponent(Bundle.main.bundleIdentifier ?? "win.aizen.app", isDirectory: true)
+            .appendingPathComponent("aizen.sqlite")
+        guard fileManager.fileExists(atPath: legacyStoreURL.path) else { return .noLegacyStore }
+        let legacyModelURL = Bundle.main.url(forResource: "aizen", withExtension: "momd")
         guard let legacyModelURL else { throw CocoaError(.fileNoSuchFile) }
         try HostLegacyMigrationRequestStore.schedule(
             sourceStoreURL: legacyStoreURL,

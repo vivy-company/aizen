@@ -26,9 +26,6 @@ extension aizenApp {
                     ghosttyApp.reloadConfig()
                     await TmuxSessionRuntime.shared.updateConfig()
                 }
-                .task {
-                    await cleanupOrphanedTmuxSessions()
-                }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified)

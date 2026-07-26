@@ -6,7 +6,6 @@
 //
 import ACP
 import SwiftUI
-import CoreData
 import Sparkle
 import AppKit
 import os
@@ -15,7 +14,6 @@ import os
 struct aizenApp: App {
     @NSApplicationDelegateAdaptor(AizenAppDelegate.self) var appDelegate
 
-    let persistenceController = PersistenceController.shared
     let reignitionHost = ReignitionHostComposition()
     @StateObject var ghosttyApp = Ghostty.App()
     @FocusedValue(\.chatActions) var chatActions
@@ -33,18 +31,14 @@ struct aizenApp: App {
     @AppStorage("terminalUsePerAppearanceTheme") var terminalUsePerAppearanceTheme = false
     @AppStorage(TerminalPreferences.scrollbackLimitMBKey)
     var terminalScrollbackLimitMB = TerminalPreferences.defaultScrollbackLimitMB
-    @AppStorage("terminalSessionPersistence") var sessionPersistence = false
-
     init() {
         updaterController = Self.makeUpdaterController()
         configureStartup()
         _ = shortcutMonitor
         let host = reignitionHost
-        let legacyStoreURL = persistenceController.container.persistentStoreCoordinator.persistentStores.first?.url
-        let legacyModelURL = Bundle.main.url(forResource: "aizen", withExtension: "momd")
-        Task { [host, legacyStoreURL, legacyModelURL] in
+        Task { [host] in
             do {
-                _ = try await host.prepareLegacyMigration(legacyStoreURL: legacyStoreURL, legacyModelURL: legacyModelURL)
+                _ = try await host.prepareLegacyMigration()
                 try await host.activate()
                 do {
                     let agentConfiguration = try await DefaultACPAgentLaunchConfigurationResolver().launchConfiguration()

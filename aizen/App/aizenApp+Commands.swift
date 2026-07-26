@@ -40,18 +40,6 @@ extension aizenApp {
         }
 
         CommandGroup(after: .newItem) {
-            Button("Activity Monitor...") {
-                ActiveWorktreesWindowController.shared.show(context: persistenceController.container.viewContext)
-            }
-            .keyboardShortcut("a", modifiers: [.command, .shift])
-
-            Button("Chat Sessions...") {
-                SessionsWindowController.shared.show(context: persistenceController.container.viewContext)
-            }
-            .keyboardShortcut("s", modifiers: [.command, .shift])
-
-            Divider()
-
             Button("Split Right") {
                 TerminalSplitActionRouter.shared.splitHorizontal()
             }
@@ -92,21 +80,6 @@ extension aizenApp {
                     NSWorkspace.shared.open(url)
                 }
             }
-        }
-
-        ReignitionConversationCommands()
-    }
-}
-
-private struct ReignitionConversationCommands: Commands {
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some Commands {
-        CommandGroup(after: .newItem) {
-            Button("Reignition Conversations") {
-                openWindow(id: "reignition-conversations")
-            }
-            .keyboardShortcut("r", modifiers: [.command, .shift])
         }
     }
 }

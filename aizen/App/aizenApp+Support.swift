@@ -6,7 +6,6 @@
 //
 
 import AppKit
-import CoreData
 import SwiftUI
 
 extension aizenApp {
@@ -37,38 +36,5 @@ extension aizenApp {
         alert.informativeText = result.message
         alert.addButton(withTitle: "OK")
         alert.runModal()
-    }
-
-    /// Clean up orphaned tmux sessions that no longer have matching Core Data panes
-    func cleanupOrphanedTmuxSessions() async {
-        guard sessionPersistence else { return }
-
-        let context = persistenceController.container.viewContext
-        var validPaneIds = Set<String>()
-
-        await context.perform {
-            do {
-                let layoutRequest: NSFetchRequest<WorktreeLayout> = WorktreeLayout.fetchRequest()
-                for layout in try context.fetch(layoutRequest) {
-                    if let treeJSON = layout.treeJSON,
-                       let tree = WorkspaceLayoutCodec.decode(treeJSON) {
-                        validPaneIds.formUnion(tree.allPaneIds())
-                    }
-                }
-
-                // Terminal sessions of worktrees not yet migrated to workspace layouts.
-                let sessionRequest: NSFetchRequest<TerminalSession> = TerminalSession.fetchRequest()
-                for session in try context.fetch(sessionRequest) {
-                    if let layoutJSON = session.splitLayout,
-                       let layout = WorkspaceLayoutCodec.decode(layoutJSON) {
-                        validPaneIds.formUnion(layout.allPaneIds())
-                    }
-                }
-            } catch {
-                // Best-effort cleanup only.
-            }
-        }
-
-        await TmuxSessionRuntime.shared.cleanupOrphanedSessions(validPaneIds: validPaneIds)
     }
 }
