@@ -1406,6 +1406,23 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(operation.lifecycle == .completed)
 }
 
+@Test func hostRecordsRepositoryPushesAsCompletedDurableOperations() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Repository")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let host = LocalHost(storage: storage, repositoryPusher: RecordingRepositoryPusher())
+    let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(PushRepositoryCommandPayload(resourceID: resource.id.description, expectedRepositoryRevision: "head", expectedIndexRevision: String(repeating: "a", count: 64)))))
+    let result = try PushRepositoryResultPayload(protobufBytes: response.payload.protobufBytes)
+    let operation = try #require(try await storage.load().operations.first)
+    #expect(operation.id.description == result.operationID)
+    #expect(operation.lifecycle == .completed)
+}
+
 @Test func localHostListsExecutionContextFilesThroughTypedWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1685,6 +1702,12 @@ private actor RecordingRepositoryFetcher: RepositoryFetching {
 
 private actor RecordingRepositoryPuller: RepositoryPulling {
     func pull(at repositoryURL: URL, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> RepositoryFetchResult {
+        .init(repositoryRevision: String(repeating: "c", count: 40), indexRevision: String(repeating: "b", count: 64))
+    }
+}
+
+private actor RecordingRepositoryPusher: RepositoryPushing {
+    func push(at repositoryURL: URL, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> RepositoryFetchResult {
         .init(repositoryRevision: String(repeating: "c", count: 40), indexRevision: String(repeating: "b", count: 64))
     }
 }

@@ -168,6 +168,10 @@ public protocol RepositoryPulling: Sendable {
     func pull(at repositoryURL: URL, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> RepositoryFetchResult
 }
 
+public protocol RepositoryPushing: Sendable {
+    func push(at repositoryURL: URL, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> RepositoryFetchResult
+}
+
 public protocol XcodeProjectOpening: Sendable {
     func openXcodeProject(at url: URL) async throws
 }
@@ -201,6 +205,7 @@ public actor LocalHost: WireEndpoint {
     private let repositoryBranchUpdater: (any RepositoryBranchUpdating)?
     private let repositoryFetcher: (any RepositoryFetching)?
     private let repositoryPuller: (any RepositoryPulling)?
+    private let repositoryPusher: (any RepositoryPushing)?
     private let xcodeProjectOpener: (any XcodeProjectOpening)?
     private let xcodeProjectInspector: (any XcodeProjectInspecting)?
     private let xcodeProjectBuilder: (any XcodeProjectBuilding)?
@@ -226,6 +231,7 @@ public actor LocalHost: WireEndpoint {
         repositoryBranchUpdater: (any RepositoryBranchUpdating)? = nil,
         repositoryFetcher: (any RepositoryFetching)? = nil,
         repositoryPuller: (any RepositoryPulling)? = nil,
+        repositoryPusher: (any RepositoryPushing)? = nil,
         xcodeProjectOpener: (any XcodeProjectOpening)? = nil,
         xcodeProjectInspector: (any XcodeProjectInspecting)? = nil,
         xcodeProjectBuilder: (any XcodeProjectBuilding)? = nil
@@ -249,6 +255,7 @@ public actor LocalHost: WireEndpoint {
         self.repositoryBranchUpdater = repositoryBranchUpdater
         self.repositoryFetcher = repositoryFetcher
         self.repositoryPuller = repositoryPuller
+        self.repositoryPusher = repositoryPusher
         self.xcodeProjectOpener = xcodeProjectOpener
         self.xcodeProjectInspector = xcodeProjectInspector
         self.xcodeProjectBuilder = xcodeProjectBuilder
@@ -354,6 +361,8 @@ public actor LocalHost: WireEndpoint {
                 FetchRepositoryResultPayload.identifier,
                 PullRepositoryCommandPayload.identifier,
                 PullRepositoryResultPayload.identifier,
+                PushRepositoryCommandPayload.identifier,
+                PushRepositoryResultPayload.identifier,
                 CreateLocalFolderContextCommandPayload.identifier,
                 CreateLocalFolderContextResultPayload.identifier,
                 CreateRepositoryCheckoutContextCommandPayload.identifier,
@@ -999,6 +1008,24 @@ public actor LocalHost: WireEndpoint {
                     _ = try await self.storage.transact { snapshot in guard let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) else { return }; snapshot.operations[index].lifecycle = .completed; snapshot.operations[index].progress = 1 }
                     return try TypedPayload(PullRepositoryResultPayload(repositoryRevision: result.repositoryRevision, indexRevision: result.indexRevision, operationID: operation.id.description))
                 } catch { _ = try? await self.storage.transact { snapshot in guard let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) else { return }; snapshot.operations[index].lifecycle = .failed; snapshot.operations[index].failureDescription = error.localizedDescription }; throw error }
+            }
+            kind = .commandResult
+        case .command where envelope.payload.identifier == PushRepositoryCommandPayload.identifier:
+            guard let repositoryPusher else { throw HostProtocolError.runtimeUnavailable }
+            let command = try PushRepositoryCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resourceID = try Self.resourceID(from: command.resourceID)
+            guard let resource = try await storage.load().resources.first(where: { $0.id == resourceID }), resource.kind == .repository, let repositoryURL = try Self.localResourceDirectory(for: resource) else { throw HostProtocolError.unknownResource(resourceID) }
+            payload = try await executeDurably(envelope: envelope, spaceID: resource.spaceID) {
+                let operation = Operation(spaceID: resource.spaceID, lifecycle: .running, progress: 0)
+                _ = try await self.storage.transact { $0.operations.append(operation) }
+                do {
+                    let result = try await repositoryPusher.push(at: repositoryURL, expectedRepositoryRevision: command.expectedRepositoryRevision, expectedIndexRevision: command.expectedIndexRevision)
+                    _ = try await self.storage.transact { snapshot in guard let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) else { return }; snapshot.operations[index].lifecycle = .completed; snapshot.operations[index].progress = 1 }
+                    return try TypedPayload(PushRepositoryResultPayload(repositoryRevision: result.repositoryRevision, indexRevision: result.indexRevision, operationID: operation.id.description))
+                } catch {
+                    _ = try? await self.storage.transact { snapshot in guard let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) else { return }; snapshot.operations[index].lifecycle = .failed; snapshot.operations[index].failureDescription = error.localizedDescription }
+                    throw error
+                }
             }
             kind = .commandResult
         case .command where envelope.payload.identifier == CreateLocalFolderContextCommandPayload.identifier:
