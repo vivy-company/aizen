@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import AizenCore
 import AizenStorage
 import AizenSecurity
@@ -1332,6 +1333,13 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     let entries = try await service.listDirectory(contextID: context.id)
     #expect(entries.map(\.relativePath) == ["Sources", "README.md"])
     #expect(try await service.readTextFile(contextID: context.id, relativePath: "README.md") == "hello")
+    let helloHash = SHA256.hash(data: Data("hello".utf8)).map { String(format: "%02x", $0) }.joined()
+    let replacementHash = try await service.replaceTextFile(contextID: context.id, relativePath: "README.md", expectedContentHash: helloHash, text: "updated")
+    #expect(try await service.readTextFile(contextID: context.id, relativePath: "README.md") == "updated")
+    #expect(replacementHash.count == 64)
+    await #expect(throws: ExecutionContextFileService.Error.revisionConflict) {
+        try await service.replaceTextFile(contextID: context.id, relativePath: "README.md", expectedContentHash: helloHash, text: "stale")
+    }
     #expect(try await service.listDirectory(contextID: context.id, includeHidden: true).map(\.relativePath) == ["Sources", "README.md"])
     await #expect(throws: ExecutionContextFileService.Error.sensitivePath(".env")) {
         try await service.readTextFile(contextID: context.id, relativePath: ".env")

@@ -1,5 +1,6 @@
 import AizenCore
 import AizenStorage
+import CryptoKit
 import Foundation
 
 /// Resolves filesystem access inside Host-owned execution-context roots.
@@ -14,6 +15,7 @@ public actor ExecutionContextFileService {
         case fileTooLarge(String)
         case invalidText(String)
         case sensitivePath(String)
+        case revisionConflict
     }
 
     private let storage: StorageRepository
@@ -59,7 +61,28 @@ public actor ExecutionContextFileService {
         return text
     }
 
+    /// Rechecks the expected SHA-256 while this actor owns the file operation, then replaces
+    /// only a regular context-relative UTF-8 file using Foundation's atomic write.
+    public func replaceTextFile(contextID: ExecutionContextID, relativePath: String, expectedContentHash: String, text: String) async throws -> String {
+        guard !Self.isSensitive(relativePath) else { throw Error.sensitivePath(relativePath) }
+        let root = try await contextRoot(contextID)
+        let file = try resolvedChild(relativePath, root: root)
+        let values = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true else { throw Error.notFile(relativePath) }
+        guard (values.fileSize ?? 0) <= Self.maximumTextFileBytes else { throw Error.fileTooLarge(relativePath) }
+        let existing = try Data(contentsOf: file, options: [.mappedIfSafe])
+        guard Self.contentHash(existing) == expectedContentHash else { throw Error.revisionConflict }
+        let replacement = Data(text.utf8)
+        guard replacement.count <= Self.maximumTextFileBytes else { throw Error.fileTooLarge(relativePath) }
+        try replacement.write(to: file, options: .atomic)
+        return Self.contentHash(replacement)
+    }
+
     private static let maximumTextFileBytes = 1_048_576
+
+    private static func contentHash(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
 
     private func contextRoot(_ contextID: ExecutionContextID) async throws -> URL {
         let snapshot = try await storage.load()
