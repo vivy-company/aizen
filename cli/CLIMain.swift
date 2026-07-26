@@ -1,3 +1,4 @@
+import AizenCore
 import Foundation
 import CoreData
 import Darwin
@@ -263,14 +264,11 @@ private extension AizenCLI {
             throw CLIError.invalidArguments("workspace list does not take arguments")
         }
 
-        let store = try CLIStore()
-        let context = store.container.viewContext
-
         let filters = workspaceFilters(from: parsed)
-        let workspaces = try fetchWorkspaces(in: context, filters: filters)
+        let workspaces = try await v2Workspaces(filters: filters)
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
         if parsed.flags.contains("json") {
-            let payload = WorkspaceListPayload(filters: filters, workspaces: workspaces.map(workspaceOutput))
+            let payload = WorkspaceListPayload(filters: filters, workspaces: workspaces.enumerated().map(workspaceOutput))
             printJSON(payload)
             return
         }
@@ -298,11 +296,9 @@ private extension AizenCLI {
             throw CLIError.invalidArguments("Invalid color hex: \(color)")
         }
 
-        let store = try CLIStore()
-        let manager = CLIRepositoryManager(context: store.container.viewContext)
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
-        let workspace = try manager.createWorkspace(name: parsed.positionals[0], colorHex: parsed.options["color"])
-        print(style.success("Created workspace: \(workspace.name ?? "")"))
+        try await V2CLIClient().createSpace(name: parsed.positionals[0], icon: parsed.options["color"])
+        print(style.success("Created workspace: \(parsed.positionals[0])"))
     }
 
     static func handleWorkspaceDelete(_ args: [String]) async throws {
@@ -1260,6 +1256,28 @@ private extension AizenCLI {
         let workspaces: [WorkspaceOutput]
     }
 
+    static func v2Workspaces(filters: WorkspaceFilters) async throws -> [Space] {
+        let all = try await V2CLIClient().snapshot().spaces.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+        let include = Set(filters.includeWorkspaces.map { $0.lowercased() })
+        let exclude = Set(filters.excludeWorkspaces.map { $0.lowercased() })
+
+        for name in filters.includeWorkspaces + filters.excludeWorkspaces {
+            guard all.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                throw CLIError.workspaceNotFound(name)
+            }
+        }
+
+        let nameContains = filters.nameContains?.lowercased()
+        return all.filter { space in
+            let name = space.name.lowercased()
+            return (include.isEmpty || include.contains(name)) &&
+                !exclude.contains(name) &&
+                (nameContains.map { name.contains($0) } ?? true)
+        }
+    }
+
     struct StatusPayload: Encodable {
         let workspaces: Int
         let repositories: Int
@@ -1304,6 +1322,14 @@ private extension AizenCLI {
             let repoCount = String(((workspace.repositories as? Set<Repository>)?.filter { !isCrossProjectRepository($0) }.count) ?? 0)
             let order = String(workspace.order)
             rows.append([name, color, repoCount, order])
+        }
+        printTable(headers: headers, rows: rows, style: style)
+    }
+
+    static func printWorkspaceTable(_ spaces: [Space], style: OutputStyle) {
+        let headers = ["Workspace", "Color", "Repositories", "Order"]
+        let rows = spaces.enumerated().map { index, space in
+            [space.name, space.icon ?? "-", "0", String(index)]
         }
         printTable(headers: headers, rows: rows, style: style)
     }
@@ -1364,6 +1390,10 @@ private extension AizenCLI {
             repositories: ((workspace.repositories as? Set<Repository>)?.filter { !isCrossProjectRepository($0) }.count) ?? 0,
             order: Int(workspace.order)
         )
+    }
+
+    static func workspaceOutput(_ space: (offset: Int, element: Space)) -> WorkspaceOutput {
+        WorkspaceOutput(name: space.element.name, color: space.element.icon, repositories: 0, order: space.offset)
     }
 
     static func iso8601Date(_ date: Date?) -> String? {

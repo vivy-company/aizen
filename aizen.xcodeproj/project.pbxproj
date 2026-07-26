@@ -41,6 +41,10 @@
 		F20000000000000000000078 /* AizenStorage in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000068 /* AizenStorage */; };
 		F20000000000000000000079 /* AizenTransport in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000069 /* AizenTransport */; };
 		F2000000000000000000007A /* AizenMacPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = F2000000000000000000006A /* AizenMacPlatform */; };
+		F20000000000000000000091 /* AizenClient in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000081 /* AizenClient */; };
+		F20000000000000000000092 /* AizenHost in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000082 /* AizenHost */; };
+		F20000000000000000000093 /* AizenStorage in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000083 /* AizenStorage */; };
+		F20000000000000000000094 /* AizenTransport in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000084 /* AizenTransport */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -219,6 +223,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F20000000000000000000091 /* AizenClient in Frameworks */,
+				F20000000000000000000092 /* AizenHost in Frameworks */,
+				F20000000000000000000093 /* AizenStorage in Frameworks */,
+				F20000000000000000000094 /* AizenTransport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -398,6 +406,12 @@
 				CCF000000000000000000006 /* cli */,
 			);
 			name = "aizen-cli";
+			packageProductDependencies = (
+				F20000000000000000000081 /* AizenClient */,
+				F20000000000000000000082 /* AizenHost */,
+				F20000000000000000000083 /* AizenStorage */,
+				F20000000000000000000084 /* AizenTransport */,
+			);
 			productName = "aizen-cli";
 			productReference = CCF000000000000000000001 /* aizen-cli */;
 			productType = "com.apple.product-type.tool";
@@ -1404,6 +1418,26 @@
 		F20000000000000000000068 /* AizenStorage */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000053 /* XCLocalSwiftPackageReference "Packages/Storage" */; productName = AizenStorage; };
 		F20000000000000000000069 /* AizenTransport */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000054 /* XCLocalSwiftPackageReference "Packages/Transport" */; productName = AizenTransport; };
 		F2000000000000000000006A /* AizenMacPlatform */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000055 /* XCLocalSwiftPackageReference "Packages/MacPlatform" */; productName = AizenMacPlatform; };
+		F20000000000000000000081 /* AizenClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F20000000000000000000051 /* XCLocalSwiftPackageReference "Packages/Client" */;
+			productName = AizenClient;
+		};
+		F20000000000000000000082 /* AizenHost */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F20000000000000000000052 /* XCLocalSwiftPackageReference "Packages/Host" */;
+			productName = AizenHost;
+		};
+		F20000000000000000000083 /* AizenStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F20000000000000000000053 /* XCLocalSwiftPackageReference "Packages/Storage" */;
+			productName = AizenStorage;
+		};
+		F20000000000000000000084 /* AizenTransport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F20000000000000000000054 /* XCLocalSwiftPackageReference "Packages/Transport" */;
+			productName = AizenTransport;
+		};
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CCB04B3A2EA241B30007DBB1 /* Project object */;
