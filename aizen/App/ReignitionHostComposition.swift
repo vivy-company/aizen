@@ -76,8 +76,16 @@ actor ReignitionHostComposition {
         try await client.importLocalFolder(spaceID: spaceID, path: path, title: title)
     }
 
+    func importLocalRepository(spaceID: SpaceID, path: String, title: String?) async throws -> ResourceID {
+        try await client.importLocalRepository(spaceID: spaceID, path: path, title: title)
+    }
+
     func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
         try await client.createLocalFolderContext(spaceID: spaceID, resourceID: resourceID)
+    }
+
+    func createRepositoryCheckoutContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
+        try await client.createRepositoryCheckoutContext(spaceID: spaceID, resourceID: resourceID)
     }
 
     func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {

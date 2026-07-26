@@ -175,6 +175,9 @@ struct ReignitionConversationWindow: View {
             Button("Choose Folder\u{2026}") {
                 chooseFolder(for: conversation.id)
             }
+            Button("Choose Repository\u{2026}") {
+                chooseRepository(for: conversation.id)
+            }
         }
         .disabled(store.isSynchronizing)
     }
@@ -187,5 +190,15 @@ struct ReignitionConversationWindow: View {
         panel.prompt = "Attach Folder"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task { await store.importAndAttachFolder(at: url, to: sessionID) }
+    }
+
+    private func chooseRepository(for sessionID: SessionID) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Attach Repository"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task { await store.importAndAttachRepository(at: url, to: sessionID) }
     }
 }

@@ -100,6 +100,20 @@ final class ReignitionConversationStore: ObservableObject {
         }
     }
 
+    func importAndAttachRepository(at url: URL, to sessionID: SessionID) async {
+        guard let session = conversations.first(where: { $0.id == sessionID }) else { return }
+        await perform {
+            let resourceID = try await self.host.importLocalRepository(
+                spaceID: session.spaceID,
+                path: url.path,
+                title: url.lastPathComponent
+            )
+            let contextID = try await self.host.createRepositoryCheckoutContext(spaceID: session.spaceID, resourceID: resourceID)
+            try await self.host.attachExecutionContext(sessionID: session.id, contextID: contextID)
+            try await self.refreshProjection(spaceID: session.spaceID)
+        }
+    }
+
     func detachExecutionContext(from sessionID: SessionID) async {
         guard let session = conversations.first(where: { $0.id == sessionID }) else { return }
         await perform {
