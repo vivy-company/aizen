@@ -1,5 +1,6 @@
 import AizenCore
 import AizenWire
+import CryptoKit
 import Foundation
 import Testing
 @testable import AizenSecurity
@@ -125,4 +126,31 @@ import Testing
     var tampered = try await host.seal(envelope)
     tampered[tampered.index(before: tampered.endIndex)] ^= 1
     await #expect(throws: SecurityError.malformedAuthenticatedFrame) { try await device.open(tampered) }
+}
+
+@Test func pairedTLSPreSharedKeysAreSharedOnlyByThePairedIdentities() throws {
+    let hostIdentity = LocalCryptographicIdentity()
+    let deviceIdentity = LocalCryptographicIdentity()
+    let hostID = HostID()
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: deviceIdentity.publicIdentity())
+    let hostKey = try PairedTLSPreSharedKey.derive(hostID: hostID, device: device, hostIdentity: hostIdentity)
+    let deviceKey = try deviceIdentity.sharedSecret(with: hostIdentity.publicIdentity()).hkdfDerivedSymmetricKey(
+        using: SHA256.self,
+        salt: tlsPSKSalt(hostID: hostID, deviceID: device.deviceID),
+        sharedInfo: Data("aizen.tls-psk.v1".utf8),
+        outputByteCount: 32
+    ).withUnsafeBytes { Data($0) }
+    #expect(hostKey == deviceKey)
+    #expect(PairedTLSPreSharedKey.identity(for: device.deviceID) == Data(device.deviceID.description.utf8))
+    let otherHostKey = try PairedTLSPreSharedKey.derive(hostID: HostID(), device: device, hostIdentity: hostIdentity)
+    #expect(hostKey != otherHostKey)
+}
+
+private func tlsPSKSalt(hostID: HostID, deviceID: DeviceID) -> Data {
+    var salt = Data("aizen.tls-psk.salt.v1".utf8)
+    for identifier in [hostID.rawValue, deviceID.rawValue] {
+        var tuple = identifier.uuid
+        withUnsafeBytes(of: &tuple) { salt.append(contentsOf: $0) }
+    }
+    return Data(SHA256.hash(data: salt))
 }

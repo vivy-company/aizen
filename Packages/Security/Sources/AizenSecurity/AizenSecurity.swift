@@ -461,6 +461,36 @@ public enum ConnectionAuthenticator {
     }
 }
 
+/// Derives a stable TLS 1.3 PSK for one already-paired Host/device identity pair.
+public enum PairedTLSPreSharedKey {
+    public static func derive(
+        hostID: HostID,
+        device: DevicePublicIdentity,
+        hostIdentity: LocalCryptographicIdentity
+    ) throws -> Data {
+        let sharedSecret = try hostIdentity.sharedSecret(with: device.cryptographicIdentity)
+        var salt = Data("aizen.tls-psk.salt.v1".utf8)
+        append(hostID.rawValue, to: &salt)
+        append(device.deviceID.rawValue, to: &salt)
+        let key = sharedSecret.hkdfDerivedSymmetricKey(
+            using: SHA256.self,
+            salt: Data(SHA256.hash(data: salt)),
+            sharedInfo: Data("aizen.tls-psk.v1".utf8),
+            outputByteCount: 32
+        )
+        return key.withUnsafeBytes { Data($0) }
+    }
+
+    public static func identity(for deviceID: DeviceID) -> Data {
+        Data(deviceID.description.utf8)
+    }
+
+    private static func append(_ value: UUID, to data: inout Data) {
+        var tuple = value.uuid
+        withUnsafeBytes(of: &tuple) { data.append(contentsOf: $0) }
+    }
+}
+
 public struct AuthenticatedWireFrame: Sendable, Hashable {
     public static let maximumCiphertextLength = 16 * 1_024 * 1_024
 
