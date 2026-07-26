@@ -669,6 +669,12 @@ public actor HostClient {
         return try PullRepositoryResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func pushRepository(id: ResourceID, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> PushRepositoryResultPayload {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(PushRepositoryCommandPayload(resourceID: id.description, expectedRepositoryRevision: expectedRepositoryRevision, expectedIndexRevision: expectedIndexRevision))))
+        guard response.kind == .commandResult, response.payload.identifier == PushRepositoryResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try PushRepositoryResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
         let response = try await send(.init(
             messageID: UUID().uuidString,
