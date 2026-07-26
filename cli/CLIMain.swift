@@ -1073,19 +1073,13 @@ private extension AizenCLI {
     }
 
     static func printJSON<T: Encodable>(_ payload: T) {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        if let data = try? encoder.encode(payload),
-           let output = String(data: data, encoding: .utf8) {
+        if let output = try? encodeJSON(payload) {
             print(output)
         }
     }
 
     static func printJSONLine<T: Encodable>(_ payload: T) {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        if let data = try? encoder.encode(payload),
-           let output = String(data: data, encoding: .utf8) {
+        if let output = try? encodeJSON(payload, prettyPrinted: false) {
             print(output)
         }
     }

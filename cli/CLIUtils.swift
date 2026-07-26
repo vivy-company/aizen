@@ -1,7 +1,7 @@
 import Foundation
 import Darwin
 
-func parseArguments(_ args: [String]) throws -> ParsedArguments {
+public func parseArguments(_ args: [String]) throws -> ParsedArguments {
     var positionals: [String] = []
     var options: [String: String] = [:]
     var flags: Set<String> = []
@@ -170,6 +170,12 @@ func shouldUseColor(flags: Set<String>) -> Bool {
         return true
     }
     return isStdoutTTY()
+}
+
+public func encodeJSON<T: Encodable>(_ payload: T, prettyPrinted: Bool = true) throws -> String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = prettyPrinted ? [.prettyPrinted, .sortedKeys] : [.sortedKeys]
+    return String(decoding: try encoder.encode(payload), as: UTF8.self)
 }
 
 func readLineTrimmed() -> String? {

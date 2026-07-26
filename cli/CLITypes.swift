@@ -1,6 +1,6 @@
 import Foundation
 
-enum ExitCode: Int32 {
+public enum ExitCode: Int32 {
     case success = 0
     case generalError = 1
     case invalidArguments = 2
@@ -14,7 +14,7 @@ enum ExitCode: Int32 {
     case hostTimeout = 11
 }
 
-enum CLIError: Error, LocalizedError {
+public enum CLIError: Error, LocalizedError, Equatable {
     case invalidArguments(String)
     case repositoryNotFound(String)
     case workspaceNotFound(String)
@@ -26,7 +26,7 @@ enum CLIError: Error, LocalizedError {
     case sessionNotFound(String)
     case cancelled
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .invalidArguments(let message):
             return message
@@ -51,7 +51,7 @@ enum CLIError: Error, LocalizedError {
         }
     }
 
-    var exitCode: ExitCode {
+    public var exitCode: ExitCode {
         switch self {
         case .invalidArguments:
             return .invalidArguments
@@ -67,10 +67,16 @@ enum CLIError: Error, LocalizedError {
     }
 }
 
-struct ParsedArguments {
-    var positionals: [String]
-    var options: [String: String]
-    var flags: Set<String>
+public struct ParsedArguments: Equatable {
+    public let positionals: [String]
+    public let options: [String: String]
+    public let flags: Set<String>
+
+    public init(positionals: [String], options: [String: String], flags: Set<String>) {
+        self.positionals = positionals
+        self.options = options
+        self.flags = flags
+    }
 }
 
 func printError(_ message: String) {
