@@ -295,6 +295,29 @@ public struct Resource: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+/// Client-safe Xcode project metadata discovered by the Host for a repository or folder Resource.
+public struct XcodeProjectDescriptor: Codable, Sendable, Hashable, Identifiable {
+    public enum Kind: String, Codable, Sendable, Hashable {
+        case project
+        case workspace
+    }
+
+    public let resourceID: ResourceID
+    public let id: String
+    public let name: String
+    public let kind: Kind
+    public let schemes: [String]
+
+    public init(resourceID: ResourceID, id: String, name: String, kind: Kind, schemes: [String]) {
+        precondition(!id.isEmpty && !name.isEmpty, "Xcode project descriptors require an identity and name")
+        self.resourceID = resourceID
+        self.id = id
+        self.name = name
+        self.kind = kind
+        self.schemes = schemes
+    }
+}
+
 public struct ExecutionContext: Codable, Sendable, Hashable, Identifiable {
     public let id: ExecutionContextID
     public let spaceID: SpaceID

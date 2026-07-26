@@ -40,6 +40,18 @@ import Testing
     #expect(Aizen1MigrationMapping.target(for: .worktreeOrFolder) == .executionContext)
 }
 
+@Test func xcodeProjectDescriptorsAreClientSafeValues() {
+    let descriptor = XcodeProjectDescriptor(
+        resourceID: ResourceID(),
+        id: "App.xcodeproj",
+        name: "App",
+        kind: .project,
+        schemes: ["App"]
+    )
+    #expect(descriptor.kind == .project)
+    #expect(descriptor.schemes == ["App"])
+}
+
 @Test func operationRejectsInvalidDurableState() {
     #expect(OperationLifecycle.queued.canTransition(to: .running))
     #expect(!OperationLifecycle.completed.canTransition(to: .running))
