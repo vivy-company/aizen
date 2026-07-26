@@ -8,6 +8,18 @@ import AizenWire
 import Foundation
 import Testing
 
+@Test func hostMachServiceConfigurationBuildsTheTeamRequirement() throws {
+    let configuration = try HostMachServiceConfiguration(
+        machServiceName: "win.aizen.host",
+        teamIdentifier: "QW4U57CXJX"
+    )
+
+    #expect(configuration.peerCodeSigningRequirement == "anchor apple generic and certificate leaf[subject.OU] = \"QW4U57CXJX\"")
+    #expect(throws: HostMachServiceConfigurationError.invalidTeamIdentifier) {
+        _ = try HostMachServiceConfiguration(machServiceName: "win.aizen.host", teamIdentifier: "QW4U57CXJX\"")
+    }
+}
+
 @Test func xpcWireServiceRoundTripsTheWireEnvelope() async throws {
     let request = ProtocolEnvelope(
         messageID: "xpc-round-trip",
