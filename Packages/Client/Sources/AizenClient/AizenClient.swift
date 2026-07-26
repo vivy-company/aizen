@@ -61,6 +61,50 @@ public enum JournalSynchronizationError: Swift.Error, Sendable, Equatable {
     case gap(expected: UInt64, received: UInt64)
 }
 
+public protocol CommandOutbox: Sendable {
+    func enqueue(_ command: ProtocolEnvelope) async throws
+    func pendingCommands() async throws -> [ProtocolEnvelope]
+    func acknowledge(commandID: String) async throws
+}
+
+public enum CommandOutboxError: Swift.Error, Sendable, Equatable {
+    case invalidCommand
+}
+
+/// Client-owned persistence for commands whose Host receipt may have been lost in transit.
+public actor FileCommandOutbox: CommandOutbox {
+    private let url: URL
+
+    public init(url: URL) {
+        self.url = url
+    }
+
+    public func enqueue(_ command: ProtocolEnvelope) throws {
+        guard command.kind == .command, UUID(uuidString: command.messageID) != nil else {
+            throw CommandOutboxError.invalidCommand
+        }
+        var commands = try pendingCommands()
+        guard !commands.contains(where: { $0.messageID == command.messageID }) else { return }
+        commands.append(command)
+        try save(commands)
+    }
+
+    public func pendingCommands() throws -> [ProtocolEnvelope] {
+        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+        return try JSONDecoder().decode([ProtocolEnvelope].self, from: Data(contentsOf: url))
+    }
+
+    public func acknowledge(commandID: String) throws {
+        let retained = try pendingCommands().filter { $0.messageID != commandID }
+        try save(retained)
+    }
+
+    private func save(_ commands: [ProtocolEnvelope]) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(commands).write(to: url, options: .atomic)
+    }
+}
+
 /// Applies durable journal events serially. A reducer failure leaves the stored cursor unchanged.
 public actor JournalEventSynchronizer {
     private let cursorStore: any JournalCursorStore
@@ -114,18 +158,30 @@ public actor HostClient {
 
     private let transport: any WireTransport
     private let eventTransport: (any RunEventTransport)?
+    private let commandOutbox: (any CommandOutbox)?
     private var nextSequence: UInt64 = 1
     public private(set) var connectionState: ClientConnectionState = .disconnected
 
-    public init(transport: any WireTransport) {
+    public init(transport: any WireTransport, commandOutbox: (any CommandOutbox)? = nil) {
         self.transport = transport
         eventTransport = transport as? any RunEventTransport
+        self.commandOutbox = commandOutbox
     }
 
     public func send(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
-        let response = try await transport.send(envelope)
-        connectionState = .connected(protocolGeneration: response.protocolGeneration)
-        return response
+        if envelope.kind == .command, UUID(uuidString: envelope.messageID) != nil {
+            try await commandOutbox?.enqueue(envelope)
+        }
+        return try await transmit(envelope, acknowledgingCommand: true)
+    }
+
+    public func retryPendingCommands() async throws -> [ProtocolEnvelope] {
+        guard let commandOutbox else { return [] }
+        var responses: [ProtocolEnvelope] = []
+        for command in try await commandOutbox.pendingCommands() {
+            responses.append(try await transmit(command, acknowledgingCommand: true))
+        }
+        return responses
     }
 
     public func disconnect() {
@@ -458,5 +514,14 @@ public actor HostClient {
             throw Error.unexpectedPayload(response.payload.identifier)
         }
         _ = try SpaceMutationResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
+    private func transmit(_ envelope: ProtocolEnvelope, acknowledgingCommand: Bool) async throws -> ProtocolEnvelope {
+        let response = try await transport.send(envelope)
+        connectionState = .connected(protocolGeneration: response.protocolGeneration)
+        if acknowledgingCommand, envelope.kind == .command, response.kind == .commandResult {
+            try await commandOutbox?.acknowledge(commandID: envelope.messageID)
+        }
+        return response
     }
 }

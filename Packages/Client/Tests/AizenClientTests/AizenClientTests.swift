@@ -52,6 +52,31 @@ import AizenWire
     }
 }
 
+@Test func commandOutboxReplaysACommandAfterItsReceiptIsLost() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    _ = try await storage.transact { $0.spaces.append(space) }
+    let host = LocalHost(storage: storage)
+    let outboxURL = root.appendingPathComponent("client-outbox.json")
+    let outbox = FileCommandOutbox(url: outboxURL)
+    let unreliableClient = HostClient(transport: ReceiptDroppingTransport(endpoint: host), commandOutbox: outbox)
+
+    await #expect(throws: ReceiptDroppingTransport.Error.receiptLost) {
+        _ = try await unreliableClient.importLocalFolder(spaceID: space.id, path: folder.path)
+    }
+    #expect(try await outbox.pendingCommands().count == 1)
+    #expect(try await storage.load().resources.count == 1)
+
+    let recoveredClient = HostClient(transport: InProcessTransport(endpoint: host), commandOutbox: FileCommandOutbox(url: outboxURL))
+    #expect(try await recoveredClient.retryPendingCommands().count == 1)
+    #expect(try await FileCommandOutbox(url: outboxURL).pendingCommands().isEmpty)
+    #expect(try await storage.load().resources.count == 1)
+}
+
 @Test func clientNegotiatesThroughTheProtobufInProcessTransport() async throws {
     let client = HostClient(transport: InProcessTransport(endpoint: EchoHost()))
     let response = try await client.send(.init(
@@ -300,6 +325,23 @@ import AizenWire
 
 private struct EchoHost: WireEndpoint {
     func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope { envelope }
+}
+
+private actor ReceiptDroppingTransport: WireTransport {
+    enum Error: Swift.Error, Sendable, Equatable {
+        case receiptLost
+    }
+
+    private let endpoint: any WireEndpoint
+
+    init(endpoint: any WireEndpoint) {
+        self.endpoint = endpoint
+    }
+
+    func send(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
+        _ = try await endpoint.receive(envelope)
+        throw Error.receiptLost
+    }
 }
 
 private actor RecordingJournalCursorStore: JournalCursorStore {
