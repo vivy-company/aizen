@@ -250,6 +250,35 @@ public struct DeviceAuthorization: Codable, Sendable, Hashable {
     }
 }
 
+/// Audit metadata never carries prompt, filesystem, or terminal content.
+public enum SecurityAuditKind: String, Codable, Sendable, Hashable {
+    case pairingApproved
+    case pairingRejected
+    case pairingFailed
+    case deviceRevoked
+    case authorizationDenied
+    case authorizationChanged
+    case authenticationFailed
+}
+
+public struct SecurityAuditRecord: Codable, Sendable, Hashable, Identifiable {
+    public let id: UUID
+    public let occurredAt: Date
+    public let kind: SecurityAuditKind
+    public let deviceID: DeviceID?
+    public let route: String?
+    public let detail: String?
+
+    public init(id: UUID = UUID(), occurredAt: Date = Date(), kind: SecurityAuditKind, deviceID: DeviceID? = nil, route: String? = nil, detail: String? = nil) {
+        self.id = id
+        self.occurredAt = occurredAt
+        self.kind = kind
+        self.deviceID = deviceID
+        self.route = route
+        self.detail = detail
+    }
+}
+
 /// Strictly monotonic receive sequence guard for an authenticated connection.
 public actor ReplayProtection {
     private var highestAcceptedSequence: UInt64 = 0
