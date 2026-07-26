@@ -391,6 +391,7 @@ private struct ReignitionContextFilesSheet: View {
     @ObservedObject var store: ReignitionConversationStore
     let context: ExecutionContext
     @State private var relativePath = ""
+    @State private var selectedFile: ContextFileEntry?
 
     var body: some View {
         NavigationStack {
@@ -403,7 +404,12 @@ private struct ReignitionContextFilesSheet: View {
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Label(entry.name, systemImage: "doc")
+                    Button {
+                        selectedFile = entry
+                    } label: {
+                        Label(entry.name, systemImage: "doc.text")
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .overlay {
@@ -431,7 +437,39 @@ private struct ReignitionContextFilesSheet: View {
                 await store.loadContextFiles(contextID: context.id, relativePath: relativePath)
             }
         }
+        .sheet(item: $selectedFile) { file in
+            ReignitionContextTextFileSheet(store: store, context: context, file: file)
+        }
         .frame(minWidth: 380, minHeight: 440)
+    }
+}
+
+private struct ReignitionContextTextFileSheet: View {
+    @ObservedObject var store: ReignitionConversationStore
+    let context: ExecutionContext
+    let file: ContextFileEntry
+
+    var body: some View {
+        Group {
+            if store.contextFileTextPath == file.relativePath, let text = store.contextFileText {
+                ScrollView([.horizontal, .vertical]) {
+                    Text(text)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                        .padding()
+                }
+            } else if store.isSynchronizing {
+                ProgressView()
+            } else {
+                ContentUnavailableView("Unable to Read File", systemImage: "exclamationmark.triangle")
+            }
+        }
+        .navigationTitle(file.name)
+        .task(id: file.relativePath) {
+            await store.loadContextTextFile(contextID: context.id, relativePath: file.relativePath)
+        }
+        .frame(minWidth: 620, minHeight: 460)
     }
 }
 

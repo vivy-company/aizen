@@ -10,6 +10,9 @@ public actor ExecutionContextFileService {
         case invalidRelativePath(String)
         case pathEscapesContext(String)
         case notDirectory(String)
+        case notFile(String)
+        case fileTooLarge(String)
+        case invalidText(String)
     }
 
     private let storage: StorageRepository
@@ -40,6 +43,19 @@ public actor ExecutionContextFileService {
             }
             .sorted { ($0.isDirectory == $1.isDirectory) ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending : $0.isDirectory }
     }
+
+    public func readTextFile(contextID: ExecutionContextID, relativePath: String) async throws -> String {
+        let root = try await contextRoot(contextID)
+        let file = try resolvedChild(relativePath, root: root)
+        let values = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true else { throw Error.notFile(relativePath) }
+        guard (values.fileSize ?? 0) <= Self.maximumTextFileBytes else { throw Error.fileTooLarge(relativePath) }
+        let data = try Data(contentsOf: file, options: [.mappedIfSafe])
+        guard let text = String(data: data, encoding: .utf8) else { throw Error.invalidText(relativePath) }
+        return text
+    }
+
+    private static let maximumTextFileBytes = 1_048_576
 
     private func contextRoot(_ contextID: ExecutionContextID) async throws -> URL {
         let snapshot = try await storage.load()

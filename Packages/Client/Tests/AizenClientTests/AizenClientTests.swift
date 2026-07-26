@@ -153,6 +153,7 @@ import AizenWire
     #expect(try await client.contextFiles(executionContextID: context.id) == [
         .init(relativePath: "README.md", name: "README.md", isDirectory: false)
     ])
+    #expect(try await client.contextTextFile(executionContextID: context.id, relativePath: "README.md") == "readme")
 }
 
 @Test func clientListsHostOwnedTerminalSessions() async throws {

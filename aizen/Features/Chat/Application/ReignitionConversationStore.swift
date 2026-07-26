@@ -15,6 +15,8 @@ final class ReignitionConversationStore: ObservableObject {
     @Published private(set) var terminalSessions: [AizenCore.TerminalSession] = []
     @Published private(set) var operations: [AizenCore.Operation] = []
     @Published private(set) var contextFiles: [ContextFileEntry] = []
+    @Published private(set) var contextFileText: String?
+    @Published private(set) var contextFileTextPath: String?
     @Published private(set) var repositoryStateByResourceID: [ResourceID: RefreshRepositoryResourceResultPayload] = [:]
     @Published private(set) var selectedConversationID: SessionID?
     @Published private(set) var messages: [ConversationMessage] = []
@@ -220,6 +222,18 @@ final class ReignitionConversationStore: ObservableObject {
                 executionContextID: contextID,
                 relativePath: relativePath
             )
+        }
+    }
+
+    func loadContextTextFile(contextID: ExecutionContextID, relativePath: String) async {
+        contextFileText = nil
+        contextFileTextPath = nil
+        await perform {
+            self.contextFileText = try await self.host.contextTextFile(
+                executionContextID: contextID,
+                relativePath: relativePath
+            )
+            self.contextFileTextPath = relativePath
         }
     }
 

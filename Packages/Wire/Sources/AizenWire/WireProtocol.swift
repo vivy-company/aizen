@@ -1542,6 +1542,28 @@ public struct ListContextFilesResponsePayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct ReadContextTextFileQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.context-files.read-text@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let executionContextID: String
+    public let relativePath: String
+    public init(executionContextID: String, relativePath: String) { precondition(!executionContextID.isEmpty && !relativePath.isEmpty); self.executionContextID = executionContextID; self.relativePath = relativePath }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReadContextTextFileQuery(serializedBytes: protobufBytes); guard !m.executionContextID.isEmpty, !m.relativePath.isEmpty else { throw WireCodecError.invalidIdentity("context text file") }; self.init(executionContextID: m.executionContextID, relativePath: m.relativePath) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadContextTextFileQuery(); m.executionContextID = executionContextID; m.relativePath = relativePath; return try m.serializedData() }
+}
+
+public struct ReadContextTextFileResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.context-files.read-text@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let relativePath: String
+    public let text: String
+    public init(relativePath: String, text: String) { self.relativePath = relativePath; self.text = text }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReadContextTextFileResponse(serializedBytes: protobufBytes); guard !m.relativePath.isEmpty else { throw WireCodecError.invalidIdentity("context text file") }; self.init(relativePath: m.relativePath, text: m.text) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadContextTextFileResponse(); m.relativePath = relativePath; m.text = text; return try m.serializedData() }
+}
+
 public struct CreateTerminalSessionCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.terminal-session.create@1")
     public static let schemaVersion: UInt32 = 1

@@ -100,6 +100,10 @@ actor ReignitionHostComposition {
         )
     }
 
+    func contextTextFile(executionContextID: ExecutionContextID, relativePath: String) async throws -> String {
+        try await client.contextTextFile(executionContextID: executionContextID, relativePath: relativePath)
+    }
+
     func importLocalFolder(spaceID: SpaceID, path: String, title: String?) async throws -> ResourceID {
         try await client.importLocalFolder(spaceID: spaceID, path: path, title: title)
     }

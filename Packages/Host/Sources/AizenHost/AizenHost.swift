@@ -100,6 +100,8 @@ public actor LocalHost: WireEndpoint {
                 ListTerminalSessionsResponsePayload.identifier,
                 ListContextFilesQueryPayload.identifier,
                 ListContextFilesResponsePayload.identifier,
+                ReadContextTextFileQueryPayload.identifier,
+                ReadContextTextFileResponsePayload.identifier,
                 CreateTerminalSessionCommandPayload.identifier,
                 CreateTerminalSessionResultPayload.identifier,
                 CreateSpaceCommandPayload.identifier,
@@ -232,6 +234,12 @@ public actor LocalHost: WireEndpoint {
             )
             kind = .queryResponse
             payload = try TypedPayload(ListContextFilesResponsePayload(entries: entries))
+        case .query where envelope.payload.identifier == ReadContextTextFileQueryPayload.identifier:
+            let query = try ReadContextTextFileQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let contextID = try Self.executionContextID(from: query.executionContextID)
+            let text = try await contextFiles.readTextFile(contextID: contextID, relativePath: query.relativePath)
+            kind = .queryResponse
+            payload = try TypedPayload(ReadContextTextFileResponsePayload(relativePath: query.relativePath, text: text))
         case .command where envelope.payload.identifier == CreateTerminalSessionCommandPayload.identifier:
             let command = try CreateTerminalSessionCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)

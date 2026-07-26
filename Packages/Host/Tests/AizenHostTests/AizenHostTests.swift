@@ -948,6 +948,19 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
         .init(relativePath: "Sources", name: "Sources", isDirectory: true),
         .init(relativePath: "README.md", name: "README.md", isDirectory: false)
     ])
+
+    let textResponse = try await host.receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 2,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ReadContextTextFileQueryPayload(
+            executionContextID: context.id.description,
+            relativePath: "README.md"
+        ))
+    ))
+    #expect(textResponse.payload.identifier == ReadContextTextFileResponsePayload.identifier)
+    #expect(try ReadContextTextFileResponsePayload(protobufBytes: textResponse.payload.protobufBytes).text == "readme")
 }
 
 @Test func hostCreatesLinkedWorktreeContextsThroughAHostOperation() async throws {
@@ -1010,8 +1023,20 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
 
     let entries = try await service.listDirectory(contextID: context.id)
     #expect(entries.map(\.relativePath) == ["Sources", "README.md"])
+    #expect(try await service.readTextFile(contextID: context.id, relativePath: "README.md") == "hello")
+    try Data(repeating: 0xFF, count: 2).write(to: checkout.appendingPathComponent("binary.dat"))
+    await #expect(throws: ExecutionContextFileService.Error.invalidText("binary.dat")) {
+        try await service.readTextFile(contextID: context.id, relativePath: "binary.dat")
+    }
+    try Data(repeating: 0, count: 1_048_577).write(to: checkout.appendingPathComponent("large.txt"))
+    await #expect(throws: ExecutionContextFileService.Error.fileTooLarge("large.txt")) {
+        try await service.readTextFile(contextID: context.id, relativePath: "large.txt")
+    }
     await #expect(throws: ExecutionContextFileService.Error.invalidRelativePath("../outside")) {
         try await service.listDirectory(contextID: context.id, relativePath: "../outside")
+    }
+    await #expect(throws: ExecutionContextFileService.Error.invalidRelativePath("../outside")) {
+        try await service.readTextFile(contextID: context.id, relativePath: "../outside")
     }
 }
 

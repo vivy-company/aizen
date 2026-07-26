@@ -403,6 +403,16 @@ message ListContextFilesResponse {
   repeated ContextFileEntryRecord entries = 1;
 }
 
+message ReadContextTextFileQuery {
+  string execution_context_id = 1;
+  string relative_path = 2;
+}
+
+message ReadContextTextFileResponse {
+  string relative_path = 1;
+  string text = 2;
+}
+
 message CreateTerminalSessionCommand {
   string terminal_session_id = 1;
   string space_id = 2;
