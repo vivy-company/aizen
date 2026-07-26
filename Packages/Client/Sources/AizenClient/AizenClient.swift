@@ -580,6 +580,12 @@ public actor HostClient {
         return try ReadRepositoryStatusResponsePayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func repositoryDiff(id: ResourceID, relativePath: String = "", maximumBytes: UInt32 = 262_144) async throws -> ReadRepositoryDiffResponsePayload {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .query, channel: .state, payload: try .init(ReadRepositoryDiffQueryPayload(resourceID: id.description, relativePath: relativePath, maximumBytes: maximumBytes))))
+        guard response.kind == .queryResponse, response.payload.identifier == ReadRepositoryDiffResponsePayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try ReadRepositoryDiffResponsePayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
         let response = try await send(.init(
             messageID: UUID().uuidString,

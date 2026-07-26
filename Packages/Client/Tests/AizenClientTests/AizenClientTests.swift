@@ -443,7 +443,7 @@ import AizenWire
     let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)")))
     _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
     let reader = ClientRepositoryStatusReader()
-    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, repositoryStatusReader: reader)))
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, repositoryStatusReader: reader, repositoryDiffReader: ClientRepositoryDiffReader())))
 
     #expect(try await client.repositoryStatus(id: resource.id, maximumEntries: 1) == .init(
         resourceID: resource.id.description,
@@ -452,6 +452,7 @@ import AizenWire
         entries: [.init(path: "README.md", indexStatus: "?", worktreeStatus: "?")],
         truncated: false
     ))
+    #expect(try await client.repositoryDiff(id: resource.id, relativePath: "README.md", maximumBytes: 64) == .init(resourceID: resource.id.description, repositoryRevision: "revision", indexRevision: "index", unifiedDiff: Data("diff".utf8), truncated: false))
 }
 
 @Test func clientImportsWebResourcesThroughHost() async throws {
@@ -597,6 +598,12 @@ private actor ClientRepositoryStatusReader: RepositoryStatusReading {
             entries: [.init(path: "README.md", indexStatus: "?", worktreeStatus: "?")],
             truncated: false
         )
+    }
+}
+
+private actor ClientRepositoryDiffReader: RepositoryDiffReading {
+    func diff(at repositoryURL: URL, relativePath: String, maximumBytes: Int) async throws -> RepositoryDiffSnapshot {
+        .init(repositoryRevision: "revision", indexRevision: "index", unifiedDiff: Data("diff".utf8), truncated: false)
     }
 }
 
