@@ -286,8 +286,14 @@ final class ReignitionConversationStore: ObservableObject {
         }
     }
 
-    /// Recovery always begins from one Host consistency point; no UI projection reads Storage directly.
+    /// Recovery replays durable cursors when possible, then takes one Host consistency snapshot for the UI projection.
     private func recoverProjection(spaceID: SpaceID?) async throws {
+        let cursor = try await journalSynchronizer.lastAppliedCursor()
+        if cursor > 0 {
+            let replay = try await host.journalEvents(after: cursor)
+            _ = try await journalSynchronizer.apply(replay) { _ in }
+            if replay.events.isEmpty { return }
+        }
         let response = try await host.projectionSnapshot()
         let snapshot = response.snapshot
         spaces = snapshot.spaces
