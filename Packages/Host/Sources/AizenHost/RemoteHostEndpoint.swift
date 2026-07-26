@@ -79,7 +79,6 @@ public struct RemoteHostEndpoint: WireEndpoint {
             try await ownerConfirmation.require(.init(
                 deviceID: session.deviceID,
                 action: action,
-                capability: requirement.capability,
                 spaceID: requirement.spaceID,
                 resourceID: requirement.resourceID,
                 route: session.route.rawValue

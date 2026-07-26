@@ -16,15 +16,13 @@ public enum OwnerConfirmationAction: String, Sendable, Hashable {
 public struct OwnerConfirmationRequest: Sendable, Hashable {
     public let deviceID: DeviceID
     public let action: OwnerConfirmationAction
-    public let capability: HostCapability
     public let spaceID: SpaceID?
     public let resourceID: ResourceID?
     public let route: String
 
-    public init(deviceID: DeviceID, action: OwnerConfirmationAction, capability: HostCapability, spaceID: SpaceID?, resourceID: ResourceID?, route: String) {
+    public init(deviceID: DeviceID, action: OwnerConfirmationAction, spaceID: SpaceID?, resourceID: ResourceID?, route: String) {
         self.deviceID = deviceID
         self.action = action
-        self.capability = capability
         self.spaceID = spaceID
         self.resourceID = resourceID
         self.route = route
