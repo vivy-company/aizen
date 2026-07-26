@@ -24,7 +24,7 @@ extension aizenApp {
 
         CommandGroup(replacing: .appSettings) {
             Button {
-                SettingsWindowController.shared.show()
+                ReignitionHostSettingsWindowController.shared.show()
             } label: {
                 Label("Settings...", systemImage: "gearshape")
             }
