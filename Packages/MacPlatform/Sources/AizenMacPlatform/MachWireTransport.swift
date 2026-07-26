@@ -65,7 +65,12 @@ public final class MachWireTransport: @unchecked Sendable, RunEventTransport {
         self.responseTimeout = responseTimeout
         connection = xpc_connection_create_mach_service(machServiceName, nil, 0)
         xpc_connection_set_event_handler(connection) { [events] message in
-            guard xpc_get_type(message) == XPC_TYPE_DICTIONARY else { return }
+            guard xpc_get_type(message) == XPC_TYPE_DICTIONARY else {
+                if xpc_get_type(message) == XPC_TYPE_ERROR {
+                    Task { await events.finish() }
+                }
+                return
+            }
             var length = 0
             guard let bytes = xpc_dictionary_get_data(message, "event", &length) else { return }
             let data = Data(bytes: bytes, count: length)
@@ -286,7 +291,7 @@ private final class MachConnection: @unchecked Sendable {
     }
 }
 
-private actor MachRunEventHub {
+actor MachRunEventHub {
     private var continuations: [UUID: AsyncStream<RunEvent>.Continuation] = [:]
 
     func stream() -> AsyncStream<RunEvent> {
@@ -306,6 +311,13 @@ private actor MachRunEventHub {
               envelope.payload.identifier == RunEventPayload.identifier,
               let event = try? RunEventPayload(protobufBytes: envelope.payload.protobufBytes).event else { return }
         for continuation in continuations.values { continuation.yield(event) }
+    }
+
+    /// An XPC interruption invalidates every live subscription. New subscribers may be created
+    /// after launchd reconnects the Mach service, but consumers must first replay durable state.
+    func finish() {
+        for continuation in continuations.values { continuation.finish() }
+        continuations.removeAll()
     }
 
     private func remove(_ identifier: UUID) {

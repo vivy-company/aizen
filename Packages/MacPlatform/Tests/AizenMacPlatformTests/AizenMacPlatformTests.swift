@@ -37,6 +37,18 @@ import Testing
     #expect(String(decoding: response, as: UTF8.self) == "first")
 }
 
+@Test func machEventHubFinishesInterruptedSubscriptionsBeforeAClientResubscribes() async {
+    let hub = MachRunEventHub()
+    let stream = await hub.stream()
+    let nextEvent = Task {
+        var iterator = stream.makeAsyncIterator()
+        return await iterator.next()
+    }
+
+    await hub.finish()
+    #expect(await nextEvent.value == nil)
+}
+
 @Test func localHostRuntimeFailsInterruptedOperationsBeforeServingClients() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

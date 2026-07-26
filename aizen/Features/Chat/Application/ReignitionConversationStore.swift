@@ -34,12 +34,7 @@ final class ReignitionConversationStore: ObservableObject {
     init(host: any ReignitionConversationClient, journalCursorStore: any JournalCursorStore) {
         self.host = host
         journalSynchronizer = JournalEventSynchronizer(cursorStore: journalCursorStore)
-        eventTask = Task { [weak self, host] in
-            for await event in await host.events() {
-                guard !Task.isCancelled else { return }
-                await self?.consume(event)
-            }
-        }
+        startEventConsumer()
     }
 
     deinit { eventTask?.cancel() }
@@ -370,6 +365,35 @@ final class ReignitionConversationStore: ObservableObject {
             self.selectedConversationID = nil
             messages = []
         }
+    }
+
+    /// Run events are transient. When launchd restarts the Host, finish the old stream, restore
+    /// this projection from the durable journal/snapshot, then subscribe again.
+    private func startEventConsumer() {
+        eventTask = Task { [weak self, host] in
+            while !Task.isCancelled {
+                for await event in await host.events() {
+                    guard !Task.isCancelled else { return }
+                    await self?.consume(event)
+                }
+                guard !Task.isCancelled else { return }
+                await self?.recoverAfterEventInterruption()
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func recoverAfterEventInterruption() async {
+        let spaceID = selectedConversationID.flatMap { sessionID in
+            conversations.first(where: { $0.id == sessionID })?.spaceID
+        }
+        do {
+            try await recoverProjection(spaceID: spaceID)
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+        connectionState = await host.connectionState()
     }
 
     /// Recovery replays durable cursors when possible, then takes one Host consistency snapshot for the UI projection.
