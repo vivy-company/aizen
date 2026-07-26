@@ -318,6 +318,76 @@ nonisolated struct AizenWireV1_Capabilities: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_AuthenticationStart: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var hostID: String = String()
+
+  var deviceID: String = String()
+
+  var connectionID: String = String()
+
+  var clientNonce: Data = Data()
+
+  var deviceSigningPublicKey: Data = Data()
+
+  var deviceKeyAgreementPublicKey: Data = Data()
+
+  var clientEphemeralPublicKey: Data = Data()
+
+  var route: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_AuthenticationChallenge: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var hostID: String = String()
+
+  var deviceID: String = String()
+
+  var connectionID: String = String()
+
+  var clientNonce: Data = Data()
+
+  var serverNonce: Data = Data()
+
+  var hostSigningPublicKey: Data = Data()
+
+  var hostKeyAgreementPublicKey: Data = Data()
+
+  var serverEphemeralPublicKey: Data = Data()
+
+  var route: String = String()
+
+  var hostSignature: Data = Data()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_AuthenticationProof: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var connectionID: String = String()
+
+  var deviceSignature: Data = Data()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_CommandReceipt: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1552,6 +1622,181 @@ nonisolated extension AizenWireV1_Capabilities: SwiftProtobuf.Message, SwiftProt
     if lhs.maximumProtocolGeneration != rhs.maximumProtocolGeneration {return false}
     if lhs.productVersion != rhs.productVersion {return false}
     if lhs.minimumCompatibleProductVersion != rhs.minimumCompatibleProductVersion {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_AuthenticationStart: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".AuthenticationStart"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}host_id\0\u{3}device_id\0\u{3}connection_id\0\u{3}client_nonce\0\u{3}device_signing_public_key\0\u{3}device_key_agreement_public_key\0\u{3}client_ephemeral_public_key\0\u{1}route\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.hostID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.connectionID) }()
+      case 4: try { try decoder.decodeSingularBytesField(value: &self.clientNonce) }()
+      case 5: try { try decoder.decodeSingularBytesField(value: &self.deviceSigningPublicKey) }()
+      case 6: try { try decoder.decodeSingularBytesField(value: &self.deviceKeyAgreementPublicKey) }()
+      case 7: try { try decoder.decodeSingularBytesField(value: &self.clientEphemeralPublicKey) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.route) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.hostID.isEmpty {
+      try visitor.visitSingularStringField(value: self.hostID, fieldNumber: 1)
+    }
+    if !self.deviceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
+    }
+    if !self.connectionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.connectionID, fieldNumber: 3)
+    }
+    if !self.clientNonce.isEmpty {
+      try visitor.visitSingularBytesField(value: self.clientNonce, fieldNumber: 4)
+    }
+    if !self.deviceSigningPublicKey.isEmpty {
+      try visitor.visitSingularBytesField(value: self.deviceSigningPublicKey, fieldNumber: 5)
+    }
+    if !self.deviceKeyAgreementPublicKey.isEmpty {
+      try visitor.visitSingularBytesField(value: self.deviceKeyAgreementPublicKey, fieldNumber: 6)
+    }
+    if !self.clientEphemeralPublicKey.isEmpty {
+      try visitor.visitSingularBytesField(value: self.clientEphemeralPublicKey, fieldNumber: 7)
+    }
+    if !self.route.isEmpty {
+      try visitor.visitSingularStringField(value: self.route, fieldNumber: 8)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_AuthenticationStart, rhs: AizenWireV1_AuthenticationStart) -> Bool {
+    if lhs.hostID != rhs.hostID {return false}
+    if lhs.deviceID != rhs.deviceID {return false}
+    if lhs.connectionID != rhs.connectionID {return false}
+    if lhs.clientNonce != rhs.clientNonce {return false}
+    if lhs.deviceSigningPublicKey != rhs.deviceSigningPublicKey {return false}
+    if lhs.deviceKeyAgreementPublicKey != rhs.deviceKeyAgreementPublicKey {return false}
+    if lhs.clientEphemeralPublicKey != rhs.clientEphemeralPublicKey {return false}
+    if lhs.route != rhs.route {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_AuthenticationChallenge: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".AuthenticationChallenge"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}host_id\0\u{3}device_id\0\u{3}connection_id\0\u{3}client_nonce\0\u{3}server_nonce\0\u{3}host_signing_public_key\0\u{3}host_key_agreement_public_key\0\u{3}server_ephemeral_public_key\0\u{1}route\0\u{3}host_signature\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.hostID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.connectionID) }()
+      case 4: try { try decoder.decodeSingularBytesField(value: &self.clientNonce) }()
+      case 5: try { try decoder.decodeSingularBytesField(value: &self.serverNonce) }()
+      case 6: try { try decoder.decodeSingularBytesField(value: &self.hostSigningPublicKey) }()
+      case 7: try { try decoder.decodeSingularBytesField(value: &self.hostKeyAgreementPublicKey) }()
+      case 8: try { try decoder.decodeSingularBytesField(value: &self.serverEphemeralPublicKey) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.route) }()
+      case 10: try { try decoder.decodeSingularBytesField(value: &self.hostSignature) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.hostID.isEmpty {
+      try visitor.visitSingularStringField(value: self.hostID, fieldNumber: 1)
+    }
+    if !self.deviceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
+    }
+    if !self.connectionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.connectionID, fieldNumber: 3)
+    }
+    if !self.clientNonce.isEmpty {
+      try visitor.visitSingularBytesField(value: self.clientNonce, fieldNumber: 4)
+    }
+    if !self.serverNonce.isEmpty {
+      try visitor.visitSingularBytesField(value: self.serverNonce, fieldNumber: 5)
+    }
+    if !self.hostSigningPublicKey.isEmpty {
+      try visitor.visitSingularBytesField(value: self.hostSigningPublicKey, fieldNumber: 6)
+    }
+    if !self.hostKeyAgreementPublicKey.isEmpty {
+      try visitor.visitSingularBytesField(value: self.hostKeyAgreementPublicKey, fieldNumber: 7)
+    }
+    if !self.serverEphemeralPublicKey.isEmpty {
+      try visitor.visitSingularBytesField(value: self.serverEphemeralPublicKey, fieldNumber: 8)
+    }
+    if !self.route.isEmpty {
+      try visitor.visitSingularStringField(value: self.route, fieldNumber: 9)
+    }
+    if !self.hostSignature.isEmpty {
+      try visitor.visitSingularBytesField(value: self.hostSignature, fieldNumber: 10)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_AuthenticationChallenge, rhs: AizenWireV1_AuthenticationChallenge) -> Bool {
+    if lhs.hostID != rhs.hostID {return false}
+    if lhs.deviceID != rhs.deviceID {return false}
+    if lhs.connectionID != rhs.connectionID {return false}
+    if lhs.clientNonce != rhs.clientNonce {return false}
+    if lhs.serverNonce != rhs.serverNonce {return false}
+    if lhs.hostSigningPublicKey != rhs.hostSigningPublicKey {return false}
+    if lhs.hostKeyAgreementPublicKey != rhs.hostKeyAgreementPublicKey {return false}
+    if lhs.serverEphemeralPublicKey != rhs.serverEphemeralPublicKey {return false}
+    if lhs.route != rhs.route {return false}
+    if lhs.hostSignature != rhs.hostSignature {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_AuthenticationProof: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".AuthenticationProof"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}connection_id\0\u{3}device_signature\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.connectionID) }()
+      case 2: try { try decoder.decodeSingularBytesField(value: &self.deviceSignature) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.connectionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.connectionID, fieldNumber: 1)
+    }
+    if !self.deviceSignature.isEmpty {
+      try visitor.visitSingularBytesField(value: self.deviceSignature, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_AuthenticationProof, rhs: AizenWireV1_AuthenticationProof) -> Bool {
+    if lhs.connectionID != rhs.connectionID {return false}
+    if lhs.deviceSignature != rhs.deviceSignature {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

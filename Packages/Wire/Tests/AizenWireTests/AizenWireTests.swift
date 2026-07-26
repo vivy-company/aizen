@@ -67,6 +67,45 @@ import Testing
     #expect(decoded == payload)
 }
 
+@Test func authenticationPayloadsRoundTripAndRejectMalformedCryptoMaterial() throws {
+    let hostID = HostID()
+    let deviceID = DeviceID()
+    let connectionID = UUID()
+    let start = AuthenticationStartPayload(
+        hostID: hostID,
+        deviceID: deviceID,
+        connectionID: connectionID,
+        clientNonce: Data(repeating: 1, count: 32),
+        deviceSigningPublicKey: Data(repeating: 2, count: 32),
+        deviceKeyAgreementPublicKey: Data(repeating: 3, count: 32),
+        clientEphemeralPublicKey: Data(repeating: 4, count: 32),
+        route: "lan"
+    )
+    let challenge = AuthenticationChallengePayload(
+        hostID: hostID,
+        deviceID: deviceID,
+        connectionID: connectionID,
+        clientNonce: start.clientNonce,
+        serverNonce: Data(repeating: 5, count: 32),
+        hostSigningPublicKey: Data(repeating: 6, count: 32),
+        hostKeyAgreementPublicKey: Data(repeating: 7, count: 32),
+        serverEphemeralPublicKey: Data(repeating: 8, count: 32),
+        route: "lan",
+        hostSignature: Data(repeating: 9, count: 64)
+    )
+    let proof = AuthenticationProofPayload(connectionID: connectionID, deviceSignature: Data(repeating: 10, count: 64))
+    #expect(try AuthenticationStartPayload(protobufBytes: start.protobufBytes()) == start)
+    #expect(try AuthenticationChallengePayload(protobufBytes: challenge.protobufBytes()) == challenge)
+    #expect(try AuthenticationProofPayload(protobufBytes: proof.protobufBytes()) == proof)
+
+    var malformed = AizenWireV1_AuthenticationProof()
+    malformed.connectionID = connectionID.uuidString
+    malformed.deviceSignature = Data(repeating: 0, count: 63)
+    #expect(throws: WireCodecError.invalidAuthenticationPayload) {
+        try AuthenticationProofPayload(protobufBytes: malformed.serializedData())
+    }
+}
+
 @Test func resourceRecordsPreserveHostPrivateDetails() throws {
     let resource = Resource(
         spaceID: SpaceID(),

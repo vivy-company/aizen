@@ -77,6 +77,35 @@ message Capabilities {
   string minimum_compatible_product_version = 5;
 }
 
+message AuthenticationStart {
+  string host_id = 1;
+  string device_id = 2;
+  string connection_id = 3;
+  bytes client_nonce = 4;
+  bytes device_signing_public_key = 5;
+  bytes device_key_agreement_public_key = 6;
+  bytes client_ephemeral_public_key = 7;
+  string route = 8;
+}
+
+message AuthenticationChallenge {
+  string host_id = 1;
+  string device_id = 2;
+  string connection_id = 3;
+  bytes client_nonce = 4;
+  bytes server_nonce = 5;
+  bytes host_signing_public_key = 6;
+  bytes host_key_agreement_public_key = 7;
+  bytes server_ephemeral_public_key = 8;
+  string route = 9;
+  bytes host_signature = 10;
+}
+
+message AuthenticationProof {
+  string connection_id = 1;
+  bytes device_signature = 2;
+}
+
 message CommandReceipt {
   string command_id = 1;
   string operation_id = 2;

@@ -214,6 +214,148 @@ public struct CapabilitiesPayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct AuthenticationStartPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.authentication.start@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let hostID: HostID
+    public let deviceID: DeviceID
+    public let connectionID: UUID
+    public let clientNonce: Data
+    public let deviceSigningPublicKey: Data
+    public let deviceKeyAgreementPublicKey: Data
+    public let clientEphemeralPublicKey: Data
+    public let route: String
+
+    public init(hostID: HostID, deviceID: DeviceID, connectionID: UUID, clientNonce: Data, deviceSigningPublicKey: Data, deviceKeyAgreementPublicKey: Data, clientEphemeralPublicKey: Data, route: String) {
+        precondition(Self.isValid(clientNonce: clientNonce, signingKey: deviceSigningPublicKey, agreementKey: deviceKeyAgreementPublicKey, ephemeralKey: clientEphemeralPublicKey, route: route), "Authentication start has invalid cryptographic material")
+        self.hostID = hostID
+        self.deviceID = deviceID
+        self.connectionID = connectionID
+        self.clientNonce = clientNonce
+        self.deviceSigningPublicKey = deviceSigningPublicKey
+        self.deviceKeyAgreementPublicKey = deviceKeyAgreementPublicKey
+        self.clientEphemeralPublicKey = clientEphemeralPublicKey
+        self.route = route
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_AuthenticationStart(serializedBytes: protobufBytes)
+        guard let hostID = UUID(uuidString: message.hostID), let deviceID = UUID(uuidString: message.deviceID), let connectionID = UUID(uuidString: message.connectionID),
+              Self.isValid(clientNonce: message.clientNonce, signingKey: message.deviceSigningPublicKey, agreementKey: message.deviceKeyAgreementPublicKey, ephemeralKey: message.clientEphemeralPublicKey, route: message.route) else {
+            throw WireCodecError.invalidAuthenticationPayload
+        }
+        self.init(hostID: .init(rawValue: hostID), deviceID: .init(rawValue: deviceID), connectionID: connectionID, clientNonce: message.clientNonce, deviceSigningPublicKey: message.deviceSigningPublicKey, deviceKeyAgreementPublicKey: message.deviceKeyAgreementPublicKey, clientEphemeralPublicKey: message.clientEphemeralPublicKey, route: message.route)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_AuthenticationStart()
+        message.hostID = hostID.description
+        message.deviceID = deviceID.description
+        message.connectionID = connectionID.uuidString
+        message.clientNonce = clientNonce
+        message.deviceSigningPublicKey = deviceSigningPublicKey
+        message.deviceKeyAgreementPublicKey = deviceKeyAgreementPublicKey
+        message.clientEphemeralPublicKey = clientEphemeralPublicKey
+        message.route = route
+        return try message.serializedData()
+    }
+
+    private static func isValid(clientNonce: Data, signingKey: Data, agreementKey: Data, ephemeralKey: Data, route: String) -> Bool {
+        clientNonce.count == 32 && signingKey.count == 32 && agreementKey.count == 32 && ephemeralKey.count == 32 && !route.isEmpty && route.utf8.count <= 32
+    }
+}
+
+public struct AuthenticationChallengePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.authentication.challenge@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let hostID: HostID
+    public let deviceID: DeviceID
+    public let connectionID: UUID
+    public let clientNonce: Data
+    public let serverNonce: Data
+    public let hostSigningPublicKey: Data
+    public let hostKeyAgreementPublicKey: Data
+    public let serverEphemeralPublicKey: Data
+    public let route: String
+    public let hostSignature: Data
+
+    public init(hostID: HostID, deviceID: DeviceID, connectionID: UUID, clientNonce: Data, serverNonce: Data, hostSigningPublicKey: Data, hostKeyAgreementPublicKey: Data, serverEphemeralPublicKey: Data, route: String, hostSignature: Data) {
+        precondition(Self.isValid(clientNonce: clientNonce, serverNonce: serverNonce, signingKey: hostSigningPublicKey, agreementKey: hostKeyAgreementPublicKey, ephemeralKey: serverEphemeralPublicKey, route: route, signature: hostSignature), "Authentication challenge has invalid cryptographic material")
+        self.hostID = hostID
+        self.deviceID = deviceID
+        self.connectionID = connectionID
+        self.clientNonce = clientNonce
+        self.serverNonce = serverNonce
+        self.hostSigningPublicKey = hostSigningPublicKey
+        self.hostKeyAgreementPublicKey = hostKeyAgreementPublicKey
+        self.serverEphemeralPublicKey = serverEphemeralPublicKey
+        self.route = route
+        self.hostSignature = hostSignature
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_AuthenticationChallenge(serializedBytes: protobufBytes)
+        guard let hostID = UUID(uuidString: message.hostID), let deviceID = UUID(uuidString: message.deviceID), let connectionID = UUID(uuidString: message.connectionID),
+              Self.isValid(clientNonce: message.clientNonce, serverNonce: message.serverNonce, signingKey: message.hostSigningPublicKey, agreementKey: message.hostKeyAgreementPublicKey, ephemeralKey: message.serverEphemeralPublicKey, route: message.route, signature: message.hostSignature) else {
+            throw WireCodecError.invalidAuthenticationPayload
+        }
+        self.init(hostID: .init(rawValue: hostID), deviceID: .init(rawValue: deviceID), connectionID: connectionID, clientNonce: message.clientNonce, serverNonce: message.serverNonce, hostSigningPublicKey: message.hostSigningPublicKey, hostKeyAgreementPublicKey: message.hostKeyAgreementPublicKey, serverEphemeralPublicKey: message.serverEphemeralPublicKey, route: message.route, hostSignature: message.hostSignature)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_AuthenticationChallenge()
+        message.hostID = hostID.description
+        message.deviceID = deviceID.description
+        message.connectionID = connectionID.uuidString
+        message.clientNonce = clientNonce
+        message.serverNonce = serverNonce
+        message.hostSigningPublicKey = hostSigningPublicKey
+        message.hostKeyAgreementPublicKey = hostKeyAgreementPublicKey
+        message.serverEphemeralPublicKey = serverEphemeralPublicKey
+        message.route = route
+        message.hostSignature = hostSignature
+        return try message.serializedData()
+    }
+
+    private static func isValid(clientNonce: Data, serverNonce: Data, signingKey: Data, agreementKey: Data, ephemeralKey: Data, route: String, signature: Data) -> Bool {
+        clientNonce.count == 32 && serverNonce.count == 32 && signingKey.count == 32 && agreementKey.count == 32 && ephemeralKey.count == 32 && signature.count == 64 && !route.isEmpty && route.utf8.count <= 32
+    }
+}
+
+public struct AuthenticationProofPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.authentication.proof@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let connectionID: UUID
+    public let deviceSignature: Data
+
+    public init(connectionID: UUID, deviceSignature: Data) {
+        precondition(deviceSignature.count == 64, "Authentication proofs require an Ed25519 signature")
+        self.connectionID = connectionID
+        self.deviceSignature = deviceSignature
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_AuthenticationProof(serializedBytes: protobufBytes)
+        guard let connectionID = UUID(uuidString: message.connectionID), message.deviceSignature.count == 64 else {
+            throw WireCodecError.invalidAuthenticationPayload
+        }
+        self.init(connectionID: connectionID, deviceSignature: message.deviceSignature)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_AuthenticationProof()
+        message.connectionID = connectionID.uuidString
+        message.deviceSignature = deviceSignature
+        return try message.serializedData()
+    }
+}
+
 public struct SnapshotRequestPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.snapshot@1")
     public static let schemaVersion: UInt32 = 1
@@ -1534,6 +1676,7 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case missingPayload
     case invalidIdentity(String)
     case invalidLifecycle(String)
+    case invalidAuthenticationPayload
 }
 
 private extension ProtocolEnvelope {
