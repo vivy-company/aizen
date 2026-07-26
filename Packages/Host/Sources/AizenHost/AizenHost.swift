@@ -99,6 +99,8 @@ public actor LocalHost: WireEndpoint {
                 GetConversationTimelineResponsePayload.identifier,
                 ListRunsQueryPayload.identifier,
                 ListRunsResponsePayload.identifier,
+                ListOperationsQueryPayload.identifier,
+                ListOperationsResponsePayload.identifier,
                 ListResourcesQueryPayload.identifier,
                 ListResourcesResponsePayload.identifier,
                 DiscoverXcodeProjectQueryPayload.identifier,
@@ -216,6 +218,15 @@ public actor LocalHost: WireEndpoint {
             let runs = try await storage.load().runs.filter { spaceID == nil || $0.spaceID == spaceID }
             kind = .queryResponse
             payload = try TypedPayload(ListRunsResponsePayload(runs: runs))
+        case .query where envelope.payload.identifier == ListOperationsQueryPayload.identifier:
+            let query = try ListOperationsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try query.spaceID.map(Self.spaceID(from:))
+            let operationID = try query.operationID.map(Self.operationID(from:))
+            let operations = try await storage.load().operations.filter {
+                (spaceID == nil || $0.spaceID == spaceID) && (operationID == nil || $0.id == operationID)
+            }
+            kind = .queryResponse
+            payload = try TypedPayload(ListOperationsResponsePayload(operations: operations))
         case .query where envelope.payload.identifier == ListResourcesQueryPayload.identifier:
             let query = try ListResourcesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try query.spaceID.map(Self.spaceID(from:))
@@ -834,6 +845,11 @@ public actor LocalHost: WireEndpoint {
     private static func resourceID(from value: String) throws -> ResourceID {
         guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
         return ResourceID(rawValue: rawValue)
+    }
+
+    private static func operationID(from value: String) throws -> OperationID {
+        guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
+        return OperationID(rawValue: rawValue)
     }
 
     private static func executionContextID(from value: String) throws -> ExecutionContextID {

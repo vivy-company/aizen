@@ -69,6 +69,8 @@ struct AizenCLI {
             try await handleConversation(subArgs)
         case "run":
             try await handleRun(subArgs)
+        case "operation":
+            try await handleOperation(subArgs)
         case "resource":
             try await handleResource(subArgs)
         case "context":
@@ -339,6 +341,39 @@ private extension AizenCLI {
         default:
             throw CLIError.invalidArguments("Unknown run command: \(subcommand)")
         }
+    }
+
+    static func handleOperation(_ args: [String]) async throws {
+        guard let subcommand = args.first else { throw CLIError.invalidArguments("operation requires list, show, or watch") }
+        let rest = Array(args.dropFirst())
+        let client = V2CLIClient()
+        switch subcommand {
+        case "list":
+            guard rest.count <= 1 else { throw CLIError.invalidArguments("operation list accepts at most one space") }
+            let spaceID = try await resolveV2Space(rest.first, client: client)
+            for operation in try await client.operations(spaceID: spaceID) { print(operationLine(operation)) }
+        case "show":
+            guard rest.count == 1, let rawID = UUID(uuidString: rest[0]) else { throw CLIError.invalidArguments("operation show requires an Operation ID") }
+            guard let operation = try await client.operations(operationID: .init(rawValue: rawID)).first else { throw CLIError.invalidArguments("Operation not found: \(rest[0])") }
+            print(operationLine(operation))
+        case "watch":
+            guard rest.count == 1, let rawID = UUID(uuidString: rest[0]) else { throw CLIError.invalidArguments("operation watch requires an Operation ID") }
+            let operationID = OperationID(rawValue: rawID)
+            var last: AizenCore.Operation?
+            while !Task.isCancelled {
+                guard let operation = try await client.operations(operationID: operationID).first else { throw CLIError.invalidArguments("Operation not found: \(rest[0])") }
+                if operation != last { print(operationLine(operation)); last = operation }
+                if operation.lifecycle == .completed || operation.lifecycle == .failed || operation.lifecycle == .cancelled { return }
+                try await Task.sleep(for: .milliseconds(500))
+            }
+        default:
+            throw CLIError.invalidArguments("Unknown operation command: \(subcommand)")
+        }
+    }
+
+    static func operationLine(_ operation: AizenCore.Operation) -> String {
+        let progress = operation.progress.map { String(format: "%.0f%%", $0 * 100) } ?? "-"
+        return "\(operation.id.description)\t\(operation.lifecycle.rawValue)\t\(progress)\t\(operation.failureDescription ?? "")"
     }
 
     static func handleResource(_ args: [String]) async throws {
@@ -1028,6 +1063,7 @@ Usage:
   aizen workspace <command>       Manage workspaces
   aizen sync [path]               Rescan worktrees
   aizen status                    Show overview
+  aizen operation list|show|watch Inspect Host operations
   aizen terminal [path]           Create persistent terminal session
   aizen attach [project]          Attach to tmux terminal session
   aizen sessions                  List active terminal sessions

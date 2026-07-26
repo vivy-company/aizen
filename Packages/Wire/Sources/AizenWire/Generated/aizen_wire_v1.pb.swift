@@ -933,6 +933,56 @@ nonisolated struct AizenWireV1_ListRunsResponse: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_ListOperationsQuery: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var spaceID: String = String()
+
+  var operationID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_OperationRecord: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var operationID: String = String()
+
+  var spaceID: String = String()
+
+  var sessionID: String = String()
+
+  var lifecycle: String = String()
+
+  var progress: Double = 0
+
+  var hasProgress_p: Bool = false
+
+  var failureDescription: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_ListOperationsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var operations: [AizenWireV1_OperationRecord] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_ListResourcesQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -3507,6 +3557,131 @@ nonisolated extension AizenWireV1_ListRunsResponse: SwiftProtobuf.Message, Swift
 
   static func ==(lhs: AizenWireV1_ListRunsResponse, rhs: AizenWireV1_ListRunsResponse) -> Bool {
     if lhs.runs != rhs.runs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ListOperationsQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ListOperationsQuery"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}space_id\0\u{3}operation_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.operationID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 1)
+    }
+    if !self.operationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.operationID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ListOperationsQuery, rhs: AizenWireV1_ListOperationsQuery) -> Bool {
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.operationID != rhs.operationID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_OperationRecord: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".OperationRecord"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}operation_id\0\u{3}space_id\0\u{3}session_id\0\u{1}lifecycle\0\u{1}progress\0\u{3}has_progress\0\u{3}failure_description\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.operationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.lifecycle) }()
+      case 5: try { try decoder.decodeSingularDoubleField(value: &self.progress) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.hasProgress_p) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.failureDescription) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.operationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.operationID, fieldNumber: 1)
+    }
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 2)
+    }
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 3)
+    }
+    if !self.lifecycle.isEmpty {
+      try visitor.visitSingularStringField(value: self.lifecycle, fieldNumber: 4)
+    }
+    if self.progress.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.progress, fieldNumber: 5)
+    }
+    if self.hasProgress_p != false {
+      try visitor.visitSingularBoolField(value: self.hasProgress_p, fieldNumber: 6)
+    }
+    if !self.failureDescription.isEmpty {
+      try visitor.visitSingularStringField(value: self.failureDescription, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_OperationRecord, rhs: AizenWireV1_OperationRecord) -> Bool {
+    if lhs.operationID != rhs.operationID {return false}
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.lifecycle != rhs.lifecycle {return false}
+    if lhs.progress != rhs.progress {return false}
+    if lhs.hasProgress_p != rhs.hasProgress_p {return false}
+    if lhs.failureDescription != rhs.failureDescription {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ListOperationsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ListOperationsResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}operations\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.operations) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.operations.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.operations, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ListOperationsResponse, rhs: AizenWireV1_ListOperationsResponse) -> Bool {
+    if lhs.operations != rhs.operations {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

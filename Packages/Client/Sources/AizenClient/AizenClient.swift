@@ -423,6 +423,20 @@ public actor HostClient {
         return try ListRunsResponsePayload(protobufBytes: response.payload.protobufBytes).runs
     }
 
+    public func operations(spaceID: SpaceID? = nil, operationID: OperationID? = nil) async throws -> [AizenCore.Operation] {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(ListOperationsQueryPayload(spaceID: spaceID?.description, operationID: operationID?.description))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == ListOperationsResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try ListOperationsResponsePayload(protobufBytes: response.payload.protobufBytes).operations
+    }
+
     public func resources(spaceID: SpaceID? = nil) async throws -> [Resource] {
         let response = try await send(.init(
             messageID: UUID().uuidString,

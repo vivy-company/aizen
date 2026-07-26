@@ -1149,6 +1149,73 @@ public struct ListRunsResponsePayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct ListOperationsQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.operation.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let spaceID: String?
+    public let operationID: String?
+
+    public init(spaceID: String? = nil, operationID: String? = nil) {
+        self.spaceID = spaceID
+        self.operationID = operationID
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListOperationsQuery(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID.isEmpty ? nil : message.spaceID, operationID: message.operationID.isEmpty ? nil : message.operationID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListOperationsQuery()
+        message.spaceID = spaceID ?? ""
+        message.operationID = operationID ?? ""
+        return try message.serializedData()
+    }
+}
+
+public struct ListOperationsResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.operation.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let operations: [AizenCore.Operation]
+
+    public init(operations: [AizenCore.Operation]) { self.operations = operations }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListOperationsResponse(serializedBytes: protobufBytes)
+        operations = try message.operations.map { record in
+            guard let operationUUID = UUID(uuidString: record.operationID),
+                  let spaceUUID = UUID(uuidString: record.spaceID),
+                  let lifecycle = OperationLifecycle(rawValue: record.lifecycle) else {
+                throw WireCodecError.invalidIdentity(record.operationID)
+            }
+            let sessionID = record.sessionID.isEmpty ? nil : UUID(uuidString: record.sessionID).map(SessionID.init(rawValue:))
+            guard record.sessionID.isEmpty || sessionID != nil,
+                  !record.hasProgress_p || (0...1).contains(record.progress) else {
+                throw WireCodecError.invalidIdentity(record.operationID)
+            }
+            let failureDescription = record.failureDescription.isEmpty ? nil : record.failureDescription
+            return AizenCore.Operation(id: .init(rawValue: operationUUID), spaceID: .init(rawValue: spaceUUID), sessionID: sessionID, lifecycle: lifecycle, progress: record.hasProgress_p ? record.progress : nil, failureDescription: failureDescription)
+        }
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListOperationsResponse()
+        message.operations = operations.map { operation in
+            var record = AizenWireV1_OperationRecord()
+            record.operationID = operation.id.description
+            record.spaceID = operation.spaceID.description
+            record.sessionID = operation.sessionID?.description ?? ""
+            record.lifecycle = operation.lifecycle.rawValue
+            if let progress = operation.progress { record.progress = progress; record.hasProgress_p = true }
+            record.failureDescription = operation.failureDescription ?? ""
+            return record
+        }
+        return try message.serializedData()
+    }
+}
+
 public struct ListResourcesQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.resource.list@1")
     public static let schemaVersion: UInt32 = 1

@@ -295,6 +295,25 @@ message ListRunsResponse {
   repeated RunRecord runs = 1;
 }
 
+message ListOperationsQuery {
+  string space_id = 1;
+  string operation_id = 2;
+}
+
+message OperationRecord {
+  string operation_id = 1;
+  string space_id = 2;
+  string session_id = 3;
+  string lifecycle = 4;
+  double progress = 5;
+  bool has_progress = 6;
+  string failure_description = 7;
+}
+
+message ListOperationsResponse {
+  repeated OperationRecord operations = 1;
+}
+
 message ListResourcesQuery {
   string space_id = 1;
 }

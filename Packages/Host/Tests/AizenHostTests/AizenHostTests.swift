@@ -270,6 +270,23 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(snapshot.operations == [operation])
 }
 
+@Test func hostListsOperationsThroughTypedWire() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Operations")
+    let operation = Operation(spaceID: space.id, lifecycle: .running, progress: 0.5)
+    _ = try await storage.transact { $0.spaces.append(space); $0.operations.append(operation) }
+    let response = try await LocalHost(storage: storage).receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ListOperationsQueryPayload(operationID: operation.id.description))
+    ))
+    #expect(try ListOperationsResponsePayload(protobufBytes: response.payload.protobufBytes).operations == [operation])
+}
+
 @Test func localHostReplaysJournalEventsOrRequiresASnapshot() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

@@ -65,6 +65,11 @@ actor V2CLIClient {
         return try await client.runs(spaceID: spaceID)
     }
 
+    func operations(spaceID: SpaceID? = nil, operationID: OperationID? = nil) async throws -> [AizenCore.Operation] {
+        try await recoverPendingCommands()
+        return try await client.operations(spaceID: spaceID, operationID: operationID)
+    }
+
     func cancelRun(id: RunID) async throws {
         try await recoverPendingCommands()
         try await client.cancelRun(id: id)

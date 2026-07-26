@@ -83,6 +83,9 @@ public struct RemoteHostEndpoint: WireEndpoint {
         case ListRunsQueryPayload.identifier:
             let request = try ListRunsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             return try requirementForOptionalSpace(request.spaceID)
+        case ListOperationsQueryPayload.identifier:
+            let request = try ListOperationsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            return try requirementForOptionalSpace(request.spaceID)
         case ListResourcesQueryPayload.identifier:
             let request = try ListResourcesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             return try requirementForOptionalSpace(request.spaceID)
