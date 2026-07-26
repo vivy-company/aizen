@@ -73,11 +73,14 @@ import Testing
     let source = RemoteRequestSource("192.168.1.20")
     let rateLimiter = RemoteRequestRateLimiter()
     let processor = HostLANWebSocketProcessor(
+        host: host,
+        hostIdentity: hostIdentity,
         authenticator: RemoteSessionAuthenticator(host: host, hostIdentity: hostIdentity, storage: storage, rateLimiter: rateLimiter),
         endpoint: LocalHost(storage: storage),
         storage: storage,
         authorization: DeviceAuthorizationGate(storage: storage),
         rateLimiter: rateLimiter,
+        pairing: PairingRequestRegistry(hostID: host.hostID, approval: PairingApprovalService(storage: storage)),
         source: source
     )
     let connectionID = UUID()
@@ -130,6 +133,70 @@ import Testing
     let request = ProtocolEnvelope(messageID: "spaces", connectionSequence: 3, kind: .query, channel: .state, payload: try .init(ListSpacesQueryPayload()))
     let response = try await deviceChannel.open(try await processor.receive(try await deviceChannel.seal(request)))
     #expect(try ListSpacesResponsePayload(protobufBytes: response.payload.protobufBytes).spaces.map(\.name) == ["LAN"])
+}
+
+@Test func lanWebSocketProcessorQueuesFirstDevicePairingOnlyAfterHostProof() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let hostIdentity = LocalCryptographicIdentity()
+    let host = HostPublicIdentity(hostID: HostID(), displayName: "Mac", cryptographicIdentity: hostIdentity.publicIdentity())
+    let deviceIdentity = LocalCryptographicIdentity()
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: deviceIdentity.publicIdentity())
+    let invitation = try PairingInvitation(secret: Data(repeating: 9, count: 32), host: host, endpointHints: [], expiresAt: Date().addingTimeInterval(60))
+    let approval = PairingApprovalService(storage: storage)
+    try await approval.issue(invitation)
+    let pairing = PairingRequestRegistry(hostID: host.hostID, approval: approval)
+    let source = RemoteRequestSource("192.168.1.20")
+    let rateLimiter = RemoteRequestRateLimiter()
+    let processor = HostLANWebSocketProcessor(
+        host: host,
+        hostIdentity: hostIdentity,
+        authenticator: RemoteSessionAuthenticator(host: host, hostIdentity: hostIdentity, storage: storage, rateLimiter: rateLimiter),
+        endpoint: LocalHost(storage: storage),
+        storage: storage,
+        authorization: DeviceAuthorizationGate(storage: storage),
+        rateLimiter: rateLimiter,
+        pairing: pairing,
+        source: source
+    )
+    let connectionID = UUID()
+    let clientEphemeral = ConnectionEphemeralKey()
+    let start = AuthenticationStartPayload(
+        hostID: host.hostID,
+        deviceID: device.deviceID,
+        connectionID: connectionID,
+        clientNonce: Data(repeating: 3, count: 32),
+        deviceSigningPublicKey: device.cryptographicIdentity.signingPublicKey,
+        deviceKeyAgreementPublicKey: device.cryptographicIdentity.keyAgreementPublicKey,
+        clientEphemeralPublicKey: clientEphemeral.publicKey,
+        route: "lan"
+    )
+    let challengeEnvelope = try ProtocolEnvelope(serializedData: try await processor.receive(ProtocolEnvelope(messageID: "start", connectionID: connectionID.uuidString, connectionSequence: 1, kind: .authentication, channel: .control, payload: .init(start)).serializedData()))
+    let challenge = try AuthenticationChallengePayload(protobufBytes: challengeEnvelope.payload.protobufBytes)
+    let binding = try ConnectionAuthenticationBinding(
+        protocolGeneration: challengeEnvelope.protocolGeneration,
+        hostID: challenge.hostID,
+        deviceID: challenge.deviceID,
+        connectionID: challenge.connectionID,
+        clientNonce: challenge.clientNonce,
+        serverNonce: challenge.serverNonce,
+        clientEphemeralPublicKey: clientEphemeral.publicKey,
+        serverEphemeralPublicKey: challenge.serverEphemeralPublicKey,
+        route: .lan
+    )
+    try ConnectionAuthenticator.verify(.init(participant: .host, signature: challenge.hostSignature), expectedParticipant: .host, identity: host.cryptographicIdentity, binding: binding)
+    let proof = ConnectionAuthenticator.makeProof(participant: .device, identity: deviceIdentity, binding: binding)
+    let deviceKeys = try ConnectionAuthenticator.deriveKeys(participant: .device, ephemeralKey: clientEphemeral, peerEphemeralPublicKey: challenge.serverEphemeralPublicKey, binding: binding)
+    let channel = AuthenticatedWireChannel(keys: deviceKeys, binding: binding)
+    let capabilities = try await channel.open(try await processor.receive(ProtocolEnvelope(messageID: "proof", connectionID: connectionID.uuidString, connectionSequence: 2, kind: .authentication, channel: .control, payload: try .init(AuthenticationProofPayload(connectionID: connectionID, deviceSignature: proof.signature))).serializedData()))
+    #expect(capabilities.kind == .capabilities)
+
+    let request = PairingRequestPayload(tokenID: invitation.tokenID, pairingSecret: invitation.secret, hostID: host.hostID, deviceID: device.deviceID, deviceDisplayName: device.displayName, devicePlatform: device.platform, deviceSigningPublicKey: device.cryptographicIdentity.signingPublicKey, deviceKeyAgreementPublicKey: device.cryptographicIdentity.keyAgreementPublicKey, route: "lan")
+    let pending = try await channel.open(try await processor.receive(try await channel.seal(ProtocolEnvelope(messageID: "pair", connectionID: connectionID.uuidString, connectionSequence: 3, kind: .command, channel: .control, payload: .init(request)))))
+    #expect(try PairingPendingPayload(protobufBytes: pending.payload.protobufBytes).tokenID == invitation.tokenID)
+    #expect(await pairing.pending().map(\.tokenID) == [invitation.tokenID])
+    #expect(try await storage.deviceAuthorizations().isEmpty)
 }
 
 @Test func localHostRuntimeOwnsTheStorageBackedHost() async throws {

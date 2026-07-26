@@ -1,3 +1,4 @@
+import AizenCore
 import AizenHost
 import AizenSecurity
 import AizenStorage
@@ -9,6 +10,7 @@ import Network
 
 public enum HostLANListenerError: Swift.Error, Sendable, Equatable {
     case malformedHandshake
+    case invalidPairingRequest
 }
 
 /// Main-actor lifecycle owner for the Host's TLS 1.3 binary WebSocket listener.
@@ -21,6 +23,7 @@ public final class HostLANWebSocketListener {
     private let authenticator: RemoteSessionAuthenticator
     private let authorization: DeviceAuthorizationGate
     private let rateLimiter: RemoteRequestRateLimiter
+    private let pairing: PairingRequestRegistry
     private let queue = DispatchQueue(label: "win.aizen.host.lan")
     private var listener: NWListener?
     private var advertisement: HostBonjourAdvertisement?
@@ -35,6 +38,7 @@ public final class HostLANWebSocketListener {
         self.rateLimiter = rateLimiter
         authenticator = RemoteSessionAuthenticator(host: host, hostIdentity: hostIdentity, storage: storage, rateLimiter: rateLimiter)
         authorization = DeviceAuthorizationGate(storage: storage)
+        pairing = PairingRequestRegistry(hostID: host.hostID, approval: PairingApprovalService(storage: storage))
     }
 
     public func start() async throws {
@@ -76,6 +80,19 @@ public final class HostLANWebSocketListener {
         listener = nil
     }
 
+    /// The local approval UI reads only safe device metadata from this surface.
+    public func pendingPairingRequests() async -> [PendingPairingRequest] {
+        await pairing.pending()
+    }
+
+    public func approvePairingRequest(tokenID: UUID, grants: Set<CapabilityGrant>) async throws -> DeviceAuthorization {
+        try await pairing.approve(tokenID: tokenID, grants: grants)
+    }
+
+    public func rejectPairingRequest(tokenID: UUID) async throws {
+        try await pairing.reject(tokenID: tokenID)
+    }
+
     private func accept(_ connection: NWConnection) {
         let rawSource = connection.endpoint.debugDescription
         let source = RemoteRequestSource(rawSource.isEmpty ? "unknown" : String(rawSource.prefix(256)))
@@ -84,11 +101,14 @@ public final class HostLANWebSocketListener {
             connection: connection,
             queue: queue,
             processor: HostLANWebSocketProcessor(
+                host: host,
+                hostIdentity: hostIdentity,
                 authenticator: authenticator,
                 endpoint: endpoint,
                 storage: storage,
                 authorization: authorization,
                 rateLimiter: rateLimiter,
+                pairing: pairing,
                 source: source
             ),
             onClose: { [weak self] in
@@ -105,8 +125,14 @@ public final class HostLANWebSocketListener {
 actor HostLANWebSocketProcessor {
     private enum Phase {
         case awaitingStart
-        case awaitingProof
+        case awaitingProof(AuthenticationMode)
         case authenticated(AuthenticatedWireChannel, RemoteHostEndpoint)
+        case awaitingPairingRequest(AuthenticatedWireChannel, DeviceID, PublicCryptographicIdentity)
+    }
+
+    private enum AuthenticationMode {
+        case paired
+        case pairing
     }
 
     private let authenticator: RemoteSessionAuthenticator
@@ -114,15 +140,19 @@ actor HostLANWebSocketProcessor {
     private let storage: StorageRepository
     private let authorization: DeviceAuthorizationGate
     private let rateLimiter: RemoteRequestRateLimiter
+    private let pairing: PairingRequestRegistry
+    private let pairingAuthenticator: PairingSessionAuthenticator
     private let source: RemoteRequestSource
     private var phase = Phase.awaitingStart
 
-    init(authenticator: RemoteSessionAuthenticator, endpoint: any WireEndpoint, storage: StorageRepository, authorization: DeviceAuthorizationGate, rateLimiter: RemoteRequestRateLimiter, source: RemoteRequestSource) {
+    init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, authenticator: RemoteSessionAuthenticator, endpoint: any WireEndpoint, storage: StorageRepository, authorization: DeviceAuthorizationGate, rateLimiter: RemoteRequestRateLimiter, pairing: PairingRequestRegistry, source: RemoteRequestSource) {
         self.authenticator = authenticator
         self.endpoint = endpoint
         self.storage = storage
         self.authorization = authorization
         self.rateLimiter = rateLimiter
+        self.pairing = pairing
+        pairingAuthenticator = PairingSessionAuthenticator(host: host, hostIdentity: hostIdentity)
         self.source = source
     }
 
@@ -131,20 +161,48 @@ actor HostLANWebSocketProcessor {
         case .awaitingStart:
             let envelope = try ProtocolEnvelope(serializedData: data)
             guard envelope.kind == .authentication, envelope.payload.identifier == AuthenticationStartPayload.identifier else { throw HostLANListenerError.malformedHandshake }
-            let challenge = try await authenticator.begin(try AuthenticationStartPayload(protobufBytes: envelope.payload.protobufBytes), source: source, protocolGeneration: envelope.protocolGeneration)
-            phase = .awaitingProof
+            let start = try AuthenticationStartPayload(protobufBytes: envelope.payload.protobufBytes)
+            let challenge: AuthenticationChallengePayload
+            if let authorization = try await storage.deviceAuthorization(for: start.deviceID), authorization.revokedAt == nil {
+                challenge = try await authenticator.begin(start, source: source, protocolGeneration: envelope.protocolGeneration)
+                phase = .awaitingProof(.paired)
+            } else {
+                try await rateLimiter.require(kind: .pairing, source: source, deviceID: start.deviceID)
+                challenge = try await pairingAuthenticator.begin(start, protocolGeneration: envelope.protocolGeneration)
+                phase = .awaitingProof(.pairing)
+            }
             return try ProtocolEnvelope(messageID: UUID().uuidString, connectionID: envelope.connectionID, connectionSequence: envelope.connectionSequence, kind: .authentication, channel: .control, correlationID: envelope.messageID, payload: .init(challenge)).serializedData()
-        case .awaitingProof:
+        case let .awaitingProof(mode):
             let envelope = try ProtocolEnvelope(serializedData: data)
             guard envelope.kind == .authentication, envelope.payload.identifier == AuthenticationProofPayload.identifier else { throw HostLANListenerError.malformedHandshake }
-            let session = try await authenticator.finish(try AuthenticationProofPayload(protobufBytes: envelope.payload.protobufBytes))
-            let channel = AuthenticatedWireChannel(keys: session.keys, binding: session.binding)
-            let endpoint = RemoteHostEndpoint(endpoint: endpoint, storage: storage, authorization: authorization, rateLimiter: rateLimiter, session: session, source: source)
-            phase = .authenticated(channel, endpoint)
-            return try await channel.seal(ProtocolEnvelope(messageID: UUID().uuidString, connectionID: session.connectionID.uuidString, connectionSequence: 1, kind: .capabilities, channel: .control, correlationID: envelope.messageID, payload: .init(CapabilitiesPayload(identifiers: [HelloPayload.identifier, CapabilitiesPayload.identifier]))))
+            switch mode {
+            case .paired:
+                let session = try await authenticator.finish(try AuthenticationProofPayload(protobufBytes: envelope.payload.protobufBytes))
+                let channel = AuthenticatedWireChannel(keys: session.keys, binding: session.binding)
+                let endpoint = RemoteHostEndpoint(endpoint: endpoint, storage: storage, authorization: authorization, rateLimiter: rateLimiter, session: session, source: source)
+                phase = .authenticated(channel, endpoint)
+                return try await channel.seal(ProtocolEnvelope(messageID: UUID().uuidString, connectionID: session.connectionID.uuidString, connectionSequence: 1, kind: .capabilities, channel: .control, correlationID: envelope.messageID, payload: .init(CapabilitiesPayload(identifiers: [HelloPayload.identifier, CapabilitiesPayload.identifier]))))
+            case .pairing:
+                let session = try await pairingAuthenticator.finish(try AuthenticationProofPayload(protobufBytes: envelope.payload.protobufBytes))
+                let channel = AuthenticatedWireChannel(keys: session.keys, binding: session.binding)
+                phase = .awaitingPairingRequest(channel, session.deviceID, session.deviceIdentity)
+                return try await channel.seal(ProtocolEnvelope(messageID: UUID().uuidString, connectionID: envelope.connectionID, connectionSequence: 1, kind: .capabilities, channel: .control, correlationID: envelope.messageID, payload: .init(CapabilitiesPayload(identifiers: [PairingRequestPayload.identifier, PairingPendingPayload.identifier]))))
+            }
         case let .authenticated(channel, endpoint):
             let request = try await channel.open(data)
             return try await channel.seal(try await endpoint.receive(request))
+        case let .awaitingPairingRequest(channel, deviceID, deviceIdentity):
+            let request = try await channel.open(data)
+            guard request.kind == .command, request.channel == .control, request.payload.identifier == PairingRequestPayload.identifier else { throw HostLANListenerError.invalidPairingRequest }
+            let pairingRequest = try PairingRequestPayload(protobufBytes: request.payload.protobufBytes)
+            guard pairingRequest.deviceID == deviceID,
+                  pairingRequest.deviceSigningPublicKey == deviceIdentity.signingPublicKey,
+                  pairingRequest.deviceKeyAgreementPublicKey == deviceIdentity.keyAgreementPublicKey else {
+                throw HostLANListenerError.invalidPairingRequest
+            }
+            try await rateLimiter.require(kind: .pairing, source: source, deviceID: deviceID)
+            let pending = try await pairing.submit(pairingRequest)
+            return try await channel.seal(ProtocolEnvelope(messageID: UUID().uuidString, connectionID: request.connectionID, connectionSequence: request.connectionSequence, kind: .commandReceipt, channel: .control, correlationID: request.messageID, payload: .init(PairingPendingPayload(tokenID: pending.tokenID))))
         }
     }
 }
