@@ -29,6 +29,81 @@ public struct SpaceProjection: Sendable, Hashable {
     }
 }
 
+// MARK: - Journal synchronization
+
+public protocol JournalCursorStore: Sendable {
+    func loadCursor() async throws -> UInt64
+    func saveCursor(_ cursor: UInt64) async throws
+}
+
+/// Small durable cursor store owned by a Client, never by Host Storage.
+public actor FileJournalCursorStore: JournalCursorStore {
+    private let url: URL
+
+    public init(url: URL) {
+        self.url = url
+    }
+
+    public func loadCursor() throws -> UInt64 {
+        guard FileManager.default.fileExists(atPath: url.path) else { return 0 }
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(UInt64.self, from: data)
+    }
+
+    public func saveCursor(_ cursor: UInt64) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(cursor).write(to: url, options: .atomic)
+    }
+}
+
+public enum JournalSynchronizationError: Swift.Error, Sendable, Equatable {
+    case snapshotRequired
+    case gap(expected: UInt64, received: UInt64)
+}
+
+/// Applies durable journal events serially. A reducer failure leaves the stored cursor unchanged.
+public actor JournalEventSynchronizer {
+    private let cursorStore: any JournalCursorStore
+    private var cursor: UInt64?
+
+    public init(cursorStore: any JournalCursorStore) {
+        self.cursorStore = cursorStore
+    }
+
+    public func lastAppliedCursor() async throws -> UInt64 {
+        if let cursor { return cursor }
+        let stored = try await cursorStore.loadCursor()
+        cursor = stored
+        return stored
+    }
+
+    @discardableResult
+    public func apply(
+        _ response: ReadJournalEventsResponsePayload,
+        reducer: @Sendable (JournalEvent) async throws -> Void
+    ) async throws -> UInt64 {
+        guard !response.snapshotRequired else { throw JournalSynchronizationError.snapshotRequired }
+        var appliedCursor = try await lastAppliedCursor()
+        for event in response.events {
+            guard event.cursor > appliedCursor else { continue }
+            let expected = appliedCursor + 1
+            guard event.cursor == expected else {
+                throw JournalSynchronizationError.gap(expected: expected, received: event.cursor)
+            }
+            try await reducer(event)
+            try await cursorStore.saveCursor(event.cursor)
+            appliedCursor = event.cursor
+            cursor = appliedCursor
+        }
+        return appliedCursor
+    }
+
+    public func reset(to cursor: UInt64) async throws {
+        try await cursorStore.saveCursor(cursor)
+        self.cursor = cursor
+    }
+}
+
 public actor HostClient {
     public enum Error: Swift.Error, Sendable, Equatable {
         case sequenceExhausted

@@ -11,6 +11,47 @@ import AizenWire
     #expect(AizenClientModule.protocolGeneration == 1)
 }
 
+@Test func journalSynchronizerPersistsOnlySuccessfullyReducedEvents() async throws {
+    let store = RecordingJournalCursorStore()
+    let synchronizer = JournalEventSynchronizer(cursorStore: store)
+    let events = [journalEvent(cursor: 1), journalEvent(cursor: 2)]
+    let response = ReadJournalEventsResponsePayload(events: events, oldestCursor: 1, latestCursor: 2, snapshotRequired: false)
+    let applied = try await synchronizer.apply(response) { event in
+        #expect(event.cursor < 3)
+    }
+    #expect(applied == 2)
+    #expect(await store.cursor == 2)
+
+    let duplicateApplied = try await synchronizer.apply(response) { _ in
+        Issue.record("Duplicate events must not reach the reducer")
+    }
+    #expect(duplicateApplied == 2)
+
+    await #expect(throws: ClientReducerFailure.expected) {
+        try await synchronizer.apply(
+            ReadJournalEventsResponsePayload(events: [journalEvent(cursor: 3)], oldestCursor: 1, latestCursor: 3, snapshotRequired: false)
+        ) { _ in
+            throw ClientReducerFailure.expected
+        }
+    }
+    #expect(await store.cursor == 2)
+}
+
+@Test func journalSynchronizerRejectsGapsAndExpiredCursors() async throws {
+    let store = RecordingJournalCursorStore()
+    let synchronizer = JournalEventSynchronizer(cursorStore: store)
+    await #expect(throws: JournalSynchronizationError.gap(expected: 1, received: 2)) {
+        try await synchronizer.apply(
+            ReadJournalEventsResponsePayload(events: [journalEvent(cursor: 2)], oldestCursor: 2, latestCursor: 2, snapshotRequired: false)
+        ) { _ in }
+    }
+    await #expect(throws: JournalSynchronizationError.snapshotRequired) {
+        try await synchronizer.apply(
+            ReadJournalEventsResponsePayload(events: [], oldestCursor: 2, latestCursor: 2, snapshotRequired: true)
+        ) { _ in }
+    }
+}
+
 @Test func clientNegotiatesThroughTheProtobufInProcessTransport() async throws {
     let client = HostClient(transport: InProcessTransport(endpoint: EchoHost()))
     let response = try await client.send(.init(
@@ -259,6 +300,30 @@ import AizenWire
 
 private struct EchoHost: WireEndpoint {
     func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope { envelope }
+}
+
+private actor RecordingJournalCursorStore: JournalCursorStore {
+    private(set) var cursor: UInt64 = 0
+
+    func loadCursor() -> UInt64 { cursor }
+    func saveCursor(_ cursor: UInt64) { self.cursor = cursor }
+}
+
+private enum ClientReducerFailure: Error, Equatable {
+    case expected
+}
+
+private func journalEvent(cursor: UInt64) -> JournalEvent {
+    JournalEvent(
+        cursor: cursor,
+        aggregateID: "host",
+        aggregateType: "host",
+        aggregateRevision: cursor,
+        payloadIdentifier: "aizen.event.host@1",
+        payloadSchemaVersion: 1,
+        payloadBytes: Data([UInt8(cursor)]),
+        durability: .durable
+    )
 }
 
 private actor ClientPromptRuntime: PromptRunRuntime {
