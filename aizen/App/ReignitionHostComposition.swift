@@ -48,6 +48,10 @@ actor ReignitionHostComposition {
         _ = try await client.retryPendingCommands()
     }
 
+    func connectionState() async -> ClientConnectionState {
+        await client.connectionState
+    }
+
     func spaces() async throws -> [Space] {
         try await client.spaces()
     }

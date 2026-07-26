@@ -1,4 +1,5 @@
 import AizenCore
+import AizenClient
 import Combine
 import Foundation
 
@@ -14,6 +15,7 @@ final class ReignitionConversationStore: ObservableObject {
     @Published private(set) var messages: [ConversationMessage] = []
     @Published private(set) var activeRunLifecycles: [RunID: RunLifecycle] = [:]
     @Published private(set) var assistantTextByRun: [RunID: String] = [:]
+    @Published private(set) var connectionState: ClientConnectionState = .disconnected
     @Published private(set) var isSynchronizing = false
     @Published private(set) var lastError: String?
 
@@ -202,12 +204,13 @@ final class ReignitionConversationStore: ObservableObject {
     private func perform(_ operation: () async throws -> Void) async {
         isSynchronizing = true
         lastError = nil
-        defer { isSynchronizing = false }
         do {
             try await operation()
         } catch {
             lastError = error.localizedDescription
         }
+        isSynchronizing = false
+        connectionState = await host.connectionState()
     }
 }
 

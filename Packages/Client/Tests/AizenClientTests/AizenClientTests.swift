@@ -87,7 +87,7 @@ import AizenWire
         payload: .init(identifier: .init(rawValue: "aizen.control.hello@1"), schemaVersion: 1, protobufBytes: Data(), stateAffecting: false)
     ))
     #expect(response.messageID == "hello")
-    #expect(await client.connectionState == .connected(protocolGeneration: 1))
+    #expect(await client.connectionState == .ready(protocolGeneration: 1))
 }
 
 @Test func clientNegotiatesProductAndProtocolCompatibilityBeforeCommands() async throws {
@@ -101,7 +101,7 @@ import AizenWire
     #expect(capabilities.minimumCompatibleProductVersion == "2.0.0")
     #expect(capabilities.minimumProtocolGeneration == 1)
     #expect(capabilities.maximumProtocolGeneration == 1)
-    #expect(await client.connectionState == .connected(protocolGeneration: 1))
+    #expect(await client.connectionState == .ready(protocolGeneration: 1))
 }
 
 @Test func selectingSpaceIsAnExplicitProjectionTransition() {

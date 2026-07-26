@@ -1,4 +1,5 @@
 import AizenCore
+import AizenClient
 import AppKit
 import SwiftUI
 
@@ -30,6 +31,9 @@ struct ReignitionConversationWindow: View {
                     Button("New Space…", systemImage: "plus") {
                         newSpaceName = "New Space"
                     }
+                    Label(connectionStateTitle, systemImage: connectionStateSymbol)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Section("Conversations") {
                     ForEach(store.conversations) { conversation in
@@ -159,6 +163,26 @@ struct ReignitionConversationWindow: View {
             get: { store.lastError != nil },
             set: { if !$0 { store.dismissError() } }
         )
+    }
+
+    private var connectionStateTitle: String {
+        switch store.connectionState {
+        case .disconnected: "Disconnected"
+        case .connecting: "Connecting"
+        case .synchronizing: "Synchronizing"
+        case .ready(_): "Ready"
+        case .reconnecting: "Reconnecting"
+        case .blocked: "Blocked"
+        case .failed: "Connection failed"
+        }
+    }
+
+    private var connectionStateSymbol: String {
+        switch store.connectionState {
+        case .ready(_): "checkmark.circle"
+        case .blocked, .failed: "exclamationmark.triangle"
+        default: "arrow.triangle.2.circlepath"
+        }
     }
 
     private func createConversation() {

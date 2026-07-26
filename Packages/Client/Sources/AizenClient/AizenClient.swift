@@ -11,7 +11,12 @@ public enum AizenClientModule {
 
 public enum ClientConnectionState: Sendable, Hashable {
     case disconnected
-    case connected(protocolGeneration: UInt32)
+    case connecting
+    case synchronizing
+    case ready(protocolGeneration: UInt32)
+    case reconnecting
+    case blocked
+    case failed
 }
 
 public struct SpaceProjection: Sendable, Hashable {
@@ -199,8 +204,11 @@ public actor HostClient {
 
     public func retryPendingCommands() async throws -> [ProtocolEnvelope] {
         guard let commandOutbox else { return [] }
+        let pendingCommands = try await commandOutbox.pendingCommands()
+        guard !pendingCommands.isEmpty else { return [] }
+        connectionState = .synchronizing
         var responses: [ProtocolEnvelope] = []
-        for command in try await commandOutbox.pendingCommands() {
+        for command in pendingCommands {
             responses.append(try await transmit(command, acknowledgingCommand: true))
         }
         return responses
@@ -211,34 +219,40 @@ public actor HostClient {
     }
 
     public func negotiate() async throws -> CapabilitiesPayload {
-        let response = try await transport.send(.init(
-            messageID: UUID().uuidString,
-            connectionSequence: try nextConnectionSequence(),
-            kind: .hello,
-            channel: .control,
-            payload: try .init(HelloPayload(
-                minimumProtocolGeneration: UInt32(AizenClientModule.protocolGeneration),
-                maximumProtocolGeneration: UInt32(AizenClientModule.protocolGeneration),
-                productVersion: AizenClientModule.productVersion
+        connectionState = connectionState == .disconnected ? .connecting : .reconnecting
+        do {
+            let response = try await transport.send(.init(
+                messageID: UUID().uuidString,
+                connectionSequence: try nextConnectionSequence(),
+                kind: .hello,
+                channel: .control,
+                payload: try .init(HelloPayload(
+                    minimumProtocolGeneration: UInt32(AizenClientModule.protocolGeneration),
+                    maximumProtocolGeneration: UInt32(AizenClientModule.protocolGeneration),
+                    productVersion: AizenClientModule.productVersion
+                ))
             ))
-        ))
-        guard response.kind == .capabilities, response.payload.identifier == CapabilitiesPayload.identifier else {
-            throw Error.unexpectedPayload(response.payload.identifier)
+            guard response.kind == .capabilities, response.payload.identifier == CapabilitiesPayload.identifier else {
+                throw Error.unexpectedPayload(response.payload.identifier)
+            }
+            let capabilities = try CapabilitiesPayload(protobufBytes: response.payload.protobufBytes)
+            guard capabilities.minimumProtocolGeneration <= AizenClientModule.protocolGeneration,
+                  capabilities.maximumProtocolGeneration >= AizenClientModule.protocolGeneration,
+                  Self.isCompatible(clientVersion: AizenClientModule.productVersion, hostMinimumVersion: capabilities.minimumCompatibleProductVersion) else {
+                connectionState = .blocked
+                throw Error.incompatibleHost(
+                    cliProductVersion: AizenClientModule.productVersion,
+                    hostProductVersion: capabilities.productVersion,
+                    hostProtocolRange: capabilities.minimumProtocolGeneration...capabilities.maximumProtocolGeneration,
+                    minimumCompatibleProductVersion: capabilities.minimumCompatibleProductVersion
+                )
+            }
+            connectionState = .ready(protocolGeneration: response.protocolGeneration)
+            return capabilities
+        } catch {
+            if connectionState != .blocked { connectionState = .failed }
+            throw error
         }
-        let capabilities = try CapabilitiesPayload(protobufBytes: response.payload.protobufBytes)
-        guard capabilities.minimumProtocolGeneration <= AizenClientModule.protocolGeneration,
-              capabilities.maximumProtocolGeneration >= AizenClientModule.protocolGeneration,
-              Self.isCompatible(clientVersion: AizenClientModule.productVersion, hostMinimumVersion: capabilities.minimumCompatibleProductVersion) else {
-            connectionState = .disconnected
-            throw Error.incompatibleHost(
-                cliProductVersion: AizenClientModule.productVersion,
-                hostProductVersion: capabilities.productVersion,
-                hostProtocolRange: capabilities.minimumProtocolGeneration...capabilities.maximumProtocolGeneration,
-                minimumCompatibleProductVersion: capabilities.minimumCompatibleProductVersion
-            )
-        }
-        connectionState = .connected(protocolGeneration: response.protocolGeneration)
-        return capabilities
     }
 
     public func runEvents() async throws -> AsyncStream<RunEvent> {
@@ -660,12 +674,17 @@ public actor HostClient {
     }
 
     private func transmit(_ envelope: ProtocolEnvelope, acknowledgingCommand: Bool) async throws -> ProtocolEnvelope {
-        let response = try await transport.send(envelope)
-        connectionState = .connected(protocolGeneration: response.protocolGeneration)
-        if acknowledgingCommand, envelope.kind == .command, response.kind == .commandResult {
-            try await commandOutbox?.acknowledge(commandID: envelope.messageID)
+        do {
+            let response = try await transport.send(envelope)
+            connectionState = .ready(protocolGeneration: response.protocolGeneration)
+            if acknowledgingCommand, envelope.kind == .command, response.kind == .commandResult {
+                try await commandOutbox?.acknowledge(commandID: envelope.messageID)
+            }
+            return response
+        } catch {
+            connectionState = .failed
+            throw error
         }
-        return response
     }
 
     private static func isCompatible(clientVersion: String, hostMinimumVersion: String) -> Bool {
