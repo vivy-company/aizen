@@ -30,6 +30,13 @@ import Testing
     #expect(second.displayName == "Renamed Mac")
 }
 
+@Test func hostIdentityCredentialsKeepTheKeychainIdentityInMemoryOnly() async throws {
+    let persistence = MemoryHostIdentityPersistence()
+    let credentials = try await HostIdentityStore(persistence: persistence).loadOrCreateCredentials(displayName: "Mac")
+    let message = Data("aizen-host".utf8)
+    #expect(credentials.publicIdentity.cryptographicIdentity.verifies(signature: credentials.localIdentity.sign(message), message: message))
+}
+
 @Test func localHostRuntimeOwnsTheStorageBackedHost() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

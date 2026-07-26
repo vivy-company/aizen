@@ -3,6 +3,17 @@ import AizenSecurity
 import Foundation
 import Security
 
+/// The Host's public identity and in-memory signing material for one process lifetime.
+public struct HostIdentityCredentials: Sendable {
+    public let publicIdentity: HostPublicIdentity
+    public let localIdentity: LocalCryptographicIdentity
+
+    public init(publicIdentity: HostPublicIdentity, localIdentity: LocalCryptographicIdentity) {
+        self.publicIdentity = publicIdentity
+        self.localIdentity = localIdentity
+    }
+}
+
 /// Durable Host identity persistence. The private signing and agreement keys remain Keychain-only.
 public actor HostIdentityStore {
     private struct StoredIdentity: Codable, Sendable {
@@ -19,16 +30,23 @@ public actor HostIdentityStore {
     }
 
     public func loadOrCreate(displayName: String) throws -> HostPublicIdentity {
+        try loadOrCreateCredentials(displayName: displayName).publicIdentity
+    }
+
+    public func loadOrCreateCredentials(displayName: String) throws -> HostIdentityCredentials {
         if let data = try persistence.load() {
             let stored = try JSONDecoder().decode(StoredIdentity.self, from: data)
             let identity = try LocalCryptographicIdentity(
                 signingPrivateKey: stored.signingPrivateKey,
                 keyAgreementPrivateKey: stored.keyAgreementPrivateKey
             )
-            return HostPublicIdentity(
-                hostID: stored.hostID,
-                displayName: displayName,
-                cryptographicIdentity: identity.publicIdentity(createdAt: stored.createdAt)
+            return HostIdentityCredentials(
+                publicIdentity: HostPublicIdentity(
+                    hostID: stored.hostID,
+                    displayName: displayName,
+                    cryptographicIdentity: identity.publicIdentity(createdAt: stored.createdAt)
+                ),
+                localIdentity: identity
             )
         }
 
@@ -41,10 +59,13 @@ public actor HostIdentityStore {
             createdAt: createdAt
         )
         try persistence.save(JSONEncoder().encode(stored))
-        return HostPublicIdentity(
-            hostID: stored.hostID,
-            displayName: displayName,
-            cryptographicIdentity: identity.publicIdentity(createdAt: createdAt)
+        return HostIdentityCredentials(
+            publicIdentity: HostPublicIdentity(
+                hostID: stored.hostID,
+                displayName: displayName,
+                cryptographicIdentity: identity.publicIdentity(createdAt: createdAt)
+            ),
+            localIdentity: identity
         )
     }
 }
