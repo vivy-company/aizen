@@ -167,6 +167,10 @@ import Testing
 
     #expect(try CreateTerminalSessionCommandPayload(protobufBytes: command.protobufBytes()) == command)
     #expect(try CreateTerminalSessionResultPayload(protobufBytes: CreateTerminalSessionResultPayload(session: session).protobufBytes()).session == session)
+    let acquire = AcquireTerminalControlCommandPayload(terminalSessionID: session.id.description, leaseSeconds: 30)
+    #expect(try AcquireTerminalControlCommandPayload(protobufBytes: acquire.protobufBytes()) == acquire)
+    let input = TerminalInputCommandPayload(terminalSessionID: session.id.description, sequence: 1, input: Data("pwd\n".utf8))
+    #expect(try TerminalInputCommandPayload(protobufBytes: input.protobufBytes()) == input)
 }
 
 @Test func agentLaunchConfigurationPayloadRoundTrips() throws {

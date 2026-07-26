@@ -1899,6 +1899,37 @@ public struct CreateTerminalSessionResultPayload: WirePayload, Sendable, Hashabl
     }
 }
 
+public struct AcquireTerminalControlCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.terminal-control.acquire@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let terminalSessionID: String
+    public let leaseSeconds: UInt32
+    public init(terminalSessionID: String, leaseSeconds: UInt32 = 60) { self.terminalSessionID = terminalSessionID; self.leaseSeconds = leaseSeconds }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_AcquireTerminalControlCommand(serializedBytes: protobufBytes); guard !m.terminalSessionID.isEmpty else { throw WireCodecError.invalidIdentity("terminal session") }; self.init(terminalSessionID: m.terminalSessionID, leaseSeconds: m.leaseSeconds) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_AcquireTerminalControlCommand(); m.terminalSessionID = terminalSessionID; m.leaseSeconds = leaseSeconds; return try m.serializedData() }
+}
+
+public struct ReleaseTerminalControlCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.terminal-control.release@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let terminalSessionID: String
+    public init(terminalSessionID: String) { self.terminalSessionID = terminalSessionID }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_ReleaseTerminalControlCommand(serializedBytes: protobufBytes); guard !m.terminalSessionID.isEmpty else { throw WireCodecError.invalidIdentity("terminal session") }; self.init(terminalSessionID: m.terminalSessionID) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_ReleaseTerminalControlCommand(); m.terminalSessionID = terminalSessionID; return try m.serializedData() }
+}
+
+public struct TerminalInputCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.terminal.input@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let terminalSessionID: String; public let sequence: UInt64; public let input: Data
+    public init(terminalSessionID: String, sequence: UInt64, input: Data) { self.terminalSessionID = terminalSessionID; self.sequence = sequence; self.input = input }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_TerminalInputCommand(serializedBytes: protobufBytes); guard !m.terminalSessionID.isEmpty, m.sequence > 0 else { throw WireCodecError.invalidIdentity("terminal input") }; self.init(terminalSessionID: m.terminalSessionID, sequence: m.sequence, input: m.input) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_TerminalInputCommand(); m.terminalSessionID = terminalSessionID; m.sequence = sequence; m.input = input; return try m.serializedData() }
+}
+
 private func terminalSession(from record: AizenWireV1_TerminalSessionRecord) throws -> TerminalSession {
     guard let sessionUUID = UUID(uuidString: record.sessionID),
           let spaceUUID = UUID(uuidString: record.spaceID) else {
