@@ -86,6 +86,11 @@ actor V2CLIClient {
         try await client.cancelRun(id: id)
     }
 
+    func cancelOperation(id: OperationID) async throws {
+        try await recoverPendingCommands()
+        try await client.cancelOperation(id: id)
+    }
+
     func resources(spaceID: SpaceID? = nil) async throws -> [Resource] {
         try await recoverPendingCommands()
         return try await client.resources(spaceID: spaceID)

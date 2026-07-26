@@ -370,7 +370,7 @@ private extension AizenCLI {
             print(operationHelpText())
             return
         }
-        guard let subcommand = parsed.positionals.first else { throw CLIError.invalidArguments("operation requires list, show, or watch") }
+        guard let subcommand = parsed.positionals.first else { throw CLIError.invalidArguments("operation requires list, show, watch, or cancel") }
         let rest = Array(parsed.positionals.dropFirst())
         let client = V2CLIClient()
         switch subcommand {
@@ -417,6 +417,9 @@ private extension AizenCLI {
                 if operation.lifecycle == .completed || operation.lifecycle == .failed || operation.lifecycle == .cancelled { return }
                 try await Task.sleep(for: .milliseconds(500))
             }
+        case "cancel":
+            guard rest.count == 1, let rawID = UUID(uuidString: rest[0]) else { throw CLIError.invalidArguments("operation cancel requires an Operation ID") }
+            try await client.cancelOperation(id: .init(rawValue: rawID))
         default:
             throw CLIError.invalidArguments("Unknown operation command: \(subcommand)")
         }
@@ -1196,6 +1199,7 @@ Usage:
   aizen operation list [space] [--json]
   aizen operation show <operation-id> [--json]
   aizen operation watch <operation-id> [--json]
+  aizen operation cancel <operation-id>
 
 `watch --json` emits newline-delimited JSON, one object for each observed operation state.
 """
