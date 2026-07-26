@@ -616,6 +616,7 @@ public struct Operation: Codable, Sendable, Hashable, Identifiable {
     public let id: OperationID
     public let spaceID: SpaceID
     public let sessionID: SessionID?
+    public let resourceID: ResourceID?
     public var lifecycle: OperationLifecycle
     public var progress: Double?
     public var failureDescription: String?
@@ -624,6 +625,7 @@ public struct Operation: Codable, Sendable, Hashable, Identifiable {
         id: OperationID = OperationID(),
         spaceID: SpaceID,
         sessionID: SessionID? = nil,
+        resourceID: ResourceID? = nil,
         lifecycle: OperationLifecycle = .queued,
         progress: Double? = nil,
         failureDescription: String? = nil
@@ -633,6 +635,7 @@ public struct Operation: Codable, Sendable, Hashable, Identifiable {
         self.id = id
         self.spaceID = spaceID
         self.sessionID = sessionID
+        self.resourceID = resourceID
         self.lifecycle = lifecycle
         self.progress = progress
         self.failureDescription = failureDescription
