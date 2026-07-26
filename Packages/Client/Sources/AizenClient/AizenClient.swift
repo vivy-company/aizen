@@ -150,7 +150,7 @@ public actor JournalEventSynchronizer {
 }
 
 public actor HostClient {
-    public enum Error: Swift.Error, Sendable, Equatable {
+    public enum Error: Swift.Error, Sendable, Equatable, LocalizedError {
         case sequenceExhausted
         case unexpectedPayload(PayloadIdentifier)
         case invalidIdentity(String)
@@ -161,6 +161,21 @@ public actor HostClient {
             hostProtocolRange: ClosedRange<UInt32>,
             minimumCompatibleProductVersion: String
         )
+
+        public var errorDescription: String? {
+            switch self {
+            case .sequenceExhausted:
+                "The Client connection sequence is exhausted. Reconnect to Aizen Host."
+            case .unexpectedPayload(let identifier):
+                "Aizen Host returned an unexpected payload: \(identifier.rawValue)."
+            case .invalidIdentity(let value):
+                "Aizen Host returned an invalid identity: \(value)."
+            case .eventStreamingUnavailable:
+                "This Aizen Host connection does not support run event streaming."
+            case let .incompatibleHost(cliProductVersion, hostProductVersion, hostProtocolRange, minimumCompatibleProductVersion):
+                "Aizen CLI \(cliProductVersion) is incompatible with Host \(hostProductVersion). Host supports protocol generation \(hostProtocolRange.lowerBound)...\(hostProtocolRange.upperBound) and requires Client version \(minimumCompatibleProductVersion) or newer."
+            }
+        }
     }
 
     private let transport: any WireTransport
