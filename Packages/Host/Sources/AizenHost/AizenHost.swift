@@ -154,6 +154,16 @@ public protocol RepositoryBranchUpdating: Sendable {
     ) async throws -> RepositoryBranchUpdateResult
 }
 
+public struct RepositoryFetchResult: Sendable, Equatable {
+    public let repositoryRevision: String
+    public let indexRevision: String
+    public init(repositoryRevision: String, indexRevision: String) { self.repositoryRevision = repositoryRevision; self.indexRevision = indexRevision }
+}
+
+public protocol RepositoryFetching: Sendable {
+    func fetch(at repositoryURL: URL, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> RepositoryFetchResult
+}
+
 public protocol XcodeProjectOpening: Sendable {
     func openXcodeProject(at url: URL) async throws
 }
@@ -185,6 +195,7 @@ public actor LocalHost: WireEndpoint {
     private let repositoryIndexUpdater: (any RepositoryIndexUpdating)?
     private let repositoryCommitter: (any RepositoryCommitting)?
     private let repositoryBranchUpdater: (any RepositoryBranchUpdating)?
+    private let repositoryFetcher: (any RepositoryFetching)?
     private let xcodeProjectOpener: (any XcodeProjectOpening)?
     private let xcodeProjectInspector: (any XcodeProjectInspecting)?
     private let xcodeProjectBuilder: (any XcodeProjectBuilding)?
@@ -208,6 +219,7 @@ public actor LocalHost: WireEndpoint {
         repositoryIndexUpdater: (any RepositoryIndexUpdating)? = nil,
         repositoryCommitter: (any RepositoryCommitting)? = nil,
         repositoryBranchUpdater: (any RepositoryBranchUpdating)? = nil,
+        repositoryFetcher: (any RepositoryFetching)? = nil,
         xcodeProjectOpener: (any XcodeProjectOpening)? = nil,
         xcodeProjectInspector: (any XcodeProjectInspecting)? = nil,
         xcodeProjectBuilder: (any XcodeProjectBuilding)? = nil
@@ -229,6 +241,7 @@ public actor LocalHost: WireEndpoint {
         self.repositoryIndexUpdater = repositoryIndexUpdater
         self.repositoryCommitter = repositoryCommitter
         self.repositoryBranchUpdater = repositoryBranchUpdater
+        self.repositoryFetcher = repositoryFetcher
         self.xcodeProjectOpener = xcodeProjectOpener
         self.xcodeProjectInspector = xcodeProjectInspector
         self.xcodeProjectBuilder = xcodeProjectBuilder
@@ -330,6 +343,8 @@ public actor LocalHost: WireEndpoint {
                 CommitRepositoryResultPayload.identifier,
                 UpdateRepositoryBranchCommandPayload.identifier,
                 UpdateRepositoryBranchResultPayload.identifier,
+                FetchRepositoryCommandPayload.identifier,
+                FetchRepositoryResultPayload.identifier,
                 CreateLocalFolderContextCommandPayload.identifier,
                 CreateLocalFolderContextResultPayload.identifier,
                 CreateRepositoryCheckoutContextCommandPayload.identifier,
@@ -940,6 +955,24 @@ public actor LocalHost: WireEndpoint {
                         snapshot.operations[index].lifecycle = .failed
                         snapshot.operations[index].failureDescription = error.localizedDescription
                     }
+                    throw error
+                }
+            }
+            kind = .commandResult
+        case .command where envelope.payload.identifier == FetchRepositoryCommandPayload.identifier:
+            guard let repositoryFetcher else { throw HostProtocolError.runtimeUnavailable }
+            let command = try FetchRepositoryCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resourceID = try Self.resourceID(from: command.resourceID)
+            guard let resource = try await storage.load().resources.first(where: { $0.id == resourceID }), resource.kind == .repository, let repositoryURL = try Self.localResourceDirectory(for: resource) else { throw HostProtocolError.unknownResource(resourceID) }
+            payload = try await executeDurably(envelope: envelope, spaceID: resource.spaceID) {
+                let operation = Operation(spaceID: resource.spaceID, lifecycle: .running, progress: 0)
+                _ = try await self.storage.transact { $0.operations.append(operation) }
+                do {
+                    let result = try await repositoryFetcher.fetch(at: repositoryURL, expectedRepositoryRevision: command.expectedRepositoryRevision, expectedIndexRevision: command.expectedIndexRevision)
+                    _ = try await self.storage.transact { snapshot in guard let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) else { return }; snapshot.operations[index].lifecycle = .completed; snapshot.operations[index].progress = 1 }
+                    return try TypedPayload(FetchRepositoryResultPayload(repositoryRevision: result.repositoryRevision, indexRevision: result.indexRevision, operationID: operation.id.description))
+                } catch {
+                    _ = try? await self.storage.transact { snapshot in guard let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) else { return }; snapshot.operations[index].lifecycle = .failed; snapshot.operations[index].failureDescription = error.localizedDescription }
                     throw error
                 }
             }

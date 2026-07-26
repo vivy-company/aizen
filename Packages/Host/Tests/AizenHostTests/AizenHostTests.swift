@@ -1369,6 +1369,26 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(await updater.create)
 }
 
+@Test func hostRecordsRepositoryFetchesAsCompletedDurableOperations() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Repository")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let fetcher = RecordingRepositoryFetcher()
+    let host = LocalHost(storage: storage, repositoryFetcher: fetcher)
+    let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(FetchRepositoryCommandPayload(resourceID: resource.id.description, expectedRepositoryRevision: "head", expectedIndexRevision: String(repeating: "a", count: 64)))))
+
+    let result = try FetchRepositoryResultPayload(protobufBytes: response.payload.protobufBytes)
+    let operation = try #require(try await storage.load().operations.first)
+    #expect(operation.id.description == result.operationID)
+    #expect(operation.lifecycle == .completed)
+    #expect(await fetcher.requestedURL == repository)
+}
+
 @Test func localHostListsExecutionContextFilesThroughTypedWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1633,6 +1653,15 @@ private actor RecordingRepositoryBranchUpdater: RepositoryBranchUpdating {
     func updateBranch(at repositoryURL: URL, branchName: String, expectedRepositoryRevision: String, expectedIndexRevision: String, create: Bool) async throws -> RepositoryBranchUpdateResult {
         self.branchName = branchName
         self.create = create
+        return .init(repositoryRevision: String(repeating: "c", count: 40), indexRevision: String(repeating: "b", count: 64))
+    }
+}
+
+private actor RecordingRepositoryFetcher: RepositoryFetching {
+    private(set) var requestedURL: URL?
+
+    func fetch(at repositoryURL: URL, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> RepositoryFetchResult {
+        requestedURL = repositoryURL
         return .init(repositoryRevision: String(repeating: "c", count: 40), indexRevision: String(repeating: "b", count: 64))
     }
 }
