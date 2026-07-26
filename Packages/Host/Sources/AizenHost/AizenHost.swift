@@ -641,7 +641,8 @@ public actor LocalHost: WireEndpoint {
             },
             executionContexts: snapshot.executionContexts.map {
                 ExecutionContext(id: $0.id, spaceID: $0.spaceID, kind: $0.kind, resourceID: $0.resourceID)
-            }
+            },
+            operations: snapshot.operations
         )
     }
 
