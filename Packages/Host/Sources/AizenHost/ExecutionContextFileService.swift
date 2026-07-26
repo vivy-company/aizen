@@ -1,5 +1,6 @@
 import AizenCore
 import AizenStorage
+import AizenWire
 import CryptoKit
 import Foundation
 
@@ -131,6 +132,30 @@ public actor ExecutionContextFileService {
         let existing = try Data(contentsOf: file, options: [.mappedIfSafe])
         guard Self.contentHash(existing) == expectedContentHash else { throw Error.revisionConflict }
         let replacement = Data(text.utf8)
+        guard replacement.count <= Self.maximumTextFileBytes else { throw Error.fileTooLarge(relativePath) }
+        try replacement.write(to: file, options: .atomic)
+        return Self.contentHash(replacement)
+    }
+
+    public func applyTextPatch(contextID: ExecutionContextID, relativePath: String, expectedContentHash: String, kind: ContextTextPatchKind, startLine: UInt32, endLineExclusive: UInt32, replacementText: String) async throws -> String {
+        guard !Self.isSensitive(relativePath) else { throw Error.sensitivePath(relativePath) }
+        let root = try await contextRoot(contextID)
+        let file = try resolvedChild(relativePath, root: root)
+        let values = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true else { throw Error.notFile(relativePath) }
+        guard (values.fileSize ?? 0) <= Self.maximumTextFileBytes else { throw Error.fileTooLarge(relativePath) }
+        let existing = try Data(contentsOf: file, options: [.mappedIfSafe])
+        guard Self.contentHash(existing) == expectedContentHash else { throw Error.revisionConflict }
+        guard let text = String(data: existing, encoding: .utf8), let start = Int(exactly: startLine), let end = Int(exactly: endLineExclusive) else { throw Error.invalidText(relativePath) }
+        var lines = text.components(separatedBy: "\n")
+        guard start <= end, end <= lines.count else { throw Error.invalidText(relativePath) }
+        switch kind {
+        case .insert: guard start == end else { throw Error.invalidText(relativePath) }
+        case .delete: guard start < end, replacementText.isEmpty else { throw Error.invalidText(relativePath) }
+        case .replace: guard start < end else { throw Error.invalidText(relativePath) }
+        }
+        lines.replaceSubrange(start..<end, with: replacementText.components(separatedBy: "\n"))
+        let replacement = Data(lines.joined(separator: "\n").utf8)
         guard replacement.count <= Self.maximumTextFileBytes else { throw Error.fileTooLarge(relativePath) }
         try replacement.write(to: file, options: .atomic)
         return Self.contentHash(replacement)

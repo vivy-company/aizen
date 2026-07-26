@@ -223,6 +223,10 @@ public struct RemoteHostEndpoint: WireEndpoint {
             let command = try ReplaceContextTextFileCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let context = try await requiredExecutionContext(command.executionContextID)
             return .init(capability: .fileWrite, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil, ownerConfirmationAction: .fileWrite)
+        case ApplyContextTextPatchCommandPayload.identifier:
+            let command = try ApplyContextTextPatchCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let context = try await requiredExecutionContext(command.executionContextID)
+            return .init(capability: .fileWrite, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil, ownerConfirmationAction: .fileWrite)
         case GetConversationTimelineQueryPayload.identifier:
             let request = try GetConversationTimelineQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let conversation = try await requiredSession(request.sessionID)

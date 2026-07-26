@@ -347,6 +347,8 @@ public actor LocalHost: WireEndpoint {
                 ReadContextTextFileResponsePayload.identifier,
                 ReplaceContextTextFileCommandPayload.identifier,
                 ReplaceContextTextFileResultPayload.identifier,
+                ApplyContextTextPatchCommandPayload.identifier,
+                ApplyContextTextPatchResultPayload.identifier,
                 CreateTerminalSessionCommandPayload.identifier,
                 CreateTerminalSessionResultPayload.identifier,
                 TerminalInputCommandPayload.identifier,
@@ -643,6 +645,12 @@ public actor LocalHost: WireEndpoint {
             let contentHash = try await contextFiles.replaceTextFile(contextID: contextID, relativePath: command.relativePath, expectedContentHash: command.expectedContentHash, text: command.text)
             kind = .commandResult
             payload = try TypedPayload(ReplaceContextTextFileResultPayload(relativePath: command.relativePath, contentHash: contentHash))
+        case .command where envelope.payload.identifier == ApplyContextTextPatchCommandPayload.identifier:
+            let command = try ApplyContextTextPatchCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let contextID = try Self.executionContextID(from: command.executionContextID)
+            let contentHash = try await contextFiles.applyTextPatch(contextID: contextID, relativePath: command.relativePath, expectedContentHash: command.expectedContentHash, kind: command.kind, startLine: command.startLine, endLineExclusive: command.endLineExclusive, replacementText: command.replacementText)
+            kind = .commandResult
+            payload = try TypedPayload(ApplyContextTextPatchResultPayload(relativePath: command.relativePath, contentHash: contentHash))
         case .command where envelope.payload.identifier == TerminalInputCommandPayload.identifier:
             let command = try TerminalInputCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)
