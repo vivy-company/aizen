@@ -1433,6 +1433,26 @@ public struct BuildXcodeProjectResultPayload: WirePayload, Sendable, Hashable {
     public func protobufBytes() throws -> Data { var value = AizenWireV1_BuildXcodeProjectResult(); value.operationID = operationID; return try value.serializedData() }
 }
 
+public struct CancelOperationCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.operation.cancel@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let operationID: String
+    public init(operationID: String) { precondition(UUID(uuidString: operationID) != nil, "Operation cancellation requires an Operation ID"); self.operationID = operationID }
+    public init(protobufBytes: Data) throws { let value = try AizenWireV1_CancelOperationCommand(serializedBytes: protobufBytes); guard UUID(uuidString: value.operationID) != nil else { throw WireCodecError.invalidOperationCancellationCommand }; self.init(operationID: value.operationID) }
+    public func protobufBytes() throws -> Data { var value = AizenWireV1_CancelOperationCommand(); value.operationID = operationID; return try value.serializedData() }
+}
+
+public struct CancelOperationResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.operation.cancel@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let operationID: String
+    public init(operationID: String) { precondition(UUID(uuidString: operationID) != nil, "Operation cancellation requires an Operation ID"); self.operationID = operationID }
+    public init(protobufBytes: Data) throws { let value = try AizenWireV1_CancelOperationResult(serializedBytes: protobufBytes); guard UUID(uuidString: value.operationID) != nil else { throw WireCodecError.invalidOperationCancellationResult }; self.init(operationID: value.operationID) }
+    public func protobufBytes() throws -> Data { var value = AizenWireV1_CancelOperationResult(); value.operationID = operationID; return try value.serializedData() }
+}
+
 public struct ImportLocalFolderCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.resource.import-local-folder@1")
     public static let schemaVersion: UInt32 = 1
@@ -2776,6 +2796,8 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidRepositoryPullResult
     case invalidRepositoryPushCommand
     case invalidRepositoryPushResult
+    case invalidOperationCancellationCommand
+    case invalidOperationCancellationResult
 }
 
 private extension ProtocolEnvelope {

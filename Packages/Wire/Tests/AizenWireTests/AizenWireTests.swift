@@ -204,6 +204,13 @@ import Testing
     #expect(try PushRepositoryResultPayload(protobufBytes: result.protobufBytes()) == result)
 }
 
+@Test func operationCancellationPayloadsRequireOperationIDs() throws {
+    let command = CancelOperationCommandPayload(operationID: UUID().uuidString)
+    let result = CancelOperationResultPayload(operationID: UUID().uuidString)
+    #expect(try CancelOperationCommandPayload(protobufBytes: command.protobufBytes()) == command)
+    #expect(try CancelOperationResultPayload(protobufBytes: result.protobufBytes()) == result)
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")

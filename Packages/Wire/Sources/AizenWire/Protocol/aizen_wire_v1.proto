@@ -369,6 +369,14 @@ message BuildXcodeProjectResult {
   string operation_id = 1;
 }
 
+message CancelOperationCommand {
+  string operation_id = 1;
+}
+
+message CancelOperationResult {
+  string operation_id = 1;
+}
+
 message ImportLocalFolderCommand {
   string space_id = 1;
   string path = 2;
