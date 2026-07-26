@@ -518,6 +518,50 @@ nonisolated struct AizenWireV1_ConfigureAgentLaunchResult: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_RunEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var eventID: String = String()
+
+  var sequence: UInt64 = 0
+
+  var spaceID: String = String()
+
+  var sessionID: String = String()
+
+  var runID: String = String()
+
+  var kind: AizenWireV1_RunEvent.OneOf_Kind? = nil
+
+  var lifecycle: String {
+    get {
+      if case .lifecycle(let v)? = kind {return v}
+      return String()
+    }
+    set {kind = .lifecycle(newValue)}
+  }
+
+  var assistantTextDelta: String {
+    get {
+      if case .assistantTextDelta(let v)? = kind {return v}
+      return String()
+    }
+    set {kind = .assistantTextDelta(newValue)}
+  }
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  nonisolated enum OneOf_Kind: Equatable, Sendable {
+    case lifecycle(String)
+    case assistantTextDelta(String)
+
+  }
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_ListSpacesQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1990,6 +2034,88 @@ nonisolated extension AizenWireV1_ConfigureAgentLaunchResult: SwiftProtobuf.Mess
   }
 
   static func ==(lhs: AizenWireV1_ConfigureAgentLaunchResult, rhs: AizenWireV1_ConfigureAgentLaunchResult) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_RunEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".RunEvent"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}event_id\0\u{1}sequence\0\u{3}space_id\0\u{3}session_id\0\u{3}run_id\0\u{1}lifecycle\0\u{3}assistant_text_delta\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.eventID) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.sequence) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.runID) }()
+      case 6: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.kind != nil {try decoder.handleConflictingOneOf()}
+          self.kind = .lifecycle(v)
+        }
+      }()
+      case 7: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.kind != nil {try decoder.handleConflictingOneOf()}
+          self.kind = .assistantTextDelta(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.eventID.isEmpty {
+      try visitor.visitSingularStringField(value: self.eventID, fieldNumber: 1)
+    }
+    if self.sequence != 0 {
+      try visitor.visitSingularUInt64Field(value: self.sequence, fieldNumber: 2)
+    }
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 3)
+    }
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 4)
+    }
+    if !self.runID.isEmpty {
+      try visitor.visitSingularStringField(value: self.runID, fieldNumber: 5)
+    }
+    switch self.kind {
+    case .lifecycle?: try {
+      guard case .lifecycle(let v)? = self.kind else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    }()
+    case .assistantTextDelta?: try {
+      guard case .assistantTextDelta(let v)? = self.kind else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_RunEvent, rhs: AizenWireV1_RunEvent) -> Bool {
+    if lhs.eventID != rhs.eventID {return false}
+    if lhs.sequence != rhs.sequence {return false}
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.runID != rhs.runID {return false}
+    if lhs.kind != rhs.kind {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

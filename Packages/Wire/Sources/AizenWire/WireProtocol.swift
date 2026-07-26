@@ -559,6 +559,61 @@ public struct ConfigureAgentLaunchResultPayload: WirePayload, Sendable, Hashable
     }
 }
 
+public struct RunEventPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.event.run@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let event: RunEvent
+
+    public init(event: RunEvent) {
+        self.event = event
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_RunEvent(serializedBytes: protobufBytes)
+        guard let eventID = UUID(uuidString: message.eventID),
+              let spaceID = UUID(uuidString: message.spaceID),
+              let sessionID = UUID(uuidString: message.sessionID),
+              let runID = UUID(uuidString: message.runID),
+              message.sequence > 0 else {
+            throw WireCodecError.invalidIdentity(message.eventID)
+        }
+        let kind: RunEventKind
+        switch message.kind {
+        case .lifecycle(let lifecycle):
+            guard let value = RunLifecycle(rawValue: lifecycle) else { throw WireCodecError.invalidIdentity(lifecycle) }
+            kind = .lifecycle(value)
+        case .assistantTextDelta(let text):
+            kind = .assistantTextDelta(text)
+        case nil:
+            throw WireCodecError.invalidIdentity(message.eventID)
+        }
+        event = RunEvent(
+            id: eventID,
+            sequence: message.sequence,
+            spaceID: SpaceID(rawValue: spaceID),
+            sessionID: SessionID(rawValue: sessionID),
+            runID: RunID(rawValue: runID),
+            kind: kind
+        )
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_RunEvent()
+        message.eventID = event.id.uuidString
+        message.sequence = event.sequence
+        message.spaceID = event.spaceID.description
+        message.sessionID = event.sessionID.description
+        message.runID = event.runID.description
+        switch event.kind {
+        case .lifecycle(let lifecycle): message.lifecycle = lifecycle.rawValue
+        case .assistantTextDelta(let text): message.assistantTextDelta = text
+        }
+        return try message.serializedData()
+    }
+}
+
 public struct ListSpacesQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.space.list@1")
     public static let schemaVersion: UInt32 = 1

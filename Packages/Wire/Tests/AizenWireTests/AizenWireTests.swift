@@ -111,6 +111,24 @@ import Testing
     #expect(try ConfigureAgentLaunchResultPayload(protobufBytes: ConfigureAgentLaunchResultPayload().protobufBytes()) == .init())
 }
 
+@Test func runEventPayloadRoundTrips() throws {
+    let eventID = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000001"))
+    let spaceID = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000002"))
+    let sessionID = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000003"))
+    let runID = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000004"))
+    let event = RunEvent(
+        id: eventID,
+        sequence: 1,
+        spaceID: SpaceID(rawValue: spaceID),
+        sessionID: SessionID(rawValue: sessionID),
+        runID: RunID(rawValue: runID),
+        kind: .assistantTextDelta("Hello")
+    )
+    let payload = RunEventPayload(event: event)
+
+    #expect(try RunEventPayload(protobufBytes: payload.protobufBytes()) == payload)
+}
+
 @Test func journalReplayPayloadRoundTripsTypedEvents() throws {
     let space = SpaceID()
     let event = JournalEvent(

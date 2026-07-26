@@ -144,6 +144,18 @@ message ConfigureAgentLaunchCommand {
 
 message ConfigureAgentLaunchResult {}
 
+message RunEvent {
+  string event_id = 1;
+  uint64 sequence = 2;
+  string space_id = 3;
+  string session_id = 4;
+  string run_id = 5;
+  oneof kind {
+    string lifecycle = 6;
+    string assistant_text_delta = 7;
+  }
+}
+
 message ListSpacesQuery {}
 
 message SpaceRecord {
