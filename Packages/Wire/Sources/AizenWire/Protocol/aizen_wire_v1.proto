@@ -385,6 +385,24 @@ message ListTerminalSessionsResponse {
   repeated TerminalSessionRecord sessions = 1;
 }
 
+// Filesystem paths are always relative to the execution-context root. The Host
+// resolves and validates them; neither request nor response carries a local path.
+message ListContextFilesQuery {
+  string execution_context_id = 1;
+  string relative_path = 2;
+  bool include_hidden = 3;
+}
+
+message ContextFileEntryRecord {
+  string relative_path = 1;
+  string name = 2;
+  bool is_directory = 3;
+}
+
+message ListContextFilesResponse {
+  repeated ContextFileEntryRecord entries = 1;
+}
+
 message CreateTerminalSessionCommand {
   string terminal_session_id = 1;
   string space_id = 2;

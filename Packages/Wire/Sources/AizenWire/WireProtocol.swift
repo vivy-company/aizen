@@ -1479,6 +1479,69 @@ public struct ListTerminalSessionsResponsePayload: WirePayload, Sendable, Hashab
     }
 }
 
+public struct ListContextFilesQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.context-files.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let executionContextID: String
+    public let relativePath: String
+    public let includeHidden: Bool
+
+    public init(executionContextID: String, relativePath: String = "", includeHidden: Bool = false) {
+        precondition(!executionContextID.isEmpty, "Context file listing requires an execution context")
+        self.executionContextID = executionContextID
+        self.relativePath = relativePath
+        self.includeHidden = includeHidden
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListContextFilesQuery(serializedBytes: protobufBytes)
+        guard !message.executionContextID.isEmpty else { throw WireCodecError.invalidIdentity("execution context") }
+        self.init(executionContextID: message.executionContextID, relativePath: message.relativePath, includeHidden: message.includeHidden)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListContextFilesQuery()
+        message.executionContextID = executionContextID
+        message.relativePath = relativePath
+        message.includeHidden = includeHidden
+        return try message.serializedData()
+    }
+}
+
+public struct ListContextFilesResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.context-files.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let entries: [ContextFileEntry]
+
+    public init(entries: [ContextFileEntry]) { self.entries = entries }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListContextFilesResponse(serializedBytes: protobufBytes)
+        entries = try message.entries.map { record in
+            guard !record.relativePath.hasPrefix("/"), !record.name.isEmpty else {
+                throw WireCodecError.invalidIdentity("context file entry")
+            }
+            return .init(relativePath: record.relativePath, name: record.name, isDirectory: record.isDirectory)
+        }
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListContextFilesResponse()
+        message.entries = entries.map { entry in
+            var record = AizenWireV1_ContextFileEntryRecord()
+            record.relativePath = entry.relativePath
+            record.name = entry.name
+            record.isDirectory = entry.isDirectory
+            return record
+        }
+        return try message.serializedData()
+    }
+}
+
 public struct CreateTerminalSessionCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.terminal-session.create@1")
     public static let schemaVersion: UInt32 = 1

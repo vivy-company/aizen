@@ -916,6 +916,40 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     ))
 }
 
+@Test func localHostListsExecutionContextFilesThroughTypedWire() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let checkout = root.appendingPathComponent("checkout", isDirectory: true)
+    try FileManager.default.createDirectory(at: checkout.appendingPathComponent("Sources"), withIntermediateDirectories: true)
+    try Data("readme".utf8).write(to: checkout.appendingPathComponent("README.md"))
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Files")
+    let context = ExecutionContext(
+        spaceID: space.id,
+        kind: .repositoryCheckout,
+        hostReference: .init(rawValue: "local-checkout:\(checkout.path)")
+    )
+    _ = try await storage.transact { snapshot in
+        snapshot.spaces.append(space)
+        snapshot.executionContexts.append(context)
+    }
+    let host = LocalHost(storage: storage)
+
+    let response = try await host.receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ListContextFilesQueryPayload(executionContextID: context.id.description))
+    ))
+
+    #expect(response.payload.identifier == ListContextFilesResponsePayload.identifier)
+    #expect(try ListContextFilesResponsePayload(protobufBytes: response.payload.protobufBytes).entries == [
+        .init(relativePath: "Sources", name: "Sources", isDirectory: true),
+        .init(relativePath: "README.md", name: "README.md", isDirectory: false)
+    ])
+}
+
 @Test func hostCreatesLinkedWorktreeContextsThroughAHostOperation() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

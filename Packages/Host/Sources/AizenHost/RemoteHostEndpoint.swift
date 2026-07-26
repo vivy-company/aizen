@@ -96,6 +96,10 @@ public struct RemoteHostEndpoint: WireEndpoint {
         case ListTerminalSessionsQueryPayload.identifier:
             let request = try ListTerminalSessionsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             return try requirementForOptionalSpace(request.spaceID)
+        case ListContextFilesQueryPayload.identifier:
+            let request = try ListContextFilesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let context = try await requiredExecutionContext(request.executionContextID)
+            return .init(capability: .fileRead, spaceID: context.spaceID, resourceID: context.resourceID, rateLimitKind: nil)
         case GetConversationTimelineQueryPayload.identifier:
             let request = try GetConversationTimelineQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let conversation = try await requiredSession(request.sessionID)

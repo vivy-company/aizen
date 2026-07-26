@@ -131,6 +131,30 @@ import AizenWire
     #expect(try await client.spaces().map(\.name) == ["Vivy"])
 }
 
+@Test func clientListsContextFilesThroughTheHost() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let checkout = root.appendingPathComponent("checkout", isDirectory: true)
+    try FileManager.default.createDirectory(at: checkout, withIntermediateDirectories: true)
+    try Data("readme".utf8).write(to: checkout.appendingPathComponent("README.md"))
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Files")
+    let context = ExecutionContext(
+        spaceID: space.id,
+        kind: .repositoryCheckout,
+        hostReference: .init(rawValue: "local-checkout:\(checkout.path)")
+    )
+    _ = try await storage.transact { snapshot in
+        snapshot.spaces.append(space)
+        snapshot.executionContexts.append(context)
+    }
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+
+    #expect(try await client.contextFiles(executionContextID: context.id) == [
+        .init(relativePath: "README.md", name: "README.md", isDirectory: false)
+    ])
+}
+
 @Test func clientListsHostOwnedTerminalSessions() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

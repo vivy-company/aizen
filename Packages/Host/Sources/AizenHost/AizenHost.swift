@@ -36,6 +36,7 @@ public actor LocalHost: WireEndpoint {
     private let pairingRegistry: PairingRequestRegistry?
     private let linkedWorktrees: (any LinkedWorktreeCreating)?
     private let independentContexts: (any IndependentContextCreating)?
+    private let contextFiles: ExecutionContextFileService
 
     public init(
         storage: StorageRepository,
@@ -57,6 +58,7 @@ public actor LocalHost: WireEndpoint {
         self.pairingRegistry = pairingRegistry
         self.linkedWorktrees = linkedWorktrees
         self.independentContexts = independentContexts
+        self.contextFiles = .init(storage: storage)
     }
 
     public func runEvents() async -> AsyncStream<RunEvent> {
@@ -96,6 +98,8 @@ public actor LocalHost: WireEndpoint {
                 ListExecutionContextsResponsePayload.identifier,
                 ListTerminalSessionsQueryPayload.identifier,
                 ListTerminalSessionsResponsePayload.identifier,
+                ListContextFilesQueryPayload.identifier,
+                ListContextFilesResponsePayload.identifier,
                 CreateTerminalSessionCommandPayload.identifier,
                 CreateTerminalSessionResultPayload.identifier,
                 CreateSpaceCommandPayload.identifier,
@@ -218,6 +222,16 @@ public actor LocalHost: WireEndpoint {
             let sessions = try await storage.load().terminalSessions.filter { spaceID == nil || $0.spaceID == spaceID }
             kind = .queryResponse
             payload = try TypedPayload(ListTerminalSessionsResponsePayload(sessions: sessions))
+        case .query where envelope.payload.identifier == ListContextFilesQueryPayload.identifier:
+            let query = try ListContextFilesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let contextID = try Self.executionContextID(from: query.executionContextID)
+            let entries = try await contextFiles.listDirectory(
+                contextID: contextID,
+                relativePath: query.relativePath,
+                includeHidden: query.includeHidden
+            )
+            kind = .queryResponse
+            payload = try TypedPayload(ListContextFilesResponsePayload(entries: entries))
         case .command where envelope.payload.identifier == CreateTerminalSessionCommandPayload.identifier:
             let command = try CreateTerminalSessionCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)

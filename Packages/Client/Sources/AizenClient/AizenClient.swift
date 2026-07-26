@@ -517,6 +517,28 @@ public actor HostClient {
         return try ListTerminalSessionsResponsePayload(protobufBytes: response.payload.protobufBytes).sessions
     }
 
+    public func contextFiles(
+        executionContextID: ExecutionContextID,
+        relativePath: String = "",
+        includeHidden: Bool = false
+    ) async throws -> [ContextFileEntry] {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(ListContextFilesQueryPayload(
+                executionContextID: executionContextID.description,
+                relativePath: relativePath,
+                includeHidden: includeHidden
+            ))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == ListContextFilesResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try ListContextFilesResponsePayload(protobufBytes: response.payload.protobufBytes).entries
+    }
+
     public func createTerminalSession(
         id: SessionID = SessionID(),
         spaceID: SpaceID,
