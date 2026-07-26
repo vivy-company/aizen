@@ -199,6 +199,44 @@ import Testing
     #expect(await recorder.channels == [.blob, .control, .blob])
 }
 
+@Test func fullDuplexRemoteTransportDemultiplexesRepliesAndHostEvents() async throws {
+    let hostEphemeral = ConnectionEphemeralKey()
+    let deviceEphemeral = ConnectionEphemeralKey()
+    let binding = try ConnectionAuthenticationBinding(
+        protocolGeneration: 1,
+        hostID: HostID(),
+        deviceID: DeviceID(),
+        connectionID: UUID(),
+        clientNonce: Data(repeating: 1, count: 32),
+        serverNonce: Data(repeating: 2, count: 32),
+        clientEphemeralPublicKey: deviceEphemeral.publicKey,
+        serverEphemeralPublicKey: hostEphemeral.publicKey,
+        route: .lan
+    )
+    let server = AuthenticatedWireChannel(keys: try ConnectionAuthenticator.deriveKeys(participant: .host, ephemeralKey: hostEphemeral, peerEphemeralPublicKey: deviceEphemeral.publicKey, binding: binding), binding: binding)
+    let client = AuthenticatedWireChannel(keys: try ConnectionAuthenticator.deriveKeys(participant: .device, ephemeralKey: deviceEphemeral, peerEphemeralPublicKey: hostEphemeral.publicKey, binding: binding), binding: binding)
+    let frames = AsyncThrowingStream<Data, Error>.makeStream()
+    let transport = AuthenticatedRemoteWireTransport(channel: client, frameSender: { frame in
+        let request = try await server.open(frame)
+        frames.continuation.yield(try await server.seal(request))
+    })
+    await transport.startReceiving(frames.stream)
+
+    let request = try testEnvelope(messageID: "duplex-request", channel: .control)
+    #expect(try await transport.send(request) == request)
+
+    let events = try await transport.runEvents()
+    let next = Task {
+        var iterator = events.makeAsyncIterator()
+        return await iterator.next()
+    }
+    let run = RunEvent(sequence: 9, spaceID: SpaceID(), sessionID: SessionID(), runID: RunID(), kind: .assistantTextDelta("ready"))
+    let envelope = try ProtocolEnvelope(messageID: UUID().uuidString, connectionSequence: run.sequence, kind: .event, channel: .runStream, payload: TypedPayload(RunEventPayload(event: run)))
+    frames.continuation.yield(try await server.seal(envelope))
+    #expect(await next.value == HostEvent.run(run))
+    frames.continuation.finish()
+}
+
 private actor AuthenticatedTestServer {
     private let host: HostPublicIdentity
     private let hostIdentity: LocalCryptographicIdentity

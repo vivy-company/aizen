@@ -46,9 +46,11 @@ public struct RemoteWebSocketRouteConnector: Sendable {
         try await bridge.start()
         let routeKind = connectionRoute(for: route.kind)
         let authenticator = RemoteClientAuthenticator(host: host, device: device, deviceIdentity: deviceIdentity, route: routeKind)
-        let transport = try await authenticator.authenticate { frame in
-            try await bridge.exchange(frame)
-        }
+        let transport = try await authenticator.authenticate(
+            using: { frame in try await bridge.exchange(frame) },
+            frameSender: { frame in try await bridge.send(frame) },
+            frameStream: { bridge.frames() }
+        )
         return .init(
             transport: transport,
             authenticatedHostIdentity: host.cryptographicIdentity.fingerprint.description,
@@ -131,7 +133,7 @@ private final class RemoteWebSocketFrameExchange: @unchecked Sendable {
         return try await receive()
     }
 
-    private func send(_ frame: Data) async throws {
+    func send(_ frame: Data) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             queue.async { [connection] in
                 connection.send(
@@ -164,6 +166,28 @@ private final class RemoteWebSocketFrameExchange: @unchecked Sendable {
                     continuation.resume(returning: content)
                 }
             }
+        }
+    }
+
+    func frames() -> AsyncThrowingStream<Data, Error> {
+        AsyncThrowingStream { continuation in
+            queue.async { [weak self] in self?.receiveNext(continuation) }
+            continuation.onTermination = { [weak self] _ in self?.connection.cancel() }
+        }
+    }
+
+    private func receiveNext(_ continuation: AsyncThrowingStream<Data, Error>.Continuation) {
+        connection.receiveMessage { [weak self] content, context, _, error in
+            guard let self else { return }
+            guard error == nil,
+                  let content,
+                  content.count <= AuthenticatedWireFrame.maximumCiphertextLength + 12,
+                  (context?.protocolMetadata(definition: NWProtocolWebSocket.definition) as? NWProtocolWebSocket.Metadata)?.opcode == .binary else {
+                continuation.finish(throwing: error.map { RemoteWebSocketTransportError.connectionFailed($0.debugDescription) } ?? .invalidFrame)
+                return
+            }
+            continuation.yield(content)
+            self.receiveNext(continuation)
         }
     }
 

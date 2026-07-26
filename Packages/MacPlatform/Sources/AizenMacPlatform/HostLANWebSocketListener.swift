@@ -218,6 +218,40 @@ actor HostLANWebSocketProcessor {
             return try await channel.seal(ProtocolEnvelope(messageID: UUID().uuidString, connectionID: request.connectionID, connectionSequence: request.connectionSequence, kind: .commandReceipt, channel: .control, correlationID: request.messageID, payload: .init(PairingPendingPayload(tokenID: pending.tokenID))))
         }
     }
+
+    func eventFrames() async -> AsyncStream<Data>? {
+        guard case let .authenticated(channel, endpoint) = phase else { return nil }
+        let events = await endpoint.runEvents()
+        return AsyncStream { continuation in
+            let forwarding = Task {
+                for await event in events {
+                    guard !Task.isCancelled else { return }
+                    let envelope: ProtocolEnvelope
+                    switch event {
+                    case let .run(run):
+                        envelope = try ProtocolEnvelope(
+                            messageID: UUID().uuidString,
+                            connectionSequence: run.sequence,
+                            kind: .event,
+                            channel: .runStream,
+                            payload: TypedPayload(RunEventPayload(event: run))
+                        )
+                    case let .terminalOutput(output):
+                        envelope = try ProtocolEnvelope(
+                            messageID: UUID().uuidString,
+                            connectionSequence: output.sequence,
+                            kind: .event,
+                            channel: .terminal,
+                            payload: TypedPayload(TerminalOutputEventPayload(event: output))
+                        )
+                    }
+                    continuation.yield(try await channel.seal(envelope))
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in forwarding.cancel() }
+        }
+    }
 }
 
 /// All Network access is confined to `queue`; the processor actor owns protocol state.
@@ -227,6 +261,11 @@ private final class HostLANWebSocketConnection: @unchecked Sendable {
     private let processor: HostLANWebSocketProcessor
     private let onClose: @Sendable () -> Void
     private var closed = false
+    private var inbound: [Data] = []
+    private var outbound: [Data] = []
+    private var isProcessing = false
+    private var isSending = false
+    private var eventTask: Task<Void, Never>?
 
     init(connection: NWConnection, queue: DispatchQueue, processor: HostLANWebSocketProcessor, onClose: @escaping @Sendable () -> Void) {
         self.connection = connection
@@ -257,24 +296,62 @@ private final class HostLANWebSocketConnection: @unchecked Sendable {
                 self.close()
                 return
             }
-            Task { [weak self] in
-                do {
+            guard self.inbound.count < 64 else { self.close(); return }
+            self.inbound.append(content)
+            self.receiveNext()
+            self.processNext()
+        }
+    }
+
+    private func processNext() {
+        guard !isProcessing, !inbound.isEmpty else { return }
+        isProcessing = true
+        let request = inbound.removeFirst()
+        Task { [weak self] in
+            do {
+                guard let self else { return }
+                let response = try await self.processor.receive(request)
+                let events = await self.processor.eventFrames()
+                self.queue.async { [weak self] in
                     guard let self else { return }
-                    let response = try await self.processor.receive(content)
-                    self.queue.async { [weak self] in self?.send(response) }
-                } catch {
-                    self?.queue.async { [weak self] in self?.close() }
+                    self.enqueue(response)
+                    self.startEventForwarding(events)
+                    self.isProcessing = false
+                    self.processNext()
                 }
+            } catch {
+                self?.queue.async { [weak self] in self?.close() }
             }
         }
     }
 
-    private func send(_ response: Data) {
+    private func startEventForwarding(_ events: AsyncStream<Data>?) {
+        guard eventTask == nil, let events else { return }
+        eventTask = Task { [weak self] in
+            for await frame in events {
+                guard !Task.isCancelled else { return }
+                self?.queue.async { [weak self] in self?.enqueue(frame) }
+            }
+        }
+    }
+
+    private func enqueue(_ response: Data) {
+        guard !closed else { return }
+        outbound.append(response)
+        sendNext()
+    }
+
+    private func sendNext() {
+        guard !isSending, let response = outbound.first else { return }
+        isSending = true
         connection.send(content: response, contentContext: .init(identifier: "aizen.binary", metadata: [NWProtocolWebSocket.Metadata(opcode: .binary)]), isComplete: true, completion: .contentProcessed { [weak self] error in
+            guard let self else { return }
             if error == nil {
-                self?.receiveNext()
+                self.outbound.removeFirst()
+                self.isSending = false
+                self.sendNext()
             } else {
-                self?.close()
+                self.close()
             }
         })
     }
@@ -282,6 +359,8 @@ private final class HostLANWebSocketConnection: @unchecked Sendable {
     private func close() {
         guard !closed else { return }
         closed = true
+        eventTask?.cancel()
+        eventTask = nil
         connection.cancel()
         onClose()
     }

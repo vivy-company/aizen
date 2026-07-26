@@ -53,12 +53,12 @@ public struct RemoteClientAuthenticator: Sendable {
     public func authenticate(
         using exchange: @escaping RemoteFrameExchange,
         frameSender: @escaping RemoteFrameSender,
-        frames: AsyncThrowingStream<Data, Error>
+        frameStream: @escaping @Sendable () -> AsyncThrowingStream<Data, Error>
     ) async throws -> AuthenticatedRemoteWireTransport {
         let transport = try await authenticate(using: exchange) { channel in
             AuthenticatedRemoteWireTransport(channel: channel, frameSender: frameSender)
         }
-        await transport.startReceiving(frames)
+        await transport.startReceiving(frameStream())
         return transport
     }
 
