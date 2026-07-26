@@ -11,7 +11,8 @@ enum HostService {
         do {
             let configuration = try HostMachServiceConfiguration(
                 machServiceName: machServiceName,
-                teamIdentifier: teamIdentifier
+                teamIdentifier: teamIdentifier,
+                allowsDevelopmentClients: developmentClientsAreAllowed
             )
             let displayName = Host.current().localizedName ?? ProcessInfo.processInfo.hostName
             let credentials = try await HostIdentityStore().loadOrCreateCredentials(displayName: displayName)
@@ -29,5 +30,13 @@ enum HostService {
             try? HostStartupStatusStore.recordFailure(error, storageURL: storageURL)
             throw error
         }
+    }
+
+    private static var developmentClientsAreAllowed: Bool {
+        #if DEBUG
+        true
+        #else
+        false
+        #endif
     }
 }

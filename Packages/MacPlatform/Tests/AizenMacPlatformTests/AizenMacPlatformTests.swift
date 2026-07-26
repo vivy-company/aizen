@@ -21,6 +21,16 @@ import Testing
     }
 }
 
+@Test func developmentHostConfigurationAllowsOnlyBundledDebugProducts() throws {
+    let configuration = try HostMachServiceConfiguration(
+        machServiceName: "win.aizen.host",
+        teamIdentifier: "QW4U57CXJX",
+        allowsDevelopmentClients: true
+    )
+
+    #expect(configuration.peerCodeSigningRequirement == "identifier \"Aizen\" or identifier \"aizen-cli\"")
+}
+
 @Test func machWireServiceExportsStableHostErrorCodes() {
     #expect(hostErrorPayload(for: HostProtocolError.unknownResource(ResourceID())).code == HostErrorCode.unknownResource.rawValue)
     #expect(hostErrorPayload(for: HostProtocolError.runtimeUnavailable).code == HostErrorCode.unavailable.rawValue)

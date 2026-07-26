@@ -38,8 +38,9 @@ public enum HostMachServiceConfigurationError: Swift.Error, Sendable, Equatable 
 public struct HostMachServiceConfiguration: Sendable, Equatable {
     public let machServiceName: String
     public let teamIdentifier: String
+    public let allowsDevelopmentClients: Bool
 
-    public init(machServiceName: String, teamIdentifier: String) throws {
+    public init(machServiceName: String, teamIdentifier: String, allowsDevelopmentClients: Bool = false) throws {
         guard !machServiceName.isEmpty,
               !teamIdentifier.isEmpty,
               teamIdentifier.unicodeScalars.allSatisfy({ $0.isASCII && ($0.properties.isAlphabetic || $0.properties.numericType != nil) }) else {
@@ -47,10 +48,16 @@ public struct HostMachServiceConfiguration: Sendable, Equatable {
         }
         self.machServiceName = machServiceName
         self.teamIdentifier = teamIdentifier
+        self.allowsDevelopmentClients = allowsDevelopmentClients
     }
 
     public var peerCodeSigningRequirement: String {
-        "anchor apple generic and certificate leaf[subject.OU] = \"\(teamIdentifier)\""
+        if allowsDevelopmentClients {
+            // Debug products are ad-hoc signed, so development must opt in to the exact bundled
+            // product identifiers rather than silently disabling peer authentication altogether.
+            return "identifier \"Aizen\" or identifier \"aizen-cli\""
+        }
+        return "anchor apple generic and certificate leaf[subject.OU] = \"\(teamIdentifier)\""
     }
 }
 
