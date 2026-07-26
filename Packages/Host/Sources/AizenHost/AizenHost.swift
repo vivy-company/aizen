@@ -235,20 +235,22 @@ public actor LocalHost: WireEndpoint {
         case .command where envelope.payload.identifier == ImportLocalRepositoryCommandPayload.identifier:
             let command = try ImportLocalRepositoryCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
-            let directory = try Self.localDirectory(from: command.path)
-            guard Self.isGitRepository(directory) else { throw HostProtocolError.invalidResourcePath(directory.path) }
-            let resource = Resource(spaceID: spaceID, kind: .repository, title: command.title ?? directory.lastPathComponent, details: .hostPrivate(.init(rawValue: "local-repository:\(directory.path)")))
-            let snapshot = try await storage.transact { snapshot in
-                guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
-                if let existing = snapshot.resources.first(where: { $0.details == resource.details }) {
-                    guard existing.spaceID == spaceID else { throw HostProtocolError.duplicateResource(existing.id) }
-                    return
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                let directory = try Self.localDirectory(from: command.path)
+                guard Self.isGitRepository(directory) else { throw HostProtocolError.invalidResourcePath(directory.path) }
+                let resource = Resource(spaceID: spaceID, kind: .repository, title: command.title ?? directory.lastPathComponent, details: .hostPrivate(.init(rawValue: "local-repository:\(directory.path)")))
+                let snapshot = try await self.storage.transact { snapshot in
+                    guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
+                    if let existing = snapshot.resources.first(where: { $0.details == resource.details }) {
+                        guard existing.spaceID == spaceID else { throw HostProtocolError.duplicateResource(existing.id) }
+                        return
+                    }
+                    snapshot.resources.append(resource)
                 }
-                snapshot.resources.append(resource)
+                guard let imported = snapshot.resources.first(where: { $0.details == resource.details }) else { throw HostProtocolError.unknownResource(resource.id) }
+                return try TypedPayload(ImportLocalRepositoryResultPayload(resourceID: imported.id.description))
             }
-            guard let imported = snapshot.resources.first(where: { $0.details == resource.details }) else { throw HostProtocolError.unknownResource(resource.id) }
             kind = .commandResult
-            payload = try TypedPayload(ImportLocalRepositoryResultPayload(resourceID: imported.id.description))
         case .command where envelope.payload.identifier == RemoveResourceCommandPayload.identifier:
             let command = try RemoveResourceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             guard let uuid = UUID(uuidString: command.resourceID) else { throw HostProtocolError.invalidIdentity(command.resourceID) }
