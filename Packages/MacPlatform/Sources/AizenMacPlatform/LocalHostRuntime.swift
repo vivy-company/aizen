@@ -6,10 +6,12 @@ import Foundation
 public final class LocalHostRuntime: @unchecked Sendable {
     public let host: LocalHost
     public let agentLaunchConfiguration: HostAgentLaunchConfigurationStore
+    private let storage: StorageRepository
     private let migrationGate: HostMigrationGate
 
     public init(storageURL: URL) {
         let storage = StorageRepository(url: storageURL)
+        self.storage = storage
         let root = storageURL.deletingLastPathComponent()
         let agentLaunchConfiguration = HostAgentLaunchConfigurationStore(
             configurationURL: root.appendingPathComponent("host-agent-launch.json")
@@ -42,5 +44,15 @@ public final class LocalHostRuntime: @unchecked Sendable {
 
     public func makeMachListener(configuration: HostMachServiceConfiguration) throws -> MachWireHostListener {
         try MachWireHostListener(configuration: configuration, endpoint: migrationGate)
+    }
+
+    @MainActor
+    public func makeLANListener(credentials: HostIdentityCredentials) -> HostLANWebSocketListener {
+        HostLANWebSocketListener(
+            host: credentials.publicIdentity,
+            hostIdentity: credentials.localIdentity,
+            storage: storage,
+            endpoint: migrationGate
+        )
     }
 }

@@ -34,7 +34,7 @@ struct AizenCLI {
 
     static func run() async throws {
         if ProcessInfo.processInfo.environment["AIZEN_HOST_SERVICE"] == "1" {
-            try HostService.serve(storageURL: V2CLIClient.defaultStorageURL())
+            try await HostService.serve(storageURL: V2CLIClient.defaultStorageURL())
         }
         let args = Array(CommandLine.arguments.dropFirst())
         if args.isEmpty {
@@ -95,7 +95,7 @@ private extension AizenCLI {
         guard args == ["serve"] else {
             throw CLIError.invalidArguments("host requires: serve")
         }
-        try HostService.serve(storageURL: V2CLIClient.defaultStorageURL())
+        try await HostService.serve(storageURL: V2CLIClient.defaultStorageURL())
     }
 
     static func handleVersion(_ args: [String]) async throws {
