@@ -309,14 +309,16 @@ public actor LocalHost: WireEndpoint {
             let command = try CreateRepositoryCheckoutContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
             let resourceID = try Self.resourceID(from: command.resourceID)
-            let context = ExecutionContext(spaceID: spaceID, kind: .repositoryCheckout, resourceID: resourceID, hostReference: .init(rawValue: "repository-checkout:\(resourceID.description)"))
-            _ = try await storage.transact { snapshot in
-                guard let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == spaceID }), resource.kind == .repository else { throw HostProtocolError.unknownResource(resourceID) }
-                guard !snapshot.executionContexts.contains(where: { $0.resourceID == resourceID && $0.kind == .repositoryCheckout }) else { throw HostProtocolError.resourceInUse(resourceID) }
-                snapshot.executionContexts.append(context)
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                let context = ExecutionContext(spaceID: spaceID, kind: .repositoryCheckout, resourceID: resourceID, hostReference: .init(rawValue: "repository-checkout:\(resourceID.description)"))
+                _ = try await self.storage.transact { snapshot in
+                    guard let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == spaceID }), resource.kind == .repository else { throw HostProtocolError.unknownResource(resourceID) }
+                    guard !snapshot.executionContexts.contains(where: { $0.resourceID == resourceID && $0.kind == .repositoryCheckout }) else { throw HostProtocolError.resourceInUse(resourceID) }
+                    snapshot.executionContexts.append(context)
+                }
+                return try TypedPayload(CreateRepositoryCheckoutContextResultPayload(contextID: context.id.description))
             }
             kind = .commandResult
-            payload = try TypedPayload(CreateRepositoryCheckoutContextResultPayload(contextID: context.id.description))
         case .command where envelope.payload.identifier == RemoveExecutionContextCommandPayload.identifier:
             let command = try RemoveExecutionContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let contextID = try Self.executionContextID(from: command.contextID)
