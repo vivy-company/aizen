@@ -1,6 +1,7 @@
 import AizenClient
 import AizenCore
 import AizenMacPlatform
+import AizenWire
 import Foundation
 import Darwin
 
@@ -378,7 +379,7 @@ private extension AizenCLI {
 
     static func handleExecutionContext(_ args: [String]) async throws {
         guard let subcommand = args.first else {
-            throw CLIError.invalidArguments("context requires list, create, create-checkout, attach, detach, or remove")
+            throw CLIError.invalidArguments("context requires list, create, create-checkout, create-worktree, clone, copy, attach, detach, or remove")
         }
         let rest = Array(args.dropFirst())
         let client = V2CLIClient()
@@ -413,6 +414,17 @@ private extension AizenCLI {
             let spaceID = try await resolveV2Space(rest[0], client: client)
             guard let spaceID else { throw CLIError.invalidArguments("context create-checkout requires a space") }
             print(try await client.createRepositoryCheckoutContext(spaceID: spaceID, resourceID: ResourceID(rawValue: resourceUUID)).description)
+        case "create-worktree":
+            guard rest.count == 4, let resourceUUID = UUID(uuidString: rest[1]) else { throw CLIError.invalidArguments("context create-worktree requires a space, Resource ID, destination path, and branch") }
+            guard let spaceID = try await resolveV2Space(rest[0], client: client) else { throw CLIError.invalidArguments("context create-worktree requires a space") }
+            let result = try await client.createLinkedWorktreeContext(spaceID: spaceID, resourceID: ResourceID(rawValue: resourceUUID), destinationPath: rest[2], branch: rest[3], createBranch: true)
+            print("\(result.0.description)\t\(result.1.description)")
+        case "clone", "copy":
+            guard rest.count == 3, let resourceUUID = UUID(uuidString: rest[1]) else { throw CLIError.invalidArguments("context \(subcommand) requires a space, Resource ID, and destination path") }
+            guard let spaceID = try await resolveV2Space(rest[0], client: client) else { throw CLIError.invalidArguments("context \(subcommand) requires a space") }
+            let mode: IndependentContextMode = subcommand == "clone" ? .clone : .copy
+            let result = try await client.createIndependentContext(spaceID: spaceID, resourceID: ResourceID(rawValue: resourceUUID), destinationPath: rest[2], mode: mode)
+            print("\(result.0.description)\t\(result.1.description)")
         case "remove":
             guard rest.count == 1, let contextUUID = UUID(uuidString: rest[0]) else {
                 throw CLIError.invalidArguments("context remove requires a Context ID")

@@ -559,6 +559,14 @@ public actor HostClient {
         return (.init(rawValue: context), .init(rawValue: operation))
     }
 
+    public func createIndependentContext(spaceID: SpaceID, resourceID: ResourceID, destinationPath: String, mode: IndependentContextMode) async throws -> (contextID: ExecutionContextID, operationID: OperationID) {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(CreateIndependentContextCommandPayload(spaceID: spaceID.description, resourceID: resourceID.description, destinationPath: destinationPath, mode: mode))))
+        guard response.kind == .commandResult, response.payload.identifier == CreateIndependentContextResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        let result = try CreateIndependentContextResultPayload(protobufBytes: response.payload.protobufBytes)
+        guard let context = UUID(uuidString: result.contextID), let operation = UUID(uuidString: result.operationID) else { throw Error.invalidIdentity("Independent context result") }
+        return (.init(rawValue: context), .init(rawValue: operation))
+    }
+
     public func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {
         let response = try await send(.init(
             messageID: UUID().uuidString,

@@ -130,6 +130,18 @@ actor V2CLIClient {
         return try await client.createRepositoryCheckoutContext(spaceID: spaceID, resourceID: resourceID)
     }
 
+    func createLinkedWorktreeContext(spaceID: SpaceID, resourceID: ResourceID, destinationPath: String, branch: String, createBranch: Bool, baseBranch: String? = nil) async throws -> (ExecutionContextID, OperationID) {
+        try await recoverPendingCommands()
+        let result = try await client.createLinkedWorktreeContext(spaceID: spaceID, resourceID: resourceID, destinationPath: destinationPath, branch: branch, createBranch: createBranch, baseBranch: baseBranch)
+        return (result.contextID, result.operationID)
+    }
+
+    func createIndependentContext(spaceID: SpaceID, resourceID: ResourceID, destinationPath: String, mode: IndependentContextMode) async throws -> (ExecutionContextID, OperationID) {
+        try await recoverPendingCommands()
+        let result = try await client.createIndependentContext(spaceID: spaceID, resourceID: resourceID, destinationPath: destinationPath, mode: mode)
+        return (result.contextID, result.operationID)
+    }
+
     func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {
         try await recoverPendingCommands()
         try await client.attachExecutionContext(sessionID: sessionID, contextID: contextID)
