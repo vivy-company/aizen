@@ -31,6 +31,16 @@
 		CCF00000000000000000000D /* aizen-cli in Copy CLI */ = {isa = PBXBuildFile; fileRef = CCF000000000000000000001 /* aizen-cli */; };
 		D40AC0EE6127B8397D78C242 /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = 2CE06D116E3316BF792222D8 /* MLXFFT */; };
 		F023734E9DB882ACB5152A8C /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = F9A93A2E8948A4831C8E4835 /* MLX */; };
+		F20000000000000000000071 /* AizenClient in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000061 /* AizenClient */; };
+		F20000000000000000000072 /* AizenHost in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000062 /* AizenHost */; };
+		F20000000000000000000073 /* AizenStorage in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000063 /* AizenStorage */; };
+		F20000000000000000000074 /* AizenTransport in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000064 /* AizenTransport */; };
+		F20000000000000000000075 /* AizenMacPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000065 /* AizenMacPlatform */; };
+		F20000000000000000000076 /* AizenClient in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000066 /* AizenClient */; };
+		F20000000000000000000077 /* AizenHost in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000067 /* AizenHost */; };
+		F20000000000000000000078 /* AizenStorage in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000068 /* AizenStorage */; };
+		F20000000000000000000079 /* AizenTransport in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000069 /* AizenTransport */; };
+		F2000000000000000000007A /* AizenMacPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = F2000000000000000000006A /* AizenMacPlatform */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -149,6 +159,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F20000000000000000000076 /* AizenClient in Frameworks */,
+				F20000000000000000000077 /* AizenHost in Frameworks */,
+				F20000000000000000000078 /* AizenStorage in Frameworks */,
+				F20000000000000000000079 /* AizenTransport in Frameworks */,
+				F2000000000000000000007A /* AizenMacPlatform in Frameworks */,
 				CCACP0001000000000000002 /* ACP in Frameworks */,
 				CCACP0001000000000000004 /* ACPRegistry in Frameworks */,
 				A1D4A4A2B3C4D5E6F7A8B902 /* VVDevKit in Frameworks */,
@@ -167,6 +182,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F20000000000000000000071 /* AizenClient in Frameworks */,
+				F20000000000000000000072 /* AizenHost in Frameworks */,
+				F20000000000000000000073 /* AizenStorage in Frameworks */,
+				F20000000000000000000074 /* AizenTransport in Frameworks */,
+				F20000000000000000000075 /* AizenMacPlatform in Frameworks */,
 				CCACP0001000000000000001 /* ACP in Frameworks */,
 				CCACP0001000000000000003 /* ACPRegistry in Frameworks */,
 				A1D4A4A2B3C4D5E6F7A8B901 /* VVDevKit in Frameworks */,
@@ -262,6 +282,11 @@
 			);
 			name = "aizen nightly";
 			packageProductDependencies = (
+				F20000000000000000000066 /* AizenClient */,
+				F20000000000000000000067 /* AizenHost */,
+				F20000000000000000000068 /* AizenStorage */,
+				F20000000000000000000069 /* AizenTransport */,
+				F2000000000000000000006A /* AizenMacPlatform */,
 				CCACP0002000000000000002 /* ACP */,
 				CCACP0002000000000000004 /* ACPRegistry */,
 				A1D4A4A2B3C4D5E6F7A8B912 /* VVDevKit */,
@@ -296,6 +321,11 @@
 			);
 			name = aizen;
 			packageProductDependencies = (
+				F20000000000000000000061 /* AizenClient */,
+				F20000000000000000000062 /* AizenHost */,
+				F20000000000000000000063 /* AizenStorage */,
+				F20000000000000000000064 /* AizenTransport */,
+				F20000000000000000000065 /* AizenMacPlatform */,
 				CCACP0002000000000000001 /* ACP */,
 				CCACP0002000000000000003 /* ACPRegistry */,
 				A1D4A4A2B3C4D5E6F7A8B911 /* VVDevKit */,
@@ -409,6 +439,11 @@
 			mainGroup = CCB04B392EA241B30007DBB1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				F20000000000000000000051 /* XCLocalSwiftPackageReference "Packages/Client" */,
+				F20000000000000000000052 /* XCLocalSwiftPackageReference "Packages/Host" */,
+				F20000000000000000000053 /* XCLocalSwiftPackageReference "Packages/Storage" */,
+				F20000000000000000000054 /* XCLocalSwiftPackageReference "Packages/Transport" */,
+				F20000000000000000000055 /* XCLocalSwiftPackageReference "Packages/MacPlatform" */,
 				CCACP0003000000000000001 /* XCRemoteSwiftPackageReference "swift-acp" */,
 				CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				CC128B192EAF8DD600EA9A50 /* XCRemoteSwiftPackageReference "Sparkle" */,
@@ -1266,8 +1301,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/wiedymi/swift-acp";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = revision;
+				revision = 9498537769d1309b6519fbb87d0c22fcf9317f3e;
 			};
 		};
 		CCB04B742EA241B60007DBB1 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
@@ -1279,6 +1314,14 @@
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		F20000000000000000000051 /* XCLocalSwiftPackageReference "Packages/Client" */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/Client; };
+		F20000000000000000000052 /* XCLocalSwiftPackageReference "Packages/Host" */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/Host; };
+		F20000000000000000000053 /* XCLocalSwiftPackageReference "Packages/Storage" */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/Storage; };
+		F20000000000000000000054 /* XCLocalSwiftPackageReference "Packages/Transport" */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/Transport; };
+		F20000000000000000000055 /* XCLocalSwiftPackageReference "Packages/MacPlatform" */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/MacPlatform; };
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		2CE06D116E3316BF792222D8 /* MLXFFT */ = {
@@ -1351,6 +1394,16 @@
 			package = 79EC426B0DCDB46C628589C2 /* XCRemoteSwiftPackageReference "mlx-swift" */;
 			productName = MLX;
 		};
+		F20000000000000000000061 /* AizenClient */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000051 /* XCLocalSwiftPackageReference "Packages/Client" */; productName = AizenClient; };
+		F20000000000000000000062 /* AizenHost */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000052 /* XCLocalSwiftPackageReference "Packages/Host" */; productName = AizenHost; };
+		F20000000000000000000063 /* AizenStorage */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000053 /* XCLocalSwiftPackageReference "Packages/Storage" */; productName = AizenStorage; };
+		F20000000000000000000064 /* AizenTransport */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000054 /* XCLocalSwiftPackageReference "Packages/Transport" */; productName = AizenTransport; };
+		F20000000000000000000065 /* AizenMacPlatform */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000055 /* XCLocalSwiftPackageReference "Packages/MacPlatform" */; productName = AizenMacPlatform; };
+		F20000000000000000000066 /* AizenClient */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000051 /* XCLocalSwiftPackageReference "Packages/Client" */; productName = AizenClient; };
+		F20000000000000000000067 /* AizenHost */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000052 /* XCLocalSwiftPackageReference "Packages/Host" */; productName = AizenHost; };
+		F20000000000000000000068 /* AizenStorage */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000053 /* XCLocalSwiftPackageReference "Packages/Storage" */; productName = AizenStorage; };
+		F20000000000000000000069 /* AizenTransport */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000054 /* XCLocalSwiftPackageReference "Packages/Transport" */; productName = AizenTransport; };
+		F2000000000000000000006A /* AizenMacPlatform */ = {isa = XCSwiftPackageProductDependency; package = F20000000000000000000055 /* XCLocalSwiftPackageReference "Packages/MacPlatform" */; productName = AizenMacPlatform; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CCB04B3A2EA241B30007DBB1 /* Project object */;

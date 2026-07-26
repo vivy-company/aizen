@@ -15,6 +15,7 @@ struct aizenApp: App {
     @NSApplicationDelegateAdaptor(AizenAppDelegate.self) var appDelegate
 
     let persistenceController = PersistenceController.shared
+    let reignitionHost = ReignitionHostComposition()
     @StateObject var ghosttyApp = Ghostty.App()
     @FocusedValue(\.chatActions) var chatActions
 

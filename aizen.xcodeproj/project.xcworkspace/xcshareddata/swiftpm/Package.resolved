@@ -1,5 +1,5 @@
 {
-  "originHash" : "ea04590b5a7b14fcbb694da4339e5c91359ee129d2473c6293f58551581f6f10",
+  "originHash" : "fa68bc27a880bb82f0e7d517ecfec80950e57aa6154071715f63f04ebce1b97b",
   "pins" : [
     {
       "identity" : "jsonrpc",
@@ -42,7 +42,6 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/wiedymi/swift-acp",
       "state" : {
-        "branch" : "main",
         "revision" : "9498537769d1309b6519fbb87d0c22fcf9317f3e"
       }
     },
@@ -71,6 +70,15 @@
       "state" : {
         "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
         "version" : "1.1.1"
+      }
+    },
+    {
+      "identity" : "swift-protobuf",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-protobuf.git",
+      "state" : {
+        "revision" : "55d7a1cc5666b85c13464aea1c4b4a90feccb4c8",
+        "version" : "1.38.1"
       }
     },
     {
