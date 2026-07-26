@@ -373,6 +373,22 @@ message DiscoverXcodeProjectResponse {
   optional XcodeProjectDescriptorRecord project = 1;
 }
 
+message XcodeDestinationRecord {
+  string id = 1;
+  string name = 2;
+  string platform = 3;
+}
+
+message ListXcodeDestinationsQuery {
+  string resource_id = 1;
+  string project_id = 2;
+  string scheme = 3;
+}
+
+message ListXcodeDestinationsResponse {
+  repeated XcodeDestinationRecord destinations = 1;
+}
+
 message OpenXcodeProjectCommand {
   string resource_id = 1;
   string project_id = 2;

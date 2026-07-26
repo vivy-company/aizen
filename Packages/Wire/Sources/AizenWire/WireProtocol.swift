@@ -1470,6 +1470,81 @@ public struct DiscoverXcodeProjectResponsePayload: WirePayload, Sendable, Hashab
     }
 }
 
+public struct ListXcodeDestinationsQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.xcode-project.destinations@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let resourceID: String
+    public let projectID: String
+    public let scheme: String
+
+    public init(resourceID: String, projectID: String, scheme: String) {
+        precondition(Self.isValid(resourceID: resourceID, projectID: projectID, scheme: scheme), "Xcode destination queries require bounded identifiers")
+        self.resourceID = resourceID
+        self.projectID = projectID
+        self.scheme = scheme
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListXcodeDestinationsQuery(serializedBytes: protobufBytes)
+        guard Self.isValid(resourceID: message.resourceID, projectID: message.projectID, scheme: message.scheme) else {
+            throw WireCodecError.invalidXcodeDestinationQuery
+        }
+        self.init(resourceID: message.resourceID, projectID: message.projectID, scheme: message.scheme)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListXcodeDestinationsQuery()
+        message.resourceID = resourceID
+        message.projectID = projectID
+        message.scheme = scheme
+        return try message.serializedData()
+    }
+
+    private static func isValid(resourceID: String, projectID: String, scheme: String) -> Bool {
+        !resourceID.isEmpty && !projectID.isEmpty && projectID.utf8.count <= 255 && !projectID.contains("\0") && !projectID.contains("/") &&
+            !scheme.isEmpty && scheme.utf8.count <= 255 && !scheme.contains("\0")
+    }
+}
+
+public struct ListXcodeDestinationsResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.xcode-project.destinations@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let destinations: [XcodeDestination]
+
+    public init(destinations: [XcodeDestination]) {
+        precondition(destinations.count <= 256, "Xcode destination responses must remain bounded")
+        self.destinations = destinations
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListXcodeDestinationsResponse(serializedBytes: protobufBytes)
+        guard message.destinations.count <= 256 else { throw WireCodecError.invalidXcodeDestinationResponse }
+        self.init(destinations: try message.destinations.map { record in
+            guard !record.id.isEmpty, record.id.utf8.count <= 1_024,
+                  record.id.unicodeScalars.allSatisfy({ (0x20...0x7E).contains($0.value) }),
+                  !record.name.isEmpty, record.name.utf8.count <= 255,
+                  !record.platform.isEmpty, record.platform.utf8.count <= 255 else {
+                throw WireCodecError.invalidXcodeDestinationResponse
+            }
+            return .init(id: record.id, name: record.name, platform: record.platform)
+        })
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListXcodeDestinationsResponse()
+        message.destinations = destinations.map { destination in
+            var record = AizenWireV1_XcodeDestinationRecord()
+            record.id = destination.id
+            record.name = destination.name
+            record.platform = destination.platform
+            return record
+        }
+        return try message.serializedData()
+    }
+}
+
 public struct OpenXcodeProjectCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.xcode-project.open@1")
     public static let schemaVersion: UInt32 = 1
@@ -1521,7 +1596,7 @@ public struct BuildXcodeProjectCommandPayload: WirePayload, Sendable, Hashable {
     private static func isValid(resourceID: String, projectID: String, scheme: String, destination: String) -> Bool {
         !resourceID.isEmpty && !projectID.isEmpty && projectID.utf8.count <= 255 && !projectID.contains("\0") && !projectID.contains("/") &&
             !scheme.isEmpty && scheme.utf8.count <= 255 && !scheme.contains("\0") &&
-            ["platform=macOS", "generic/platform=iOS"].contains(destination)
+            !destination.isEmpty && destination.utf8.count <= 1_024 && destination.unicodeScalars.allSatisfy { (0x20...0x7E).contains($0.value) }
     }
 }
 
@@ -3199,6 +3274,8 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidOperationCancellationCommand
     case invalidOperationCancellationResult
     case invalidXcodeBuildCommand
+    case invalidXcodeDestinationQuery
+    case invalidXcodeDestinationResponse
 }
 
 private extension ProtocolEnvelope {

@@ -444,6 +444,22 @@ import Testing
     #expect(!arguments.contains("build"))
 }
 
+@Test func macXcodeProjectInspectorParsesOnlyCompatibleHostDestinations() {
+    let destinations = MacXcodeProjectInspector.parseDestinations("""
+    Destinations compatible with the \"App\" scheme:
+        { platform:macOS, arch:arm64, id:00006000-001A193E0EC3801E, name:My Mac }
+        { platform:macOS, name:Any Mac }
+
+    Destinations incompatible with the \"App\" scheme:
+        { platform:iOS, id:device-1, name:Phone, error:unsupported }
+    """)
+
+    #expect(destinations == [
+        .init(id: "platform=macOS,id=00006000-001A193E0EC3801E", name: "My Mac", platform: "macOS"),
+        .init(id: "platform=macOS", name: "Any Mac", platform: "macOS")
+    ])
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")

@@ -24,21 +24,68 @@ public struct MacXcodeProjectInspector: XcodeProjectInspecting {
         try projectDetails(for: projectURL, kind: kind).configurations
     }
 
+    public func destinations(for projectURL: URL, kind: XcodeProjectDescriptor.Kind, scheme: String) async throws -> [XcodeDestination] {
+        let output = try xcodebuildOutput(arguments: [
+            "-showdestinations",
+            kind == .workspace ? "-workspace" : "-project",
+            projectURL.path,
+            "-scheme",
+            scheme
+        ])
+        return Self.parseDestinations(output)
+    }
+
     private func projectDetails(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) throws -> (schemes: [String], configurations: [String]) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
-        process.arguments = ["-list", "-json", kind == .workspace ? "-workspace" : "-project", projectURL.path]
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = Pipe()
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return ([], []) }
-        let data = try output.fileHandleForReading.readToEnd() ?? Data()
-        let document = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let data = try xcodebuildOutput(arguments: ["-list", "-json", kind == .workspace ? "-workspace" : "-project", projectURL.path])
+        let document = try JSONSerialization.jsonObject(with: Data(data.utf8)) as? [String: Any]
         let key = kind == .workspace ? "workspace" : "project"
         let details = document?[key] as? [String: Any]
         return (details?["schemes"] as? [String] ?? [], details?["configurations"] as? [String] ?? [])
+    }
+
+    static func parseDestinations(_ output: String) -> [XcodeDestination] {
+        let compatibleSection = output
+            .components(separatedBy: "Destinations incompatible with the").first ?? output
+        var destinations: [XcodeDestination] = []
+        var identifiers = Set<String>()
+        for line in compatibleSection.split(separator: "\n") {
+            let value = String(line).trimmingCharacters(in: .whitespaces)
+            guard value.hasPrefix("{ "), value.hasSuffix(" }"),
+                  let platform = field("platform", in: value),
+                  let name = field("name", in: value) else { continue }
+            let destination = "platform=\(platform)" + (field("id", in: value).map { ",id=\($0)" } ?? "")
+            guard identifiers.insert(destination).inserted else { continue }
+            destinations.append(.init(id: destination, name: name, platform: platform))
+        }
+        return destinations
+    }
+
+    private static func field(_ name: String, in destination: String) -> String? {
+        guard let range = destination.range(of: "\(name):") else { return nil }
+        let remainder = destination[range.upperBound...]
+        let value = remainder.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false).first?
+            .trimmingCharacters(in: .whitespaces)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "}"))
+            .trimmingCharacters(in: .whitespaces)
+        return value?.isEmpty == false ? value : nil
+    }
+
+    private func xcodebuildOutput(arguments: [String]) throws -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
+        process.arguments = arguments
+        let output = Pipe()
+        process.standardOutput = output
+        let error = Pipe()
+        process.standardError = error
+        try process.run()
+        process.waitUntilExit()
+        let outputData = try output.fileHandleForReading.readToEnd() ?? Data()
+        let errorData = try error.fileHandleForReading.readToEnd() ?? Data()
+        guard process.terminationStatus == 0 else {
+            throw MacXcodeProjectInspectionError.failed(process.terminationStatus)
+        }
+        return String(decoding: outputData + errorData, as: UTF8.self)
     }
 }
 
@@ -133,6 +180,16 @@ enum MacXcodeBuildError: LocalizedError, Sendable, Equatable {
     var errorDescription: String? {
         switch self {
         case let .failed(status): "xcodebuild exited with status \(status)."
+        }
+    }
+}
+
+enum MacXcodeProjectInspectionError: LocalizedError, Sendable, Equatable {
+    case failed(Int32)
+
+    var errorDescription: String? {
+        switch self {
+        case let .failed(status): "xcodebuild inspection exited with status \(status)."
         }
     }
 }

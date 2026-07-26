@@ -301,6 +301,28 @@ public enum XcodeProjectAction: String, Codable, Sendable, Hashable {
     case test
 }
 
+/// A build destination reported by the Host for one Xcode scheme.
+///
+/// `id` is the canonical single argument passed to `xcodebuild -destination`; Clients must
+/// select from Host-reported values instead of constructing an arbitrary destination string.
+public struct XcodeDestination: Codable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let name: String
+    public let platform: String
+
+    public init(id: String, name: String, platform: String) {
+        precondition(
+            !id.isEmpty && id.utf8.count <= 1_024 && id.unicodeScalars.allSatisfy { (0x20...0x7E).contains($0.value) },
+            "Xcode destination identities must be bounded and safe as an xcodebuild argument"
+        )
+        precondition(!name.isEmpty && name.utf8.count <= 255, "Xcode destinations need a name")
+        precondition(!platform.isEmpty && platform.utf8.count <= 255, "Xcode destinations need a platform")
+        self.id = id
+        self.name = name
+        self.platform = platform
+    }
+}
+
 public struct XcodeProjectDescriptor: Codable, Sendable, Hashable, Identifiable {
     public enum Kind: String, Codable, Sendable, Hashable {
         case project

@@ -1927,6 +1927,49 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(try await storage.operationLogChunks(operationID: OperationID(rawValue: try #require(UUID(uuidString: result.operationID))), maximumBytes: 64 * 1_024).map(\.text) == ["CompileSwift App.swift\\n"])
 }
 
+@Test func hostListsSchemeDestinationsAndRejectsUnadvertisedBuildTargets() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder.appendingPathComponent("App.xcodeproj"), withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Xcode")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "folder", details: .hostPrivate(.init(rawValue: "local-folder:\(folder.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let destinations = [
+        XcodeDestination(id: "platform=macOS", name: "Any Mac", platform: "macOS"),
+        XcodeDestination(id: "platform=iOS,id=device-1", name: "Phone", platform: "iOS")
+    ]
+    let host = LocalHost(
+        storage: storage,
+        xcodeProjectInspector: StaticXcodeProjectInspector(schemes: ["App"], destinations: destinations),
+        xcodeProjectBuilder: ControlledXcodeProjectBuilder()
+    )
+    let listResponse = try await host.receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ListXcodeDestinationsQueryPayload(resourceID: resource.id.description, projectID: "App.xcodeproj", scheme: "App"))
+    ))
+    #expect(try ListXcodeDestinationsResponsePayload(protobufBytes: listResponse.payload.protobufBytes).destinations == destinations)
+
+    await #expect(throws: HostProtocolError.invalidXcodeDestination("generic/platform=iOS")) {
+        _ = try await host.receive(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: 2,
+            kind: .command,
+            channel: .state,
+            payload: try .init(BuildXcodeProjectCommandPayload(
+                resourceID: resource.id.description,
+                projectID: "App.xcodeproj",
+                scheme: "App",
+                destination: "generic/platform=iOS"
+            ))
+        ))
+    }
+}
+
 @Test func hostStartsStructuredXcodeTestsThroughItsRuntime() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -2074,8 +2117,17 @@ private actor RecordingXcodeProjectOpener: XcodeProjectOpening {
 
 private struct StaticXcodeProjectInspector: XcodeProjectInspecting {
     let schemes: [String]
+    let destinations: [XcodeDestination]
+
+    init(schemes: [String], destinations: [XcodeDestination] = [.init(id: "platform=macOS", name: "Any Mac", platform: "macOS")]) {
+        self.schemes = schemes
+        self.destinations = destinations
+    }
     func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { schemes }
     func configurations(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { ["Debug", "Release"] }
+    func destinations(for projectURL: URL, kind: XcodeProjectDescriptor.Kind, scheme: String) async throws -> [XcodeDestination] {
+        destinations
+    }
 }
 
 private actor ControlledXcodeProjectBuilder: XcodeProjectBuilding, XcodeBuildRunning {

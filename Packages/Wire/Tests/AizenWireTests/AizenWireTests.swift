@@ -211,12 +211,12 @@ import Testing
     #expect(try CancelOperationResultPayload(protobufBytes: result.protobufBytes()) == result)
 }
 
-@Test func xcodeBuildCommandsRejectUnboundedOrUnsupportedDestinations() throws {
+@Test func xcodeBuildCommandsRejectUnboundedOrUnsafeDestinations() throws {
     var command = AizenWireV1_BuildXcodeProjectCommand()
     command.resourceID = UUID().uuidString
     command.projectID = "App.xcodeproj"
     command.scheme = "App"
-    command.destination = "platform=iOS Simulator,name=User Device"
+    command.destination = "platform=macOS\n-scheme=Other"
     #expect(throws: WireCodecError.invalidXcodeBuildCommand) {
         try BuildXcodeProjectCommandPayload(protobufBytes: command.serializedData())
     }
@@ -283,6 +283,16 @@ import Testing
     let descriptor = XcodeProjectDescriptor(resourceID: ResourceID(), id: "App.xcodeproj", name: "App", kind: .project, schemes: ["App"], configurations: ["Debug", "Release"])
     let payload = DiscoverXcodeProjectResponsePayload(project: descriptor)
     #expect(try DiscoverXcodeProjectResponsePayload(protobufBytes: payload.protobufBytes()) == payload)
+}
+
+@Test func xcodeDestinationListingCarriesHostChosenBuildIdentifiers() throws {
+    let query = ListXcodeDestinationsQueryPayload(resourceID: UUID().uuidString, projectID: "App.xcodeproj", scheme: "App")
+    let response = ListXcodeDestinationsResponsePayload(destinations: [
+        .init(id: "platform=macOS", name: "Any Mac", platform: "macOS"),
+        .init(id: "platform=iOS,id=device-1", name: "Phone", platform: "iOS")
+    ])
+    #expect(try ListXcodeDestinationsQueryPayload(protobufBytes: query.protobufBytes()) == query)
+    #expect(try ListXcodeDestinationsResponsePayload(protobufBytes: response.protobufBytes()) == response)
 }
 
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {

@@ -497,6 +497,25 @@ public actor HostClient {
         return try DiscoverXcodeProjectResponsePayload(protobufBytes: response.payload.protobufBytes).project
     }
 
+    public func xcodeDestinations(resourceID: ResourceID, projectID: String, scheme: String) async throws -> [XcodeDestination] {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(ListXcodeDestinationsQueryPayload(
+                resourceID: resourceID.description,
+                projectID: projectID,
+                scheme: scheme
+            ))
+        ))
+        guard response.kind == .queryResponse,
+              response.payload.identifier == ListXcodeDestinationsResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try ListXcodeDestinationsResponsePayload(protobufBytes: response.payload.protobufBytes).destinations
+    }
+
     public func openXcodeProject(resourceID: ResourceID, projectID: String) async throws {
         let response = try await send(.init(
             messageID: UUID().uuidString,

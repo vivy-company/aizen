@@ -179,6 +179,7 @@ public protocol XcodeProjectOpening: Sendable {
 public protocol XcodeProjectInspecting: Sendable {
     func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String]
     func configurations(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String]
+    func destinations(for projectURL: URL, kind: XcodeProjectDescriptor.Kind, scheme: String) async throws -> [XcodeDestination]
 }
 
 public protocol XcodeBuildRunning: Sendable {
@@ -332,6 +333,8 @@ public actor LocalHost: WireEndpoint {
                 ListResourcesResponsePayload.identifier,
                 DiscoverXcodeProjectQueryPayload.identifier,
                 DiscoverXcodeProjectResponsePayload.identifier,
+                ListXcodeDestinationsQueryPayload.identifier,
+                ListXcodeDestinationsResponsePayload.identifier,
                 OpenXcodeProjectCommandPayload.identifier,
                 OpenXcodeProjectResultPayload.identifier,
                 BuildXcodeProjectCommandPayload.identifier,
@@ -523,6 +526,17 @@ public actor LocalHost: WireEndpoint {
             }
             kind = .queryResponse
             payload = try TypedPayload(DiscoverXcodeProjectResponsePayload(project: try await xcodeProject(for: resource)))
+        case .query where envelope.payload.identifier == ListXcodeDestinationsQueryPayload.identifier:
+            let query = try ListXcodeDestinationsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resourceID = try Self.resourceID(from: query.resourceID)
+            let snapshot = try await storage.load()
+            guard let resource = snapshot.resources.first(where: { $0.id == resourceID }) else {
+                throw HostProtocolError.unknownResource(resourceID)
+            }
+            kind = .queryResponse
+            payload = try TypedPayload(ListXcodeDestinationsResponsePayload(
+                destinations: try await xcodeDestinations(for: resource, projectID: query.projectID, scheme: query.scheme)
+            ))
         case .command where envelope.payload.identifier == OpenXcodeProjectCommandPayload.identifier:
             guard let xcodeProjectOpener else { throw HostProtocolError.runtimeUnavailable }
             let command = try OpenXcodeProjectCommandPayload(protobufBytes: envelope.payload.protobufBytes)
@@ -550,7 +564,10 @@ public actor LocalHost: WireEndpoint {
             guard let resource = snapshot.resources.first(where: { $0.id == resourceID }) else { throw HostProtocolError.unknownResource(resourceID) }
             payload = try await executeDurably(envelope: envelope, spaceID: resource.spaceID) {
                 guard let project = try await self.xcodeProject(for: resource), project.id == command.projectID, project.schemes.contains(command.scheme),
-                      let directory = try Self.localResourceDirectory(for: resource) else { throw HostProtocolError.unknownResource(resourceID) }
+                      let directory = try Self.localResourceDirectory(for: resource),
+                      try await self.xcodeDestinations(for: resource, projectID: command.projectID, scheme: command.scheme).contains(where: { $0.id == command.destination }) else {
+                    throw HostProtocolError.invalidXcodeDestination(command.destination)
+                }
                 let operation = Operation(spaceID: resource.spaceID, resourceID: resource.id, lifecycle: .running, progress: 0)
                 _ = try await self.storage.transact { $0.operations.append(operation) }
                 let build = try await xcodeProjectBuilder.startXcodeProjectBuild(
@@ -1599,6 +1616,19 @@ public actor LocalHost: WireEndpoint {
         return try await .init(resourceID: project.resourceID, id: project.id, name: project.name, kind: project.kind, schemes: schemes, configurations: configurations)
     }
 
+    private func xcodeDestinations(for resource: Resource, projectID: String, scheme: String) async throws -> [XcodeDestination] {
+        guard let xcodeProjectInspector,
+              let project = try await xcodeProject(for: resource), project.id == projectID, project.schemes.contains(scheme),
+              let directory = try Self.localResourceDirectory(for: resource) else {
+            throw HostProtocolError.runtimeUnavailable
+        }
+        return try await xcodeProjectInspector.destinations(
+            for: directory.appendingPathComponent(project.id),
+            kind: project.kind,
+            scheme: scheme
+        )
+    }
+
     private static func localResourceDirectory(for resource: Resource) throws -> URL? {
         guard case let .hostPrivate(reference) = resource.details else { return nil }
         let prefixes = resource.kind == .repository ? ["local-repository:"] : resource.kind == .folder ? ["local-folder:"] : []
@@ -1699,6 +1729,7 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case invalidResourcePath(String)
     case invalidExecutionContext(ExecutionContextID)
     case invalidTerminalDimensions
+    case invalidXcodeDestination(String)
     case spaceNotEmpty(SpaceID)
     case runtimeUnavailable
 
@@ -1706,7 +1737,7 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
         switch self {
         case .unsupportedRequest:
             .unsupportedRequest
-        case .invalidIdentity, .invalidResourcePath, .invalidExecutionContext, .invalidTerminalDimensions:
+        case .invalidIdentity, .invalidResourcePath, .invalidExecutionContext, .invalidTerminalDimensions, .invalidXcodeDestination:
             .invalidRequest
         case .unknownSpace:
             .unknownSpace
