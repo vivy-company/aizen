@@ -148,6 +148,65 @@ import AizenWire
     }
 }
 
+@Test func remoteHostEndpointEnforcesAuthorizationBeforeDispatchingWireRequests() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Private")
+    _ = try await storage.transact { $0.spaces.append(space) }
+    let allowedDevice = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: LocalCryptographicIdentity().publicIdentity())
+    try await storage.saveDeviceAuthorization(.init(device: allowedDevice, grants: [.init(capability: .hostRead)]))
+    let endpoint = LocalHost(storage: storage)
+    let gate = DeviceAuthorizationGate(storage: storage)
+    let source = RemoteRequestSource("192.168.1.20")
+    let allowed = RemoteHostEndpoint(
+        endpoint: endpoint,
+        storage: storage,
+        authorization: gate,
+        rateLimiter: RemoteRequestRateLimiter(),
+        session: try authenticatedSession(for: allowedDevice.deviceID),
+        source: source
+    )
+    let listSpaces = ProtocolEnvelope(messageID: "remote-list", connectionSequence: 1, kind: .query, channel: .state, payload: try .init(ListSpacesQueryPayload()))
+    let response = try await allowed.receive(listSpaces)
+    #expect(try ListSpacesResponsePayload(protobufBytes: response.payload.protobufBytes).spaces.map(\.name) == ["Private"])
+
+    let unpaired = RemoteHostEndpoint(
+        endpoint: endpoint,
+        storage: storage,
+        authorization: gate,
+        rateLimiter: RemoteRequestRateLimiter(),
+        session: try authenticatedSession(for: DeviceID()),
+        source: source
+    )
+    await #expect(throws: DeviceAuthorizationError.deviceNotPaired) {
+        try await unpaired.receive(listSpaces)
+    }
+
+    let unsupported = ProtocolEnvelope(messageID: "remote-unsupported", connectionSequence: 2, kind: .command, channel: .state, payload: try .init(CreateSpaceResultPayload(spaceID: SpaceID().description)))
+    await #expect(throws: RemoteHostAuthorizationError.unsupportedPayload(CreateSpaceResultPayload.identifier)) {
+        try await allowed.receive(unsupported)
+    }
+}
+
+private func authenticatedSession(for deviceID: DeviceID) throws -> AuthenticatedRemoteSession {
+    let hostEphemeral = ConnectionEphemeralKey()
+    let deviceEphemeral = ConnectionEphemeralKey()
+    let binding = try ConnectionAuthenticationBinding(
+        protocolGeneration: 1,
+        hostID: HostID(),
+        deviceID: deviceID,
+        connectionID: UUID(),
+        clientNonce: Data(repeating: 1, count: 32),
+        serverNonce: Data(repeating: 2, count: 32),
+        clientEphemeralPublicKey: deviceEphemeral.publicKey,
+        serverEphemeralPublicKey: hostEphemeral.publicKey,
+        route: .lan
+    )
+    let keys = try ConnectionAuthenticator.deriveKeys(participant: .host, ephemeralKey: hostEphemeral, peerEphemeralPublicKey: deviceEphemeral.publicKey, binding: binding)
+    return AuthenticatedRemoteSession(connectionID: binding.connectionID, deviceID: deviceID, route: .lan, keys: keys)
+}
+
 @Test func localHostReturnsTheStorageSnapshotThroughWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
