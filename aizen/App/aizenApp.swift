@@ -45,9 +45,11 @@ struct aizenApp: App {
         Task { [host, legacyStoreURL, legacyModelURL] in
             do {
                 _ = try await host.prepareLegacyMigration(legacyStoreURL: legacyStoreURL, legacyModelURL: legacyModelURL)
+                let agentConfiguration = try await DefaultACPAgentLaunchConfigurationResolver().launchConfiguration()
+                try await host.activate(agentConfiguration: agentConfiguration)
             } catch {
-                Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "ReignitionMigration")
-                    .error("Legacy migration failed: \(error.localizedDescription, privacy: .public)")
+                Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "ReignitionHostStartup")
+                    .error("Reignition Host startup failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }

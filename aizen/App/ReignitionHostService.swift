@@ -1,8 +1,9 @@
 import Foundation
 import ServiceManagement
 
-enum ReignitionHostService {
-    static let plistName = "win.aizen.host.plist"
+nonisolated enum ReignitionHostService {
+    nonisolated static let plistName = "win.aizen.host.plist"
+    nonisolated static let machServiceName = "win.aizen.host"
 
     enum Error: Swift.Error, LocalizedError {
         case missingBundledService
@@ -15,11 +16,11 @@ enum ReignitionHostService {
         }
     }
 
-    static var service: SMAppService {
+    nonisolated static var service: SMAppService {
         SMAppService.agent(plistName: plistName)
     }
 
-    static func registerIfNeeded() throws {
+    nonisolated static func registerIfNeeded() throws {
         switch service.status {
         case .notRegistered:
             try service.register()

@@ -1,12 +1,10 @@
 import AizenClient
 import AizenCore
-import AizenHost
 import AizenMacPlatform
 import AizenStorage
-import AizenTransport
 import Foundation
 
-/// The app's local v2 Host composition. Views receive Client projections; they never own Storage or Host state.
+/// The app's v2 Host client composition. Views receive Client projections; they never own Host state.
 actor ReignitionHostComposition {
     enum MigrationPreparation: Sendable, Equatable {
         case noLegacyStore
@@ -15,35 +13,25 @@ actor ReignitionHostComposition {
     }
 
     let storage: StorageRepository
-    let host: LocalHost
     let client: HostClient
-    let runEvents: RunEventPublisher
 
     init(storageURL: URL? = nil) {
         let storageURL = storageURL ?? ReignitionHostComposition.defaultStorageURL()
         let storage = StorageRepository(url: storageURL)
-        let sandboxRoot = storageURL.deletingLastPathComponent().appendingPathComponent("Sandboxes", isDirectory: true)
-        let sandboxes = ManagedSandboxService(storage: storage, rootURL: sandboxRoot)
-        let runtime = ACPRunRuntime(
-            configurationResolver: StorageBackedACPRunConfigurationResolver(
-                storage: storage,
-                agentConfiguration: DefaultACPAgentLaunchConfigurationResolver(),
-                managedSandboxRoot: sandboxRoot
-            ),
-            delegateProvider: NoACPToolDelegateProvider()
-        )
-        let runEvents = RunEventPublisher()
         self.storage = storage
-        self.runEvents = runEvents
-        host = LocalHost(
-            storage: storage,
-            conversationRuns: ConversationRunCoordinator(storage: storage, runtime: runtime, eventPublisher: runEvents),
-            managedSandboxes: sandboxes,
-            runEventPublisher: runEvents
-        )
         client = HostClient(
-            transport: InProcessTransport(endpoint: host),
+            transport: MachWireTransport(machServiceName: ReignitionHostService.machServiceName),
             commandOutbox: FileCommandOutbox(url: storageURL.deletingLastPathComponent().appendingPathComponent("client-command-outbox.json"))
+        )
+    }
+
+    func activate(agentConfiguration: ACPAgentLaunchConfiguration) async throws {
+        try ReignitionHostService.registerIfNeeded()
+        _ = try await client.negotiate()
+        try await client.configureAgentLaunch(
+            executablePath: agentConfiguration.executablePath,
+            arguments: agentConfiguration.arguments,
+            environment: agentConfiguration.environment
         )
     }
 
@@ -147,7 +135,7 @@ actor ReignitionHostComposition {
 
 /// The app composition boundary maps the existing user agent preference into the v2 Host runtime.
 /// Selecting an agent per Conversation belongs to the forthcoming v2 Client state, not to Storage.
-private struct DefaultACPAgentLaunchConfigurationResolver: ACPAgentLaunchConfigurationResolving {
+struct DefaultACPAgentLaunchConfigurationResolver: ACPAgentLaunchConfigurationResolving {
     enum Error: Swift.Error, LocalizedError {
         case agentNotConfigured(String)
 
