@@ -71,6 +71,10 @@ message Hello {
 
 message Capabilities {
   repeated string identifiers = 1;
+  uint32 minimum_protocol_generation = 2;
+  uint32 maximum_protocol_generation = 3;
+  string product_version = 4;
+  string minimum_compatible_product_version = 5;
 }
 
 message CommandReceipt {

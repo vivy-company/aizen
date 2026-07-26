@@ -55,6 +55,18 @@ import Testing
     #expect(decoded.snapshot == storageBytes)
 }
 
+@Test func capabilitiesPayloadCarriesProductAndProtocolCompatibility() throws {
+    let payload = CapabilitiesPayload(
+        identifiers: [.init(rawValue: "aizen.query.space.list@1")],
+        minimumProtocolGeneration: 1,
+        maximumProtocolGeneration: 2,
+        productVersion: "2.1.0",
+        minimumCompatibleProductVersion: "2.0.0"
+    )
+    let decoded = try CapabilitiesPayload(protobufBytes: payload.protobufBytes())
+    #expect(decoded == payload)
+}
+
 @Test func journalReplayPayloadRoundTripsTypedEvents() throws {
     let space = SpaceID()
     let event = JournalEvent(

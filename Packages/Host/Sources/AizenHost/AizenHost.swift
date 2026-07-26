@@ -8,6 +8,7 @@ import Foundation
 /// Host command/query composition. Mac-only runtime adapters stay outside this package.
 public enum AizenHostModule {
     public static let protocolGeneration = AizenWireModule.protocolGeneration
+    public static let productVersion = "2.0.0"
 }
 
 /// Explicit local Host composition. It owns Storage but exposes only Wire envelopes and Core snapshots.
@@ -39,6 +40,11 @@ public actor LocalHost: WireEndpoint {
         let kind: WireMessageKind
         switch envelope.kind {
         case .hello:
+            let hello = try HelloPayload(protobufBytes: envelope.payload.protobufBytes)
+            guard hello.minimumProtocolGeneration <= AizenHostModule.protocolGeneration,
+                  hello.maximumProtocolGeneration >= AizenHostModule.protocolGeneration else {
+                throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier)
+            }
             kind = .capabilities
             payload = try TypedPayload(CapabilitiesPayload(identifiers: [
                 HelloPayload.identifier,
@@ -84,7 +90,7 @@ public actor LocalHost: WireEndpoint {
                 DetachExecutionContextCommandPayload.identifier,
                 RemoveExecutionContextCommandPayload.identifier,
                 ExecutionContextMutationResultPayload.identifier
-            ]))
+            ], productVersion: AizenHostModule.productVersion, minimumCompatibleProductVersion: "2.0.0"))
         case .query where envelope.payload.identifier == SnapshotRequestPayload.identifier:
             let request = try SnapshotRequestPayload(protobufBytes: envelope.payload.protobufBytes)
             let snapshot = try await storage.load()

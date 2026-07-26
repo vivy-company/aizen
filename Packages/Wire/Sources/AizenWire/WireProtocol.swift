@@ -172,18 +172,44 @@ public struct CapabilitiesPayload: WirePayload, Sendable, Hashable {
     public static let stateAffecting = false
 
     public let identifiers: [PayloadIdentifier]
+    public let minimumProtocolGeneration: UInt32
+    public let maximumProtocolGeneration: UInt32
+    public let productVersion: String
+    public let minimumCompatibleProductVersion: String
 
-    public init(identifiers: [PayloadIdentifier]) {
+    public init(
+        identifiers: [PayloadIdentifier],
+        minimumProtocolGeneration: UInt32 = UInt32(AizenWireModule.protocolGeneration),
+        maximumProtocolGeneration: UInt32 = UInt32(AizenWireModule.protocolGeneration),
+        productVersion: String = "2.0.0",
+        minimumCompatibleProductVersion: String = "2.0.0"
+    ) {
+        precondition(minimumProtocolGeneration > 0 && minimumProtocolGeneration <= maximumProtocolGeneration, "Protocol ranges must be ordered and non-zero")
         self.identifiers = identifiers.sorted { $0.rawValue < $1.rawValue }
+        self.minimumProtocolGeneration = minimumProtocolGeneration
+        self.maximumProtocolGeneration = maximumProtocolGeneration
+        self.productVersion = productVersion
+        self.minimumCompatibleProductVersion = minimumCompatibleProductVersion
     }
 
     public init(protobufBytes: Data) throws {
-        self.init(identifiers: try AizenWireV1_Capabilities(serializedBytes: protobufBytes).identifiers.map { PayloadIdentifier(rawValue: $0) })
+        let message = try AizenWireV1_Capabilities(serializedBytes: protobufBytes)
+        self.init(
+            identifiers: message.identifiers.map { PayloadIdentifier(rawValue: $0) },
+            minimumProtocolGeneration: message.minimumProtocolGeneration,
+            maximumProtocolGeneration: message.maximumProtocolGeneration,
+            productVersion: message.productVersion,
+            minimumCompatibleProductVersion: message.minimumCompatibleProductVersion
+        )
     }
 
     public func protobufBytes() throws -> Data {
         var message = AizenWireV1_Capabilities()
         message.identifiers = identifiers.map(\.rawValue)
+        message.minimumProtocolGeneration = minimumProtocolGeneration
+        message.maximumProtocolGeneration = maximumProtocolGeneration
+        message.productVersion = productVersion
+        message.minimumCompatibleProductVersion = minimumCompatibleProductVersion
         return try message.serializedData()
     }
 }

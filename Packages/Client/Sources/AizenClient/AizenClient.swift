@@ -6,6 +6,7 @@ import Foundation
 /// Client synchronisation and projections shared by Mac, Mobile, and CLI.
 public enum AizenClientModule {
     public static let protocolGeneration = AizenWireModule.protocolGeneration
+    public static let productVersion = "2.0.0"
 }
 
 public enum ClientConnectionState: Sendable, Hashable {
@@ -154,6 +155,12 @@ public actor HostClient {
         case unexpectedPayload(PayloadIdentifier)
         case invalidIdentity(String)
         case eventStreamingUnavailable
+        case incompatibleHost(
+            cliProductVersion: String,
+            hostProductVersion: String,
+            hostProtocolRange: ClosedRange<UInt32>,
+            minimumCompatibleProductVersion: String
+        )
     }
 
     private let transport: any WireTransport
@@ -186,6 +193,37 @@ public actor HostClient {
 
     public func disconnect() {
         connectionState = .disconnected
+    }
+
+    public func negotiate() async throws -> CapabilitiesPayload {
+        let response = try await transport.send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .hello,
+            channel: .control,
+            payload: try .init(HelloPayload(
+                minimumProtocolGeneration: UInt32(AizenClientModule.protocolGeneration),
+                maximumProtocolGeneration: UInt32(AizenClientModule.protocolGeneration),
+                productVersion: AizenClientModule.productVersion
+            ))
+        ))
+        guard response.kind == .capabilities, response.payload.identifier == CapabilitiesPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        let capabilities = try CapabilitiesPayload(protobufBytes: response.payload.protobufBytes)
+        guard capabilities.minimumProtocolGeneration <= AizenClientModule.protocolGeneration,
+              capabilities.maximumProtocolGeneration >= AizenClientModule.protocolGeneration,
+              Self.isCompatible(clientVersion: AizenClientModule.productVersion, hostMinimumVersion: capabilities.minimumCompatibleProductVersion) else {
+            connectionState = .disconnected
+            throw Error.incompatibleHost(
+                cliProductVersion: AizenClientModule.productVersion,
+                hostProductVersion: capabilities.productVersion,
+                hostProtocolRange: capabilities.minimumProtocolGeneration...capabilities.maximumProtocolGeneration,
+                minimumCompatibleProductVersion: capabilities.minimumCompatibleProductVersion
+            )
+        }
+        connectionState = .connected(protocolGeneration: response.protocolGeneration)
+        return capabilities
     }
 
     public func runEvents() async throws -> AsyncStream<RunEvent> {
@@ -523,5 +561,11 @@ public actor HostClient {
             try await commandOutbox?.acknowledge(commandID: envelope.messageID)
         }
         return response
+    }
+
+    private static func isCompatible(clientVersion: String, hostMinimumVersion: String) -> Bool {
+        let client = clientVersion.split(separator: ".").compactMap { Int($0) }
+        let minimum = hostMinimumVersion.split(separator: ".").compactMap { Int($0) }
+        return client.starts(with: minimum)
     }
 }

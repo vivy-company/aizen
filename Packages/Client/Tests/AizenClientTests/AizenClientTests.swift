@@ -90,6 +90,20 @@ import AizenWire
     #expect(await client.connectionState == .connected(protocolGeneration: 1))
 }
 
+@Test func clientNegotiatesProductAndProtocolCompatibilityBeforeCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: StorageRepository(url: root.appendingPathComponent("storage-v2.json")))))
+
+    let capabilities = try await client.negotiate()
+
+    #expect(capabilities.productVersion == "2.0.0")
+    #expect(capabilities.minimumCompatibleProductVersion == "2.0.0")
+    #expect(capabilities.minimumProtocolGeneration == 1)
+    #expect(capabilities.maximumProtocolGeneration == 1)
+    #expect(await client.connectionState == .connected(protocolGeneration: 1))
+}
+
 @Test func selectingSpaceIsAnExplicitProjectionTransition() {
     let first = Space(name: "Personal")
     let second = Space(name: "Work")

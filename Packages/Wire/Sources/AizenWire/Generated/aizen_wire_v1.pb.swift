@@ -305,6 +305,14 @@ nonisolated struct AizenWireV1_Capabilities: Sendable {
 
   var identifiers: [String] = []
 
+  var minimumProtocolGeneration: UInt32 = 0
+
+  var maximumProtocolGeneration: UInt32 = 0
+
+  var productVersion: String = String()
+
+  var minimumCompatibleProductVersion: String = String()
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -1316,7 +1324,7 @@ nonisolated extension AizenWireV1_Hello: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension AizenWireV1_Capabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".Capabilities"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}identifiers\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}identifiers\0\u{3}minimum_protocol_generation\0\u{3}maximum_protocol_generation\0\u{3}product_version\0\u{3}minimum_compatible_product_version\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1325,6 +1333,10 @@ nonisolated extension AizenWireV1_Capabilities: SwiftProtobuf.Message, SwiftProt
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedStringField(value: &self.identifiers) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.minimumProtocolGeneration) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.maximumProtocolGeneration) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.productVersion) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.minimumCompatibleProductVersion) }()
       default: break
       }
     }
@@ -1334,11 +1346,27 @@ nonisolated extension AizenWireV1_Capabilities: SwiftProtobuf.Message, SwiftProt
     if !self.identifiers.isEmpty {
       try visitor.visitRepeatedStringField(value: self.identifiers, fieldNumber: 1)
     }
+    if self.minimumProtocolGeneration != 0 {
+      try visitor.visitSingularUInt32Field(value: self.minimumProtocolGeneration, fieldNumber: 2)
+    }
+    if self.maximumProtocolGeneration != 0 {
+      try visitor.visitSingularUInt32Field(value: self.maximumProtocolGeneration, fieldNumber: 3)
+    }
+    if !self.productVersion.isEmpty {
+      try visitor.visitSingularStringField(value: self.productVersion, fieldNumber: 4)
+    }
+    if !self.minimumCompatibleProductVersion.isEmpty {
+      try visitor.visitSingularStringField(value: self.minimumCompatibleProductVersion, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: AizenWireV1_Capabilities, rhs: AizenWireV1_Capabilities) -> Bool {
     if lhs.identifiers != rhs.identifiers {return false}
+    if lhs.minimumProtocolGeneration != rhs.minimumProtocolGeneration {return false}
+    if lhs.maximumProtocolGeneration != rhs.maximumProtocolGeneration {return false}
+    if lhs.productVersion != rhs.productVersion {return false}
+    if lhs.minimumCompatibleProductVersion != rhs.minimumCompatibleProductVersion {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
