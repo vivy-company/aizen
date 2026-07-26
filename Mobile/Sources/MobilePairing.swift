@@ -31,6 +31,9 @@ final class MobilePairingStore: ObservableObject {
     @Published private(set) var runs: [Run] = []
     @Published private(set) var operations: [AizenCore.Operation] = []
     @Published private(set) var streamingText = ""
+    @Published private(set) var hostVersion: String?
+    @Published private(set) var diagnostics: HostDiagnosticsSnapshot?
+    @Published private(set) var lastSynchronizedAt: Date?
     private var client: HostClient?
     private var eventsTask: Task<Void, Never>?
 
@@ -92,7 +95,7 @@ final class MobilePairingStore: ObservableObject {
                 frameStream: { exchange.frames() }
             )
             let client = HostClient(transport: transport)
-            _ = try await client.negotiate()
+            let capabilities = try await client.negotiate()
             let spaces = try await client.spaces()
             self.client = client
             self.spaces = spaces
@@ -105,6 +108,9 @@ final class MobilePairingStore: ObservableObject {
             try MobileProjectionCache.save(.init(spaces: spaces, sessions: sessions))
             try MobilePairedHostStore.save(.init(host: storedHost.host, endpoint: storedHost.endpoint, approvalState: .approved))
             try await refreshSpaceSummaries(using: client, spaceID: selectedSpaceID)
+            diagnostics = try? await client.hostDiagnostics()
+            hostVersion = capabilities.productVersion
+            lastSynchronizedAt = Date()
             isLive = true
             subscribe(to: client)
             state = .ready(hostName: storedHost.host.displayName, spaceCount: spaces.count)
@@ -143,6 +149,30 @@ final class MobilePairingStore: ObservableObject {
     func enterForeground() async {
         guard MobilePairedHostStore.exists else { return }
         await reconnect()
+    }
+
+    func removeLocalPairing() {
+        eventsTask?.cancel()
+        eventsTask = nil
+        client = nil
+        isLive = false
+        MobilePairedHostStore.clear()
+        MobileProjectionCache.clear()
+        spaces = []
+        sessions = []
+        selectedSpaceID = nil
+        selectedSessionID = nil
+        messages = []
+        activeRunID = nil
+        streamingText = ""
+        resources = []
+        executionContexts = []
+        runs = []
+        operations = []
+        hostVersion = nil
+        diagnostics = nil
+        lastSynchronizedAt = nil
+        state = .unpaired
     }
 
     func selectSession(_ id: SessionID) async {
@@ -225,19 +255,7 @@ final class MobilePairingStore: ObservableObject {
     }
 
     private func clearRevokedPairing() {
-        MobilePairedHostStore.clear()
-        MobileProjectionCache.clear()
-        spaces = []
-        sessions = []
-        selectedSpaceID = nil
-        selectedSessionID = nil
-        messages = []
-        activeRunID = nil
-        streamingText = ""
-        resources = []
-        executionContexts = []
-        runs = []
-        operations = []
+        removeLocalPairing()
         state = .failed("This device is no longer authorized. Pair it again from your Mac.")
     }
 }

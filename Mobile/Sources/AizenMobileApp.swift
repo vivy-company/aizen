@@ -31,6 +31,7 @@ private struct MobileRootView: View {
     @State private var showsScanner = false
     @State private var newConversationTitle = ""
     @State private var composer = ""
+    @State private var confirmsPairingRemoval = false
 
     var body: some View {
         NavigationSplitView {
@@ -41,6 +42,10 @@ private struct MobileRootView: View {
                         Label("Approval pending on \(hostName)", systemImage: "clock.badge.exclamationmark")
                     case .ready(let hostName, let spaceCount):
                         Label("\(hostName) · \(spaceCount) Spaces\(pairing.isLive ? "" : " (offline)")", systemImage: "desktopcomputer.and.iphone")
+                        Text(hostStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Remove local pairing", role: .destructive) { confirmsPairingRemoval = true }
                     default:
                         Label("No paired Host", systemImage: "desktopcomputer.trianglebadge.exclamationmark")
                     }
@@ -157,6 +162,19 @@ private struct MobileRootView: View {
                 ContentUnavailableView("Choose a Session", systemImage: "bubble.left.and.bubble.right", description: Text("Paired Hosts expose only the Spaces and Sessions you are authorized to access."))
             }
         }
+        .confirmationDialog("Remove this paired Host?", isPresented: $confirmsPairingRemoval, titleVisibility: .visible) {
+            Button("Remove local pairing", role: .destructive) { pairing.removeLocalPairing() }
+        } message: {
+            Text("Cached Spaces and Sessions will be removed from this iPhone or iPad. The Host is not changed.")
+        }
+    }
+
+    private var hostStatus: String {
+        let route = "LAN"
+        let authorization = pairing.isLive ? "authorized" : "last known authorization"
+        let version = pairing.hostVersion.map { "v\($0)" } ?? "version unavailable"
+        let sync = pairing.lastSynchronizedAt.map { "synced \($0.formatted(date: .omitted, time: .shortened))" } ?? "not yet synced"
+        return "\(route) · \(authorization) · \(version) · \(sync)"
     }
 
     @ViewBuilder
