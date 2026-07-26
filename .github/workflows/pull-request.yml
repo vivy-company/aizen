@@ -1,0 +1,32 @@
+name: Pull Request
+
+on:
+  pull_request:
+  push:
+    branches:
+      - feature/aizen-v2-reignition
+
+jobs:
+  packages:
+    name: Reignition packages
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+      - name: Validate protobuf schema
+        run: scripts/validate-protobuf-schema.sh
+      - name: Test package boundaries
+        run: scripts/test-reignition-packages.sh
+
+  mac-and-cli:
+    name: Current Mac and CLI compatibility
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+      - name: Build Mac app
+        run: xcodebuild build -project aizen.xcodeproj -scheme aizen -configuration Debug -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO
+      - name: Build CLI
+        run: xcodebuild build -project aizen.xcodeproj -scheme aizen-cli -configuration Debug -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO
