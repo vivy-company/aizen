@@ -346,6 +346,23 @@ public struct HostProjectionSnapshot: Codable, Sendable, Hashable {
     }
 }
 
+/// A path-relative entry returned by a Host-owned execution-context filesystem.
+public struct ContextFileEntry: Codable, Sendable, Hashable, Identifiable {
+    public let relativePath: String
+    public let name: String
+    public let isDirectory: Bool
+
+    public var id: String { relativePath }
+
+    public init(relativePath: String, name: String, isDirectory: Bool) {
+        precondition(!relativePath.hasPrefix("/"), "Context file entries must be relative")
+        precondition(!name.isEmpty, "Context file entries need a name")
+        self.relativePath = relativePath
+        self.name = name
+        self.isDirectory = isDirectory
+    }
+}
+
 /// Host-owned metadata for a persistent terminal runtime. The tmux identity is opaque to clients;
 /// they use it only when asking the host/platform adapter to attach.
 public struct TerminalSession: Codable, Sendable, Hashable, Identifiable {
