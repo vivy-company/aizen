@@ -670,42 +670,93 @@ public actor LocalHost: WireEndpoint {
             guard envelope.channel == .blob else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
             let command = try BeginBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             guard let byteCount = Int(exactly: command.byteCount) else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
-            let descriptor = try await blobTransfers.begin(
-                target: .init(executionContextID: command.executionContextID, relativePath: command.relativePath, expectedContentHash: command.expectedContentHash),
-                byteCount: byteCount,
-                sha256: command.sha256
-            )
+            let contextID = try Self.executionContextID(from: command.executionContextID)
+            guard let context = try await storage.load().executionContexts.first(where: { $0.id == contextID }) else {
+                throw HostProtocolError.unknownExecutionContext(contextID)
+            }
             kind = .commandResult
-            payload = try TypedPayload(BeginBlobUploadResultPayload(blobID: descriptor.id, nextOffset: 0))
+            payload = try await executeDurably(envelope: envelope, spaceID: context.spaceID) {
+                let descriptor = try await self.blobTransfers.begin(
+                    target: .init(executionContextID: command.executionContextID, relativePath: command.relativePath, expectedContentHash: command.expectedContentHash),
+                    byteCount: byteCount,
+                    sha256: command.sha256
+                )
+                let operation = Operation(
+                    id: OperationID(rawValue: descriptor.id),
+                    spaceID: context.spaceID,
+                    resourceID: context.resourceID,
+                    lifecycle: .running,
+                    progress: 0
+                )
+                _ = try await self.storage.transact { $0.operations.append(operation) }
+                return try TypedPayload(BeginBlobUploadResultPayload(blobID: descriptor.id, nextOffset: 0))
+            }
         case .command where envelope.payload.identifier == AppendBlobUploadCommandPayload.identifier:
             guard envelope.channel == .blob else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
             let command = try AppendBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             guard let offset = Int(exactly: command.offset) else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
-            let received = try await blobTransfers.append(
-                id: command.blobID,
-                target: try await blobTransfers.target(id: command.blobID, executionContextID: command.executionContextID),
-                offset: offset,
-                bytes: command.bytes
-            )
+            let contextID = try Self.executionContextID(from: command.executionContextID)
+            guard let context = try await storage.load().executionContexts.first(where: { $0.id == contextID }) else {
+                throw HostProtocolError.unknownExecutionContext(contextID)
+            }
             kind = .commandResult
-            payload = try TypedPayload(AppendBlobUploadResultPayload(blobID: command.blobID, nextOffset: UInt64(received)))
+            payload = try await executeDurably(envelope: envelope, spaceID: context.spaceID) {
+                let descriptor = try await self.blobTransfers.descriptor(id: command.blobID, executionContextID: command.executionContextID)
+                let received = try await self.blobTransfers.append(
+                    id: command.blobID,
+                    target: descriptor.target,
+                    offset: offset,
+                    bytes: command.bytes
+                )
+                _ = try await self.storage.transact { snapshot in
+                    guard let index = snapshot.operations.firstIndex(where: { $0.id == OperationID(rawValue: command.blobID) }),
+                          snapshot.operations[index].lifecycle == .running else { return }
+                    snapshot.operations[index].progress = Double(received) / Double(descriptor.byteCount)
+                }
+                return try TypedPayload(AppendBlobUploadResultPayload(blobID: command.blobID, nextOffset: UInt64(received)))
+            }
         case .command where envelope.payload.identifier == FinishBlobUploadCommandPayload.identifier:
             guard envelope.channel == .blob else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
             let command = try FinishBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
-            let upload = try await blobTransfers.finish(
-                id: command.blobID,
-                target: try await blobTransfers.target(id: command.blobID, executionContextID: command.executionContextID)
-            )
-            _ = try await contextFiles.replaceUploadedFile(upload)
-            try await blobTransfers.complete(id: command.blobID, target: upload.descriptor.target)
+            let contextID = try Self.executionContextID(from: command.executionContextID)
+            guard let context = try await storage.load().executionContexts.first(where: { $0.id == contextID }) else {
+                throw HostProtocolError.unknownExecutionContext(contextID)
+            }
             kind = .commandResult
-            payload = try TypedPayload(FinishBlobUploadResultPayload(blobID: command.blobID, byteCount: UInt64(upload.descriptor.byteCount), sha256: upload.descriptor.sha256))
+            payload = try await executeDurably(envelope: envelope, spaceID: context.spaceID) {
+                let upload = try await self.blobTransfers.finish(
+                    id: command.blobID,
+                    target: try await self.blobTransfers.target(id: command.blobID, executionContextID: command.executionContextID)
+                )
+                _ = try await self.contextFiles.replaceUploadedFile(upload)
+                try await self.blobTransfers.complete(id: command.blobID, target: upload.descriptor.target)
+                _ = try await self.storage.transact { snapshot in
+                    guard let index = snapshot.operations.firstIndex(where: { $0.id == OperationID(rawValue: command.blobID) }),
+                          snapshot.operations[index].lifecycle == .running else { return }
+                    snapshot.operations[index].lifecycle = .completed
+                    snapshot.operations[index].progress = 1
+                    snapshot.operations[index].result = .init(summary: "File upload completed successfully.")
+                }
+                return try TypedPayload(FinishBlobUploadResultPayload(blobID: command.blobID, byteCount: UInt64(upload.descriptor.byteCount), sha256: upload.descriptor.sha256))
+            }
         case .command where envelope.payload.identifier == CancelBlobUploadCommandPayload.identifier:
             guard envelope.channel == .blob else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
             let command = try CancelBlobUploadCommandPayload(protobufBytes: envelope.payload.protobufBytes)
-            await blobTransfers.cancel(id: command.blobID, target: try await blobTransfers.target(id: command.blobID, executionContextID: command.executionContextID))
+            let contextID = try Self.executionContextID(from: command.executionContextID)
+            guard let context = try await storage.load().executionContexts.first(where: { $0.id == contextID }) else {
+                throw HostProtocolError.unknownExecutionContext(contextID)
+            }
             kind = .commandResult
-            payload = try TypedPayload(CancelBlobUploadResultPayload(blobID: command.blobID))
+            payload = try await executeDurably(envelope: envelope, spaceID: context.spaceID) {
+                let target = try await self.blobTransfers.target(id: command.blobID, executionContextID: command.executionContextID)
+                await self.blobTransfers.cancel(id: command.blobID, target: target)
+                _ = try await self.storage.transact { snapshot in
+                    guard let index = snapshot.operations.firstIndex(where: { $0.id == OperationID(rawValue: command.blobID) }),
+                          snapshot.operations[index].lifecycle == .running else { return }
+                    snapshot.operations[index].lifecycle = .cancelled
+                }
+                return try TypedPayload(CancelBlobUploadResultPayload(blobID: command.blobID))
+            }
         case .command where envelope.payload.identifier == TerminalInputCommandPayload.identifier:
             let command = try TerminalInputCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)

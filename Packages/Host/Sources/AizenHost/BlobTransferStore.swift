@@ -114,6 +114,13 @@ public actor BlobTransferStore {
         return transfer.descriptor.target
     }
 
+    public func descriptor(id: UUID, executionContextID: String) async throws -> Descriptor {
+        try await restoreIfNeeded()
+        guard let transfer = transfers[id] else { throw Error.unknown }
+        guard transfer.descriptor.target.executionContextID == executionContextID else { throw Error.targetMismatch }
+        return transfer.descriptor
+    }
+
     public func finish(id: UUID, target: Target) async throws -> CompletedUpload {
         try await restoreIfNeeded()
         guard let transfer = transfers[id] else { throw Error.unknown }

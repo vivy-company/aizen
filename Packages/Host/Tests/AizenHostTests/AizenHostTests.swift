@@ -1702,12 +1702,22 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     let firstChunk = Data(replacement.prefix(AppendBlobUploadCommandPayload.maximumChunkBytes))
     let secondChunk = Data(replacement.dropFirst(firstChunk.count))
     _ = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 2, kind: .command, channel: .blob, payload: try .init(AppendBlobUploadCommandPayload(blobID: blobID, executionContextID: context.id.description, offset: 0, bytes: firstChunk))))
+    let runningOperation = try #require(try await storage.load().operations.first(where: { $0.id == OperationID(rawValue: blobID) }))
+    #expect(runningOperation.lifecycle == .running)
+    #expect(runningOperation.progress == Double(firstChunk.count) / Double(replacement.count))
     _ = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 3, kind: .command, channel: .blob, payload: try .init(AppendBlobUploadCommandPayload(blobID: blobID, executionContextID: context.id.description, offset: UInt64(firstChunk.count), bytes: secondChunk))))
     let finish = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 4, kind: .command, channel: .blob, payload: try .init(FinishBlobUploadCommandPayload(blobID: blobID, executionContextID: context.id.description))))
     let result = try FinishBlobUploadResultPayload(protobufBytes: finish.payload.protobufBytes)
     #expect(result.blobID == blobID)
     #expect(result.sha256 == Data(SHA256.hash(data: replacement)))
     #expect(try Data(contentsOf: destination) == replacement)
+    let completedOperation = try #require(try await storage.load().operations.first(where: { $0.id == OperationID(rawValue: blobID) }))
+    #expect(completedOperation.lifecycle == .completed)
+    #expect(completedOperation.progress == 1)
+    #expect(completedOperation.result?.summary == "File upload completed successfully.")
+    let journalEvents = try await storage.load().journalEvents
+    #expect(journalEvents.count == 4)
+    #expect(Set(journalEvents.compactMap(\.spaceID)) == [space.id])
 }
 
 @Test func localHostStreamsRevisionBoundContextFileChunks() async throws {
