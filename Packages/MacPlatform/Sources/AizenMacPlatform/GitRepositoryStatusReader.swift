@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Host resolves the repository URL from a Resource before this actor is called; this type never
 /// receives a client-provided command or path fragment.
-public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryBranchReading, RepositoryIndexUpdating, RepositoryCommitting, RepositoryBranchUpdating {
+public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryBranchReading, RepositoryIndexUpdating, RepositoryCommitting, RepositoryBranchUpdating, RepositoryFetching {
     private static let maximumStatusBytes = 1_048_576
     private static let maximumIndexBytes = 67_108_864
 
@@ -104,6 +104,14 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
             ? ["-C", repositoryURL.path, "switch", "--no-guess", "--create", branchName]
             : ["-C", repositoryURL.path, "switch", "--no-guess", branchName]
         _ = try runGit(arguments, maximumOutputBytes: 8_192)
+        return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL))
+    }
+
+    public func fetch(at repositoryURL: URL, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> RepositoryFetchResult {
+        guard FileManager.default.fileExists(atPath: repositoryURL.appendingPathComponent(".git").path) else { throw Error.notRepository }
+        guard try currentRepositoryRevision(at: repositoryURL) == expectedRepositoryRevision else { throw Error.repositoryRevisionConflict }
+        guard try currentIndexRevision(at: repositoryURL) == expectedIndexRevision else { throw Error.indexRevisionConflict }
+        _ = try runGit(["-C", repositoryURL.path, "fetch", "--prune", "origin"], maximumOutputBytes: 65_536)
         return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL))
     }
 

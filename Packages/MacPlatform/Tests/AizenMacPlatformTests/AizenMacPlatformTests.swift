@@ -315,6 +315,29 @@ import Testing
     }
 }
 
+@Test func gitRepositoryStatusReaderFetchesFromTheFixedOriginAtExpectedRevisions() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let remote = root.appendingPathComponent("remote.git", isDirectory: true)
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try runGit(["init", "--bare", remote.path])
+    try runGit(["init", "--initial-branch=main", repository.path])
+    try runGit(["-C", repository.path, "config", "user.email", "aizen@example.test"])
+    try runGit(["-C", repository.path, "config", "user.name", "Aizen Test"])
+    try Data("seed\n".utf8).write(to: repository.appendingPathComponent("README.md"))
+    try runGit(["-C", repository.path, "add", "README.md"])
+    try runGit(["-C", repository.path, "commit", "-m", "seed"])
+    try runGit(["-C", repository.path, "remote", "add", "origin", remote.path])
+    try runGit(["-C", repository.path, "push", "-u", "origin", "main"])
+
+    let reader = GitRepositoryStatusReader()
+    let status = try await reader.status(at: repository, maximumEntries: 10)
+    let fetched = try await reader.fetch(at: repository, expectedRepositoryRevision: status.repositoryRevision, expectedIndexRevision: status.indexRevision)
+    #expect(fetched.repositoryRevision == status.repositoryRevision)
+    #expect(fetched.indexRevision == status.indexRevision)
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")
