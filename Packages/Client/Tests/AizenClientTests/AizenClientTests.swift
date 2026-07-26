@@ -444,7 +444,7 @@ import AizenWire
     _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
     let reader = ClientRepositoryStatusReader()
     let updater = ClientRepositoryIndexUpdater()
-    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, repositoryStatusReader: reader, repositoryDiffReader: ClientRepositoryDiffReader(), repositoryBranchReader: ClientRepositoryBranchReader(), repositoryIndexUpdater: updater, repositoryCommitter: ClientRepositoryCommitter(), repositoryBranchUpdater: ClientRepositoryBranchUpdater(), repositoryFetcher: ClientRepositoryFetcher())))
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, repositoryStatusReader: reader, repositoryDiffReader: ClientRepositoryDiffReader(), repositoryBranchReader: ClientRepositoryBranchReader(), repositoryIndexUpdater: updater, repositoryCommitter: ClientRepositoryCommitter(), repositoryBranchUpdater: ClientRepositoryBranchUpdater(), repositoryFetcher: ClientRepositoryFetcher(), repositoryPuller: ClientRepositoryPuller())))
 
     #expect(try await client.repositoryStatus(id: resource.id, maximumEntries: 1) == .init(
         resourceID: resource.id.description,
@@ -473,6 +473,9 @@ import AizenWire
     let fetched = try await client.fetchRepository(id: resource.id, expectedRepositoryRevision: "revision", expectedIndexRevision: String(repeating: "a", count: 64))
     #expect(fetched.repositoryRevision == String(repeating: "c", count: 40))
     #expect(UUID(uuidString: fetched.operationID) != nil)
+    let pulled = try await client.pullRepository(id: resource.id, expectedRepositoryRevision: "revision", expectedIndexRevision: String(repeating: "a", count: 64))
+    #expect(pulled.repositoryRevision == String(repeating: "c", count: 40))
+    #expect(UUID(uuidString: pulled.operationID) != nil)
 }
 
 @Test func clientImportsWebResourcesThroughHost() async throws {
@@ -656,6 +659,12 @@ private actor ClientRepositoryBranchUpdater: RepositoryBranchUpdating {
 
 private actor ClientRepositoryFetcher: RepositoryFetching {
     func fetch(at repositoryURL: URL, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> RepositoryFetchResult {
+        .init(repositoryRevision: String(repeating: "c", count: 40), indexRevision: String(repeating: "b", count: 64))
+    }
+}
+
+private actor ClientRepositoryPuller: RepositoryPulling {
+    func pull(at repositoryURL: URL, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> RepositoryFetchResult {
         .init(repositoryRevision: String(repeating: "c", count: 40), indexRevision: String(repeating: "b", count: 64))
     }
 }
