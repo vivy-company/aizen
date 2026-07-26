@@ -51,6 +51,22 @@ public actor TmuxTerminalRuntime: TerminalRuntime {
     }
 
     private func workingDirectory(for context: ExecutionContext, resource: Resource?) throws -> URL {
+        if context.kind == .gitWorktree,
+           let reference = context.hostReference?.rawValue,
+           reference.hasPrefix("local-worktree:") {
+            return try existingDirectory(
+                String(reference.dropFirst("local-worktree:".count)),
+                contextID: context.id
+            )
+        }
+        if context.kind == .repositoryCheckout,
+           let reference = context.hostReference?.rawValue,
+           reference.hasPrefix("local-checkout:") {
+            return try existingDirectory(
+                String(reference.dropFirst("local-checkout:".count)),
+                contextID: context.id
+            )
+        }
         guard (context.kind == .localFolder || context.kind == .repositoryCheckout),
               let resource,
               resource.spaceID == context.spaceID,
@@ -59,12 +75,17 @@ public actor TmuxTerminalRuntime: TerminalRuntime {
         }
         let prefix = context.kind == .localFolder ? "local-folder:" : "local-repository:"
         guard reference.rawValue.hasPrefix(prefix) else { throw Error.invalidExecutionContext(context.id) }
-        let directory = URL(fileURLWithPath: String(reference.rawValue.dropFirst(prefix.count)))
+        return try existingDirectory(String(reference.rawValue.dropFirst(prefix.count)), contextID: context.id)
+    }
+
+    private func existingDirectory(_ path: String, contextID: ExecutionContextID) throws -> URL {
+        guard path.hasPrefix("/") else { throw Error.invalidExecutionContext(contextID) }
+        let directory = URL(fileURLWithPath: path)
             .standardizedFileURL
             .resolvingSymlinksInPath()
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
-            throw Error.invalidExecutionContext(context.id)
+            throw Error.invalidExecutionContext(contextID)
         }
         return directory
     }

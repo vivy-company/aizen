@@ -67,19 +67,30 @@ public actor StorageBackedACPRunConfigurationResolver: ACPRunConfigurationResolv
                 .appendingPathComponent(context.spaceID.description, isDirectory: true)
                 .appendingPathComponent(context.id.description, isDirectory: true)
                 .path
+        } else if context.kind == .gitWorktree,
+                  let reference = context.hostReference?.rawValue,
+                  reference.hasPrefix("local-worktree:") {
+            workingDirectory = try Self.existingDirectory(
+                String(reference.dropFirst("local-worktree:".count)),
+                contextID: context.id
+            )
+        } else if context.kind == .repositoryCheckout,
+                  let reference = context.hostReference?.rawValue,
+                  reference.hasPrefix("local-checkout:") {
+            workingDirectory = try Self.existingDirectory(
+                String(reference.dropFirst("local-checkout:".count)),
+                contextID: context.id
+            )
         } else if (context.kind == .localFolder || context.kind == .repositoryCheckout),
             let resourceID = context.resourceID,
             let resource = snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == run.spaceID }),
             case .hostPrivate(let reference) = resource.details,
             let prefix = context.kind == .localFolder ? "local-folder:" : "local-repository:",
             reference.rawValue.hasPrefix(prefix) {
-            let path = String(reference.rawValue.dropFirst(prefix.count))
-            let directory = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
-            var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
-                throw Error.invalidExecutionContext(context.id)
-            }
-            workingDirectory = directory.path
+            workingDirectory = try Self.existingDirectory(
+                String(reference.rawValue.dropFirst(prefix.count)),
+                contextID: context.id
+            )
         } else {
             throw Error.invalidExecutionContext(context.id)
         }
@@ -89,6 +100,16 @@ public actor StorageBackedACPRunConfigurationResolver: ACPRunConfigurationResolv
             workingDirectory: workingDirectory,
             environment: agent.environment
         )
+    }
+
+    private static func existingDirectory(_ path: String, contextID: ExecutionContextID) throws -> String {
+        guard path.hasPrefix("/") else { throw Error.invalidExecutionContext(contextID) }
+        let directory = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw Error.invalidExecutionContext(contextID)
+        }
+        return directory.path
     }
 }
 

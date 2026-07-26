@@ -376,6 +376,26 @@ import Testing
     #expect(try await resolver.configuration(for: Run(spaceID: space.id, sessionID: session.id, executionContextID: context.id)).workingDirectory == repository.path)
 }
 
+@Test func storageBackedConfigurationUsesAHostOwnedLinkedWorktree() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let worktree = root.appendingPathComponent("worktree", isDirectory: true)
+    try FileManager.default.createDirectory(at: worktree, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(root.path)")))
+    let context = ExecutionContext(spaceID: space.id, kind: .gitWorktree, resourceID: resource.id, hostReference: .init(rawValue: "local-worktree:\(worktree.path)"))
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan", executionContextID: context.id)
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.resources.append(resource)
+        $0.executionContexts.append(context)
+        $0.sessions.append(session)
+    }
+    let resolver = StorageBackedACPRunConfigurationResolver(storage: storage, agentConfiguration: StaticAgentConfigurationResolver(), managedSandboxRoot: root.appendingPathComponent("sandboxes", isDirectory: true))
+    #expect(try await resolver.configuration(for: Run(spaceID: space.id, sessionID: session.id, executionContextID: context.id)).workingDirectory == worktree.path)
+}
+
 private struct StaticConfigurationResolver: ACPRunConfigurationResolving {
     func configuration(for run: Run) async throws -> ACPRunConfiguration {
         ACPRunConfiguration(executablePath: "/usr/bin/true", workingDirectory: "/tmp/aizen")

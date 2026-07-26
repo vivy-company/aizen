@@ -176,7 +176,9 @@ public enum LegacyCoreDataMigration {
                   let name = repository.value(forKey: "name") as? String else { report.skippedRecords += 1; continue }
             let workspaceID = (repository.value(forKey: "workspace") as? NSManagedObject)?.value(forKey: "id") as? UUID
             let space = workspaceID.flatMap { spaces[$0] } ?? fallbackSpace
-            let resource = Resource(id: ResourceID(rawValue: id), spaceID: space.id, kind: .repository, title: name, details: .repository(.init(hostReference: .init(rawValue: "legacy-repository-\(id.uuidString)"))))
+            let path = (repository.value(forKey: "path") as? String).flatMap(normalizedLocalPath)
+            let reference = path.map { "local-repository:\($0)" } ?? "legacy-repository-\(id.uuidString)"
+            let resource = Resource(id: ResourceID(rawValue: id), spaceID: space.id, kind: .repository, title: name, details: .repository(.init(hostReference: .init(rawValue: reference))))
             snapshot.resources.append(resource); resourceIDs[id] = resource.id; report.migratedResources += 1
         }
         for worktree in worktrees {
@@ -185,7 +187,11 @@ public enum LegacyCoreDataMigration {
             let resourceID = repositoryID.flatMap { resourceIDs[$0] }
             let spaceID = resourceID.flatMap { id in snapshot.resources.first(where: { $0.id == id })?.spaceID } ?? fallbackSpace.id
             let kind: ExecutionContextKind = (worktree.value(forKey: "isPrimary") as? Bool) == true ? .repositoryCheckout : .gitWorktree
-            let migrated = ExecutionContext(id: ExecutionContextID(rawValue: id), spaceID: spaceID, kind: kind, resourceID: resourceID, hostReference: .init(rawValue: "legacy-worktree-\(id.uuidString)"))
+            let path = (worktree.value(forKey: "path") as? String).flatMap(normalizedLocalPath)
+            let reference = path.map {
+                kind == .gitWorktree ? "local-worktree:\($0)" : "local-checkout:\($0)"
+            } ?? "legacy-worktree-\(id.uuidString)"
+            let migrated = ExecutionContext(id: ExecutionContextID(rawValue: id), spaceID: spaceID, kind: kind, resourceID: resourceID, hostReference: .init(rawValue: reference))
             snapshot.executionContexts.append(migrated); contextIDs[id] = migrated.id; report.migratedContexts += 1
         }
         for chat in chats {
@@ -199,6 +205,11 @@ public enum LegacyCoreDataMigration {
         }
         _ = try await destination.replaceEmpty(with: snapshot)
         return report
+    }
+
+    private static func normalizedLocalPath(_ path: String) -> String? {
+        guard path.hasPrefix("/") else { return nil }
+        return URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
     }
 
     static func backupLegacyStore(at sourceStoreURL: URL, into backupDirectory: URL, fileManager: FileManager = .default) throws -> [URL] {
