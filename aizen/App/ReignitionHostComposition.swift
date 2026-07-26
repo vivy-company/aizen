@@ -1,5 +1,6 @@
 import AizenClient
 import AizenHost
+import AizenMacPlatform
 import AizenStorage
 import AizenTransport
 import Foundation
@@ -19,8 +20,22 @@ actor ReignitionHostComposition {
     init(storageURL: URL? = nil) {
         let storageURL = storageURL ?? ReignitionHostComposition.defaultStorageURL()
         let storage = StorageRepository(url: storageURL)
+        let sandboxRoot = storageURL.deletingLastPathComponent().appendingPathComponent("Sandboxes", isDirectory: true)
+        let sandboxes = ManagedSandboxService(storage: storage, rootURL: sandboxRoot)
+        let runtime = ACPRunRuntime(
+            configurationResolver: StorageBackedACPRunConfigurationResolver(
+                storage: storage,
+                agentConfiguration: DefaultACPAgentLaunchConfigurationResolver(),
+                managedSandboxRoot: sandboxRoot
+            ),
+            delegateProvider: NoACPToolDelegateProvider()
+        )
         self.storage = storage
-        host = LocalHost(storage: storage)
+        host = LocalHost(
+            storage: storage,
+            conversationRuns: ConversationRunCoordinator(storage: storage, runtime: runtime),
+            managedSandboxes: sandboxes
+        )
         client = HostClient(transport: InProcessTransport(endpoint: host))
     }
 
@@ -47,5 +62,33 @@ actor ReignitionHostComposition {
             backupDirectory: legacyStoreURL.deletingLastPathComponent().appendingPathComponent("Reignition Backups", isDirectory: true)
         )
         return .migrated(report)
+    }
+}
+
+/// The app composition boundary maps the existing user agent preference into the v2 Host runtime.
+/// Selecting an agent per Conversation belongs to the forthcoming v2 Client state, not to Storage.
+private struct DefaultACPAgentLaunchConfigurationResolver: ACPAgentLaunchConfigurationResolving {
+    enum Error: Swift.Error, LocalizedError {
+        case agentNotConfigured(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .agentNotConfigured(let agentID):
+                "Agent '\(agentID)' is not installed or enabled. Configure it in Settings."
+            }
+        }
+    }
+
+    func launchConfiguration() async throws -> ACPAgentLaunchConfiguration {
+        let agentID = UserDefaults.standard.string(forKey: "defaultACPAgent") ?? AgentRegistry.defaultAgentID
+        guard AgentRegistry.shared.validateAgent(named: agentID),
+            let executablePath = AgentRegistry.shared.getAgentPath(for: agentID) else {
+            throw Error.agentNotConfigured(agentID)
+        }
+        return ACPAgentLaunchConfiguration(
+            executablePath: executablePath,
+            arguments: AgentRegistry.shared.getAgentLaunchArgs(for: agentID),
+            environment: await AgentRegistry.shared.resolvedAgentLaunchEnvironment(for: agentID)
+        )
     }
 }
