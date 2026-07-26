@@ -217,6 +217,42 @@ import Testing
     #expect(UUID(uuidString: try CreateSpaceResultPayload(protobufBytes: response.payload.protobufBytes).spaceID) != nil)
 }
 
+@Test func gitLinkedWorktreeServiceCreatesARealLinkedCheckout() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let source = root.appendingPathComponent("source", isDirectory: true)
+    try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+    try git(["init", source.path])
+    try git(["-C", source.path, "config", "user.email", "test@example.com"])
+    try git(["-C", source.path, "config", "user.name", "Aizen Test"])
+    try "seed".write(to: source.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+    try git(["-C", source.path, "add", "README.md"])
+    try git(["-C", source.path, "commit", "-m", "seed"])
+    let destination = root.appendingPathComponent("feature", isDirectory: true)
+
+    try await GitLinkedWorktreeService().createLinkedWorktree(source: source, destination: destination, branch: "feature/test", createBranch: true, baseBranch: "HEAD")
+
+    #expect(FileManager.default.fileExists(atPath: destination.appendingPathComponent(".git").path))
+    #expect(try gitOutput(["-C", destination.path, "branch", "--show-current"]) == "feature/test")
+}
+
+private func git(_ arguments: [String]) throws {
+    _ = try gitOutput(arguments)
+}
+
+private func gitOutput(_ arguments: [String]) throws -> String {
+    let process = Process()
+    let output = Pipe()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    process.arguments = arguments
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else { throw CocoaError(.executableNotLoadable) }
+    return String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
 @Test func hostAgentLaunchConfigurationKeepsEnvironmentOutOfTheConfigurationFile() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

@@ -13,13 +13,13 @@ public actor GitLinkedWorktreeService: LinkedWorktreeCreating {
         var arguments = ["-C", source.path, "worktree", "add"]
         if createBranch {
             arguments += ["-b", branch]
+            arguments.append(destination.path)
             if let baseBranch, !baseBranch.isEmpty { arguments.append(baseBranch) }
         } else {
             arguments += [destination.path, branch]
             try await run(arguments)
             return
         }
-        arguments.append(destination.path)
         try await run(arguments)
     }
 
