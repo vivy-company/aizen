@@ -54,4 +54,8 @@ public actor ConversationRunCoordinator {
             throw error
         }
     }
+
+    public func cancel(runID: RunID) async throws {
+        try await runs.cancel(runID)
+    }
 }

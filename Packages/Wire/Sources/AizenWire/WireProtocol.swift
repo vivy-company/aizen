@@ -447,6 +447,44 @@ public struct SendConversationResultPayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct CancelRunCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.run.cancel@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let runID: String
+
+    public init(runID: String) {
+        precondition(!runID.isEmpty, "Run cancellation requires a Run identity")
+        self.runID = runID
+    }
+
+    public init(protobufBytes: Data) throws {
+        self.init(runID: try AizenWireV1_CancelRunCommand(serializedBytes: protobufBytes).runID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_CancelRunCommand()
+        message.runID = runID
+        return try message.serializedData()
+    }
+}
+
+public struct CancelRunResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.run.cancel@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public init() {}
+
+    public init(protobufBytes: Data) throws {
+        _ = try AizenWireV1_CancelRunResult(serializedBytes: protobufBytes)
+    }
+
+    public func protobufBytes() throws -> Data {
+        try AizenWireV1_CancelRunResult().serializedData()
+    }
+}
+
 public struct ListSpacesQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.space.list@1")
     public static let schemaVersion: UInt32 = 1

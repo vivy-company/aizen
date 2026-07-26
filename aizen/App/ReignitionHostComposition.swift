@@ -72,6 +72,10 @@ actor ReignitionHostComposition {
         try await client.sendConversation(spaceID: spaceID, sessionID: sessionID, content: content)
     }
 
+    func cancelRun(id: RunID) async throws {
+        try await client.cancelRun(id: id)
+    }
+
     func prepareLegacyMigration(legacyStoreURL: URL?, legacyModelURL: URL?, fileManager: FileManager = .default) async throws -> MigrationPreparation {
         guard let legacyStoreURL, fileManager.fileExists(atPath: legacyStoreURL.path) else { return .noLegacyStore }
         guard let legacyModelURL else { throw CocoaError(.fileNoSuchFile) }

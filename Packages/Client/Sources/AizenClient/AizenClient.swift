@@ -183,6 +183,20 @@ public actor HostClient {
         return RunID(rawValue: uuid)
     }
 
+    public func cancelRun(id: RunID) async throws {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(CancelRunCommandPayload(runID: id.description))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == CancelRunResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        _ = try CancelRunResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     private func nextConnectionSequence() throws -> UInt64 {
         guard nextSequence < UInt64.max else { throw Error.sequenceExhausted }
         defer { nextSequence += 1 }

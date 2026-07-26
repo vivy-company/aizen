@@ -50,7 +50,9 @@ public actor LocalHost: WireEndpoint {
                 CreateConversationCommandPayload.identifier,
                 CreateConversationResultPayload.identifier,
                 SendConversationCommandPayload.identifier,
-                SendConversationResultPayload.identifier
+                SendConversationResultPayload.identifier,
+                CancelRunCommandPayload.identifier,
+                CancelRunResultPayload.identifier
             ]))
         case .query where envelope.payload.identifier == SnapshotRequestPayload.identifier:
             let request = try SnapshotRequestPayload(protobufBytes: envelope.payload.protobufBytes)
@@ -146,6 +148,13 @@ public actor LocalHost: WireEndpoint {
             )
             kind = .commandResult
             payload = try TypedPayload(SendConversationResultPayload(runID: runID.description))
+        case .command where envelope.payload.identifier == CancelRunCommandPayload.identifier:
+            guard let conversationRuns else { throw HostProtocolError.runtimeUnavailable }
+            let command = try CancelRunCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            guard let rawRunID = UUID(uuidString: command.runID) else { throw HostProtocolError.invalidIdentity(command.runID) }
+            try await conversationRuns.cancel(runID: RunID(rawValue: rawRunID))
+            kind = .commandResult
+            payload = try TypedPayload(CancelRunResultPayload())
         default:
             throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier)
         }

@@ -126,6 +126,12 @@ message SendConversationResult {
   string run_id = 1;
 }
 
+message CancelRunCommand {
+  string run_id = 1;
+}
+
+message CancelRunResult {}
+
 message ListSpacesQuery {}
 
 message SpaceRecord {

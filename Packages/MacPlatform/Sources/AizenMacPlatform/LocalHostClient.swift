@@ -46,4 +46,8 @@ public actor LocalHostClient {
     public func conversationTimeline(sessionID: SessionID) async throws -> [ConversationMessage] {
         try await client.conversationTimeline(sessionID: sessionID)
     }
+
+    public func cancelRun(id: RunID) async throws {
+        try await client.cancelRun(id: id)
+    }
 }
