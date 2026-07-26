@@ -454,6 +454,32 @@ public actor HostClient {
         return try ListTerminalSessionsResponsePayload(protobufBytes: response.payload.protobufBytes).sessions
     }
 
+    public func createTerminalSession(
+        id: SessionID = SessionID(),
+        spaceID: SpaceID,
+        executionContextID: ExecutionContextID,
+        title: String? = nil,
+        initialCommand: String? = nil
+    ) async throws -> TerminalSession {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .terminal,
+            payload: try .init(CreateTerminalSessionCommandPayload(
+                terminalSessionID: id.description,
+                spaceID: spaceID.description,
+                executionContextID: executionContextID.description,
+                title: title,
+                initialCommand: initialCommand
+            ))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == CreateTerminalSessionResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try CreateTerminalSessionResultPayload(protobufBytes: response.payload.protobufBytes).session
+    }
+
     public func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
         let response = try await send(.init(
             messageID: UUID().uuidString,

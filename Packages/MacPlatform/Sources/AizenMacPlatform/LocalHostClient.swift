@@ -82,6 +82,22 @@ public actor LocalHostClient {
         try await client.terminalSessions(spaceID: spaceID)
     }
 
+    public func createTerminalSession(
+        id: SessionID = SessionID(),
+        spaceID: SpaceID,
+        executionContextID: ExecutionContextID,
+        title: String? = nil,
+        initialCommand: String? = nil
+    ) async throws -> TerminalSession {
+        try await client.createTerminalSession(
+            id: id,
+            spaceID: spaceID,
+            executionContextID: executionContextID,
+            title: title,
+            initialCommand: initialCommand
+        )
+    }
+
     public func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
         try await client.createLocalFolderContext(spaceID: spaceID, resourceID: resourceID)
     }

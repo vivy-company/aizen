@@ -162,6 +162,26 @@ import AizenWire
     #expect(sessions.map(\.tmuxSessionName) == ["aizen-vivy-server"])
 }
 
+@Test func clientCreatesTerminalSessionsThroughHostCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "Project", details: .hostPrivate(.init(rawValue: "local-folder:/tmp/project")))
+    let context = ExecutionContext(spaceID: space.id, kind: .localFolder, resourceID: resource.id)
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.resources.append(resource)
+        $0.executionContexts.append(context)
+    }
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, terminalRuntime: ClientTerminalRuntime())))
+
+    let session = try await client.createTerminalSession(spaceID: space.id, executionContextID: context.id, title: "Server")
+    #expect(session.spaceID == space.id)
+    #expect(session.executionContextID == context.id)
+    #expect(session.tmuxSessionName == "aizen-client")
+}
+
 @Test func clientCreatesSpacesThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -393,6 +413,19 @@ private actor RecordingJournalCursorStore: JournalCursorStore {
 
     func loadCursor() -> UInt64 { cursor }
     func saveCursor(_ cursor: UInt64) { self.cursor = cursor }
+}
+
+private actor ClientTerminalRuntime: TerminalRuntime {
+    func createTerminal(
+        id: SessionID,
+        spaceID: SpaceID,
+        executionContext: ExecutionContext,
+        resource: Resource?,
+        title: String?,
+        initialCommand: String?
+    ) async throws -> TerminalLaunch {
+        TerminalLaunch(tmuxSessionName: "aizen-client", paneID: "%1")
+    }
 }
 
 private enum ClientReducerFailure: Error, Equatable {
