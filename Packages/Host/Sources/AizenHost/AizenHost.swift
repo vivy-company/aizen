@@ -56,6 +56,20 @@ public protocol RepositoryStatusReading: Sendable {
     func status(at repositoryURL: URL, maximumEntries: Int) async throws -> RepositoryStatusSnapshot
 }
 
+public struct RepositoryDiffSnapshot: Sendable, Equatable {
+    public let repositoryRevision: String
+    public let indexRevision: String
+    public let unifiedDiff: Data
+    public let truncated: Bool
+    public init(repositoryRevision: String, indexRevision: String, unifiedDiff: Data, truncated: Bool) {
+        self.repositoryRevision = repositoryRevision; self.indexRevision = indexRevision; self.unifiedDiff = unifiedDiff; self.truncated = truncated
+    }
+}
+
+public protocol RepositoryDiffReading: Sendable {
+    func diff(at repositoryURL: URL, relativePath: String, maximumBytes: Int) async throws -> RepositoryDiffSnapshot
+}
+
 public protocol XcodeProjectOpening: Sendable {
     func openXcodeProject(at url: URL) async throws
 }
@@ -81,6 +95,7 @@ public actor LocalHost: WireEndpoint {
     private let linkedWorktrees: (any LinkedWorktreeCreating)?
     private let independentContexts: (any IndependentContextCreating)?
     private let repositoryStatusReader: (any RepositoryStatusReading)?
+    private let repositoryDiffReader: (any RepositoryDiffReading)?
     private let xcodeProjectOpener: (any XcodeProjectOpening)?
     private let xcodeProjectInspector: (any XcodeProjectInspecting)?
     private let xcodeProjectBuilder: (any XcodeProjectBuilding)?
@@ -98,6 +113,7 @@ public actor LocalHost: WireEndpoint {
         linkedWorktrees: (any LinkedWorktreeCreating)? = nil,
         independentContexts: (any IndependentContextCreating)? = nil,
         repositoryStatusReader: (any RepositoryStatusReading)? = nil,
+        repositoryDiffReader: (any RepositoryDiffReading)? = nil,
         xcodeProjectOpener: (any XcodeProjectOpening)? = nil,
         xcodeProjectInspector: (any XcodeProjectInspecting)? = nil,
         xcodeProjectBuilder: (any XcodeProjectBuilding)? = nil
@@ -113,6 +129,7 @@ public actor LocalHost: WireEndpoint {
         self.linkedWorktrees = linkedWorktrees
         self.independentContexts = independentContexts
         self.repositoryStatusReader = repositoryStatusReader
+        self.repositoryDiffReader = repositoryDiffReader
         self.xcodeProjectOpener = xcodeProjectOpener
         self.xcodeProjectInspector = xcodeProjectInspector
         self.xcodeProjectBuilder = xcodeProjectBuilder
@@ -202,6 +219,8 @@ public actor LocalHost: WireEndpoint {
                 RefreshRepositoryResourceResultPayload.identifier,
                 ReadRepositoryStatusQueryPayload.identifier,
                 ReadRepositoryStatusResponsePayload.identifier,
+                ReadRepositoryDiffQueryPayload.identifier,
+                ReadRepositoryDiffResponsePayload.identifier,
                 CreateLocalFolderContextCommandPayload.identifier,
                 CreateLocalFolderContextResultPayload.identifier,
                 CreateRepositoryCheckoutContextCommandPayload.identifier,
@@ -708,6 +727,15 @@ public actor LocalHost: WireEndpoint {
                 entries: status.entries.map { .init(path: $0.path, indexStatus: $0.indexStatus, worktreeStatus: $0.worktreeStatus) },
                 truncated: status.truncated
             ))
+        case .query where envelope.payload.identifier == ReadRepositoryDiffQueryPayload.identifier:
+            guard let repositoryDiffReader else { throw HostProtocolError.runtimeUnavailable }
+            let query = try ReadRepositoryDiffQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resourceID = try Self.resourceID(from: query.resourceID)
+            guard let resource = try await storage.load().resources.first(where: { $0.id == resourceID }) else { throw HostProtocolError.unknownResource(resourceID) }
+            guard resource.kind == .repository, let repositoryURL = try Self.localResourceDirectory(for: resource) else { throw HostProtocolError.invalidResourcePath(resource.title) }
+            let diff = try await repositoryDiffReader.diff(at: repositoryURL, relativePath: query.relativePath, maximumBytes: Int(query.maximumBytes))
+            kind = .queryResponse
+            payload = try TypedPayload(ReadRepositoryDiffResponsePayload(resourceID: resourceID.description, repositoryRevision: diff.repositoryRevision, indexRevision: diff.indexRevision, unifiedDiff: diff.unifiedDiff, truncated: diff.truncated))
         case .command where envelope.payload.identifier == CreateLocalFolderContextCommandPayload.identifier:
             let command = try CreateLocalFolderContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)

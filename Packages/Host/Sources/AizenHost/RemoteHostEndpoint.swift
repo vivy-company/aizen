@@ -234,6 +234,10 @@ public struct RemoteHostEndpoint: WireEndpoint {
             let request = try ReadRepositoryStatusQueryPayload(protobufBytes: envelope.payload.protobufBytes)
             let resource = try await requiredResource(request.resourceID)
             return .init(capability: .gitRead, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil)
+        case ReadRepositoryDiffQueryPayload.identifier:
+            let request = try ReadRepositoryDiffQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resource = try await requiredResource(request.resourceID)
+            return .init(capability: .gitRead, spaceID: resource.spaceID, resourceID: resource.id, rateLimitKind: nil)
         case CreateTerminalSessionCommandPayload.identifier:
             let request = try CreateTerminalSessionCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let requestedSpaceID = try spaceID(request.spaceID)
