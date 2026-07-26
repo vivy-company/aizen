@@ -22,6 +22,49 @@ import AizenWire
     #expect(snapshot.spaces.map(\.name) == ["Vivy"])
 }
 
+@Test func localHostReplaysJournalEventsOrRequiresASnapshot() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    for revision in 1...3 {
+        _ = try await storage.appendJournalEvent(
+            aggregateID: "host",
+            aggregateType: "host",
+            aggregateRevision: UInt64(revision),
+            payloadIdentifier: "aizen.event.host@1",
+            payloadSchemaVersion: 1,
+            payloadBytes: Data([UInt8(revision)]),
+            durability: .durable
+        )
+    }
+    _ = try await storage.pruneJournalEvents(keepingMostRecent: 2)
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
+
+    let replay = try await transport.send(.init(
+        messageID: "journal-replay",
+        connectionSequence: 1,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ReadJournalEventsQueryPayload(afterCursor: 2))
+    ))
+    let replayResult = try ReadJournalEventsResponsePayload(protobufBytes: replay.payload.protobufBytes)
+    #expect(replayResult.events.map(\.cursor) == [3])
+    #expect(!replayResult.snapshotRequired)
+
+    let expired = try await transport.send(.init(
+        messageID: "journal-expired",
+        connectionSequence: 2,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ReadJournalEventsQueryPayload(afterCursor: 0))
+    ))
+    let expiredResult = try ReadJournalEventsResponsePayload(protobufBytes: expired.payload.protobufBytes)
+    #expect(expiredResult.events.isEmpty)
+    #expect(expiredResult.snapshotRequired)
+    #expect(expiredResult.oldestCursor == 2)
+    #expect(expiredResult.latestCursor == 3)
+}
+
 @Test func localHostListsSpacesThroughTypedWirePayloads() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

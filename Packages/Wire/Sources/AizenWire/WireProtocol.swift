@@ -1103,6 +1103,105 @@ public struct SnapshotResponsePayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct ReadJournalEventsQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.journal-events@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let afterCursor: UInt64
+    public let spaceID: String?
+
+    public init(afterCursor: UInt64, spaceID: String? = nil) {
+        self.afterCursor = afterCursor
+        self.spaceID = spaceID
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ReadJournalEventsQuery(serializedBytes: protobufBytes)
+        self.init(afterCursor: message.afterCursor, spaceID: message.spaceID.isEmpty ? nil : message.spaceID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ReadJournalEventsQuery()
+        message.afterCursor = afterCursor
+        message.spaceID = spaceID ?? ""
+        return try message.serializedData()
+    }
+}
+
+public struct ReadJournalEventsResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.journal-events@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let events: [JournalEvent]
+    public let oldestCursor: UInt64
+    public let latestCursor: UInt64
+    public let snapshotRequired: Bool
+
+    public init(events: [JournalEvent], oldestCursor: UInt64, latestCursor: UInt64, snapshotRequired: Bool) {
+        self.events = events
+        self.oldestCursor = oldestCursor
+        self.latestCursor = latestCursor
+        self.snapshotRequired = snapshotRequired
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ReadJournalEventsResponse(serializedBytes: protobufBytes)
+        let events = try message.events.map { record in
+            guard let eventID = UUID(uuidString: record.eventID), record.cursor > 0,
+                  !record.aggregateID.isEmpty, !record.aggregateType.isEmpty,
+                  !record.payloadIdentifier.isEmpty, record.payloadSchemaVersion > 0,
+                  let durability = EventDurability(rawValue: record.durability) else {
+                throw WireCodecError.invalidIdentity("journal event")
+            }
+            let spaceID = try record.spaceID.isEmpty ? nil : SpaceID(rawValue: Self.uuid(from: record.spaceID))
+            return JournalEvent(
+                id: eventID,
+                cursor: record.cursor,
+                spaceID: spaceID,
+                aggregateID: record.aggregateID,
+                aggregateType: record.aggregateType,
+                aggregateRevision: record.aggregateRevision,
+                occurredAt: Date(timeIntervalSince1970: Double(record.occurredAtMillis) / 1_000),
+                payloadIdentifier: record.payloadIdentifier,
+                payloadSchemaVersion: record.payloadSchemaVersion,
+                payloadBytes: record.payloadBytes,
+                durability: durability
+            )
+        }
+        self.init(events: events, oldestCursor: message.oldestCursor, latestCursor: message.latestCursor, snapshotRequired: message.snapshotRequired)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ReadJournalEventsResponse()
+        message.events = events.map { event in
+            var record = AizenWireV1_JournalEventRecord()
+            record.cursor = event.cursor
+            record.eventID = event.id.uuidString
+            record.spaceID = event.spaceID?.description ?? ""
+            record.aggregateID = event.aggregateID
+            record.aggregateType = event.aggregateType
+            record.aggregateRevision = event.aggregateRevision
+            record.occurredAtMillis = Int64((event.occurredAt.timeIntervalSince1970 * 1_000).rounded(.towardZero))
+            record.payloadIdentifier = event.payloadIdentifier
+            record.payloadSchemaVersion = event.payloadSchemaVersion
+            record.payloadBytes = event.payloadBytes
+            record.durability = event.durability.rawValue
+            return record
+        }
+        message.oldestCursor = oldestCursor
+        message.latestCursor = latestCursor
+        message.snapshotRequired = snapshotRequired
+        return try message.serializedData()
+    }
+
+    private static func uuid(from value: String) throws -> UUID {
+        guard let value = UUID(uuidString: value) else { throw WireCodecError.invalidIdentity(value) }
+        return value
+    }
+}
+
 public enum UnknownPayloadDisposition: Sendable, Hashable {
     case decoded
     case ignoredOptional

@@ -1,4 +1,5 @@
 import Foundation
+import AizenCore
 import SwiftProtobuf
 import Testing
 @testable import AizenWire
@@ -52,4 +53,22 @@ import Testing
     let decoded = try SnapshotResponsePayload(protobufBytes: payload.protobufBytes())
     #expect(decoded.cursor == 42)
     #expect(decoded.snapshot == storageBytes)
+}
+
+@Test func journalReplayPayloadRoundTripsTypedEvents() throws {
+    let space = SpaceID()
+    let event = JournalEvent(
+        cursor: 4,
+        spaceID: space,
+        aggregateID: "command",
+        aggregateType: "command",
+        aggregateRevision: 1,
+        occurredAt: Date(timeIntervalSince1970: 1_234),
+        payloadIdentifier: "aizen.command-result.example@1",
+        payloadSchemaVersion: 1,
+        payloadBytes: Data([1, 2]),
+        durability: .durable
+    )
+    let payload = ReadJournalEventsResponsePayload(events: [event], oldestCursor: 4, latestCursor: 4, snapshotRequired: false)
+    #expect(try ReadJournalEventsResponsePayload(protobufBytes: payload.protobufBytes()) == payload)
 }

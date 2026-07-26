@@ -45,6 +45,8 @@ public actor LocalHost: WireEndpoint {
                 CapabilitiesPayload.identifier,
                 SnapshotRequestPayload.identifier,
                 SnapshotResponsePayload.identifier,
+                ReadJournalEventsQueryPayload.identifier,
+                ReadJournalEventsResponsePayload.identifier,
                 ListSpacesQueryPayload.identifier,
                 ListSpacesResponsePayload.identifier,
                 ListConversationsQueryPayload.identifier,
@@ -91,6 +93,19 @@ public actor LocalHost: WireEndpoint {
                 scope: request.scope,
                 cursor: snapshot.journalEvents.last?.cursor ?? 0,
                 snapshot: JSONEncoder().encode(snapshot)
+            ))
+        case .query where envelope.payload.identifier == ReadJournalEventsQueryPayload.identifier:
+            let query = try ReadJournalEventsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try query.spaceID.map(Self.spaceID(from:))
+            let bounds = try await storage.journalCursorBounds()
+            let snapshotRequired = bounds.oldest.map { query.afterCursor < $0 - 1 } ?? false
+            let events = snapshotRequired ? [] : try await storage.journalEvents(after: query.afterCursor, spaceID: spaceID)
+            kind = .queryResponse
+            payload = try TypedPayload(ReadJournalEventsResponsePayload(
+                events: events,
+                oldestCursor: bounds.oldest ?? 0,
+                latestCursor: bounds.latest,
+                snapshotRequired: snapshotRequired
             ))
         case .query where envelope.payload.identifier == ListSpacesQueryPayload.identifier:
             _ = try ListSpacesQueryPayload(protobufBytes: envelope.payload.protobufBytes)

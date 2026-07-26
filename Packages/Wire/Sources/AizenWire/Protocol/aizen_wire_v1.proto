@@ -300,6 +300,32 @@ message Event {
   string event_id = 2;
 }
 
+message ReadJournalEventsQuery {
+  uint64 after_cursor = 1;
+  string space_id = 2;
+}
+
+message JournalEventRecord {
+  uint64 cursor = 1;
+  string event_id = 2;
+  string space_id = 3;
+  string aggregate_id = 4;
+  string aggregate_type = 5;
+  uint64 aggregate_revision = 6;
+  int64 occurred_at_millis = 7;
+  string payload_identifier = 8;
+  uint32 payload_schema_version = 9;
+  bytes payload_bytes = 10;
+  string durability = 11;
+}
+
+message ReadJournalEventsResponse {
+  repeated JournalEventRecord events = 1;
+  uint64 oldest_cursor = 2;
+  uint64 latest_cursor = 3;
+  bool snapshot_required = 4;
+}
+
 message Ping {
   uint64 nonce = 1;
 }

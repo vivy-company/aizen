@@ -81,6 +81,20 @@ public actor HostClient {
         try await snapshot(scope: scope).snapshot
     }
 
+    public func journalEvents(after cursor: UInt64, spaceID: SpaceID? = nil) async throws -> ReadJournalEventsResponsePayload {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(ReadJournalEventsQueryPayload(afterCursor: cursor, spaceID: spaceID?.description))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == ReadJournalEventsResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try ReadJournalEventsResponsePayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func spaces() async throws -> [Space] {
         let response = try await send(.init(
             messageID: UUID().uuidString,

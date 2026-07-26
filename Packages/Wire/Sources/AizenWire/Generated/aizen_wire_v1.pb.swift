@@ -975,6 +975,70 @@ nonisolated struct AizenWireV1_Event: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_ReadJournalEventsQuery: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var afterCursor: UInt64 = 0
+
+  var spaceID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_JournalEventRecord: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var cursor: UInt64 = 0
+
+  var eventID: String = String()
+
+  var spaceID: String = String()
+
+  var aggregateID: String = String()
+
+  var aggregateType: String = String()
+
+  var aggregateRevision: UInt64 = 0
+
+  var occurredAtMillis: Int64 = 0
+
+  var payloadIdentifier: String = String()
+
+  var payloadSchemaVersion: UInt32 = 0
+
+  var payloadBytes: Data = Data()
+
+  var durability: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_ReadJournalEventsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var events: [AizenWireV1_JournalEventRecord] = []
+
+  var oldestCursor: UInt64 = 0
+
+  var latestCursor: UInt64 = 0
+
+  var snapshotRequired: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_Ping: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2889,6 +2953,166 @@ nonisolated extension AizenWireV1_Event: SwiftProtobuf.Message, SwiftProtobuf._M
   static func ==(lhs: AizenWireV1_Event, rhs: AizenWireV1_Event) -> Bool {
     if lhs.cursor != rhs.cursor {return false}
     if lhs.eventID != rhs.eventID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ReadJournalEventsQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ReadJournalEventsQuery"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}after_cursor\0\u{3}space_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.afterCursor) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.afterCursor != 0 {
+      try visitor.visitSingularUInt64Field(value: self.afterCursor, fieldNumber: 1)
+    }
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ReadJournalEventsQuery, rhs: AizenWireV1_ReadJournalEventsQuery) -> Bool {
+    if lhs.afterCursor != rhs.afterCursor {return false}
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_JournalEventRecord: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".JournalEventRecord"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cursor\0\u{3}event_id\0\u{3}space_id\0\u{3}aggregate_id\0\u{3}aggregate_type\0\u{3}aggregate_revision\0\u{3}occurred_at_millis\0\u{3}payload_identifier\0\u{3}payload_schema_version\0\u{3}payload_bytes\0\u{1}durability\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.cursor) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.eventID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.aggregateID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.aggregateType) }()
+      case 6: try { try decoder.decodeSingularUInt64Field(value: &self.aggregateRevision) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.occurredAtMillis) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.payloadIdentifier) }()
+      case 9: try { try decoder.decodeSingularUInt32Field(value: &self.payloadSchemaVersion) }()
+      case 10: try { try decoder.decodeSingularBytesField(value: &self.payloadBytes) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self.durability) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.cursor != 0 {
+      try visitor.visitSingularUInt64Field(value: self.cursor, fieldNumber: 1)
+    }
+    if !self.eventID.isEmpty {
+      try visitor.visitSingularStringField(value: self.eventID, fieldNumber: 2)
+    }
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 3)
+    }
+    if !self.aggregateID.isEmpty {
+      try visitor.visitSingularStringField(value: self.aggregateID, fieldNumber: 4)
+    }
+    if !self.aggregateType.isEmpty {
+      try visitor.visitSingularStringField(value: self.aggregateType, fieldNumber: 5)
+    }
+    if self.aggregateRevision != 0 {
+      try visitor.visitSingularUInt64Field(value: self.aggregateRevision, fieldNumber: 6)
+    }
+    if self.occurredAtMillis != 0 {
+      try visitor.visitSingularInt64Field(value: self.occurredAtMillis, fieldNumber: 7)
+    }
+    if !self.payloadIdentifier.isEmpty {
+      try visitor.visitSingularStringField(value: self.payloadIdentifier, fieldNumber: 8)
+    }
+    if self.payloadSchemaVersion != 0 {
+      try visitor.visitSingularUInt32Field(value: self.payloadSchemaVersion, fieldNumber: 9)
+    }
+    if !self.payloadBytes.isEmpty {
+      try visitor.visitSingularBytesField(value: self.payloadBytes, fieldNumber: 10)
+    }
+    if !self.durability.isEmpty {
+      try visitor.visitSingularStringField(value: self.durability, fieldNumber: 11)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_JournalEventRecord, rhs: AizenWireV1_JournalEventRecord) -> Bool {
+    if lhs.cursor != rhs.cursor {return false}
+    if lhs.eventID != rhs.eventID {return false}
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.aggregateID != rhs.aggregateID {return false}
+    if lhs.aggregateType != rhs.aggregateType {return false}
+    if lhs.aggregateRevision != rhs.aggregateRevision {return false}
+    if lhs.occurredAtMillis != rhs.occurredAtMillis {return false}
+    if lhs.payloadIdentifier != rhs.payloadIdentifier {return false}
+    if lhs.payloadSchemaVersion != rhs.payloadSchemaVersion {return false}
+    if lhs.payloadBytes != rhs.payloadBytes {return false}
+    if lhs.durability != rhs.durability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ReadJournalEventsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ReadJournalEventsResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}events\0\u{3}oldest_cursor\0\u{3}latest_cursor\0\u{3}snapshot_required\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.events) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.oldestCursor) }()
+      case 3: try { try decoder.decodeSingularUInt64Field(value: &self.latestCursor) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.snapshotRequired) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.events.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.events, fieldNumber: 1)
+    }
+    if self.oldestCursor != 0 {
+      try visitor.visitSingularUInt64Field(value: self.oldestCursor, fieldNumber: 2)
+    }
+    if self.latestCursor != 0 {
+      try visitor.visitSingularUInt64Field(value: self.latestCursor, fieldNumber: 3)
+    }
+    if self.snapshotRequired != false {
+      try visitor.visitSingularBoolField(value: self.snapshotRequired, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ReadJournalEventsResponse, rhs: AizenWireV1_ReadJournalEventsResponse) -> Bool {
+    if lhs.events != rhs.events {return false}
+    if lhs.oldestCursor != rhs.oldestCursor {return false}
+    if lhs.latestCursor != rhs.latestCursor {return false}
+    if lhs.snapshotRequired != rhs.snapshotRequired {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
