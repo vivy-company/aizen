@@ -1,4 +1,5 @@
 import AizenCore
+import AizenWire
 import CryptoKit
 import Foundation
 
@@ -13,6 +14,8 @@ public enum SecurityError: Swift.Error, Sendable, Equatable {
     case pairingTokenRejected
     case invalidConnectionBinding
     case invalidAuthenticationProof
+    case malformedAuthenticatedFrame
+    case connectionSequenceExhausted
     case replayedSequence
 }
 
@@ -455,6 +458,100 @@ public enum ConnectionAuthenticator {
 
     private static func signingMessage(participant: ConnectionParticipant, binding: ConnectionAuthenticationBinding) -> Data {
         Data("aizen.connection-proof.\(participant.rawValue).v1".utf8) + binding.digest()
+    }
+}
+
+public struct AuthenticatedWireFrame: Sendable, Hashable {
+    public static let maximumCiphertextLength = 16 * 1_024 * 1_024
+
+    public let sequence: UInt64
+    public let ciphertext: Data
+
+    public init(sequence: UInt64, ciphertext: Data) throws {
+        guard sequence > 0, ciphertext.count >= 16, ciphertext.count <= Self.maximumCiphertextLength else {
+            throw SecurityError.malformedAuthenticatedFrame
+        }
+        self.sequence = sequence
+        self.ciphertext = ciphertext
+    }
+
+    public func serializedData() -> Data {
+        var data = Data()
+        append(sequence, to: &data)
+        append(UInt32(ciphertext.count), to: &data)
+        data.append(ciphertext)
+        return data
+    }
+
+    public init(serializedData: Data) throws {
+        guard serializedData.count >= 12 else { throw SecurityError.malformedAuthenticatedFrame }
+        let sequence = serializedData.prefix(8).withUnsafeBytes { $0.loadUnaligned(as: UInt64.self).bigEndian }
+        let length = serializedData.dropFirst(8).prefix(4).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).bigEndian }
+        guard length >= 16, length <= Self.maximumCiphertextLength, serializedData.count == 12 + Int(length) else {
+            throw SecurityError.malformedAuthenticatedFrame
+        }
+        try self.init(sequence: sequence, ciphertext: serializedData.dropFirst(12))
+    }
+
+    private func append<T: FixedWidthInteger>(_ value: T, to data: inout Data) {
+        withUnsafeBytes(of: value.bigEndian) { data.append(contentsOf: $0) }
+    }
+}
+
+/// Seals every post-handshake Wire envelope with directional ChaChaPoly keys and replay protection.
+public actor AuthenticatedWireChannel {
+    private let outboundKey: SymmetricKey
+    private let inboundKey: SymmetricKey
+    private let additionalAuthenticatedData: Data
+    private let replayProtection = ReplayProtection()
+    private var nextOutboundSequence: UInt64 = 1
+
+    public init(keys: AuthenticatedConnectionKeys, binding: ConnectionAuthenticationBinding) {
+        outboundKey = keys.outboundKey
+        inboundKey = keys.inboundKey
+        additionalAuthenticatedData = binding.digest()
+    }
+
+    public func seal(_ envelope: ProtocolEnvelope) throws -> Data {
+        guard nextOutboundSequence < UInt64.max else { throw SecurityError.connectionSequenceExhausted }
+        let sequence = nextOutboundSequence
+        nextOutboundSequence += 1
+        let nonce = try ChaChaPoly.Nonce(data: nonceData(for: sequence))
+        let sealed = try ChaChaPoly.seal(envelope.serializedData(), using: outboundKey, nonce: nonce, authenticating: additionalAuthenticatedData(for: sequence))
+        return try AuthenticatedWireFrame(sequence: sequence, ciphertext: sealed.ciphertext + sealed.tag).serializedData()
+    }
+
+    public func open(_ data: Data) async throws -> ProtocolEnvelope {
+        let frame = try AuthenticatedWireFrame(serializedData: data)
+        let nonce = try ChaChaPoly.Nonce(data: nonceData(for: frame.sequence))
+        guard frame.ciphertext.count >= 16 else { throw SecurityError.malformedAuthenticatedFrame }
+        let ciphertext = frame.ciphertext.dropLast(16)
+        let tag = frame.ciphertext.suffix(16)
+        let box = try ChaChaPoly.SealedBox(nonce: nonce, ciphertext: ciphertext, tag: tag)
+        let plaintext: Data
+        do {
+            plaintext = try ChaChaPoly.open(box, using: inboundKey, authenticating: additionalAuthenticatedData(for: frame.sequence))
+        } catch {
+            throw SecurityError.malformedAuthenticatedFrame
+        }
+        try await replayProtection.accept(sequence: frame.sequence)
+        do {
+            return try ProtocolEnvelope(serializedData: plaintext)
+        } catch {
+            throw SecurityError.malformedAuthenticatedFrame
+        }
+    }
+
+    private func nonceData(for sequence: UInt64) -> Data {
+        var data = Data(repeating: 0, count: 4)
+        withUnsafeBytes(of: sequence.bigEndian) { data.append(contentsOf: $0) }
+        return data
+    }
+
+    private func additionalAuthenticatedData(for sequence: UInt64) -> Data {
+        var data = additionalAuthenticatedData
+        withUnsafeBytes(of: sequence.bigEndian) { data.append(contentsOf: $0) }
+        return data
     }
 }
 

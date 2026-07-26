@@ -1,4 +1,5 @@
 import AizenCore
+import AizenWire
 import Foundation
 import Testing
 @testable import AizenSecurity
@@ -95,4 +96,33 @@ import Testing
     #expect(throws: SecurityError.invalidConnectionBinding) {
         try ConnectionAuthenticator.deriveKeys(participant: .host, ephemeralKey: hostEphemeral, peerEphemeralPublicKey: ConnectionEphemeralKey().publicKey, binding: binding)
     }
+}
+
+@Test func authenticatedWireChannelEncryptsAndRejectsTamperingOrReplay() async throws {
+    let hostEphemeral = ConnectionEphemeralKey()
+    let deviceEphemeral = ConnectionEphemeralKey()
+    let binding = try ConnectionAuthenticationBinding(
+        protocolGeneration: 1,
+        hostID: HostID(),
+        deviceID: DeviceID(),
+        connectionID: UUID(),
+        clientNonce: Data(repeating: 1, count: 32),
+        serverNonce: Data(repeating: 2, count: 32),
+        clientEphemeralPublicKey: deviceEphemeral.publicKey,
+        serverEphemeralPublicKey: hostEphemeral.publicKey,
+        route: .lan
+    )
+    let hostKeys = try ConnectionAuthenticator.deriveKeys(participant: .host, ephemeralKey: hostEphemeral, peerEphemeralPublicKey: deviceEphemeral.publicKey, binding: binding)
+    let deviceKeys = try ConnectionAuthenticator.deriveKeys(participant: .device, ephemeralKey: deviceEphemeral, peerEphemeralPublicKey: hostEphemeral.publicKey, binding: binding)
+    let host = AuthenticatedWireChannel(keys: hostKeys, binding: binding)
+    let device = AuthenticatedWireChannel(keys: deviceKeys, binding: binding)
+    let envelope = ProtocolEnvelope(messageID: "authenticated", connectionSequence: 1, kind: .hello, channel: .control, payload: try .init(HelloPayload(minimumProtocolGeneration: 1, maximumProtocolGeneration: 1, productVersion: "2.0.0")))
+
+    let frame = try await host.seal(envelope)
+    #expect(try await device.open(frame) == envelope)
+    await #expect(throws: SecurityError.replayedSequence) { try await device.open(frame) }
+
+    var tampered = try await host.seal(envelope)
+    tampered[tampered.index(before: tampered.endIndex)] ^= 1
+    await #expect(throws: SecurityError.malformedAuthenticatedFrame) { try await device.open(tampered) }
 }
