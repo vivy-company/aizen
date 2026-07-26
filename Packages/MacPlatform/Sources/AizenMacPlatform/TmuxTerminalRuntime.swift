@@ -67,6 +67,14 @@ public actor TmuxTerminalRuntime: TerminalRuntime {
                 contextID: context.id
             )
         }
+        if (context.kind == .repositoryCheckout || context.kind == .copiedEnvironment),
+           let reference = context.hostReference?.rawValue,
+           reference.hasPrefix("local-independent:") {
+            return try existingDirectory(
+                String(reference.dropFirst("local-independent:".count)),
+                contextID: context.id
+            )
+        }
         guard (context.kind == .localFolder || context.kind == .repositoryCheckout),
               let resource,
               resource.spaceID == context.spaceID,
