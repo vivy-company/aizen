@@ -184,6 +184,25 @@ public protocol XcodeProjectInspecting: Sendable {
 public protocol XcodeBuildRunning: Sendable {
     func waitForCompletion() async throws
     func cancel() async
+    func output() async -> AsyncStream<XcodeBuildOutput>
+}
+
+public struct XcodeBuildOutput: Sendable, Hashable {
+    public let stream: OperationLogChunk.Stream
+    public let text: String
+
+    public init(stream: OperationLogChunk.Stream, text: String) {
+        precondition(!text.isEmpty, "Xcode build output cannot be empty")
+        precondition(text.utf8.count <= OperationLogChunk.maximumTextUTF8Count, "Xcode build output must be bounded")
+        self.stream = stream
+        self.text = text
+    }
+}
+
+public extension XcodeBuildRunning {
+    func output() async -> AsyncStream<XcodeBuildOutput> {
+        AsyncStream { continuation in continuation.finish() }
+    }
 }
 
 public protocol XcodeProjectBuilding: Sendable {
@@ -534,9 +553,13 @@ public actor LocalHost: WireEndpoint {
                 )
                 self.xcodeBuilds[operation.id] = build
                 Task { [weak self] in
+                    await self?.persistXcodeBuildOutput(operationID: operation.id, build: build)
+                }
+                Task { [weak self] in
                     await self?.runXcodeProjectBuild(
                         operationID: operation.id,
-                        build: build
+                        build: build,
+                        action: command.action
                     )
                 }
                 return try TypedPayload(BuildXcodeProjectResultPayload(operationID: operation.id.description))
@@ -1404,7 +1427,8 @@ public actor LocalHost: WireEndpoint {
 
     private func runXcodeProjectBuild(
         operationID: OperationID,
-        build: any XcodeBuildRunning
+        build: any XcodeBuildRunning,
+        action: XcodeProjectAction
     ) async {
         do {
             try await build.waitForCompletion()
@@ -1413,6 +1437,9 @@ public actor LocalHost: WireEndpoint {
                 guard snapshot.operations[index].lifecycle == .running else { return }
                 snapshot.operations[index].lifecycle = .completed
                 snapshot.operations[index].progress = 1
+                snapshot.operations[index].result = OperationResult(
+                    summary: action == .build ? "Xcode build completed successfully." : "Xcode tests completed successfully."
+                )
             }
         } catch {
             _ = try? await storage.transact { snapshot in
@@ -1423,6 +1450,17 @@ public actor LocalHost: WireEndpoint {
             }
         }
         xcodeBuilds.removeValue(forKey: operationID)
+    }
+
+    private func persistXcodeBuildOutput(operationID: OperationID, build: any XcodeBuildRunning) async {
+        let output = await build.output()
+        for await chunk in output {
+            _ = try? await storage.appendOperationLogChunk(
+                operationID: operationID,
+                stream: chunk.stream,
+                text: chunk.text
+            )
+        }
     }
 
     private func xcodeProject(for resource: Resource) async throws -> XcodeProjectDescriptor? {

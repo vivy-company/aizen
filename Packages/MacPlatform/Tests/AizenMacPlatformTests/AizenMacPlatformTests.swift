@@ -409,6 +409,29 @@ import Testing
     }
 }
 
+@Test func macXcodeBuildProcessForwardsStandardOutputAndError() async throws {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = ["-c", "printf 'build output\\n'; printf 'build warning\\n' >&2"]
+    let standardOutput = Pipe()
+    let standardError = Pipe()
+    process.standardOutput = standardOutput
+    process.standardError = standardError
+    let build = MacXcodeBuildProcess(process: process, standardOutput: standardOutput, standardError: standardError)
+    let output = await build.output()
+    let collector = Task { () -> [XcodeBuildOutput] in
+        var values: [XcodeBuildOutput] = []
+        for await value in output { values.append(value) }
+        return values
+    }
+
+    try process.run()
+    try await build.waitForCompletion()
+    let values = await collector.value
+    #expect(values.contains(.init(stream: .standardOutput, text: "build output\n")))
+    #expect(values.contains(.init(stream: .standardError, text: "build warning\n")))
+}
+
 @Test func macXcodeProjectBuilderUsesTheTypedTestAction() {
     let arguments = MacXcodeProjectBuilder.arguments(
         projectURL: URL(fileURLWithPath: "/tmp/App.xcodeproj"),

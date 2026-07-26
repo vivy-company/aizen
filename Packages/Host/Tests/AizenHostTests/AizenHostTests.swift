@@ -1697,11 +1697,17 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     }
     #expect(await builder.projectURL == folder.appendingPathComponent("App.xcodeproj"))
     #expect(await builder.action == .build)
+    for _ in 0 ..< 20 where !(await builder.hasOutputSubscriber) {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    await builder.emit(.init(stream: .standardOutput, text: "CompileSwift App.swift\\n"))
     await builder.complete()
     for _ in 0 ..< 20 where try await storage.load().operations.first?.lifecycle != .completed {
         try await Task.sleep(for: .milliseconds(10))
     }
     #expect(try await storage.load().operations.first?.lifecycle == .completed)
+    #expect(try await storage.load().operations.first?.result?.summary == "Xcode build completed successfully.")
+    #expect(try await storage.operationLogChunks(operationID: OperationID(rawValue: try #require(UUID(uuidString: result.operationID))), maximumBytes: 64 * 1_024).map(\.text) == ["CompileSwift App.swift\\n"])
 }
 
 @Test func hostStartsStructuredXcodeTestsThroughItsRuntime() async throws {
@@ -1861,6 +1867,15 @@ private actor ControlledXcodeProjectBuilder: XcodeProjectBuilding, XcodeBuildRun
     private(set) var didCancel = false
     private var continuation: CheckedContinuation<Void, Error>?
     private var completed = false
+    private let outputStream: AsyncStream<XcodeBuildOutput>
+    private let outputContinuation: AsyncStream<XcodeBuildOutput>.Continuation
+    private(set) var hasOutputSubscriber = false
+
+    init() {
+        var continuation: AsyncStream<XcodeBuildOutput>.Continuation?
+        outputStream = AsyncStream { continuation = $0 }
+        outputContinuation = continuation!
+    }
 
     func startXcodeProjectBuild(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String, action: XcodeProjectAction) async throws -> any XcodeBuildRunning {
         projectURL = url
@@ -1874,16 +1889,27 @@ private actor ControlledXcodeProjectBuilder: XcodeProjectBuilding, XcodeBuildRun
         try await withCheckedThrowingContinuation { continuation = $0 }
     }
 
+    func output() async -> AsyncStream<XcodeBuildOutput> {
+        hasOutputSubscriber = true
+        return outputStream
+    }
+
+    func emit(_ output: XcodeBuildOutput) {
+        outputContinuation.yield(output)
+    }
+
     func complete() {
         completed = true
         continuation?.resume()
         continuation = nil
+        outputContinuation.finish()
     }
 
     func cancel() {
         didCancel = true
         continuation?.resume(throwing: CancellationError())
         continuation = nil
+        outputContinuation.finish()
     }
 }
 

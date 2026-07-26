@@ -48,9 +48,12 @@ public actor MacXcodeProjectBuilder: XcodeProjectBuilding {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
         process.arguments = Self.arguments(projectURL: url, kind: kind, scheme: scheme, destination: destination, action: action)
-        process.standardOutput = Pipe(); process.standardError = Pipe()
+        let standardOutput = Pipe()
+        let standardError = Pipe()
+        process.standardOutput = standardOutput
+        process.standardError = standardError
         try process.run()
-        return MacXcodeBuildProcess(process: process)
+        return MacXcodeBuildProcess(process: process, standardOutput: standardOutput, standardError: standardError)
     }
 
     static func arguments(projectURL: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String, action: XcodeProjectAction) -> [String] {
@@ -60,9 +63,20 @@ public actor MacXcodeProjectBuilder: XcodeProjectBuilding {
 
 actor MacXcodeBuildProcess: XcodeBuildRunning {
     private let process: XcodeBuildProcessReference
+    private let outputStream: AsyncStream<XcodeBuildOutput>
+    private let outputContinuation: AsyncStream<XcodeBuildOutput>.Continuation
 
     init(process: Process) {
+        self.init(process: process, standardOutput: Pipe(), standardError: Pipe())
+    }
+
+    init(process: Process, standardOutput: Pipe, standardError: Pipe) {
         self.process = .init(process: process)
+        var continuation: AsyncStream<XcodeBuildOutput>.Continuation?
+        outputStream = AsyncStream { continuation = $0 }
+        outputContinuation = continuation!
+        Self.forward(standardOutput.fileHandleForReading, stream: .standardOutput, to: outputContinuation)
+        Self.forward(standardError.fileHandleForReading, stream: .standardError, to: outputContinuation)
     }
 
     func waitForCompletion() async throws {
@@ -70,12 +84,38 @@ actor MacXcodeBuildProcess: XcodeBuildRunning {
             process.process.waitUntilExit()
             return process.process.terminationStatus
         }.value
+        outputContinuation.finish()
         guard status == 0 else { throw MacXcodeBuildError.failed(status) }
     }
+
+    func output() async -> AsyncStream<XcodeBuildOutput> { outputStream }
 
     func cancel() {
         guard process.process.isRunning else { return }
         process.process.terminate()
+    }
+
+    private nonisolated static func forward(
+        _ handle: FileHandle,
+        stream: OperationLogChunk.Stream,
+        to continuation: AsyncStream<XcodeBuildOutput>.Continuation
+    ) {
+        handle.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                return
+            }
+            var start = data.startIndex
+            while start < data.endIndex {
+                let end = min(start + OperationLogChunk.maximumTextUTF8Count, data.endIndex)
+                let text = String(decoding: data[start..<end], as: UTF8.self)
+                if !text.isEmpty {
+                    continuation.yield(.init(stream: stream, text: text))
+                }
+                start = end
+            }
+        }
     }
 }
 
