@@ -5,6 +5,7 @@
 //  Created by Uladzislau Yakauleu on 17.10.25.
 //
 import ACP
+import CoreData
 import SwiftUI
 import Sparkle
 import AppKit
@@ -14,6 +15,7 @@ import os
 struct aizenApp: App {
     @NSApplicationDelegateAdaptor(AizenAppDelegate.self) var appDelegate
 
+    let persistenceController = PersistenceController.shared
     let reignitionHost = ReignitionHostComposition()
     @StateObject var ghosttyApp = Ghostty.App()
     @FocusedValue(\.chatActions) var chatActions
