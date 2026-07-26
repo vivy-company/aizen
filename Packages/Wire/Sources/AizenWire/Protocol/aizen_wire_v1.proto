@@ -103,6 +103,19 @@ message CreateConversationResult {
   string session_id = 1;
 }
 
+message ListSpacesQuery {}
+
+message SpaceRecord {
+  string space_id = 1;
+  string name = 2;
+  string icon = 3;
+  string summary = 4;
+}
+
+message ListSpacesResponse {
+  repeated SpaceRecord spaces = 1;
+}
+
 message SnapshotRequest {
   string scope = 1;
   uint64 after_cursor = 2;

@@ -43,6 +43,15 @@ import AizenWire
     #expect(snapshot.spaces.map(\.name) == ["Vivy"])
 }
 
+@Test func clientListsSpacesWithoutDecodingStorage() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    _ = try await storage.transact { $0.spaces.append(.init(name: "Vivy")) }
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+    #expect(try await client.spaces().map(\.name) == ["Vivy"])
+}
+
 @Test func clientCreatesSpacesThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

@@ -22,6 +22,22 @@ import AizenWire
     #expect(snapshot.spaces.map(\.name) == ["Vivy"])
 }
 
+@Test func localHostListsSpacesThroughTypedWirePayloads() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    _ = try await storage.transact { $0.spaces.append(.init(name: "Vivy", icon: "sparkles")) }
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
+    let response = try await transport.send(.init(
+        messageID: "list-spaces",
+        connectionSequence: 1,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ListSpacesQueryPayload())
+    ))
+    #expect(try ListSpacesResponsePayload(protobufBytes: response.payload.protobufBytes).spaces.map(\.name) == ["Vivy"])
+}
+
 @Test func coordinatorOwnsRunLifecycle() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

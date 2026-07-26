@@ -45,6 +45,7 @@
 		F20000000000000000000092 /* AizenHost in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000082 /* AizenHost */; };
 		F20000000000000000000093 /* AizenStorage in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000083 /* AizenStorage */; };
 		F20000000000000000000094 /* AizenTransport in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000084 /* AizenTransport */; };
+		F20000000000000000000095 /* AizenMacPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000085 /* AizenMacPlatform */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -223,10 +224,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F20000000000000000000091 /* AizenClient in Frameworks */,
-				F20000000000000000000092 /* AizenHost in Frameworks */,
-				F20000000000000000000093 /* AizenStorage in Frameworks */,
-				F20000000000000000000094 /* AizenTransport in Frameworks */,
+				F20000000000000000000095 /* AizenMacPlatform in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -407,10 +405,7 @@
 			);
 			name = "aizen-cli";
 			packageProductDependencies = (
-				F20000000000000000000081 /* AizenClient */,
-				F20000000000000000000082 /* AizenHost */,
-				F20000000000000000000083 /* AizenStorage */,
-				F20000000000000000000084 /* AizenTransport */,
+				F20000000000000000000085 /* AizenMacPlatform */,
 			);
 			productName = "aizen-cli";
 			productReference = CCF000000000000000000001 /* aizen-cli */;
@@ -1437,6 +1432,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F20000000000000000000054 /* XCLocalSwiftPackageReference "Packages/Transport" */;
 			productName = AizenTransport;
+		};
+		F20000000000000000000085 /* AizenMacPlatform */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F20000000000000000000055 /* XCLocalSwiftPackageReference "Packages/MacPlatform" */;
+			productName = AizenMacPlatform;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

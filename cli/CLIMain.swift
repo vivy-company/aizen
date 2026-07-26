@@ -1257,7 +1257,7 @@ private extension AizenCLI {
     }
 
     static func v2Workspaces(filters: WorkspaceFilters) async throws -> [Space] {
-        let all = try await V2CLIClient().snapshot().spaces.sorted {
+        let all = try await V2CLIClient().spaces().sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
         let include = Set(filters.includeWorkspaces.map { $0.lowercased() })

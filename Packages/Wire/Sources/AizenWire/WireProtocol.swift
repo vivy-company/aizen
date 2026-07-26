@@ -1,3 +1,4 @@
+import AizenCore
 import Foundation
 import SwiftProtobuf
 
@@ -320,6 +321,60 @@ public struct CreateConversationResultPayload: WirePayload, Sendable, Hashable {
 
 /// `snapshot` is a versioned Storage representation whose internal encoding is owned by Storage,
 /// while this enclosing payload remains an actual protobuf message on every transport.
+public struct ListSpacesQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.space.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public init() {}
+
+    public init(protobufBytes: Data) throws {
+        _ = try AizenWireV1_ListSpacesQuery(serializedBytes: protobufBytes)
+    }
+
+    public func protobufBytes() throws -> Data {
+        try AizenWireV1_ListSpacesQuery().serializedData()
+    }
+}
+
+public struct ListSpacesResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.space.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let spaces: [Space]
+
+    public init(spaces: [Space]) {
+        self.spaces = spaces
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListSpacesResponse(serializedBytes: protobufBytes)
+        spaces = try message.spaces.map { record in
+            guard let uuid = UUID(uuidString: record.spaceID) else { throw WireCodecError.invalidIdentity(record.spaceID) }
+            return Space(
+                id: SpaceID(rawValue: uuid),
+                name: record.name,
+                icon: record.icon.isEmpty ? nil : record.icon,
+                summary: record.summary.isEmpty ? nil : record.summary
+            )
+        }
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListSpacesResponse()
+        message.spaces = spaces.map { space in
+            var record = AizenWireV1_SpaceRecord()
+            record.spaceID = space.id.description
+            record.name = space.name
+            record.icon = space.icon ?? ""
+            record.summary = space.summary ?? ""
+            return record
+        }
+        return try message.serializedData()
+    }
+}
+
 public struct SnapshotResponsePayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.snapshot.host@1")
     public static let schemaVersion: UInt32 = 1
@@ -390,6 +445,7 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidChannel(Int)
     case unsupportedPayloadEncoding(Int)
     case missingPayload
+    case invalidIdentity(String)
 }
 
 private extension ProtocolEnvelope {

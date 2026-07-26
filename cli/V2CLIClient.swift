@@ -1,21 +1,17 @@
-import AizenClient
-import AizenHost
-import AizenStorage
-import AizenTransport
+import AizenCore
+import AizenMacPlatform
 import Foundation
 
 /// CLI composition for the local v2 Host. The CLI stays a client and never opens v2 files directly.
 actor V2CLIClient {
-    private let client: HostClient
+    private let client: LocalHostClient
 
     init(storageURL: URL? = nil) {
-        let storage = StorageRepository(url: storageURL ?? Self.defaultStorageURL())
-        let host = LocalHost(storage: storage)
-        client = HostClient(transport: InProcessTransport(endpoint: host))
+        client = LocalHostClient(storageURL: storageURL ?? Self.defaultStorageURL())
     }
 
-    func snapshot() async throws -> StorageSnapshot {
-        try JSONDecoder().decode(StorageSnapshot.self, from: try await client.snapshotData())
+    func spaces() async throws -> [Space] {
+        try await client.spaces()
     }
 
     func createSpace(name: String, icon: String?) async throws {

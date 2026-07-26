@@ -28,6 +28,8 @@ public actor LocalHost: WireEndpoint {
                 CapabilitiesPayload.identifier,
                 SnapshotRequestPayload.identifier,
                 SnapshotResponsePayload.identifier,
+                ListSpacesQueryPayload.identifier,
+                ListSpacesResponsePayload.identifier,
                 CreateSpaceCommandPayload.identifier,
                 CreateSpaceResultPayload.identifier,
                 CreateConversationCommandPayload.identifier,
@@ -38,6 +40,11 @@ public actor LocalHost: WireEndpoint {
             let snapshot = try await storage.load()
             kind = .queryResponse
             payload = try TypedPayload(SnapshotResponsePayload(scope: request.scope, cursor: 0, snapshot: JSONEncoder().encode(snapshot)))
+        case .query where envelope.payload.identifier == ListSpacesQueryPayload.identifier:
+            _ = try ListSpacesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaces = try await storage.load().spaces
+            kind = .queryResponse
+            payload = try TypedPayload(ListSpacesResponsePayload(spaces: spaces))
         case .command where envelope.payload.identifier == CreateSpaceCommandPayload.identifier:
             let command = try CreateSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let space = Space(name: command.name, icon: command.icon, summary: command.summary)

@@ -73,6 +73,20 @@ public actor HostClient {
         try await snapshot(scope: scope).snapshot
     }
 
+    public func spaces() async throws -> [Space] {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(ListSpacesQueryPayload())
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == ListSpacesResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try ListSpacesResponsePayload(protobufBytes: response.payload.protobufBytes).spaces
+    }
+
     public func createSpace(name: String, icon: String? = nil, summary: String? = nil) async throws -> SpaceID {
         let response = try await send(.init(
             messageID: UUID().uuidString,
