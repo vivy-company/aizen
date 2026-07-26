@@ -290,6 +290,31 @@ import Testing
     #expect(try gitOutput(["-C", root.path, "log", "-1", "--format=%s"]) == "amended")
 }
 
+@Test func gitRepositoryStatusReaderCreatesAndSwitchesBranchesAtExpectedRevisions() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try runGit(["init", "--initial-branch=main", root.path])
+    try runGit(["-C", root.path, "config", "user.email", "aizen@example.test"])
+    try runGit(["-C", root.path, "config", "user.name", "Aizen Test"])
+    try Data("seed\n".utf8).write(to: root.appendingPathComponent("README.md"))
+    try runGit(["-C", root.path, "add", "README.md"])
+    try runGit(["-C", root.path, "commit", "-m", "seed"])
+
+    let reader = GitRepositoryStatusReader()
+    let main = try await reader.status(at: root, maximumEntries: 10)
+    _ = try await reader.updateBranch(at: root, branchName: "feature/reignition", expectedRepositoryRevision: main.repositoryRevision, expectedIndexRevision: main.indexRevision, create: true)
+    #expect(try gitOutput(["-C", root.path, "branch", "--show-current"]) == "feature/reignition")
+
+    let feature = try await reader.status(at: root, maximumEntries: 10)
+    _ = try await reader.updateBranch(at: root, branchName: "main", expectedRepositoryRevision: feature.repositoryRevision, expectedIndexRevision: feature.indexRevision, create: false)
+    #expect(try gitOutput(["-C", root.path, "branch", "--show-current"]) == "main")
+
+    await #expect(throws: GitRepositoryStatusReader.Error.repositoryRevisionConflict) {
+        _ = try await reader.updateBranch(at: root, branchName: "feature/reignition", expectedRepositoryRevision: "stale", expectedIndexRevision: feature.indexRevision, create: false)
+    }
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")

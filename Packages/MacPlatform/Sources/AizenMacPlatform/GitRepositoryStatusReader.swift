@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Host resolves the repository URL from a Resource before this actor is called; this type never
 /// receives a client-provided command or path fragment.
-public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryBranchReading, RepositoryIndexUpdating, RepositoryCommitting {
+public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryBranchReading, RepositoryIndexUpdating, RepositoryCommitting, RepositoryBranchUpdating {
     private static let maximumStatusBytes = 1_048_576
     private static let maximumIndexBytes = 67_108_864
 
@@ -93,6 +93,17 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
         var arguments = ["-C", repositoryURL.path, "commit", "--no-gpg-sign", "--file=-"]
         if amend { arguments.append("--amend") }
         _ = try runGitWithInput(arguments, input: Data(message.utf8), maximumOutputBytes: 8_192)
+        return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL))
+    }
+
+    public func updateBranch(at repositoryURL: URL, branchName: String, expectedRepositoryRevision: String, expectedIndexRevision: String, create: Bool) async throws -> RepositoryBranchUpdateResult {
+        guard FileManager.default.fileExists(atPath: repositoryURL.appendingPathComponent(".git").path) else { throw Error.notRepository }
+        guard try currentRepositoryRevision(at: repositoryURL) == expectedRepositoryRevision else { throw Error.repositoryRevisionConflict }
+        guard try currentIndexRevision(at: repositoryURL) == expectedIndexRevision else { throw Error.indexRevisionConflict }
+        let arguments = create
+            ? ["-C", repositoryURL.path, "switch", "--no-guess", "--create", branchName]
+            : ["-C", repositoryURL.path, "switch", "--no-guess", branchName]
+        _ = try runGit(arguments, maximumOutputBytes: 8_192)
         return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL))
     }
 
