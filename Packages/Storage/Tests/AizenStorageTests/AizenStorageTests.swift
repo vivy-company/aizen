@@ -58,6 +58,12 @@ import AizenCore
     let completed = try await repository.transitionCommand(id: command.id, to: .succeeded, result: result)
     #expect(completed.result == result)
     #expect(try await repository.load().commands == [completed])
+
+    let secondCommand = DurableCommand(spaceID: space.id, payloadDigest: "sha256:three")
+    _ = try await repository.acceptCommand(secondCommand)
+    await #expect(throws: StorageError.invalidCommandResult) {
+        try await repository.transitionCommand(id: secondCommand.id, to: .executing, result: result)
+    }
 }
 
 @Test func failedTransactionsLeaveTheLastValidSnapshotIntact() async throws {
