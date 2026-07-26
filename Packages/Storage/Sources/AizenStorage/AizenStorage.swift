@@ -11,6 +11,30 @@ public enum DurableCommandReceipt: Sendable, Equatable {
     case conflict(DurableCommand)
 }
 
+/// Host-private metadata for a staged resumable file upload. The staged bytes stay in the
+/// Host-owned filesystem; this record only lets a restarted Host recover their identity and target.
+public struct BlobTransferRecord: Codable, Sendable, Hashable, Identifiable {
+    public let id: UUID
+    public let executionContextID: String
+    public let relativePath: String
+    public let expectedContentHash: String
+    public let byteCount: Int
+    public let sha256: Data
+    public var expiresAt: Date
+
+    public init(id: UUID, executionContextID: String, relativePath: String, expectedContentHash: String, byteCount: Int, sha256: Data, expiresAt: Date) {
+        precondition(!executionContextID.isEmpty && !relativePath.isEmpty)
+        precondition(expectedContentHash.count == 64 && byteCount > 0 && sha256.count == 32)
+        self.id = id
+        self.executionContextID = executionContextID
+        self.relativePath = relativePath
+        self.expectedContentHash = expectedContentHash
+        self.byteCount = byteCount
+        self.sha256 = sha256
+        self.expiresAt = expiresAt
+    }
+}
+
 public struct StorageSnapshot: Codable, Sendable, Hashable {
     public static let schemaVersion = 2
     public var schemaVersion: Int
@@ -29,11 +53,12 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
     public var pairingTokens: [PairingTokenRecord]
     public var deviceAuthorizations: [DeviceAuthorization]
     public var securityAuditRecords: [SecurityAuditRecord]
+    public var blobTransfers: [BlobTransferRecord]
 
     public init(
         schemaVersion: Int = Self.schemaVersion,
         spaces: [Space] = [], sessions: [Session] = [], conversationMessages: [ConversationMessage] = [], resources: [Resource] = [],
-        executionContexts: [ExecutionContext] = [], terminalSessions: [TerminalSession] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], operationLogChunks: [OperationLogChunk] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = [], journalEvents: [JournalEvent] = [], pairingTokens: [PairingTokenRecord] = [], deviceAuthorizations: [DeviceAuthorization] = [], securityAuditRecords: [SecurityAuditRecord] = []
+        executionContexts: [ExecutionContext] = [], terminalSessions: [TerminalSession] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], operationLogChunks: [OperationLogChunk] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = [], journalEvents: [JournalEvent] = [], pairingTokens: [PairingTokenRecord] = [], deviceAuthorizations: [DeviceAuthorization] = [], securityAuditRecords: [SecurityAuditRecord] = [], blobTransfers: [BlobTransferRecord] = []
     ) {
         precondition(schemaVersion == Self.schemaVersion, "Storage snapshots must use schema v2")
         self.schemaVersion = schemaVersion
@@ -52,15 +77,16 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         self.pairingTokens = pairingTokens
         self.deviceAuthorizations = deviceAuthorizations
         self.securityAuditRecords = securityAuditRecords
+        self.blobTransfers = blobTransfers
     }
 
     public var isEmpty: Bool {
         spaces.isEmpty && sessions.isEmpty && conversationMessages.isEmpty && resources.isEmpty && executionContexts.isEmpty &&
-            terminalSessions.isEmpty && runs.isEmpty && operations.isEmpty && operationLogChunks.isEmpty && artifacts.isEmpty && commands.isEmpty && journalEvents.isEmpty && pairingTokens.isEmpty && deviceAuthorizations.isEmpty && securityAuditRecords.isEmpty
+            terminalSessions.isEmpty && runs.isEmpty && operations.isEmpty && operationLogChunks.isEmpty && artifacts.isEmpty && commands.isEmpty && journalEvents.isEmpty && pairingTokens.isEmpty && deviceAuthorizations.isEmpty && securityAuditRecords.isEmpty && blobTransfers.isEmpty
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, terminalSessions, runs, operations, operationLogChunks, artifacts, commands, journalEvents, pairingTokens, deviceAuthorizations, securityAuditRecords
+        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, terminalSessions, runs, operations, operationLogChunks, artifacts, commands, journalEvents, pairingTokens, deviceAuthorizations, securityAuditRecords, blobTransfers
     }
 
     public init(from decoder: Decoder) throws {
@@ -81,6 +107,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         pairingTokens = try values.decodeIfPresent([PairingTokenRecord].self, forKey: .pairingTokens) ?? []
         deviceAuthorizations = try values.decodeIfPresent([DeviceAuthorization].self, forKey: .deviceAuthorizations) ?? []
         securityAuditRecords = try values.decodeIfPresent([SecurityAuditRecord].self, forKey: .securityAuditRecords) ?? []
+        blobTransfers = try values.decodeIfPresent([BlobTransferRecord].self, forKey: .blobTransfers) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -101,6 +128,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         try values.encode(pairingTokens, forKey: .pairingTokens)
         try values.encode(deviceAuthorizations, forKey: .deviceAuthorizations)
         try values.encode(securityAuditRecords, forKey: .securityAuditRecords)
+        try values.encode(blobTransfers, forKey: .blobTransfers)
     }
 }
 
@@ -516,6 +544,7 @@ public actor StorageRepository {
         guard Set(snapshot.pairingTokens.map(\.tokenID)).count == snapshot.pairingTokens.count else { throw StorageError.duplicateIdentity("pairing token") }
         guard Set(snapshot.deviceAuthorizations.map(\.device.deviceID)).count == snapshot.deviceAuthorizations.count else { throw StorageError.duplicateIdentity("device authorization") }
         guard Set(snapshot.securityAuditRecords.map(\.id)).count == snapshot.securityAuditRecords.count else { throw StorageError.duplicateIdentity("security audit record") }
+        guard Set(snapshot.blobTransfers.map(\.id)).count == snapshot.blobTransfers.count else { throw StorageError.duplicateIdentity("blob transfer") }
         guard zip(snapshot.journalEvents, snapshot.journalEvents.dropFirst()).allSatisfy({ $0.cursor < $1.cursor }) else { throw StorageError.duplicateIdentity("journal cursor") }
         guard snapshot.resources.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
         guard snapshot.executionContexts.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }

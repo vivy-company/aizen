@@ -686,8 +686,8 @@ public actor LocalHost: WireEndpoint {
                 id: command.blobID,
                 target: try await blobTransfers.target(id: command.blobID, executionContextID: command.executionContextID)
             )
-            defer { Task { await self.blobTransfers.discard(upload) } }
             _ = try await contextFiles.replaceUploadedFile(upload)
+            try await blobTransfers.complete(id: command.blobID, target: upload.descriptor.target)
             kind = .commandResult
             payload = try TypedPayload(FinishBlobUploadResultPayload(blobID: command.blobID, byteCount: UInt64(upload.descriptor.byteCount), sha256: upload.descriptor.sha256))
         case .command where envelope.payload.identifier == CancelBlobUploadCommandPayload.identifier:

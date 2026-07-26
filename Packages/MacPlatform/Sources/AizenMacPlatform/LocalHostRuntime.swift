@@ -71,7 +71,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
             repositoryPusher: repositoryReader,
             xcodeProjectOpener: MacXcodeProjectOpener(),
             xcodeProjectInspector: MacXcodeProjectInspector(),
-            xcodeProjectBuilder: MacXcodeProjectBuilder()
+            xcodeProjectBuilder: MacXcodeProjectBuilder(),
+            blobTransfers: .init(directory: root.appendingPathComponent("BlobUploads", isDirectory: true), storage: storage)
         )
         self.host = host
         migrationGate = HostMigrationGate(

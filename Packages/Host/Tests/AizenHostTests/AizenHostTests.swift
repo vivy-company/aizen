@@ -1589,6 +1589,26 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(operation.lifecycle == .completed)
 }
 
+@Test func blobTransferStoreRecoversAnInterruptedUploadAfterHostRestart() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let target = BlobTransferStore.Target(executionContextID: UUID().uuidString, relativePath: "attachment.bin", expectedContentHash: String(repeating: "0", count: 64))
+    let bytes = Data("resume after restart".utf8)
+    let uploads = root.appendingPathComponent("uploads", isDirectory: true)
+    let initial = BlobTransferStore(directory: uploads, storage: storage)
+    let descriptor = try await initial.begin(target: target, byteCount: bytes.count, sha256: Data(SHA256.hash(data: bytes)))
+    _ = try await initial.append(id: descriptor.id, target: target, offset: 0, bytes: bytes.prefix(6))
+    #expect(try await storage.load().blobTransfers.map(\.id) == [descriptor.id])
+
+    let restarted = BlobTransferStore(directory: uploads, storage: storage)
+    #expect(try await restarted.append(id: descriptor.id, target: target, offset: 6, bytes: bytes.dropFirst(6)) == bytes.count)
+    let upload = try await restarted.finish(id: descriptor.id, target: target)
+    #expect(try Data(contentsOf: upload.url) == bytes)
+    try await restarted.complete(id: descriptor.id, target: target)
+    #expect(try await storage.load().blobTransfers.isEmpty)
+}
+
 @Test func localHostListsExecutionContextFilesThroughTypedWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
