@@ -114,7 +114,7 @@ import AizenWire
     _ = try await storage.transact { $0.spaces.append(space) }
     let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
     let messageID = UUID().uuidString
-    let envelope = try ProtocolEnvelope(
+    let envelope = ProtocolEnvelope(
         messageID: messageID,
         connectionSequence: 1,
         kind: .command,
