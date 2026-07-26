@@ -468,10 +468,27 @@ public enum PairedTLSPreSharedKey {
         device: DevicePublicIdentity,
         hostIdentity: LocalCryptographicIdentity
     ) throws -> Data {
-        let sharedSecret = try hostIdentity.sharedSecret(with: device.cryptographicIdentity)
+        try derive(hostID: hostID, deviceID: device.deviceID, peerIdentity: device.cryptographicIdentity, localIdentity: hostIdentity)
+    }
+
+    public static func derive(
+        host: HostPublicIdentity,
+        deviceID: DeviceID,
+        deviceIdentity: LocalCryptographicIdentity
+    ) throws -> Data {
+        try derive(hostID: host.hostID, deviceID: deviceID, peerIdentity: host.cryptographicIdentity, localIdentity: deviceIdentity)
+    }
+
+    private static func derive(
+        hostID: HostID,
+        deviceID: DeviceID,
+        peerIdentity: PublicCryptographicIdentity,
+        localIdentity: LocalCryptographicIdentity
+    ) throws -> Data {
+        let sharedSecret = try localIdentity.sharedSecret(with: peerIdentity)
         var salt = Data("aizen.tls-psk.salt.v1".utf8)
         append(hostID.rawValue, to: &salt)
-        append(device.deviceID.rawValue, to: &salt)
+        append(deviceID.rawValue, to: &salt)
         let key = sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
             salt: Data(SHA256.hash(data: salt)),

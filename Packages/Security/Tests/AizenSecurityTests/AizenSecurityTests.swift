@@ -133,6 +133,7 @@ import Testing
     let deviceIdentity = LocalCryptographicIdentity()
     let hostID = HostID()
     let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: deviceIdentity.publicIdentity())
+    let host = HostPublicIdentity(hostID: hostID, displayName: "Mac", cryptographicIdentity: hostIdentity.publicIdentity())
     let hostKey = try PairedTLSPreSharedKey.derive(hostID: hostID, device: device, hostIdentity: hostIdentity)
     let deviceKey = try deviceIdentity.sharedSecret(with: hostIdentity.publicIdentity()).hkdfDerivedSymmetricKey(
         using: SHA256.self,
@@ -141,6 +142,8 @@ import Testing
         outputByteCount: 32
     ).withUnsafeBytes { Data($0) }
     #expect(hostKey == deviceKey)
+    let clientKey = try PairedTLSPreSharedKey.derive(host: host, deviceID: device.deviceID, deviceIdentity: deviceIdentity)
+    #expect(hostKey == clientKey)
     #expect(PairedTLSPreSharedKey.identity(for: device.deviceID) == Data(device.deviceID.description.utf8))
     let otherHostKey = try PairedTLSPreSharedKey.derive(hostID: HostID(), device: device, hostIdentity: hostIdentity)
     #expect(hostKey != otherHostKey)
