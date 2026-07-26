@@ -155,6 +155,12 @@ import AizenWire
     #expect(resource.kind == .folder)
     #expect(resource.title == "folder")
     #expect(resource.details == .none)
+    #expect(try await client.importLocalFolder(spaceID: spaceID, path: folder.path) == resourceID)
+    #expect(try await client.resources(spaceID: spaceID).count == 1)
+    let otherSpaceID = try await client.createSpace(name: "Other")
+    await #expect(throws: HostProtocolError.duplicateResource(resourceID)) {
+        try await client.importLocalFolder(spaceID: otherSpaceID, path: folder.path)
+    }
     let contextID = try await client.createLocalFolderContext(spaceID: spaceID, resourceID: resourceID)
     let context = try #require(try await client.executionContexts(spaceID: spaceID, resourceID: resourceID).first)
     #expect(context.id == contextID)

@@ -208,15 +208,21 @@ public actor LocalHost: WireEndpoint {
                 title: command.title ?? directory.lastPathComponent,
                 details: .hostPrivate(HostPrivateReference(rawValue: "local-folder:\(directory.path)"))
             )
-            _ = try await storage.transact { snapshot in
+            let snapshot = try await storage.transact { snapshot in
                 guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
-                guard !snapshot.resources.contains(where: { $0.details == resource.details }) else {
-                    throw HostProtocolError.duplicateResource(resource.id)
+                if let existing = snapshot.resources.first(where: { $0.details == resource.details }) {
+                    guard existing.spaceID == spaceID else {
+                        throw HostProtocolError.duplicateResource(existing.id)
+                    }
+                    return
                 }
                 snapshot.resources.append(resource)
             }
+            guard let importedResource = snapshot.resources.first(where: { $0.details == resource.details }) else {
+                throw HostProtocolError.unknownResource(resource.id)
+            }
             kind = .commandResult
-            payload = try TypedPayload(ImportLocalFolderResultPayload(resourceID: resource.id.description))
+            payload = try TypedPayload(ImportLocalFolderResultPayload(resourceID: importedResource.id.description))
         case .command where envelope.payload.identifier == RemoveResourceCommandPayload.identifier:
             let command = try RemoveResourceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             guard let uuid = UUID(uuidString: command.resourceID) else { throw HostProtocolError.invalidIdentity(command.resourceID) }
