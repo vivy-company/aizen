@@ -1763,6 +1763,74 @@ public struct ReadRepositoryStatusResponsePayload: WirePayload, Sendable, Hashab
     }
 }
 
+public struct ReadRepositoryDiffQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.repository.diff@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public static let maximumByteLimit: UInt32 = 1_048_576
+    public let resourceID: String
+    public let relativePath: String
+    public let maximumBytes: UInt32
+
+    public init(resourceID: String, relativePath: String = "", maximumBytes: UInt32 = 262_144) {
+        precondition(!resourceID.isEmpty, "Repository diff needs a resource identity")
+        precondition(Self.isValidRelativePath(relativePath), "Repository diff paths must be repository-relative")
+        precondition((1...Self.maximumByteLimit).contains(maximumBytes), "Repository diff byte limit is out of bounds")
+        self.resourceID = resourceID
+        self.relativePath = relativePath
+        self.maximumBytes = maximumBytes
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ReadRepositoryDiffQuery(serializedBytes: protobufBytes)
+        guard !message.resourceID.isEmpty, Self.isValidRelativePath(message.relativePath),
+              (1...Self.maximumByteLimit).contains(message.maximumBytes) else { throw WireCodecError.invalidRepositoryDiffQuery }
+        self.init(resourceID: message.resourceID, relativePath: message.relativePath, maximumBytes: message.maximumBytes)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ReadRepositoryDiffQuery()
+        message.resourceID = resourceID
+        message.relativePath = relativePath
+        message.maximumBytes = maximumBytes
+        return try message.serializedData()
+    }
+
+    private static func isValidRelativePath(_ path: String) -> Bool {
+        path.isEmpty || (!path.hasPrefix("/") && !path.contains("\0") && !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }))
+    }
+}
+
+public struct ReadRepositoryDiffResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.repository.diff@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let resourceID: String
+    public let repositoryRevision: String
+    public let indexRevision: String
+    public let unifiedDiff: Data
+    public let truncated: Bool
+
+    public init(resourceID: String, repositoryRevision: String, indexRevision: String, unifiedDiff: Data, truncated: Bool) {
+        precondition(!resourceID.isEmpty && !repositoryRevision.isEmpty && !indexRevision.isEmpty, "Repository diff needs identities and revisions")
+        precondition(unifiedDiff.count <= Int(ReadRepositoryDiffQueryPayload.maximumByteLimit), "Repository diff exceeded its protocol bound")
+        self.resourceID = resourceID; self.repositoryRevision = repositoryRevision; self.indexRevision = indexRevision; self.unifiedDiff = unifiedDiff; self.truncated = truncated
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ReadRepositoryDiffResponse(serializedBytes: protobufBytes)
+        guard !message.resourceID.isEmpty, !message.repositoryRevision.isEmpty, !message.indexRevision.isEmpty,
+              message.unifiedDiff.count <= Int(ReadRepositoryDiffQueryPayload.maximumByteLimit) else { throw WireCodecError.invalidRepositoryDiffResponse }
+        self.init(resourceID: message.resourceID, repositoryRevision: message.repositoryRevision, indexRevision: message.indexRevision, unifiedDiff: message.unifiedDiff, truncated: message.truncated)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ReadRepositoryDiffResponse()
+        message.resourceID = resourceID; message.repositoryRevision = repositoryRevision; message.indexRevision = indexRevision; message.unifiedDiff = unifiedDiff; message.truncated = truncated
+        return try message.serializedData()
+    }
+}
+
 public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.execution-context.list@1")
     public static let schemaVersion: UInt32 = 1
@@ -2546,6 +2614,8 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case invalidRepositoryStatusQuery
     case invalidRepositoryStatusEntry
     case invalidRepositoryStatusResponse
+    case invalidRepositoryDiffQuery
+    case invalidRepositoryDiffResponse
 }
 
 private extension ProtocolEnvelope {

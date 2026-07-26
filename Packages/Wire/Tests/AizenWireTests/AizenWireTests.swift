@@ -92,6 +92,22 @@ import Testing
     }
 }
 
+@Test func repositoryDiffPayloadsAreBoundedAndRejectTraversal() throws {
+    let resourceID = UUID().uuidString
+    let query = ReadRepositoryDiffQueryPayload(resourceID: resourceID, relativePath: "Sources/App.swift", maximumBytes: 512)
+    #expect(try ReadRepositoryDiffQueryPayload(protobufBytes: query.protobufBytes()) == query)
+    let response = ReadRepositoryDiffResponsePayload(resourceID: resourceID, repositoryRevision: "revision", indexRevision: "index", unifiedDiff: Data("diff --git a/App.swift b/App.swift".utf8), truncated: false)
+    #expect(try ReadRepositoryDiffResponsePayload(protobufBytes: response.protobufBytes()) == response)
+
+    var malformed = AizenWireV1_ReadRepositoryDiffQuery()
+    malformed.resourceID = resourceID
+    malformed.relativePath = "../secret"
+    malformed.maximumBytes = 10
+    #expect(throws: WireCodecError.invalidRepositoryDiffQuery) {
+        try ReadRepositoryDiffQueryPayload(protobufBytes: malformed.serializedData())
+    }
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")

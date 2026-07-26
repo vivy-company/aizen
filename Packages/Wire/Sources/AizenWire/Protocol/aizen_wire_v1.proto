@@ -437,6 +437,20 @@ message ReadRepositoryStatusResponse {
   bool truncated = 5;
 }
 
+message ReadRepositoryDiffQuery {
+  string resource_id = 1;
+  string relative_path = 2;
+  uint32 maximum_bytes = 3;
+}
+
+message ReadRepositoryDiffResponse {
+  string resource_id = 1;
+  string repository_revision = 2;
+  string index_revision = 3;
+  bytes unified_diff = 4;
+  bool truncated = 5;
+}
+
 message ListExecutionContextsQuery {
   string space_id = 1;
   string resource_id = 2;

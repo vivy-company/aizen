@@ -1365,6 +1365,42 @@ nonisolated struct AizenWireV1_ReadRepositoryStatusResponse: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_ReadRepositoryDiffQuery: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var resourceID: String = String()
+
+  var relativePath: String = String()
+
+  var maximumBytes: UInt32 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_ReadRepositoryDiffResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var resourceID: String = String()
+
+  var repositoryRevision: String = String()
+
+  var indexRevision: String = String()
+
+  var unifiedDiff: Data = Data()
+
+  var truncated: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_ListExecutionContextsQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -4810,6 +4846,96 @@ nonisolated extension AizenWireV1_ReadRepositoryStatusResponse: SwiftProtobuf.Me
     if lhs.repositoryRevision != rhs.repositoryRevision {return false}
     if lhs.indexRevision != rhs.indexRevision {return false}
     if lhs.entries != rhs.entries {return false}
+    if lhs.truncated != rhs.truncated {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ReadRepositoryDiffQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ReadRepositoryDiffQuery"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{3}relative_path\0\u{3}maximum_bytes\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.relativePath) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.maximumBytes) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 1)
+    }
+    if !self.relativePath.isEmpty {
+      try visitor.visitSingularStringField(value: self.relativePath, fieldNumber: 2)
+    }
+    if self.maximumBytes != 0 {
+      try visitor.visitSingularUInt32Field(value: self.maximumBytes, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ReadRepositoryDiffQuery, rhs: AizenWireV1_ReadRepositoryDiffQuery) -> Bool {
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.relativePath != rhs.relativePath {return false}
+    if lhs.maximumBytes != rhs.maximumBytes {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ReadRepositoryDiffResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ReadRepositoryDiffResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0\u{3}repository_revision\0\u{3}index_revision\0\u{3}unified_diff\0\u{1}truncated\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.repositoryRevision) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.indexRevision) }()
+      case 4: try { try decoder.decodeSingularBytesField(value: &self.unifiedDiff) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.truncated) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 1)
+    }
+    if !self.repositoryRevision.isEmpty {
+      try visitor.visitSingularStringField(value: self.repositoryRevision, fieldNumber: 2)
+    }
+    if !self.indexRevision.isEmpty {
+      try visitor.visitSingularStringField(value: self.indexRevision, fieldNumber: 3)
+    }
+    if !self.unifiedDiff.isEmpty {
+      try visitor.visitSingularBytesField(value: self.unifiedDiff, fieldNumber: 4)
+    }
+    if self.truncated != false {
+      try visitor.visitSingularBoolField(value: self.truncated, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ReadRepositoryDiffResponse, rhs: AizenWireV1_ReadRepositoryDiffResponse) -> Bool {
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.repositoryRevision != rhs.repositoryRevision {return false}
+    if lhs.indexRevision != rhs.indexRevision {return false}
+    if lhs.unifiedDiff != rhs.unifiedDiff {return false}
     if lhs.truncated != rhs.truncated {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
