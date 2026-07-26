@@ -51,13 +51,11 @@ import Testing
     #expect(values.values.joined().contains("Wiedy") == false)
 }
 
-@Test func pairedTLSOptionsRequireAnActivePairedDevice() throws {
+@Test func pairedTLSOptionsKeepTheHostReachableBeforeFirstPairing() throws {
     let hostIdentity = LocalCryptographicIdentity()
     let host = HostPublicIdentity(hostID: HostID(), displayName: "Mac", cryptographicIdentity: hostIdentity.publicIdentity())
     let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: LocalCryptographicIdentity().publicIdentity())
-    #expect(throws: PairedTLSOptionsError.noAuthorizedDevices) {
-        try PairedTLSOptions.server(host: host, hostIdentity: hostIdentity, authorizations: [])
-    }
+    _ = try PairedTLSOptions.server(host: host, hostIdentity: hostIdentity, authorizations: [])
     _ = try PairedTLSOptions.server(host: host, hostIdentity: hostIdentity, authorizations: [.init(device: device, grants: [.init(capability: .hostRead)])])
 }
 
