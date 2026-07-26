@@ -461,6 +461,22 @@ public actor HostClient {
         return ResourceID(rawValue: id)
     }
 
+    public func importWebResource(spaceID: SpaceID, url: URL, title: String? = nil) async throws -> ResourceID {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(ImportWebResourceCommandPayload(spaceID: spaceID.description, url: url, title: title))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == ImportWebResourceResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        let result = try ImportWebResourceResultPayload(protobufBytes: response.payload.protobufBytes)
+        guard let id = UUID(uuidString: result.resourceID) else { throw Error.invalidIdentity(result.resourceID) }
+        return ResourceID(rawValue: id)
+    }
+
     public func removeResource(id: ResourceID) async throws {
         let response = try await send(.init(
             messageID: UUID().uuidString,

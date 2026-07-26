@@ -1042,6 +1042,43 @@ nonisolated struct AizenWireV1_ImportLocalFolderResult: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_ImportWebResourceCommand: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var spaceID: String = String()
+
+  var url: String = String()
+
+  var title: String {
+    get {_title ?? String()}
+    set {_title = newValue}
+  }
+  /// Returns true if `title` has been explicitly set.
+  var hasTitle: Bool {self._title != nil}
+  /// Clears the value of `title`. Subsequent reads from it will return its default value.
+  mutating func clearTitle() {self._title = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _title: String? = nil
+}
+
+nonisolated struct AizenWireV1_ImportWebResourceResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var resourceID: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_RemoveResourceCommand: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -3646,6 +3683,80 @@ nonisolated extension AizenWireV1_ImportLocalFolderResult: SwiftProtobuf.Message
   }
 
   static func ==(lhs: AizenWireV1_ImportLocalFolderResult, rhs: AizenWireV1_ImportLocalFolderResult) -> Bool {
+    if lhs.resourceID != rhs.resourceID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ImportWebResourceCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ImportWebResourceCommand"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}space_id\0\u{1}url\0\u{1}title\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.spaceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._title) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.spaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.spaceID, fieldNumber: 1)
+    }
+    if !self.url.isEmpty {
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 2)
+    }
+    try { if let v = self._title {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ImportWebResourceCommand, rhs: AizenWireV1_ImportWebResourceCommand) -> Bool {
+    if lhs.spaceID != rhs.spaceID {return false}
+    if lhs.url != rhs.url {return false}
+    if lhs._title != rhs._title {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ImportWebResourceResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ImportWebResourceResult"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_id\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.resourceID) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.resourceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.resourceID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ImportWebResourceResult, rhs: AizenWireV1_ImportWebResourceResult) -> Bool {
     if lhs.resourceID != rhs.resourceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

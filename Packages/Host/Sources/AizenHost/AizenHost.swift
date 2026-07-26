@@ -121,6 +121,8 @@ public actor LocalHost: WireEndpoint {
                 ImportLocalFolderResultPayload.identifier,
                 ImportLocalRepositoryCommandPayload.identifier,
                 ImportLocalRepositoryResultPayload.identifier,
+                ImportWebResourceCommandPayload.identifier,
+                ImportWebResourceResultPayload.identifier,
                 RemoveResourceCommandPayload.identifier,
                 ResourceMutationResultPayload.identifier,
                 RefreshRepositoryResourceCommandPayload.identifier,
@@ -426,6 +428,37 @@ public actor LocalHost: WireEndpoint {
                 }
                 guard let imported = snapshot.resources.first(where: { $0.details == resource.details }) else { throw HostProtocolError.unknownResource(resource.id) }
                 return try TypedPayload(ImportLocalRepositoryResultPayload(resourceID: imported.id.description))
+            }
+            kind = .commandResult
+        case .command where envelope.payload.identifier == ImportWebResourceCommandPayload.identifier:
+            let command = try ImportWebResourceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try Self.spaceID(from: command.spaceID)
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                guard let scheme = command.url.scheme?.lowercased(), ["http", "https"].contains(scheme) else {
+                    throw HostProtocolError.invalidResourcePath(command.url.absoluteString)
+                }
+                let resource = Resource(
+                    spaceID: spaceID,
+                    kind: .webSource,
+                    title: command.title ?? command.url.host ?? command.url.absoluteString,
+                    details: .web(WebResourceDetails(url: command.url))
+                )
+                let snapshot = try await self.storage.transact { snapshot in
+                    guard snapshot.spaces.contains(where: { $0.id == spaceID }) else {
+                        throw HostProtocolError.unknownSpace(spaceID)
+                    }
+                    if let existing = snapshot.resources.first(where: { $0.details == resource.details }) {
+                        guard existing.spaceID == spaceID else {
+                            throw HostProtocolError.duplicateResource(existing.id)
+                        }
+                        return
+                    }
+                    snapshot.resources.append(resource)
+                }
+                guard let imported = snapshot.resources.first(where: { $0.details == resource.details }) else {
+                    throw HostProtocolError.unknownResource(resource.id)
+                }
+                return try TypedPayload(ImportWebResourceResultPayload(resourceID: imported.id.description))
             }
             kind = .commandResult
         case .command where envelope.payload.identifier == RemoveResourceCommandPayload.identifier:

@@ -125,12 +125,15 @@ public struct RemoteHostEndpoint: WireEndpoint {
             let request = try CancelRunCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let run = try await requiredRun(request.runID)
             return .init(capability: .conversationCancel, spaceID: run.spaceID, resourceID: nil, rateLimitKind: nil)
-        case ImportLocalFolderCommandPayload.identifier, ImportLocalRepositoryCommandPayload.identifier:
+        case ImportLocalFolderCommandPayload.identifier, ImportLocalRepositoryCommandPayload.identifier,
+             ImportWebResourceCommandPayload.identifier:
             let spaceID: SpaceID
             if envelope.payload.identifier == ImportLocalFolderCommandPayload.identifier {
                 spaceID = try self.spaceID(try ImportLocalFolderCommandPayload(protobufBytes: envelope.payload.protobufBytes).spaceID)
-            } else {
+            } else if envelope.payload.identifier == ImportLocalRepositoryCommandPayload.identifier {
                 spaceID = try self.spaceID(try ImportLocalRepositoryCommandPayload(protobufBytes: envelope.payload.protobufBytes).spaceID)
+            } else {
+                spaceID = try self.spaceID(try ImportWebResourceCommandPayload(protobufBytes: envelope.payload.protobufBytes).spaceID)
             }
             return .init(capability: .fileRead, spaceID: spaceID, resourceID: nil, rateLimitKind: nil)
         case RemoveResourceCommandPayload.identifier:

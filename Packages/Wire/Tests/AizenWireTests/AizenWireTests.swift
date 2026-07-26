@@ -67,6 +67,12 @@ import Testing
     #expect(decoded == payload)
 }
 
+@Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
+    let url = try #require(URL(string: "https://example.com/docs"))
+    let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")
+    #expect(try ImportWebResourceCommandPayload(protobufBytes: payload.protobufBytes()) == payload)
+}
+
 @Test func authenticationPayloadsRoundTripAndRejectMalformedCryptoMaterial() throws {
     let hostID = HostID()
     let deviceID = DeviceID()

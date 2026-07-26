@@ -373,6 +373,24 @@ import AizenWire
     #expect(context.hostReference == nil)
 }
 
+@Test func clientImportsWebResourcesThroughHost() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+    let spaceID = try await client.createSpace(name: "Vivy")
+    let url = try #require(URL(string: "https://example.com/docs"))
+
+    let resourceID = try await client.importWebResource(spaceID: spaceID, url: url, title: "Docs")
+    let resource = try #require(try await client.resources(spaceID: spaceID).first)
+    #expect(resource.id == resourceID)
+    #expect(resource.kind == .webSource)
+    #expect(resource.title == "Docs")
+    #expect(resource.details == .web(.init(url: url)))
+    #expect(try await client.importWebResource(spaceID: spaceID, url: url, title: "Ignored") == resourceID)
+    #expect(try await client.resources(spaceID: spaceID).count == 1)
+}
+
 @Test func clientCancelsRunsThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

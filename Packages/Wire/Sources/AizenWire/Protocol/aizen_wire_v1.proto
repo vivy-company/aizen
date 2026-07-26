@@ -331,6 +331,16 @@ message ImportLocalFolderResult {
   string resource_id = 1;
 }
 
+message ImportWebResourceCommand {
+  string space_id = 1;
+  string url = 2;
+  optional string title = 3;
+}
+
+message ImportWebResourceResult {
+  string resource_id = 1;
+}
+
 message RemoveResourceCommand {
   string resource_id = 1;
 }

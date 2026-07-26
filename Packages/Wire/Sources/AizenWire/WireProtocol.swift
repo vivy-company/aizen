@@ -1276,6 +1276,58 @@ public struct ImportLocalFolderResultPayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct ImportWebResourceCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.resource.import-web@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let spaceID: String
+    public let url: URL
+    public let title: String?
+
+    public init(spaceID: String, url: URL, title: String? = nil) {
+        precondition(!spaceID.isEmpty, "Web imports require a Space")
+        precondition(url.scheme != nil && url.host != nil, "Web imports require an absolute URL")
+        self.spaceID = spaceID
+        self.url = url
+        self.title = title
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ImportWebResourceCommand(serializedBytes: protobufBytes)
+        guard let url = URL(string: message.url), url.scheme != nil, url.host != nil else {
+            throw WireCodecError.invalidURL(message.url)
+        }
+        self.init(spaceID: message.spaceID, url: url, title: message.hasTitle ? message.title : nil)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ImportWebResourceCommand()
+        message.spaceID = spaceID
+        message.url = url.absoluteString
+        if let title { message.title = title }
+        return try message.serializedData()
+    }
+}
+
+public struct ImportWebResourceResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.resource.import-web@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let resourceID: String
+
+    public init(resourceID: String) { self.resourceID = resourceID }
+
+    public init(protobufBytes: Data) throws {
+        self.init(resourceID: try AizenWireV1_ImportWebResourceResult(serializedBytes: protobufBytes).resourceID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ImportWebResourceResult()
+        message.resourceID = resourceID
+        return try message.serializedData()
+    }
+}
+
 public struct RemoveResourceCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.resource.remove@1")
     public static let schemaVersion: UInt32 = 1
@@ -1994,6 +2046,7 @@ public enum WireCodecError: Error, Sendable, Equatable {
     case unsupportedPayloadEncoding(Int)
     case missingPayload
     case invalidIdentity(String)
+    case invalidURL(String)
     case invalidLifecycle(String)
     case invalidAuthenticationPayload
     case invalidRepositoryAvailability(String)
