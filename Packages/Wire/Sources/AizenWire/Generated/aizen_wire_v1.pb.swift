@@ -997,6 +997,54 @@ nonisolated struct AizenWireV1_ListOperationsResponse: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_ReadOperationLogQuery: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var operationID: String = String()
+
+  var afterSequence: UInt64 = 0
+
+  var maximumBytes: UInt32 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_OperationLogChunkRecord: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var operationID: String = String()
+
+  var sequence: UInt64 = 0
+
+  var stream: String = String()
+
+  var text: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_ReadOperationLogResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var chunks: [AizenWireV1_OperationLogChunkRecord] = []
+
+  var truncated: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_ListResourcesQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -4347,6 +4395,126 @@ nonisolated extension AizenWireV1_ListOperationsResponse: SwiftProtobuf.Message,
 
   static func ==(lhs: AizenWireV1_ListOperationsResponse, rhs: AizenWireV1_ListOperationsResponse) -> Bool {
     if lhs.operations != rhs.operations {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ReadOperationLogQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ReadOperationLogQuery"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}operation_id\0\u{3}after_sequence\0\u{3}maximum_bytes\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.operationID) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.afterSequence) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.maximumBytes) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.operationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.operationID, fieldNumber: 1)
+    }
+    if self.afterSequence != 0 {
+      try visitor.visitSingularUInt64Field(value: self.afterSequence, fieldNumber: 2)
+    }
+    if self.maximumBytes != 0 {
+      try visitor.visitSingularUInt32Field(value: self.maximumBytes, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ReadOperationLogQuery, rhs: AizenWireV1_ReadOperationLogQuery) -> Bool {
+    if lhs.operationID != rhs.operationID {return false}
+    if lhs.afterSequence != rhs.afterSequence {return false}
+    if lhs.maximumBytes != rhs.maximumBytes {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_OperationLogChunkRecord: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".OperationLogChunkRecord"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}operation_id\0\u{1}sequence\0\u{1}stream\0\u{1}text\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.operationID) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.sequence) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.stream) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.text) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.operationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.operationID, fieldNumber: 1)
+    }
+    if self.sequence != 0 {
+      try visitor.visitSingularUInt64Field(value: self.sequence, fieldNumber: 2)
+    }
+    if !self.stream.isEmpty {
+      try visitor.visitSingularStringField(value: self.stream, fieldNumber: 3)
+    }
+    if !self.text.isEmpty {
+      try visitor.visitSingularStringField(value: self.text, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_OperationLogChunkRecord, rhs: AizenWireV1_OperationLogChunkRecord) -> Bool {
+    if lhs.operationID != rhs.operationID {return false}
+    if lhs.sequence != rhs.sequence {return false}
+    if lhs.stream != rhs.stream {return false}
+    if lhs.text != rhs.text {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ReadOperationLogResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ReadOperationLogResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}chunks\0\u{1}truncated\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.chunks) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.truncated) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.chunks.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.chunks, fieldNumber: 1)
+    }
+    if self.truncated != false {
+      try visitor.visitSingularBoolField(value: self.truncated, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ReadOperationLogResponse, rhs: AizenWireV1_ReadOperationLogResponse) -> Bool {
+    if lhs.chunks != rhs.chunks {return false}
+    if lhs.truncated != rhs.truncated {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

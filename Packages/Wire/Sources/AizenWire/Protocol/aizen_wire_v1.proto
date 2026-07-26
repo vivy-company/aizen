@@ -319,6 +319,24 @@ message ListOperationsResponse {
   repeated OperationRecord operations = 1;
 }
 
+message ReadOperationLogQuery {
+  string operation_id = 1;
+  uint64 after_sequence = 2;
+  uint32 maximum_bytes = 3;
+}
+
+message OperationLogChunkRecord {
+  string operation_id = 1;
+  uint64 sequence = 2;
+  string stream = 3;
+  string text = 4;
+}
+
+message ReadOperationLogResponse {
+  repeated OperationLogChunkRecord chunks = 1;
+  bool truncated = 2;
+}
+
 message ListResourcesQuery {
   string space_id = 1;
 }

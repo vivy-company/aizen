@@ -1264,6 +1264,89 @@ public struct ListOperationsResponsePayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct ReadOperationLogQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.operation.log@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public static let defaultMaximumBytes = 256 * 1_024
+    public static let maximumAllowedBytes = 1_024 * 1_024
+
+    public let operationID: String
+    public let afterSequence: UInt64
+    public let maximumBytes: Int
+
+    public init(operationID: String, afterSequence: UInt64 = 0, maximumBytes: Int = Self.defaultMaximumBytes) {
+        self.operationID = operationID
+        self.afterSequence = afterSequence
+        self.maximumBytes = maximumBytes
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ReadOperationLogQuery(serializedBytes: protobufBytes)
+        guard UUID(uuidString: message.operationID) != nil,
+              (1...Self.maximumAllowedBytes).contains(Int(message.maximumBytes)) else {
+            throw WireCodecError.invalidIdentity("operation log query")
+        }
+        self.init(operationID: message.operationID, afterSequence: message.afterSequence, maximumBytes: Int(message.maximumBytes))
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ReadOperationLogQuery()
+        message.operationID = operationID
+        message.afterSequence = afterSequence
+        message.maximumBytes = UInt32(maximumBytes)
+        return try message.serializedData()
+    }
+}
+
+public struct ReadOperationLogResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.operation.log@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let chunks: [OperationLogChunk]
+    public let truncated: Bool
+
+    public init(chunks: [OperationLogChunk], truncated: Bool) {
+        self.chunks = chunks
+        self.truncated = truncated
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ReadOperationLogResponse(serializedBytes: protobufBytes)
+        chunks = try message.chunks.map { record in
+            guard let operationUUID = UUID(uuidString: record.operationID),
+                  let stream = OperationLogChunk.Stream(rawValue: record.stream) else {
+                throw WireCodecError.invalidIdentity("operation log chunk")
+            }
+            return OperationLogChunk(
+                operationID: OperationID(rawValue: operationUUID),
+                sequence: record.sequence,
+                stream: stream,
+                text: record.text
+            )
+        }
+        guard zip(chunks, chunks.dropFirst()).allSatisfy({ $0.sequence < $1.sequence }) else {
+            throw WireCodecError.invalidIdentity("operation log sequence")
+        }
+        truncated = message.truncated
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ReadOperationLogResponse()
+        message.chunks = chunks.map { chunk in
+            var record = AizenWireV1_OperationLogChunkRecord()
+            record.operationID = chunk.operationID.description
+            record.sequence = chunk.sequence
+            record.stream = chunk.stream.rawValue
+            record.text = chunk.text
+            return record
+        }
+        message.truncated = truncated
+        return try message.serializedData()
+    }
+}
+
 public struct ListResourcesQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.resource.list@1")
     public static let schemaVersion: UInt32 = 1

@@ -227,6 +227,18 @@ import Testing
     #expect(try BuildXcodeProjectCommandPayload(protobufBytes: command.protobufBytes()) == command)
 }
 
+@Test func operationLogPayloadsKeepCursorsAndBoundedChunks() throws {
+    let operationID = OperationID()
+    let query = ReadOperationLogQueryPayload(operationID: operationID.description, afterSequence: 4, maximumBytes: 4_096)
+    let response = ReadOperationLogResponsePayload(
+        chunks: [OperationLogChunk(operationID: operationID, sequence: 5, stream: .standardError, text: "failure detail\\n")],
+        truncated: true
+    )
+
+    #expect(try ReadOperationLogQueryPayload(protobufBytes: query.protobufBytes()) == query)
+    #expect(try ReadOperationLogResponsePayload(protobufBytes: response.protobufBytes()) == response)
+}
+
 @Test func xcodeProjectDiscoveryCarriesBuildConfigurations() throws {
     let descriptor = XcodeProjectDescriptor(resourceID: ResourceID(), id: "App.xcodeproj", name: "App", kind: .project, schemes: ["App"], configurations: ["Debug", "Release"])
     let payload = DiscoverXcodeProjectResponsePayload(project: descriptor)
