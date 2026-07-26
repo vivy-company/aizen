@@ -3,6 +3,7 @@ import AizenCore
 import AizenHost
 import AizenStorage
 import AizenTransport
+import AizenWire
 import Foundation
 
 /// macOS-only temporary composition until the persistent Host/XPC transport replaces it.
@@ -21,8 +22,8 @@ public actor LocalHostClient {
         _ = try await client.retryPendingCommands()
     }
 
-    public func negotiate() async throws {
-        _ = try await client.negotiate()
+    public func negotiate() async throws -> CapabilitiesPayload {
+        try await client.negotiate()
     }
 
     public func spaces() async throws -> [Space] {

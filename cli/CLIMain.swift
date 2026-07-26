@@ -32,6 +32,8 @@ struct AizenCLI {
         switch command {
         case "-h", "--help", "help":
             print(helpText())
+        case "--version", "version":
+            try await handleVersion(subArgs)
         case "open":
             try await handleOpen(subArgs)
         case "add":
@@ -71,6 +73,15 @@ struct AizenCLI {
 }
 
 private extension AizenCLI {
+    static func handleVersion(_ args: [String]) async throws {
+        guard args.isEmpty else { throw CLIError.invalidArguments("version does not take arguments") }
+        let capabilities = try await V2CLIClient().compatibility()
+        print("Aizen CLI \(V2CLIClient.productVersion)")
+        print("Host \(capabilities.productVersion)")
+        print("Protocol generation \(capabilities.minimumProtocolGeneration)...\(capabilities.maximumProtocolGeneration)")
+        print("Minimum compatible product \(capabilities.minimumCompatibleProductVersion)")
+    }
+
     static func handleOpen(_ args: [String]) async throws {
         if args.contains("--help") || args.contains("-h") {
             print(openHelpText())

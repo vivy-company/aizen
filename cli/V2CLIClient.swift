@@ -1,9 +1,11 @@
 import AizenCore
 import AizenMacPlatform
+import AizenWire
 import Foundation
 
 /// CLI composition for the local v2 Host. The CLI stays a client and never opens v2 files directly.
 actor V2CLIClient {
+    static let productVersion = "2.0.0"
     private let client: LocalHostClient
     private var negotiated = false
 
@@ -115,9 +117,18 @@ actor V2CLIClient {
         try await client.detachExecutionContext(sessionID: sessionID)
     }
 
+    func compatibility() async throws -> CapabilitiesPayload {
+        if !negotiated {
+            let capabilities = try await client.negotiate()
+            negotiated = true
+            return capabilities
+        }
+        return try await client.negotiate()
+    }
+
     private func recoverPendingCommands() async throws {
         if !negotiated {
-            try await client.negotiate()
+            _ = try await client.negotiate()
             negotiated = true
         }
         try await client.recoverPendingCommands()
