@@ -77,6 +77,30 @@ import AizenWire
     #expect(snapshot.sessions == [Session(id: SessionID(rawValue: UUID(uuidString: result.sessionID)!), spaceID: space.id, kind: .conversation, title: "Plan")])
 }
 
+@Test func managedSandboxProvisioningLinksAProjectlessConversation() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+    }
+    let sandboxes = ManagedSandboxService(storage: storage, rootURL: root.appendingPathComponent("sandboxes", isDirectory: true))
+    let context = try await sandboxes.provision(for: session.id, persistence: .temporary)
+    let snapshot = try await storage.load()
+    let directory = await sandboxes.directoryURL(for: context)
+    let permissions = try FileManager.default.attributesOfItem(atPath: directory.path)[.posixPermissions] as? NSNumber
+
+    #expect(context.spaceID == space.id)
+    #expect(context.kind == .managedTemporarySandbox)
+    #expect(snapshot.sessions.first?.executionContextID == context.id)
+    #expect(snapshot.executionContexts == [context])
+    #expect(FileManager.default.fileExists(atPath: directory.appendingPathComponent("metadata.json").path))
+    #expect(permissions?.intValue == 0o700)
+}
+
 @Test func coordinatorRejectsUnknownRunWithoutTouchingRuntime() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
