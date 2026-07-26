@@ -288,17 +288,15 @@ public actor LocalHost: WireEndpoint {
                       let directory = try Self.localResourceDirectory(for: resource) else { throw HostProtocolError.unknownResource(resourceID) }
                 let operation = Operation(spaceID: resource.spaceID, lifecycle: .running, progress: 0)
                 _ = try await self.storage.transact { $0.operations.append(operation) }
-                do {
-                    try await xcodeProjectBuilder.buildXcodeProject(at: directory.appendingPathComponent(project.id), kind: project.kind, scheme: command.scheme, destination: command.destination)
-                    _ = try await self.storage.transact { snapshot in
-                        if let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) {
-                            snapshot.operations[index].lifecycle = .completed
-                            snapshot.operations[index].progress = 1
-                        }
-                    }
-                } catch {
-                    _ = try? await self.storage.transact { snapshot in if let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) { snapshot.operations[index].lifecycle = .failed; snapshot.operations[index].failureDescription = error.localizedDescription } }
-                    throw error
+                Task { [weak self, xcodeProjectBuilder] in
+                    await self?.runXcodeProjectBuild(
+                        operationID: operation.id,
+                        projectURL: directory.appendingPathComponent(project.id),
+                        kind: project.kind,
+                        scheme: command.scheme,
+                        destination: command.destination,
+                        builder: xcodeProjectBuilder
+                    )
                 }
                 return try TypedPayload(BuildXcodeProjectResultPayload(operationID: operation.id.description))
             }
@@ -924,6 +922,30 @@ public actor LocalHost: WireEndpoint {
         }
         guard let candidate = candidates.first else { return nil }
         return XcodeProjectDescriptor(resourceID: resource.id, id: candidate.url.lastPathComponent, name: candidate.url.deletingPathExtension().lastPathComponent, kind: candidate.kind, schemes: [])
+    }
+
+    private func runXcodeProjectBuild(
+        operationID: OperationID,
+        projectURL: URL,
+        kind: XcodeProjectDescriptor.Kind,
+        scheme: String,
+        destination: String,
+        builder: any XcodeProjectBuilding
+    ) async {
+        do {
+            try await builder.buildXcodeProject(at: projectURL, kind: kind, scheme: scheme, destination: destination)
+            _ = try await storage.transact { snapshot in
+                guard let index = snapshot.operations.firstIndex(where: { $0.id == operationID }) else { return }
+                snapshot.operations[index].lifecycle = .completed
+                snapshot.operations[index].progress = 1
+            }
+        } catch {
+            _ = try? await storage.transact { snapshot in
+                guard let index = snapshot.operations.firstIndex(where: { $0.id == operationID }) else { return }
+                snapshot.operations[index].lifecycle = .failed
+                snapshot.operations[index].failureDescription = error.localizedDescription
+            }
+        }
     }
 
     private func xcodeProject(for resource: Resource) async throws -> XcodeProjectDescriptor? {

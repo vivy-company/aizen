@@ -1199,12 +1199,20 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     let space = Space(name: "Xcode")
     let resource = Resource(spaceID: space.id, kind: .folder, title: "folder", details: .hostPrivate(.init(rawValue: "local-folder:\(folder.path)")))
     _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
-    let builder = RecordingXcodeProjectBuilder()
+    let builder = ControlledXcodeProjectBuilder()
     let host = LocalHost(storage: storage, xcodeProjectInspector: StaticXcodeProjectInspector(schemes: ["App"]), xcodeProjectBuilder: builder)
     let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(BuildXcodeProjectCommandPayload(resourceID: resource.id.description, projectID: "App.xcodeproj", scheme: "App", destination: "platform=macOS"))))
     let result = try BuildXcodeProjectResultPayload(protobufBytes: response.payload.protobufBytes)
-    #expect(await builder.projectURL == folder.appendingPathComponent("App.xcodeproj"))
     #expect(try await storage.load().operations.first?.id.description == result.operationID)
+    #expect(try await storage.load().operations.first?.lifecycle == .running)
+    for _ in 0 ..< 20 where await builder.projectURL == nil {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await builder.projectURL == folder.appendingPathComponent("App.xcodeproj"))
+    await builder.complete()
+    for _ in 0 ..< 20 where try await storage.load().operations.first?.lifecycle != .completed {
+        try await Task.sleep(for: .milliseconds(10))
+    }
     #expect(try await storage.load().operations.first?.lifecycle == .completed)
 }
 
@@ -1233,9 +1241,19 @@ private struct StaticXcodeProjectInspector: XcodeProjectInspecting {
     func schemes(for projectURL: URL, kind: XcodeProjectDescriptor.Kind) async throws -> [String] { schemes }
 }
 
-private actor RecordingXcodeProjectBuilder: XcodeProjectBuilding {
+private actor ControlledXcodeProjectBuilder: XcodeProjectBuilding {
     private(set) var projectURL: URL?
-    func buildXcodeProject(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws { projectURL = url }
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func buildXcodeProject(at url: URL, kind: XcodeProjectDescriptor.Kind, scheme: String, destination: String) async throws {
+        projectURL = url
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func complete() {
+        continuation?.resume()
+        continuation = nil
+    }
 }
 
 private actor RecordingAgentLaunchUpdater: AgentLaunchConfigurationUpdating {
