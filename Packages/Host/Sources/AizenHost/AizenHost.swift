@@ -74,6 +74,7 @@ public actor LocalHost: WireEndpoint {
                 CreateLocalFolderContextCommandPayload.identifier,
                 CreateLocalFolderContextResultPayload.identifier,
                 AttachExecutionContextCommandPayload.identifier,
+                DetachExecutionContextCommandPayload.identifier,
                 RemoveExecutionContextCommandPayload.identifier,
                 ExecutionContextMutationResultPayload.identifier
             ]))
@@ -287,6 +288,17 @@ public actor LocalHost: WireEndpoint {
                     throw HostProtocolError.executionContextInUse(contextID)
                 }
                 snapshot.executionContexts.removeAll(where: { $0.id == contextID })
+            }
+            kind = .commandResult
+            payload = try TypedPayload(ExecutionContextMutationResultPayload())
+        case .command where envelope.payload.identifier == DetachExecutionContextCommandPayload.identifier:
+            let command = try DetachExecutionContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let sessionID = try Self.sessionID(from: command.sessionID)
+            _ = try await storage.transact { snapshot in
+                guard let index = snapshot.sessions.firstIndex(where: { $0.id == sessionID }) else {
+                    throw HostProtocolError.unknownSession(sessionID)
+                }
+                snapshot.sessions[index].executionContextID = nil
             }
             kind = .commandResult
             payload = try TypedPayload(ExecutionContextMutationResultPayload())

@@ -279,6 +279,20 @@ public actor HostClient {
         _ = try ExecutionContextMutationResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func detachExecutionContext(sessionID: SessionID) async throws {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(DetachExecutionContextCommandPayload(sessionID: sessionID.description))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == ExecutionContextMutationResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        _ = try ExecutionContextMutationResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func sendConversation(
         spaceID: SpaceID,
         sessionID: SessionID,

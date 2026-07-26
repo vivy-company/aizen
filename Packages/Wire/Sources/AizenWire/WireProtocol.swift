@@ -1010,6 +1010,20 @@ public struct RemoveExecutionContextCommandPayload: WirePayload, Sendable, Hasha
     }
 }
 
+public struct DetachExecutionContextCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.session.detach-execution-context@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let sessionID: String
+    public init(sessionID: String) { self.sessionID = sessionID }
+    public init(protobufBytes: Data) throws { self.init(sessionID: try AizenWireV1_DetachExecutionContextCommand(serializedBytes: protobufBytes).sessionID) }
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_DetachExecutionContextCommand()
+        message.sessionID = sessionID
+        return try message.serializedData()
+    }
+}
+
 public struct ExecutionContextMutationResultPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.execution-context.mutation@1")
     public static let schemaVersion: UInt32 = 1

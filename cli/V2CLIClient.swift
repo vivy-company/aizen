@@ -70,6 +70,10 @@ actor V2CLIClient {
         try await client.removeExecutionContext(id: id)
     }
 
+    func detachExecutionContext(sessionID: SessionID) async throws {
+        try await client.detachExecutionContext(sessionID: sessionID)
+    }
+
     static func defaultStorageURL(fileManager: FileManager = .default) -> URL {
         if let override = ProcessInfo.processInfo.environment["AIZEN_V2_STORE_PATH"], !override.isEmpty {
             return URL(fileURLWithPath: (override as NSString).expandingTildeInPath).standardizedFileURL
