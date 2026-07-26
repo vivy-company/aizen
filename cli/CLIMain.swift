@@ -52,6 +52,8 @@ struct AizenCLI {
             try await handleRun(subArgs)
         case "resource":
             try await handleResource(subArgs)
+        case "context":
+            try await handleExecutionContext(subArgs)
         case "sync":
             try await handleSync(subArgs)
         case "status":
@@ -339,6 +341,41 @@ private extension AizenCLI {
             try await client.removeResource(id: ResourceID(rawValue: uuid))
         default:
             throw CLIError.invalidArguments("Unknown resource command: \(subcommand)")
+        }
+    }
+
+    static func handleExecutionContext(_ args: [String]) async throws {
+        guard let subcommand = args.first else {
+            throw CLIError.invalidArguments("context requires list, create, or attach")
+        }
+        let rest = Array(args.dropFirst())
+        let client = V2CLIClient()
+        switch subcommand {
+        case "list":
+            guard rest.count <= 1 else { throw CLIError.invalidArguments("context list accepts at most one space") }
+            let spaceID = try await resolveV2Space(rest.first, client: client)
+            for context in try await client.executionContexts(spaceID: spaceID) {
+                print("\(context.id.description)\t\(context.kind.rawValue)\t\(context.resourceID?.description ?? "-")")
+            }
+        case "create":
+            guard rest.count == 2, let resourceUUID = UUID(uuidString: rest[1]) else {
+                throw CLIError.invalidArguments("context create requires a space and Resource ID")
+            }
+            let spaceID = try await resolveV2Space(rest[0], client: client)
+            guard let spaceID else { throw CLIError.invalidArguments("context create requires a space") }
+            print(try await client.createLocalFolderContext(spaceID: spaceID, resourceID: ResourceID(rawValue: resourceUUID)).description)
+        case "attach":
+            guard rest.count == 2,
+                let sessionUUID = UUID(uuidString: rest[0]),
+                let contextUUID = UUID(uuidString: rest[1]) else {
+                throw CLIError.invalidArguments("context attach requires a Session ID and Context ID")
+            }
+            try await client.attachExecutionContext(
+                sessionID: SessionID(rawValue: sessionUUID),
+                contextID: ExecutionContextID(rawValue: contextUUID)
+            )
+        default:
+            throw CLIError.invalidArguments("Unknown context command: \(subcommand)")
         }
     }
 
