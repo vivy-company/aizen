@@ -1278,6 +1278,41 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(try ReadRepositoryDiffResponsePayload(protobufBytes: response.payload.protobufBytes) == .init(resourceID: resource.id.description, repositoryRevision: "revision", indexRevision: "index", unifiedDiff: Data("diff".utf8), truncated: false))
 }
 
+@Test func hostRecordsRepositoryIndexUpdatesAsCompletedDurableOperations() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Repository")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let updater = RecordingRepositoryIndexUpdater(revision: String(repeating: "b", count: 64))
+    let host = LocalHost(storage: storage, repositoryIndexUpdater: updater)
+    let response = try await host.receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(UpdateRepositoryIndexCommandPayload(
+            resourceID: resource.id.description,
+            relativePaths: ["README.md"],
+            expectedIndexRevision: String(repeating: "a", count: 64),
+            stage: true
+        ))
+    ))
+
+    let result = try UpdateRepositoryIndexResultPayload(protobufBytes: response.payload.protobufBytes)
+    let operation = try #require(try await storage.load().operations.first)
+    #expect(operation.id.description == result.operationID)
+    #expect(operation.spaceID == space.id)
+    #expect(operation.lifecycle == .completed)
+    #expect(operation.progress == 1)
+    #expect(await updater.requestedURL == repository)
+    #expect(await updater.requestedPaths == ["README.md"])
+    #expect(await updater.stage)
+}
+
 @Test func localHostListsExecutionContextFilesThroughTypedWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1499,6 +1534,22 @@ private actor StaticRepositoryStatusReader: RepositoryStatusReading {
 private actor StaticRepositoryDiffReader: RepositoryDiffReading {
     func diff(at repositoryURL: URL, relativePath: String, maximumBytes: Int) async throws -> RepositoryDiffSnapshot {
         .init(repositoryRevision: "revision", indexRevision: "index", unifiedDiff: Data("diff".utf8), truncated: false)
+    }
+}
+
+private actor RecordingRepositoryIndexUpdater: RepositoryIndexUpdating {
+    let revision: String
+    private(set) var requestedURL: URL?
+    private(set) var requestedPaths: [String] = []
+    private(set) var stage = false
+
+    init(revision: String) { self.revision = revision }
+
+    func updateIndex(at repositoryURL: URL, relativePaths: [String], expectedIndexRevision: String, stage: Bool) async throws -> String {
+        requestedURL = repositoryURL
+        requestedPaths = relativePaths
+        self.stage = stage
+        return revision
     }
 }
 

@@ -773,9 +773,32 @@ public actor LocalHost: WireEndpoint {
             let command = try UpdateRepositoryIndexCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let resourceID = try Self.resourceID(from: command.resourceID)
             guard let resource = try await storage.load().resources.first(where: { $0.id == resourceID }), resource.kind == .repository, let repositoryURL = try Self.localResourceDirectory(for: resource) else { throw HostProtocolError.unknownResource(resourceID) }
-            let revision = try await repositoryIndexUpdater.updateIndex(at: repositoryURL, relativePaths: command.relativePaths, expectedIndexRevision: command.expectedIndexRevision, stage: command.stage)
+            payload = try await executeDurably(envelope: envelope, spaceID: resource.spaceID) {
+                let operation = Operation(spaceID: resource.spaceID, lifecycle: .running, progress: 0)
+                _ = try await self.storage.transact { $0.operations.append(operation) }
+                do {
+                    let revision = try await repositoryIndexUpdater.updateIndex(
+                        at: repositoryURL,
+                        relativePaths: command.relativePaths,
+                        expectedIndexRevision: command.expectedIndexRevision,
+                        stage: command.stage
+                    )
+                    _ = try await self.storage.transact { snapshot in
+                        guard let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) else { return }
+                        snapshot.operations[index].lifecycle = .completed
+                        snapshot.operations[index].progress = 1
+                    }
+                    return try TypedPayload(UpdateRepositoryIndexResultPayload(indexRevision: revision, operationID: operation.id.description))
+                } catch {
+                    _ = try? await self.storage.transact { snapshot in
+                        guard let index = snapshot.operations.firstIndex(where: { $0.id == operation.id }) else { return }
+                        snapshot.operations[index].lifecycle = .failed
+                        snapshot.operations[index].failureDescription = error.localizedDescription
+                    }
+                    throw error
+                }
+            }
             kind = .commandResult
-            payload = try TypedPayload(UpdateRepositoryIndexResultPayload(indexRevision: revision))
         case .command where envelope.payload.identifier == CreateLocalFolderContextCommandPayload.identifier:
             let command = try CreateLocalFolderContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
