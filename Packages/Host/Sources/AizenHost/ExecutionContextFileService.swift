@@ -13,6 +13,7 @@ public actor ExecutionContextFileService {
         case notFile(String)
         case fileTooLarge(String)
         case invalidText(String)
+        case sensitivePath(String)
     }
 
     private let storage: StorageRepository
@@ -35,8 +36,10 @@ public actor ExecutionContextFileService {
                 let resolved = url.resolvingSymlinksInPath().standardizedFileURL
                 guard resolved.path == root.path || resolved.path.hasPrefix(root.path + "/") else { return nil }
                 let values = try? resolved.resourceValues(forKeys: [.isDirectoryKey])
+                let relativePath = String(resolved.path.dropFirst(root.path.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                guard !Self.isSensitive(relativePath) else { return nil }
                 return ContextFileEntry(
-                    relativePath: String(resolved.path.dropFirst(root.path.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/")),
+                    relativePath: relativePath,
                     name: url.lastPathComponent,
                     isDirectory: values?.isDirectory == true
                 )
@@ -45,6 +48,7 @@ public actor ExecutionContextFileService {
     }
 
     public func readTextFile(contextID: ExecutionContextID, relativePath: String) async throws -> String {
+        guard !Self.isSensitive(relativePath) else { throw Error.sensitivePath(relativePath) }
         let root = try await contextRoot(contextID)
         let file = try resolvedChild(relativePath, root: root)
         let values = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
@@ -70,9 +74,26 @@ public actor ExecutionContextFileService {
     }
 
     private func resolvedChild(_ relativePath: String, root: URL) throws -> URL {
-        guard !relativePath.hasPrefix("/"), !relativePath.split(separator: "/").contains("..") else { throw Error.invalidRelativePath(relativePath) }
+        let components = relativePath.split(separator: "/", omittingEmptySubsequences: false)
+        guard relativePath.isEmpty || (
+            !relativePath.contains("\0") &&
+            !relativePath.hasPrefix("/") &&
+            !relativePath.hasSuffix("/") &&
+            !components.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." })
+        ) else {
+            throw Error.invalidRelativePath(relativePath)
+        }
         let child = root.appendingPathComponent(relativePath).standardizedFileURL.resolvingSymlinksInPath()
         guard child.path == root.path || child.path.hasPrefix(root.path + "/") else { throw Error.pathEscapesContext(relativePath) }
         return child
+    }
+
+    private static func isSensitive(_ relativePath: String) -> Bool {
+        relativePath.split(separator: "/").contains { component in
+            let name = component.lowercased()
+            return name == ".ssh" || name == ".aizen" || name == ".env" || name.hasPrefix(".env.") ||
+                name == "id_rsa" || name == "id_ed25519" || name == "authorized_keys" ||
+                name.contains("credential") || name.hasSuffix(".pem") || name.hasSuffix(".key") || name.hasSuffix(".p12")
+        }
     }
 }

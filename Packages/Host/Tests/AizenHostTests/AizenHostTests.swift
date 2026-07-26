@@ -1148,6 +1148,9 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     let checkout = root.appendingPathComponent("checkout", isDirectory: true)
     try FileManager.default.createDirectory(at: checkout.appendingPathComponent("Sources", isDirectory: true), withIntermediateDirectories: true)
     try Data("hello".utf8).write(to: checkout.appendingPathComponent("README.md"))
+    try Data("secret".utf8).write(to: checkout.appendingPathComponent(".env"))
+    try Data("private".utf8).write(to: checkout.appendingPathComponent("identity.pem"))
+    try FileManager.default.createDirectory(at: checkout.appendingPathComponent(".ssh", isDirectory: true), withIntermediateDirectories: true)
     let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
     let space = Space(name: "Files")
     let context = ExecutionContext(spaceID: space.id, kind: .repositoryCheckout, hostReference: .init(rawValue: "local-checkout:\(checkout.path)"))
@@ -1157,6 +1160,13 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     let entries = try await service.listDirectory(contextID: context.id)
     #expect(entries.map(\.relativePath) == ["Sources", "README.md"])
     #expect(try await service.readTextFile(contextID: context.id, relativePath: "README.md") == "hello")
+    #expect(try await service.listDirectory(contextID: context.id, includeHidden: true).map(\.relativePath) == ["Sources", "README.md"])
+    await #expect(throws: ExecutionContextFileService.Error.sensitivePath(".env")) {
+        try await service.readTextFile(contextID: context.id, relativePath: ".env")
+    }
+    await #expect(throws: ExecutionContextFileService.Error.sensitivePath(".ssh/config")) {
+        try await service.readTextFile(contextID: context.id, relativePath: ".ssh/config")
+    }
     try Data(repeating: 0xFF, count: 2).write(to: checkout.appendingPathComponent("binary.dat"))
     await #expect(throws: ExecutionContextFileService.Error.invalidText("binary.dat")) {
         try await service.readTextFile(contextID: context.id, relativePath: "binary.dat")
@@ -1170,6 +1180,11 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     }
     await #expect(throws: ExecutionContextFileService.Error.invalidRelativePath("../outside")) {
         try await service.readTextFile(contextID: context.id, relativePath: "../outside")
+    }
+    for path in ["./README.md", "README.md/", "README\u{0}md"] {
+        await #expect(throws: ExecutionContextFileService.Error.invalidRelativePath(path)) {
+            try await service.readTextFile(contextID: context.id, relativePath: path)
+        }
     }
 }
 
