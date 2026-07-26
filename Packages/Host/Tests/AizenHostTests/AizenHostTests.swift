@@ -1,6 +1,7 @@
 import Foundation
 import AizenCore
 import AizenStorage
+import AizenSecurity
 import AizenTransport
 import Testing
 @testable import AizenHost
@@ -8,6 +9,26 @@ import AizenWire
 
 @Test func hostUsesTheWireProtocol() {
     #expect(AizenHostModule.protocolGeneration == 1)
+}
+
+@Test func deviceAuthorizationGateDeniesUnpairedAndRevokedDevices() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let gate = DeviceAuthorizationGate(storage: storage)
+    let deviceID = DeviceID()
+
+    await #expect(throws: DeviceAuthorizationError.deviceNotPaired) {
+        try await gate.require(deviceID: deviceID, capability: .spaceRead, route: "lan")
+    }
+    #expect(try await storage.load().securityAuditRecords.map(\.kind) == [.authorizationDenied])
+
+    let device = DevicePublicIdentity(deviceID: deviceID, displayName: "Phone", platform: "iOS", cryptographicIdentity: LocalCryptographicIdentity().publicIdentity())
+    try await storage.saveDeviceAuthorization(DeviceAuthorization(device: device, grants: [CapabilityGrant(capability: .spaceRead)]))
+    try await gate.require(deviceID: deviceID, capability: .spaceRead, route: "lan")
+    await #expect(throws: DeviceAuthorizationError.capabilityDenied(.fileWrite)) {
+        try await gate.require(deviceID: deviceID, capability: .fileWrite, route: "lan")
+    }
 }
 
 @Test func localHostReturnsTheStorageSnapshotThroughWire() async throws {
