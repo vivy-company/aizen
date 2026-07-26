@@ -100,6 +100,14 @@ final class ReignitionConversationStore: ObservableObject {
         }
     }
 
+    func detachExecutionContext(from sessionID: SessionID) async {
+        guard let session = conversations.first(where: { $0.id == sessionID }) else { return }
+        await perform {
+            try await self.host.detachExecutionContext(sessionID: session.id)
+            try await self.refreshProjection(spaceID: session.spaceID)
+        }
+    }
+
     func dismissError() {
         lastError = nil
     }

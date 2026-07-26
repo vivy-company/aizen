@@ -84,6 +84,10 @@ actor ReignitionHostComposition {
         try await client.attachExecutionContext(sessionID: sessionID, contextID: contextID)
     }
 
+    func detachExecutionContext(sessionID: SessionID) async throws {
+        try await client.detachExecutionContext(sessionID: sessionID)
+    }
+
     func conversationTimeline(sessionID: SessionID) async throws -> [ConversationMessage] {
         try await client.conversationTimeline(sessionID: sessionID)
     }

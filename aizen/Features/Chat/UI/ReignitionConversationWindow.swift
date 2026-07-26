@@ -156,6 +156,12 @@ struct ReignitionConversationWindow: View {
     @ViewBuilder
     private func folderMenu(for conversation: Session) -> some View {
         Menu("Attach Folder", systemImage: "folder.badge.plus") {
+            if store.folderResource(for: conversation) != nil {
+                Button("Detach Folder", systemImage: "folder.badge.minus", role: .destructive) {
+                    Task { await store.detachExecutionContext(from: conversation.id) }
+                }
+                Divider()
+            }
             let folderResources = store.resources.filter { $0.kind == .folder }
             if !folderResources.isEmpty {
                 Section("Existing Folders") {
