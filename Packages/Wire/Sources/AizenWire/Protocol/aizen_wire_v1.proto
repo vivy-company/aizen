@@ -493,6 +493,36 @@ message CreateTerminalSessionResult {
   TerminalSessionRecord session = 1;
 }
 
+// Remote control is bound to the authenticated Device by the Host session; no
+// request carries a claimed controller identity or a shell command.
+message AcquireTerminalControlCommand {
+  string terminal_session_id = 1;
+  uint32 lease_seconds = 2;
+}
+
+message ReleaseTerminalControlCommand {
+  string terminal_session_id = 1;
+}
+
+message TerminalControlLeaseResult {
+  string terminal_session_id = 1;
+  string controller_device_id = 2;
+  int64 expires_at_millis = 3;
+}
+
+message TerminalInputCommand {
+  string terminal_session_id = 1;
+  uint64 sequence = 2;
+  bytes input = 3;
+}
+
+message TerminalResizeCommand {
+  string terminal_session_id = 1;
+  uint64 sequence = 2;
+  uint32 columns = 3;
+  uint32 rows = 4;
+}
+
 message CreateLocalFolderContextCommand {
   string space_id = 1;
   string resource_id = 2;
