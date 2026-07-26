@@ -50,6 +50,10 @@ public actor LocalHostClient {
         try await client.importLocalFolder(spaceID: spaceID, path: path, title: title)
     }
 
+    public func importLocalRepository(spaceID: SpaceID, path: String, title: String? = nil) async throws -> ResourceID {
+        try await client.importLocalRepository(spaceID: spaceID, path: path, title: title)
+    }
+
     public func removeResource(id: ResourceID) async throws {
         try await client.removeResource(id: id)
     }
@@ -60,6 +64,10 @@ public actor LocalHostClient {
 
     public func createLocalFolderContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
         try await client.createLocalFolderContext(spaceID: spaceID, resourceID: resourceID)
+    }
+
+    public func createRepositoryCheckoutContext(spaceID: SpaceID, resourceID: ResourceID) async throws -> ExecutionContextID {
+        try await client.createRepositoryCheckoutContext(spaceID: spaceID, resourceID: resourceID)
     }
 
     public func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {

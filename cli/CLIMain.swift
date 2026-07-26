@@ -321,7 +321,7 @@ private extension AizenCLI {
 
     static func handleResource(_ args: [String]) async throws {
         guard let subcommand = args.first else {
-            throw CLIError.invalidArguments("resource requires list, add, or remove")
+            throw CLIError.invalidArguments("resource requires list, add, add-repository, or remove")
         }
         let rest = Array(args.dropFirst())
         let client = V2CLIClient()
@@ -339,6 +339,12 @@ private extension AizenCLI {
             let path = rest[1]
             let title = rest.count > 2 ? rest.dropFirst(2).joined(separator: " ") : nil
             print(try await client.importLocalFolder(spaceID: spaceID, path: path, title: title).description)
+        case "add-repository":
+            guard rest.count >= 2 else { throw CLIError.invalidArguments("resource add-repository requires a space and absolute repository path") }
+            let spaceID = try await resolveV2Space(rest[0], client: client)
+            guard let spaceID else { throw CLIError.invalidArguments("resource add-repository requires a space") }
+            let title = rest.count > 2 ? rest.dropFirst(2).joined(separator: " ") : nil
+            print(try await client.importLocalRepository(spaceID: spaceID, path: rest[1], title: title).description)
         case "remove":
             guard rest.count == 1, let uuid = UUID(uuidString: rest[0]) else {
                 throw CLIError.invalidArguments("resource remove requires a Resource ID")
@@ -351,7 +357,7 @@ private extension AizenCLI {
 
     static func handleExecutionContext(_ args: [String]) async throws {
         guard let subcommand = args.first else {
-            throw CLIError.invalidArguments("context requires list, create, attach, detach, or remove")
+            throw CLIError.invalidArguments("context requires list, create, create-checkout, attach, detach, or remove")
         }
         let rest = Array(args.dropFirst())
         let client = V2CLIClient()
@@ -379,6 +385,13 @@ private extension AizenCLI {
                 sessionID: SessionID(rawValue: sessionUUID),
                 contextID: ExecutionContextID(rawValue: contextUUID)
             )
+        case "create-checkout":
+            guard rest.count == 2, let resourceUUID = UUID(uuidString: rest[1]) else {
+                throw CLIError.invalidArguments("context create-checkout requires a space and Resource ID")
+            }
+            let spaceID = try await resolveV2Space(rest[0], client: client)
+            guard let spaceID else { throw CLIError.invalidArguments("context create-checkout requires a space") }
+            print(try await client.createRepositoryCheckoutContext(spaceID: spaceID, resourceID: ResourceID(rawValue: resourceUUID)).description)
         case "remove":
             guard rest.count == 1, let contextUUID = UUID(uuidString: rest[0]) else {
                 throw CLIError.invalidArguments("context remove requires a Context ID")
