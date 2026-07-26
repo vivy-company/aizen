@@ -1348,6 +1348,27 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(!(await committer.amend))
 }
 
+@Test func hostRecordsRepositoryBranchUpdatesAsCompletedDurableOperations() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Repository")
+    let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)")))
+    _ = try await storage.transact { $0.spaces.append(space); $0.resources.append(resource) }
+    let updater = RecordingRepositoryBranchUpdater()
+    let host = LocalHost(storage: storage, repositoryBranchUpdater: updater)
+    let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .command, channel: .state, payload: try .init(UpdateRepositoryBranchCommandPayload(resourceID: resource.id.description, branchName: "feature/reignition", expectedRepositoryRevision: "head", expectedIndexRevision: String(repeating: "a", count: 64), create: true))))
+
+    let result = try UpdateRepositoryBranchResultPayload(protobufBytes: response.payload.protobufBytes)
+    let operation = try #require(try await storage.load().operations.first)
+    #expect(operation.id.description == result.operationID)
+    #expect(operation.lifecycle == .completed)
+    #expect(await updater.branchName == "feature/reignition")
+    #expect(await updater.create)
+}
+
 @Test func localHostListsExecutionContextFilesThroughTypedWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1601,6 +1622,17 @@ private actor RecordingRepositoryCommitter: RepositoryCommitting {
     func commit(at repositoryURL: URL, message: String, expectedRepositoryRevision: String, expectedIndexRevision: String, amend: Bool) async throws -> RepositoryCommitResult {
         self.message = message
         self.amend = amend
+        return .init(repositoryRevision: String(repeating: "c", count: 40), indexRevision: String(repeating: "b", count: 64))
+    }
+}
+
+private actor RecordingRepositoryBranchUpdater: RepositoryBranchUpdating {
+    private(set) var branchName: String?
+    private(set) var create = false
+
+    func updateBranch(at repositoryURL: URL, branchName: String, expectedRepositoryRevision: String, expectedIndexRevision: String, create: Bool) async throws -> RepositoryBranchUpdateResult {
+        self.branchName = branchName
+        self.create = create
         return .init(repositoryRevision: String(repeating: "c", count: 40), indexRevision: String(repeating: "b", count: 64))
     }
 }
