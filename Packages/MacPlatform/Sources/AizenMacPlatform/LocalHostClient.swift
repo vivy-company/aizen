@@ -21,4 +21,12 @@ public actor LocalHostClient {
     public func createSpace(name: String, icon: String? = nil, summary: String? = nil) async throws -> SpaceID {
         try await client.createSpace(name: name, icon: icon, summary: summary)
     }
+
+    public func renameSpace(id: SpaceID, name: String) async throws {
+        try await client.renameSpace(id: id, name: name)
+    }
+
+    public func deleteSpace(id: SpaceID) async throws {
+        try await client.deleteSpace(id: id)
+    }
 }

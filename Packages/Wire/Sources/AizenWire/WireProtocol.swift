@@ -268,6 +268,72 @@ public struct CreateSpaceResultPayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct RenameSpaceCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.space.rename@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let spaceID: String
+    public let name: String
+
+    public init(spaceID: String, name: String) {
+        precondition(!spaceID.isEmpty, "Spaces require an identity")
+        precondition(!name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Spaces require a name")
+        self.spaceID = spaceID
+        self.name = name
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_RenameSpaceCommand(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID, name: message.name)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_RenameSpaceCommand()
+        message.spaceID = spaceID
+        message.name = name
+        return try message.serializedData()
+    }
+}
+
+public struct DeleteSpaceCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.space.delete@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let spaceID: String
+
+    public init(spaceID: String) {
+        precondition(!spaceID.isEmpty, "Spaces require an identity")
+        self.spaceID = spaceID
+    }
+
+    public init(protobufBytes: Data) throws {
+        self.init(spaceID: try AizenWireV1_DeleteSpaceCommand(serializedBytes: protobufBytes).spaceID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_DeleteSpaceCommand()
+        message.spaceID = spaceID
+        return try message.serializedData()
+    }
+}
+
+public struct SpaceMutationResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.space.mutation@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public init() {}
+    public init(protobufBytes: Data) throws {
+        _ = try AizenWireV1_SpaceMutationResult(serializedBytes: protobufBytes)
+    }
+
+    public func protobufBytes() throws -> Data {
+        try AizenWireV1_SpaceMutationResult().serializedData()
+    }
+}
+
 public struct CreateConversationCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.conversation.create@1")
     public static let schemaVersion: UInt32 = 1

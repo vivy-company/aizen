@@ -61,6 +61,18 @@ import AizenWire
     #expect(try await storage.load().spaces == [Space(id: id, name: "CLI")])
 }
 
+@Test func clientRenamesAndDeletesSpacesThroughHostCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+    let id = try await client.createSpace(name: "CLI")
+    try await client.renameSpace(id: id, name: "Aizen")
+    #expect(try await client.spaces().map(\.name) == ["Aizen"])
+    try await client.deleteSpace(id: id)
+    #expect(try await client.spaces().isEmpty)
+}
+
 @Test func clientCreatesProjectlessConversationsThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

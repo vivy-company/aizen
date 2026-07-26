@@ -32,6 +32,9 @@ public actor LocalHost: WireEndpoint {
                 ListSpacesResponsePayload.identifier,
                 CreateSpaceCommandPayload.identifier,
                 CreateSpaceResultPayload.identifier,
+                RenameSpaceCommandPayload.identifier,
+                DeleteSpaceCommandPayload.identifier,
+                SpaceMutationResultPayload.identifier,
                 CreateConversationCommandPayload.identifier,
                 CreateConversationResultPayload.identifier
             ]))
@@ -51,10 +54,35 @@ public actor LocalHost: WireEndpoint {
             _ = try await storage.transact { $0.spaces.append(space) }
             kind = .commandResult
             payload = try TypedPayload(CreateSpaceResultPayload(spaceID: space.id.description))
+        case .command where envelope.payload.identifier == RenameSpaceCommandPayload.identifier:
+            let command = try RenameSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try Self.spaceID(from: command.spaceID)
+            _ = try await storage.transact { snapshot in
+                guard let index = snapshot.spaces.firstIndex(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
+                snapshot.spaces[index].name = command.name
+            }
+            kind = .commandResult
+            payload = try TypedPayload(SpaceMutationResultPayload())
+        case .command where envelope.payload.identifier == DeleteSpaceCommandPayload.identifier:
+            let command = try DeleteSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try Self.spaceID(from: command.spaceID)
+            _ = try await storage.transact { snapshot in
+                guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
+                guard !snapshot.sessions.contains(where: { $0.spaceID == spaceID }) &&
+                    !snapshot.resources.contains(where: { $0.spaceID == spaceID }) &&
+                    !snapshot.executionContexts.contains(where: { $0.spaceID == spaceID }) &&
+                    !snapshot.runs.contains(where: { $0.spaceID == spaceID }) &&
+                    !snapshot.operations.contains(where: { $0.spaceID == spaceID }) &&
+                    !snapshot.artifacts.contains(where: { $0.spaceID == spaceID }) else {
+                    throw HostProtocolError.spaceNotEmpty(spaceID)
+                }
+                snapshot.spaces.removeAll(where: { $0.id == spaceID })
+            }
+            kind = .commandResult
+            payload = try TypedPayload(SpaceMutationResultPayload())
         case .command where envelope.payload.identifier == CreateConversationCommandPayload.identifier:
             let command = try CreateConversationCommandPayload(protobufBytes: envelope.payload.protobufBytes)
-            guard let rawSpaceID = UUID(uuidString: command.spaceID) else { throw HostProtocolError.invalidIdentity(command.spaceID) }
-            let spaceID = SpaceID(rawValue: rawSpaceID)
+            let spaceID = try Self.spaceID(from: command.spaceID)
             let session = Session(spaceID: spaceID, kind: .conversation, title: command.title)
             _ = try await storage.transact { snapshot in
                 guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
@@ -75,12 +103,18 @@ public actor LocalHost: WireEndpoint {
             payload: payload
         )
     }
+
+    private static func spaceID(from value: String) throws -> SpaceID {
+        guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
+        return SpaceID(rawValue: rawValue)
+    }
 }
 
 public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case unsupportedRequest(kind: WireMessageKind, payload: PayloadIdentifier)
     case invalidIdentity(String)
     case unknownSpace(SpaceID)
+    case spaceNotEmpty(SpaceID)
 }
 
 /// Host-facing runtime contract. ACP, Process, and UI concerns remain in a macOS adapter.

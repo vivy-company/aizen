@@ -103,6 +103,14 @@ public actor HostClient {
         return SpaceID(rawValue: uuid)
     }
 
+    public func renameSpace(id: SpaceID, name: String) async throws {
+        try await mutateSpace(RenameSpaceCommandPayload(spaceID: id.description, name: name))
+    }
+
+    public func deleteSpace(id: SpaceID) async throws {
+        try await mutateSpace(DeleteSpaceCommandPayload(spaceID: id.description))
+    }
+
     public func createConversation(spaceID: SpaceID, title: String) async throws -> SessionID {
         let response = try await send(.init(
             messageID: UUID().uuidString,
@@ -123,5 +131,19 @@ public actor HostClient {
         guard nextSequence < UInt64.max else { throw Error.sequenceExhausted }
         defer { nextSequence += 1 }
         return nextSequence
+    }
+
+    private func mutateSpace(_ command: some WirePayload) async throws {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(command)
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == SpaceMutationResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        _ = try SpaceMutationResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 }

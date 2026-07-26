@@ -311,18 +311,15 @@ private extension AizenCLI {
             throw CLIError.invalidArguments("workspace delete requires a name")
         }
 
-        let store = try CLIStore()
-        let context = store.container.viewContext
-        let manager = CLIRepositoryManager(context: context)
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
+        let client = V2CLIClient()
 
-        guard let workspace = findWorkspace(named: parsed.positionals[0], in: context) else {
+        guard let workspace = try await client.spaces().first(where: { $0.name.caseInsensitiveCompare(parsed.positionals[0]) == .orderedSame }) else {
             throw CLIError.workspaceNotFound(parsed.positionals[0])
         }
 
-        let repositories = (workspace.repositories as? Set<Repository>) ?? []
         if !parsed.flags.contains("force") {
-            let promptMessage = "Delete workspace \"\(workspace.name ?? "")\" and remove \(repositories.count) repositories? [y/N]: "
+            let promptMessage = "Delete workspace \"\(workspace.name)\"? [y/N]: "
             let response = prompt(promptMessage)?.lowercased() ?? ""
             if response != "y" && response != "yes" {
                 print("Cancelled")
@@ -330,8 +327,8 @@ private extension AizenCLI {
             }
         }
 
-        try manager.deleteWorkspace(workspace)
-        print(style.success("Deleted workspace: \(workspace.name ?? "")"))
+        try await client.deleteSpace(id: workspace.id)
+        print(style.success("Deleted workspace: \(workspace.name)"))
     }
 
     static func handleWorkspaceRename(_ args: [String]) async throws {
@@ -344,16 +341,14 @@ private extension AizenCLI {
             throw CLIError.invalidArguments("workspace rename requires old and new names")
         }
 
-        let store = try CLIStore()
-        let context = store.container.viewContext
-        let manager = CLIRepositoryManager(context: context)
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
+        let client = V2CLIClient()
 
-        guard let workspace = findWorkspace(named: parsed.positionals[0], in: context) else {
+        guard let workspace = try await client.spaces().first(where: { $0.name.caseInsensitiveCompare(parsed.positionals[0]) == .orderedSame }) else {
             throw CLIError.workspaceNotFound(parsed.positionals[0])
         }
 
-        try manager.updateWorkspace(workspace, name: parsed.positionals[1])
+        try await client.renameSpace(id: workspace.id, name: parsed.positionals[1])
         print(style.success("Renamed workspace to: \(parsed.positionals[1])"))
     }
 

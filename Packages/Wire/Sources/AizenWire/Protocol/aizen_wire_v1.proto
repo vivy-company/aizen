@@ -94,6 +94,17 @@ message CreateSpaceResult {
   string space_id = 1;
 }
 
+message RenameSpaceCommand {
+  string space_id = 1;
+  string name = 2;
+}
+
+message DeleteSpaceCommand {
+  string space_id = 1;
+}
+
+message SpaceMutationResult {}
+
 message CreateConversationCommand {
   string space_id = 1;
   string title = 2;

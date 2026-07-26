@@ -73,6 +73,54 @@ import AizenWire
     #expect(try await storage.load().spaces.map(\.name) == ["Vivy"])
 }
 
+@Test func hostRenamesAndDeletesEmptySpacesThroughTypedCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    _ = try await storage.transact { $0.spaces.append(space) }
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
+
+    _ = try await transport.send(.init(
+        messageID: "rename-space",
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(RenameSpaceCommandPayload(spaceID: space.id.description, name: "Aizen"))
+    ))
+    #expect(try await storage.load().spaces.map(\.name) == ["Aizen"])
+
+    _ = try await transport.send(.init(
+        messageID: "delete-space",
+        connectionSequence: 2,
+        kind: .command,
+        channel: .state,
+        payload: try .init(DeleteSpaceCommandPayload(spaceID: space.id.description))
+    ))
+    #expect(try await storage.load().spaces.isEmpty)
+}
+
+@Test func hostRejectsDeletingSpacesThatOwnData() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(Session(spaceID: space.id, kind: .conversation, title: "Plan"))
+    }
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
+    await #expect(throws: HostProtocolError.spaceNotEmpty(space.id)) {
+        _ = try await transport.send(.init(
+            messageID: "delete-space",
+            connectionSequence: 1,
+            kind: .command,
+            channel: .state,
+            payload: try .init(DeleteSpaceCommandPayload(spaceID: space.id.description))
+        ))
+    }
+}
+
 @Test func hostCreatesProjectlessConversationsThroughTypedCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
