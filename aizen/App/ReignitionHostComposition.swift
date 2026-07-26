@@ -26,9 +26,10 @@ actor ReignitionHostComposition {
         )
     }
 
-    func activate() async throws {
+    @discardableResult
+    func activate() async throws -> CapabilitiesPayload {
         try ReignitionHostService.registerIfNeeded()
-        _ = try await client.negotiate()
+        return try await client.negotiate()
     }
 
     func configureAgentLaunch(_ agentConfiguration: ACPAgentLaunchConfiguration) async throws {

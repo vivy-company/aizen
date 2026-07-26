@@ -3,6 +3,9 @@ import SwiftUI
 
 struct HostServiceSettingsView: View {
     @State private var status = ReignitionHostService.status
+    @State private var isReachable = false
+    @State private var productVersion: String?
+    @State private var protocolRange: String?
     @State private var error: String?
     @State private var pendingPairings: [PendingPairingRequestRecordPayload] = []
     private let host = ReignitionHostComposition()
@@ -14,6 +17,13 @@ struct HostServiceSettingsView: View {
                 Text(status.detail)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                LabeledContent("Host", value: isReachable ? "Reachable" : "Unavailable")
+                if let productVersion {
+                    LabeledContent("Host version", value: productVersion)
+                }
+                if let protocolRange {
+                    LabeledContent("Protocol generation", value: protocolRange)
+                }
             }
 
             Section {
@@ -23,7 +33,7 @@ struct HostServiceSettingsView: View {
                 .disabled(status == .enabled)
 
                 Button("Refresh Status") {
-                    status = ReignitionHostService.status
+                    Task { await refresh() }
                 }
             } footer: {
                 Text("The Host owns Aizen 2.0 storage, agent runs, and terminal lifetime. It continues running after Aizen windows close.")
@@ -48,7 +58,7 @@ struct HostServiceSettingsView: View {
         } message: {
             Text(error ?? "")
         }
-        .task { await refreshPairings() }
+        .task { await refresh() }
     }
 
     private var errorAlert: Binding<Bool> {
@@ -59,12 +69,42 @@ struct HostServiceSettingsView: View {
         do {
             try ReignitionHostService.registerIfNeeded()
             status = ReignitionHostService.status
+            Task { await refresh() }
         } catch {
             status = ReignitionHostService.status
             self.error = error.localizedDescription
         }
     }
 
-    private func refreshPairings() async { do { try await host.activate(); pendingPairings = try await host.pendingPairingRequests() } catch { self.error = error.localizedDescription } }
-    private func decide(_ request: PendingPairingRequestRecordPayload, approve: Bool) { Task { do { if approve { try await host.approvePairingRequest(tokenID: request.tokenID) } else { try await host.rejectPairingRequest(tokenID: request.tokenID) }; await refreshPairings() } catch { self.error = error.localizedDescription } } }
+    private func refresh() async {
+        status = ReignitionHostService.status
+        do {
+            let capabilities = try await host.activate()
+            isReachable = true
+            productVersion = capabilities.productVersion
+            protocolRange = "\(capabilities.minimumProtocolGeneration)…\(capabilities.maximumProtocolGeneration)"
+            pendingPairings = try await host.pendingPairingRequests()
+        } catch {
+            isReachable = false
+            productVersion = nil
+            protocolRange = nil
+            pendingPairings = []
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func decide(_ request: PendingPairingRequestRecordPayload, approve: Bool) {
+        Task {
+            do {
+                if approve {
+                    try await host.approvePairingRequest(tokenID: request.tokenID)
+                } else {
+                    try await host.rejectPairingRequest(tokenID: request.tokenID)
+                }
+                await refresh()
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
 }
