@@ -12,6 +12,7 @@ final class ReignitionConversationStore: ObservableObject {
     @Published private(set) var conversations: [Session] = []
     @Published private(set) var resources: [Resource] = []
     @Published private(set) var executionContexts: [ExecutionContext] = []
+    @Published private(set) var terminalSessions: [AizenCore.TerminalSession] = []
     @Published private(set) var operations: [AizenCore.Operation] = []
     @Published private(set) var selectedConversationID: SessionID?
     @Published private(set) var messages: [ConversationMessage] = []
@@ -246,6 +247,7 @@ final class ReignitionConversationStore: ObservableObject {
         conversations = snapshot.sessions.filter { $0.kind == .conversation && (spaceID == nil || $0.spaceID == spaceID) }
         resources = snapshot.resources.filter { spaceID == nil || $0.spaceID == spaceID }
         executionContexts = snapshot.executionContexts.filter { spaceID == nil || $0.spaceID == spaceID }
+        terminalSessions = snapshot.terminalSessions.filter { spaceID == nil || $0.spaceID == spaceID }
         operations = snapshot.operations.filter { spaceID == nil || $0.spaceID == spaceID }
         if let selectedConversationID, !conversations.contains(where: { $0.id == selectedConversationID }) {
             self.selectedConversationID = nil

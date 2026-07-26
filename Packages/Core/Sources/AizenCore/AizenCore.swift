@@ -326,6 +326,7 @@ public struct HostProjectionSnapshot: Codable, Sendable, Hashable {
     public let sessions: [Session]
     public let resources: [Resource]
     public let executionContexts: [ExecutionContext]
+    public let terminalSessions: [TerminalSession]
     public let operations: [Operation]
 
     public init(
@@ -333,12 +334,14 @@ public struct HostProjectionSnapshot: Codable, Sendable, Hashable {
         sessions: [Session] = [],
         resources: [Resource] = [],
         executionContexts: [ExecutionContext] = [],
+        terminalSessions: [TerminalSession] = [],
         operations: [Operation] = []
     ) {
         self.spaces = spaces
         self.sessions = sessions
         self.resources = resources
         self.executionContexts = executionContexts
+        self.terminalSessions = terminalSessions
         self.operations = operations
     }
 }

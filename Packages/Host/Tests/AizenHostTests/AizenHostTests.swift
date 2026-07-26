@@ -250,11 +250,13 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     let space = Space(name: "Vivy")
     let resource = Resource(spaceID: space.id, kind: .repository, title: "Repository", details: .hostPrivate(.init(rawValue: "local-repository:/private/repository")))
     let context = ExecutionContext(spaceID: space.id, kind: .repositoryCheckout, resourceID: resource.id, hostReference: .init(rawValue: "local-checkout:/private/repository"))
+    let terminal = TerminalSession(spaceID: space.id, executionContextID: context.id, tmuxSessionName: "aizen-vivy", paneID: "%1")
     let operation = Operation(spaceID: space.id, lifecycle: .running, progress: 0.5)
     _ = try await storage.transact {
         $0.spaces.append(space)
         $0.resources.append(resource)
         $0.executionContexts.append(context)
+        $0.terminalSessions.append(terminal)
         $0.operations.append(operation)
     }
     let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
@@ -264,6 +266,7 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(snapshot.spaces.map(\.name) == ["Vivy"])
     #expect(snapshot.resources.first?.details == .some(.none))
     #expect(snapshot.executionContexts.first?.hostReference == nil)
+    #expect(snapshot.terminalSessions == [terminal])
     #expect(snapshot.operations == [operation])
 }
 
