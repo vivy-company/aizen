@@ -27,6 +27,8 @@ private struct MobileRootView: View {
                     switch pairing.state {
                     case .awaitingApproval(let hostName):
                         Label("Approval pending on \(hostName)", systemImage: "clock.badge.exclamationmark")
+                    case .ready(let hostName, let spaceCount):
+                        Label("\(hostName) · \(spaceCount) Spaces", systemImage: "desktopcomputer.and.iphone")
                     default:
                         Label("No paired Host", systemImage: "desktopcomputer.trianglebadge.exclamationmark")
                     }
@@ -45,6 +47,8 @@ private struct MobileRootView: View {
                         Task { await pairing.submit(invitationText: invitation) }
                     }
                     .disabled(invitation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || pairing.state == .pairing)
+                    Button("Reconnect approved Host") { Task { await pairing.reconnect() } }
+                        .disabled(pairing.state == .pairing)
                 }
                 Section {
                     pairingStatus
@@ -83,6 +87,8 @@ private struct MobileRootView: View {
             ProgressView("Submitting secure pairing request…")
         case .awaitingApproval(let hostName):
             Text("Approve this device in Aizen on \(hostName), then reconnect.")
+        case .ready(let hostName, let spaceCount):
+            Text("Connected to \(hostName). \(spaceCount) authorized Spaces are available.")
         case .failed(let message):
             Text(message).foregroundStyle(.red)
         }

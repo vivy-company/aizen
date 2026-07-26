@@ -1,5 +1,7 @@
 import AizenCore
+import AizenClient
 import AizenSecurity
+import AizenTransport
 import AizenWire
 import Foundation
 @preconcurrency import Network
@@ -12,6 +14,7 @@ final class MobilePairingStore: ObservableObject {
         case unpaired
         case pairing
         case awaitingApproval(hostName: String)
+        case ready(hostName: String, spaceCount: Int)
         case failed(String)
     }
 
@@ -46,6 +49,29 @@ final class MobilePairingStore: ObservableObject {
     func recordScannerFailure(_ message: String) {
         state = .failed(message)
     }
+
+    func reconnect() async {
+        do {
+            guard let pairedHost = try MobilePairedHostStore.load() else { throw MobilePairingError.noPairedHost }
+            state = .pairing
+            let identity = try MobileDeviceIdentityStore.loadOrCreate()
+            let device = DevicePublicIdentity(deviceID: identity.deviceID, displayName: UIDevice.current.name, platform: "iOS", cryptographicIdentity: identity.identity.publicIdentity(createdAt: identity.createdAt))
+            let exchange = try MobileWebSocketExchange(endpoint: pairedHost.endpoint)
+            try await exchange.start()
+            _ = try TransportRouteConfiguration(kind: .lan, endpoint: pairedHost.endpoint, expectedHostIdentity: pairedHost.host.cryptographicIdentity.fingerprint.description)
+            let transport = try await RemoteClientAuthenticator(host: pairedHost.host, device: device, deviceIdentity: identity.identity, route: .lan).authenticate(
+                using: { frame in try await exchange.exchange(frame) },
+                frameSender: { frame in try await exchange.send(frame) },
+                frameStream: { exchange.frames() }
+            )
+            let client = HostClient(transport: transport)
+            _ = try await client.negotiate()
+            let spaces = try await client.spaces()
+            state = .ready(hostName: pairedHost.host.displayName, spaceCount: spaces.count)
+        } catch {
+            state = .failed(error.localizedDescription)
+        }
+    }
 }
 
 private enum MobilePairingInvitation {
@@ -75,12 +101,14 @@ private enum MobilePairingInvitation {
 private enum MobilePairingError: LocalizedError {
     case invalidInvitation
     case missingEndpoint
+    case noPairedHost
     case keychain(OSStatus)
 
     var errorDescription: String? {
         switch self {
         case .invalidInvitation: "This pairing QR code is invalid or expired."
         case .missingEndpoint: "This pairing invitation does not include a secure Host endpoint."
+        case .noPairedHost: "No approved Host is available to reconnect."
         case let .keychain(status): "The device identity could not be stored securely (Keychain status \(status))."
         }
     }
@@ -144,9 +172,13 @@ private struct MobilePairedHost: Codable {
 private enum MobilePairedHostStore {
     private static let key = "paired-host-v1"
     static func save(_ host: MobilePairedHost) throws { UserDefaults.standard.set(try JSONEncoder().encode(host), forKey: key) }
+    static func load() throws -> MobilePairedHost? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try JSONDecoder().decode(MobilePairedHost.self, from: data)
+    }
 }
 
-private final class MobileWebSocketExchange: @unchecked Sendable {
+nonisolated private final class MobileWebSocketExchange: @unchecked Sendable {
     private let connection: NWConnection
     private let queue = DispatchQueue(label: "win.aizen.mobile.pairing")
 
@@ -193,11 +225,31 @@ private final class MobileWebSocketExchange: @unchecked Sendable {
         }
     }
 
-    private func send(_ frame: Data) async throws {
+    func frames() -> AsyncThrowingStream<Data, Error> {
+        AsyncThrowingStream { continuation in
+            queue.async { [weak self] in self?.receiveNext(continuation) }
+            continuation.onTermination = { [weak self] _ in self?.connection.cancel() }
+        }
+    }
+
+    func send(_ frame: Data) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             connection.send(content: frame, contentContext: .init(identifier: "aizen.binary", metadata: [NWProtocolWebSocket.Metadata(opcode: .binary)]), isComplete: true, completion: .contentProcessed { error in
                 if let error { continuation.resume(throwing: error) } else { continuation.resume() }
             })
+        }
+    }
+
+    private func receiveNext(_ continuation: AsyncThrowingStream<Data, Error>.Continuation) {
+        connection.receiveMessage { [weak self] content, context, _, error in
+            guard let self else { return }
+            guard error == nil, let content,
+                  (context?.protocolMetadata(definition: NWProtocolWebSocket.definition) as? NWProtocolWebSocket.Metadata)?.opcode == .binary else {
+                continuation.finish(throwing: error ?? MobilePairingError.invalidInvitation)
+                return
+            }
+            continuation.yield(content)
+            self.receiveNext(continuation)
         }
     }
 }
