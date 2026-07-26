@@ -162,26 +162,17 @@ public struct PairingInvitation: Codable, Sendable, Hashable {
     }
 }
 
-/// Host-side one-time pairing token authority. It retains only a proof, never the QR secret.
-public actor PairingTokenAuthority {
-    private struct Record: Sendable {
-        let proof: PairingSecretProof
-        let expiresAt: Date
-    }
+/// The Host persists this proof record; the QR secret is never written to disk.
+public struct PairingTokenRecord: Codable, Sendable, Hashable {
+    public let tokenID: UUID
+    public let proof: PairingSecretProof
+    public let expiresAt: Date
 
-    private var records: [UUID: Record] = [:]
-
-    public init() {}
-
-    public func issue(for invitation: PairingInvitation) throws {
-        try invitation.validate()
-        records[invitation.tokenID] = Record(proof: try PairingSecretProof(secret: invitation.secret), expiresAt: invitation.expiresAt)
-    }
-
-    public func consume(tokenID: UUID, secret: Data, now: Date = Date()) throws {
-        guard let record = records.removeValue(forKey: tokenID) else { throw SecurityError.pairingTokenUnknown }
-        guard record.expiresAt > now else { throw SecurityError.invitationExpired }
-        guard record.proof.matches(secret) else { throw SecurityError.pairingTokenRejected }
+    public init(invitation: PairingInvitation, now: Date = Date()) throws {
+        try invitation.validate(now: now)
+        tokenID = invitation.tokenID
+        proof = try PairingSecretProof(secret: invitation.secret)
+        expiresAt = invitation.expiresAt
     }
 }
 

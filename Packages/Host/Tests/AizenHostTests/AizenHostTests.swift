@@ -43,7 +43,7 @@ import AizenWire
         expiresAt: Date().addingTimeInterval(60)
     )
     let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: LocalCryptographicIdentity().publicIdentity())
-    let service = PairingApprovalService(tokens: PairingTokenAuthority(), storage: storage)
+    let service = PairingApprovalService(storage: storage)
     try await service.issue(invitation)
 
     let authorization = try await service.approve(device: device, tokenID: invitation.tokenID, secret: invitation.secret, grants: [.init(capability: .spaceRead)], route: "lan")

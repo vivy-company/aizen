@@ -16,18 +16,15 @@ import Testing
     #expect(firstSecret == secondSecret)
 }
 
-@Test func pairingTokensAreProofOnlySingleUseAndExpiring() async throws {
+@Test func pairingTokenRecordsRetainOnlyProofs() throws {
     let identity = LocalCryptographicIdentity()
     let host = HostPublicIdentity(hostID: HostID(), displayName: "Mac", cryptographicIdentity: identity.publicIdentity())
     let secret = Data(repeating: 7, count: 32)
     let invitation = try PairingInvitation(secret: secret, host: host, endpointHints: ["wss://aizen.local"], expiresAt: Date().addingTimeInterval(60))
-    let authority = PairingTokenAuthority()
-
-    try await authority.issue(for: invitation)
-    try await authority.consume(tokenID: invitation.tokenID, secret: secret)
-    await #expect(throws: SecurityError.pairingTokenUnknown) {
-        try await authority.consume(tokenID: invitation.tokenID, secret: secret)
-    }
+    let record = try PairingTokenRecord(invitation: invitation)
+    #expect(record.tokenID == invitation.tokenID)
+    #expect(record.proof.matches(secret))
+    #expect(!record.proof.matches(Data(repeating: 8, count: 32)))
 }
 
 @Test func authorizationEnforcesCapabilitySpaceAndRevocation() throws {

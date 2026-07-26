@@ -80,6 +80,55 @@ import AizenSecurity
     #expect(try await repository.load().securityAuditRecords.map(\.kind) == [.pairingApproved])
 }
 
+@Test func pairingApprovalSurvivesHostRestartAndConsumesTheProofOnce() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("storage-v2.json")
+    let host = HostPublicIdentity(
+        hostID: HostID(),
+        displayName: "Mac",
+        cryptographicIdentity: LocalCryptographicIdentity().publicIdentity()
+    )
+    let secret = Data(repeating: 4, count: 32)
+    let invitation = try PairingInvitation(secret: secret, host: host, endpointHints: [], expiresAt: Date().addingTimeInterval(60))
+    let issued = StorageRepository(url: url)
+    try await issued.issuePairingToken(PairingTokenRecord(invitation: invitation))
+
+    let restarted = StorageRepository(url: url)
+    let device = DevicePublicIdentity(
+        deviceID: DeviceID(),
+        displayName: "Phone",
+        platform: "iOS",
+        cryptographicIdentity: LocalCryptographicIdentity().publicIdentity()
+    )
+    let authorization = DeviceAuthorization(device: device, grants: [.init(capability: .spaceRead)])
+    await #expect(throws: SecurityError.pairingTokenRejected) {
+        try await restarted.approvePairing(
+            tokenID: invitation.tokenID,
+            secret: Data(repeating: 5, count: 32),
+            authorization: authorization,
+            auditRecord: .init(kind: .pairingApproved, deviceID: device.deviceID)
+        )
+    }
+    try await restarted.approvePairing(
+        tokenID: invitation.tokenID,
+        secret: secret,
+        authorization: authorization,
+        auditRecord: .init(kind: .pairingApproved, deviceID: device.deviceID)
+    )
+
+    #expect(try await restarted.deviceAuthorization(for: device.deviceID) == authorization)
+    #expect(try await restarted.load().pairingTokens.isEmpty)
+    await #expect(throws: SecurityError.pairingTokenUnknown) {
+        try await restarted.approvePairing(
+            tokenID: invitation.tokenID,
+            secret: secret,
+            authorization: authorization,
+            auditRecord: .init(kind: .pairingApproved, deviceID: device.deviceID)
+        )
+    }
+}
+
 @Test func repositoryAcceptsDurableCommandsExactlyOnce() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: directory) }

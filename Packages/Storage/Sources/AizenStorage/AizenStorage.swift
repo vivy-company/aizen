@@ -25,13 +25,14 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
     public var artifacts: [Artifact]
     public var commands: [DurableCommand]
     public var journalEvents: [JournalEvent]
+    public var pairingTokens: [PairingTokenRecord]
     public var deviceAuthorizations: [DeviceAuthorization]
     public var securityAuditRecords: [SecurityAuditRecord]
 
     public init(
         schemaVersion: Int = Self.schemaVersion,
         spaces: [Space] = [], sessions: [Session] = [], conversationMessages: [ConversationMessage] = [], resources: [Resource] = [],
-        executionContexts: [ExecutionContext] = [], terminalSessions: [TerminalSession] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = [], journalEvents: [JournalEvent] = [], deviceAuthorizations: [DeviceAuthorization] = [], securityAuditRecords: [SecurityAuditRecord] = []
+        executionContexts: [ExecutionContext] = [], terminalSessions: [TerminalSession] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = [], journalEvents: [JournalEvent] = [], pairingTokens: [PairingTokenRecord] = [], deviceAuthorizations: [DeviceAuthorization] = [], securityAuditRecords: [SecurityAuditRecord] = []
     ) {
         precondition(schemaVersion == Self.schemaVersion, "Storage snapshots must use schema v2")
         self.schemaVersion = schemaVersion
@@ -46,17 +47,18 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         self.artifacts = artifacts
         self.commands = commands
         self.journalEvents = journalEvents
+        self.pairingTokens = pairingTokens
         self.deviceAuthorizations = deviceAuthorizations
         self.securityAuditRecords = securityAuditRecords
     }
 
     public var isEmpty: Bool {
         spaces.isEmpty && sessions.isEmpty && conversationMessages.isEmpty && resources.isEmpty && executionContexts.isEmpty &&
-            terminalSessions.isEmpty && runs.isEmpty && operations.isEmpty && artifacts.isEmpty && commands.isEmpty && journalEvents.isEmpty && deviceAuthorizations.isEmpty && securityAuditRecords.isEmpty
+            terminalSessions.isEmpty && runs.isEmpty && operations.isEmpty && artifacts.isEmpty && commands.isEmpty && journalEvents.isEmpty && pairingTokens.isEmpty && deviceAuthorizations.isEmpty && securityAuditRecords.isEmpty
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, terminalSessions, runs, operations, artifacts, commands, journalEvents, deviceAuthorizations, securityAuditRecords
+        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, terminalSessions, runs, operations, artifacts, commands, journalEvents, pairingTokens, deviceAuthorizations, securityAuditRecords
     }
 
     public init(from decoder: Decoder) throws {
@@ -73,6 +75,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         artifacts = try values.decode([Artifact].self, forKey: .artifacts)
         commands = try values.decodeIfPresent([DurableCommand].self, forKey: .commands) ?? []
         journalEvents = try values.decodeIfPresent([JournalEvent].self, forKey: .journalEvents) ?? []
+        pairingTokens = try values.decodeIfPresent([PairingTokenRecord].self, forKey: .pairingTokens) ?? []
         deviceAuthorizations = try values.decodeIfPresent([DeviceAuthorization].self, forKey: .deviceAuthorizations) ?? []
         securityAuditRecords = try values.decodeIfPresent([SecurityAuditRecord].self, forKey: .securityAuditRecords) ?? []
     }
@@ -91,6 +94,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         try values.encode(artifacts, forKey: .artifacts)
         try values.encode(commands, forKey: .commands)
         try values.encode(journalEvents, forKey: .journalEvents)
+        try values.encode(pairingTokens, forKey: .pairingTokens)
         try values.encode(deviceAuthorizations, forKey: .deviceAuthorizations)
         try values.encode(securityAuditRecords, forKey: .securityAuditRecords)
     }
@@ -341,6 +345,51 @@ public actor StorageRepository {
         try load().deviceAuthorizations.first { $0.device.deviceID == deviceID }
     }
 
+    public func issuePairingToken(_ token: PairingTokenRecord) throws {
+        _ = try transact { snapshot in
+            guard !snapshot.pairingTokens.contains(where: { $0.tokenID == token.tokenID }) else {
+                throw StorageError.duplicateIdentity("pairing token")
+            }
+            snapshot.pairingTokens.append(token)
+        }
+    }
+
+    /// Atomically consumes a valid invitation proof and makes its authorization effective.
+    public func approvePairing(
+        tokenID: UUID,
+        secret: Data,
+        authorization: DeviceAuthorization,
+        auditRecord: SecurityAuditRecord,
+        now: Date = Date()
+    ) throws {
+        enum Result { case approved, unknown, expired, rejected }
+        var result: Result = .unknown
+        _ = try transact { snapshot in
+            guard let index = snapshot.pairingTokens.firstIndex(where: { $0.tokenID == tokenID }) else { return }
+            let token = snapshot.pairingTokens[index]
+            guard token.expiresAt > now else {
+                snapshot.pairingTokens.remove(at: index)
+                result = .expired
+                return
+            }
+            guard token.proof.matches(secret) else {
+                result = .rejected
+                return
+            }
+            snapshot.pairingTokens.remove(at: index)
+            snapshot.deviceAuthorizations.removeAll { $0.device.deviceID == authorization.device.deviceID }
+            snapshot.deviceAuthorizations.append(authorization)
+            snapshot.securityAuditRecords.append(auditRecord)
+            result = .approved
+        }
+        switch result {
+        case .approved: return
+        case .unknown: throw SecurityError.pairingTokenUnknown
+        case .expired: throw SecurityError.invitationExpired
+        case .rejected: throw SecurityError.pairingTokenRejected
+        }
+    }
+
     public func appendSecurityAuditRecord(_ record: SecurityAuditRecord) throws {
         _ = try transact { $0.securityAuditRecords.append(record) }
     }
@@ -369,6 +418,7 @@ public actor StorageRepository {
         guard Set(snapshot.runs.map(\.id)).count == snapshot.runs.count else { throw StorageError.duplicateIdentity("run") }
         guard Set(snapshot.commands.map(\.id)).count == snapshot.commands.count else { throw StorageError.duplicateIdentity("command") }
         guard Set(snapshot.journalEvents.map(\.id)).count == snapshot.journalEvents.count else { throw StorageError.duplicateIdentity("journal event") }
+        guard Set(snapshot.pairingTokens.map(\.tokenID)).count == snapshot.pairingTokens.count else { throw StorageError.duplicateIdentity("pairing token") }
         guard Set(snapshot.deviceAuthorizations.map(\.device.deviceID)).count == snapshot.deviceAuthorizations.count else { throw StorageError.duplicateIdentity("device authorization") }
         guard Set(snapshot.securityAuditRecords.map(\.id)).count == snapshot.securityAuditRecords.count else { throw StorageError.duplicateIdentity("security audit record") }
         guard zip(snapshot.journalEvents, snapshot.journalEvents.dropFirst()).allSatisfy({ $0.cursor < $1.cursor }) else { throw StorageError.duplicateIdentity("journal cursor") }

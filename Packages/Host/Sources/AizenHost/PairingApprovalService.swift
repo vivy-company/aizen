@@ -5,16 +5,14 @@ import Foundation
 
 /// Host-side pairing approval boundary. A valid QR proof never grants access without this explicit approval.
 public actor PairingApprovalService {
-    private let tokens: PairingTokenAuthority
     private let storage: StorageRepository
 
-    public init(tokens: PairingTokenAuthority, storage: StorageRepository) {
-        self.tokens = tokens
+    public init(storage: StorageRepository) {
         self.storage = storage
     }
 
     public func issue(_ invitation: PairingInvitation) async throws {
-        try await tokens.issue(for: invitation)
+        try await storage.issuePairingToken(PairingTokenRecord(invitation: invitation))
     }
 
     public func approve(
@@ -24,10 +22,18 @@ public actor PairingApprovalService {
         grants: Set<CapabilityGrant>,
         route: String
     ) async throws -> DeviceAuthorization {
-        try await tokens.consume(tokenID: tokenID, secret: secret)
         let authorization = DeviceAuthorization(device: device, grants: grants)
-        try await storage.saveDeviceAuthorization(authorization)
-        try await storage.appendSecurityAuditRecord(.init(kind: .pairingApproved, deviceID: device.deviceID, route: route))
+        do {
+            try await storage.approvePairing(
+                tokenID: tokenID,
+                secret: secret,
+                authorization: authorization,
+                auditRecord: .init(kind: .pairingApproved, deviceID: device.deviceID, route: route)
+            )
+        } catch {
+            try? await storage.appendSecurityAuditRecord(.init(kind: .pairingFailed, deviceID: device.deviceID, route: route))
+            throw error
+        }
         return authorization
     }
 
