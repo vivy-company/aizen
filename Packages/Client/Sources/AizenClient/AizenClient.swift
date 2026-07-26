@@ -155,6 +155,20 @@ public actor HostClient {
         return try GetConversationTimelineResponsePayload(protobufBytes: response.payload.protobufBytes).messages
     }
 
+    public func runs(spaceID: SpaceID? = nil) async throws -> [Run] {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(ListRunsQueryPayload(spaceID: spaceID?.description))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == ListRunsResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try ListRunsResponsePayload(protobufBytes: response.payload.protobufBytes).runs
+    }
+
     public func sendConversation(
         spaceID: SpaceID,
         sessionID: SessionID,

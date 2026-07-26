@@ -104,6 +104,23 @@ import AizenWire
     #expect(try await client.conversationTimeline(sessionID: session.id).map(\.content) == ["Hello", "Hi"])
 }
 
+@Test func clientReadsTypedRunsWithoutDecodingStorage() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    let run = Run(spaceID: space.id, sessionID: session.id, lifecycle: .running)
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+        $0.runs.append(run)
+    }
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+
+    #expect(try await client.runs(spaceID: space.id) == [run])
+}
+
 @Test func clientCancelsRunsThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

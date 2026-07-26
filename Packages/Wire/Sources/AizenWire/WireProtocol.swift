@@ -666,6 +666,76 @@ public struct GetConversationTimelineResponsePayload: WirePayload, Sendable, Has
     }
 }
 
+public struct ListRunsQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.run.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let spaceID: String?
+
+    public init(spaceID: String? = nil) { self.spaceID = spaceID }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListRunsQuery(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID.isEmpty ? nil : message.spaceID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListRunsQuery()
+        message.spaceID = spaceID ?? ""
+        return try message.serializedData()
+    }
+}
+
+public struct ListRunsResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.run.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let runs: [Run]
+
+    public init(runs: [Run]) { self.runs = runs }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListRunsResponse(serializedBytes: protobufBytes)
+        runs = try message.runs.map { record in
+            guard let runUUID = UUID(uuidString: record.runID),
+                let spaceUUID = UUID(uuidString: record.spaceID),
+                let sessionUUID = UUID(uuidString: record.sessionID),
+                let lifecycle = RunLifecycle(rawValue: record.lifecycle) else {
+                throw WireCodecError.invalidIdentity(record.runID)
+            }
+            let executionContextID = record.executionContextID.isEmpty
+                ? nil
+                : UUID(uuidString: record.executionContextID).map(ExecutionContextID.init(rawValue:))
+            guard record.executionContextID.isEmpty || executionContextID != nil else {
+                throw WireCodecError.invalidIdentity(record.executionContextID)
+            }
+            return Run(
+                id: RunID(rawValue: runUUID),
+                spaceID: SpaceID(rawValue: spaceUUID),
+                sessionID: SessionID(rawValue: sessionUUID),
+                executionContextID: executionContextID,
+                lifecycle: lifecycle
+            )
+        }
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListRunsResponse()
+        message.runs = runs.map { run in
+            var record = AizenWireV1_RunRecord()
+            record.runID = run.id.description
+            record.spaceID = run.spaceID.description
+            record.sessionID = run.sessionID.description
+            record.executionContextID = run.executionContextID?.description ?? ""
+            record.lifecycle = run.lifecycle.rawValue
+            return record
+        }
+        return try message.serializedData()
+    }
+}
+
 public struct SnapshotResponsePayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.snapshot.host@1")
     public static let schemaVersion: UInt32 = 1

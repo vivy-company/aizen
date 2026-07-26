@@ -42,6 +42,8 @@ public actor LocalHost: WireEndpoint {
                 ListConversationsResponsePayload.identifier,
                 GetConversationTimelineQueryPayload.identifier,
                 GetConversationTimelineResponsePayload.identifier,
+                ListRunsQueryPayload.identifier,
+                ListRunsResponsePayload.identifier,
                 CreateSpaceCommandPayload.identifier,
                 CreateSpaceResultPayload.identifier,
                 RenameSpaceCommandPayload.identifier,
@@ -80,6 +82,12 @@ public actor LocalHost: WireEndpoint {
                 .sorted { $0.createdAt < $1.createdAt }
             kind = .queryResponse
             payload = try TypedPayload(GetConversationTimelineResponsePayload(messages: messages))
+        case .query where envelope.payload.identifier == ListRunsQueryPayload.identifier:
+            let query = try ListRunsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try query.spaceID.map(Self.spaceID(from:))
+            let runs = try await storage.load().runs.filter { spaceID == nil || $0.spaceID == spaceID }
+            kind = .queryResponse
+            payload = try TypedPayload(ListRunsResponsePayload(runs: runs))
         case .command where envelope.payload.identifier == CreateSpaceCommandPayload.identifier:
             let command = try CreateSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let space = Space(name: command.name, icon: command.icon, summary: command.summary)

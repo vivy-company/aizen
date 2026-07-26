@@ -178,6 +178,22 @@ message GetConversationTimelineResponse {
   repeated ConversationMessageRecord messages = 1;
 }
 
+message ListRunsQuery {
+  string space_id = 1;
+}
+
+message RunRecord {
+  string run_id = 1;
+  string space_id = 2;
+  string session_id = 3;
+  string execution_context_id = 4;
+  string lifecycle = 5;
+}
+
+message ListRunsResponse {
+  repeated RunRecord runs = 1;
+}
+
 message SnapshotRequest {
   string scope = 1;
   uint64 after_cursor = 2;
