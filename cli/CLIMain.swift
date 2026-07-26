@@ -65,6 +65,8 @@ struct AizenCLI {
             try await handleSessions(subArgs)
         case "terminal":
             try await handleTerminal(subArgs)
+        case "host":
+            try await handleHost(subArgs)
         default:
             throw CLIError.invalidArguments("Unknown command: \(command)")
         }
@@ -72,6 +74,13 @@ struct AizenCLI {
 }
 
 private extension AizenCLI {
+    static func handleHost(_ args: [String]) async throws {
+        guard args == ["serve"] else {
+            throw CLIError.invalidArguments("host requires: serve")
+        }
+        try HostService.serve(storageURL: V2CLIClient.defaultStorageURL())
+    }
+
     static func handleVersion(_ args: [String]) async throws {
         guard args.isEmpty else { throw CLIError.invalidArguments("version does not take arguments") }
         let capabilities = try await V2CLIClient().compatibility()

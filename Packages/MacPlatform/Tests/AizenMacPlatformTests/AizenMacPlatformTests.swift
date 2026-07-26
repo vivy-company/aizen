@@ -20,6 +20,24 @@ import Testing
     }
 }
 
+@Test func localHostRuntimeOwnsTheStorageBackedHost() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let runtime = LocalHostRuntime(storageURL: root.appendingPathComponent("storage-v2.json"))
+    let transport = InProcessTransport(endpoint: runtime.host)
+    let request = ProtocolEnvelope(
+        messageID: "runtime-space",
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(CreateSpaceCommandPayload(name: "Runtime"))
+    )
+
+    let response = try await transport.send(request)
+
+    #expect(UUID(uuidString: try CreateSpaceResultPayload(protobufBytes: response.payload.protobufBytes).spaceID) != nil)
+}
+
 @Test func xpcWireServiceRoundTripsTheWireEnvelope() async throws {
     let request = ProtocolEnvelope(
         messageID: "xpc-round-trip",
