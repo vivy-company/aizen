@@ -68,10 +68,11 @@ struct AizenCLI {
             try await handleRemove(subArgs)
         case "list", "ls":
             try await handleList(subArgs)
-        case "workspace", "ws":
-            try await handleWorkspace(subArgs)
         case "space":
-            try await handleWorkspace(subArgs)
+            try await handleSpace(subArgs)
+        case "workspace", "ws":
+            printError("`workspace` is deprecated; use `aizen space` in 2.0.0.")
+            try await handleSpace(subArgs)
         case "conversation":
             try await handleConversation(subArgs)
         case "session":
@@ -243,9 +244,9 @@ private extension AizenCLI {
         printResourceTable(resources, style: style)
     }
 
-    static func handleWorkspace(_ args: [String]) async throws {
+    static func handleSpace(_ args: [String]) async throws {
         if args.contains("--help") || args.contains("-h") {
-            print(workspaceHelpText())
+            print(spaceHelpText())
             return
         }
         if args.isEmpty {
@@ -259,14 +260,16 @@ private extension AizenCLI {
         switch subcommand {
         case "list":
             try await handleWorkspaceList(rest)
-        case "new":
+        case "create", "new":
             try await handleWorkspaceNew(rest)
-        case "delete":
+        case "remove", "delete":
             try await handleWorkspaceDelete(rest)
         case "rename":
             try await handleWorkspaceRename(rest)
+        case "select":
+            try await handleSpaceSelect(rest)
         default:
-            throw CLIError.invalidArguments("Unknown workspace command: \(subcommand)")
+            throw CLIError.invalidArguments("Unknown space command: \(subcommand)")
         }
     }
 
@@ -321,7 +324,14 @@ private extension AizenCLI {
     }
 
     static func resolveV2Space(_ value: String?, client: V2CLIClient) async throws -> SpaceID? {
-        guard let value else { return nil }
+        guard let value else {
+            guard let selectedSpaceID = CLISelectedSpaceStore().selectedSpaceID() else { return nil }
+            guard try await client.spaces().contains(where: { $0.id == selectedSpaceID }) else {
+                CLISelectedSpaceStore().clear()
+                throw CLIError.workspaceNotFound("selected Space \(selectedSpaceID.description)")
+            }
+            return selectedSpaceID
+        }
         if let uuid = UUID(uuidString: value) { return SpaceID(rawValue: uuid) }
         guard let space = try await client.spaces().first(where: { $0.name.caseInsensitiveCompare(value) == .orderedSame }) else {
             throw CLIError.workspaceNotFound(value)
@@ -588,7 +598,23 @@ private extension AizenCLI {
         }
 
         try await client.deleteSpace(id: workspace.id)
+        if CLISelectedSpaceStore().selectedSpaceID() == workspace.id {
+            CLISelectedSpaceStore().clear()
+        }
         print(style.success("Deleted workspace: \(workspace.name)"))
+    }
+
+    static func handleSpaceSelect(_ args: [String]) async throws {
+        let parsed = try parseArguments(args)
+        guard parsed.positionals.count == 1 else {
+            throw CLIError.invalidArguments("space select requires a Space name or ID")
+        }
+        let client = V2CLIClient()
+        guard let spaceID = try await resolveV2Space(parsed.positionals[0], client: client) else {
+            throw CLIError.invalidArguments("space select requires a Space name or ID")
+        }
+        CLISelectedSpaceStore().select(spaceID)
+        print(spaceID.description)
     }
 
     static func handleWorkspaceRename(_ args: [String]) async throws {
@@ -1102,7 +1128,7 @@ Usage:
   aizen add [path|url]            Add repository to workspace
   aizen remove <path>             Remove repository from tracking
   aizen list [space]              List v2 resources
-  aizen workspace <command>       Manage workspaces
+  aizen space <command>           Manage Reignition Spaces
   aizen sync [path]               Rescan worktrees
   aizen status                    Show overview
   aizen operation list|show|watch Inspect Host operations
@@ -1238,13 +1264,16 @@ a workspace to add it to. Use '.' to open the current directory.
 """
     }
 
-    static func workspaceHelpText() -> String {
+    static func spaceHelpText() -> String {
         return """
 Usage:
-  aizen workspace list
-  aizen workspace new <name> [--color <hex>]
-  aizen workspace delete <name> [--force]
-  aizen workspace rename <old-name> <new-name>
+  aizen space list
+  aizen space create <name> [--color <hex>]
+  aizen space select <name-or-id>
+  aizen space remove <name> [--force]
+  aizen space rename <old-name> <new-name>
+
+Manages Reignition Spaces through the Host. `workspace` remains a deprecated alias.
 """
     }
 

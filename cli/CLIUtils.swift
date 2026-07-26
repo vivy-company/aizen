@@ -1,3 +1,4 @@
+import AizenCore
 import Foundation
 import Darwin
 
@@ -176,6 +177,31 @@ public func encodeJSON<T: Encodable>(_ payload: T, prettyPrinted: Bool = true) t
     let encoder = JSONEncoder()
     encoder.outputFormatting = prettyPrinted ? [.prettyPrinted, .sortedKeys] : [.sortedKeys]
     return String(decoding: try encoder.encode(payload), as: UTF8.self)
+}
+
+/// The only CLI-local preference: the explicit Space chosen by `aizen space select`.
+struct CLISelectedSpaceStore {
+    private static let key = "reignition.selected-space-id"
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func selectedSpaceID() -> SpaceID? {
+        guard let value = defaults.string(forKey: Self.key), let rawValue = UUID(uuidString: value) else {
+            return nil
+        }
+        return SpaceID(rawValue: rawValue)
+    }
+
+    func select(_ spaceID: SpaceID) {
+        defaults.set(spaceID.description, forKey: Self.key)
+    }
+
+    func clear() {
+        defaults.removeObject(forKey: Self.key)
+    }
 }
 
 func readLineTrimmed() -> String? {

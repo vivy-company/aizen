@@ -45,3 +45,17 @@ import Testing
     let encoded = try encodeJSON(payload)
     #expect(encoded == "{\n  \"operation\" : {\n    \"failure\" : \"Build failed\",\n    \"id\" : \"11111111-1111-1111-1111-111111111111\",\n    \"lifecycle\" : \"failed\",\n    \"progress\" : 0.5,\n    \"sessionID\" : null,\n    \"spaceID\" : \"22222222-2222-2222-2222-222222222222\"\n  }\n}")
 }
+
+@Test func selectedSpaceStorePersistsOnlyTheExplicitSpaceID() {
+    let suiteName = "AizenCLIContractsTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = CLISelectedSpaceStore(defaults: defaults)
+    let spaceID = SpaceID(rawValue: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!)
+
+    #expect(store.selectedSpaceID() == nil)
+    store.select(spaceID)
+    #expect(store.selectedSpaceID() == spaceID)
+    store.clear()
+    #expect(store.selectedSpaceID() == nil)
+}
