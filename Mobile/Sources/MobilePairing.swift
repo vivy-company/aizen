@@ -19,6 +19,12 @@ final class MobilePairingStore: ObservableObject {
     }
 
     @Published private(set) var state: State = .unpaired
+    @Published private(set) var spaces: [Space] = []
+    @Published private(set) var sessions: [Session] = []
+    @Published var selectedSpaceID: SpaceID?
+    @Published var selectedSessionID: SessionID?
+    @Published private(set) var messages: [ConversationMessage] = []
+    private var client: HostClient?
 
     func submit(invitationText: String) async {
         do {
@@ -67,10 +73,32 @@ final class MobilePairingStore: ObservableObject {
             let client = HostClient(transport: transport)
             _ = try await client.negotiate()
             let spaces = try await client.spaces()
+            self.client = client
+            self.spaces = spaces
+            selectedSpaceID = spaces.first?.id
+            sessions = try await client.conversations(spaceID: selectedSpaceID)
             state = .ready(hostName: pairedHost.host.displayName, spaceCount: spaces.count)
         } catch {
             state = .failed(error.localizedDescription)
         }
+    }
+
+    func selectSpace(_ id: SpaceID) async {
+        guard let client else { return }
+        do {
+            selectedSpaceID = id
+            selectedSessionID = nil
+            messages = []
+            sessions = try await client.conversations(spaceID: id)
+        } catch { state = .failed(error.localizedDescription) }
+    }
+
+    func selectSession(_ id: SessionID) async {
+        guard let client else { return }
+        do {
+            selectedSessionID = id
+            messages = try await client.conversationTimeline(sessionID: id)
+        } catch { state = .failed(error.localizedDescription) }
     }
 }
 

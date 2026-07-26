@@ -33,9 +33,19 @@ private struct MobileRootView: View {
                         Label("No paired Host", systemImage: "desktopcomputer.trianglebadge.exclamationmark")
                     }
                 }
+                if !pairing.spaces.isEmpty {
+                    Section("Spaces") {
+                        ForEach(pairing.spaces) { space in
+                            Button(space.name) { Task { await pairing.selectSpace(space.id) } }
+                                .fontWeight(pairing.selectedSpaceID == space.id ? .semibold : .regular)
+                        }
+                    }
+                }
             }
             .navigationTitle("Aizen")
         } content: {
+            Group {
+                if pairing.spaces.isEmpty {
             Form {
                 Section("Pair a Host") {
                     Button("Scan pairing QR code") { showsScanner = true }
@@ -69,12 +79,30 @@ private struct MobileRootView: View {
                 )
                 .ignoresSafeArea()
             }
+                } else {
+                    List(pairing.sessions) { session in
+                        Button { Task { await pairing.selectSession(session.id) } } label: {
+                            VStack(alignment: .leading) {
+                                Text(session.title)
+                                Text(session.kind.rawValue).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .navigationTitle(pairing.spaces.first(where: { $0.id == pairing.selectedSpaceID })?.name ?? "Sessions")
+                }
+            }
         } detail: {
-            ContentUnavailableView(
-                "Choose a Session",
-                systemImage: "bubble.left.and.bubble.right",
-                description: Text("Paired Hosts expose only the Spaces and Sessions you are authorized to access.")
-            )
+            if let sessionID = pairing.selectedSessionID {
+                List(pairing.messages) { message in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(message.role.rawValue.capitalized).font(.caption).foregroundStyle(.secondary)
+                        Text(message.content)
+                    }
+                }
+                .navigationTitle(pairing.sessions.first(where: { $0.id == sessionID })?.title ?? "Conversation")
+            } else {
+                ContentUnavailableView("Choose a Session", systemImage: "bubble.left.and.bubble.right", description: Text("Paired Hosts expose only the Spaces and Sessions you are authorized to access."))
+            }
         }
     }
 
