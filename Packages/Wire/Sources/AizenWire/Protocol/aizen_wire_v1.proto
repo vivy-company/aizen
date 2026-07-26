@@ -240,6 +240,12 @@ message RemoveResourceCommand {
 
 message ResourceMutationResult {}
 
+message RefreshRepositoryResourceCommand {
+  string resource_id = 1;
+}
+
+message RefreshRepositoryResourceResult {}
+
 message ListExecutionContextsQuery {
   string space_id = 1;
   string resource_id = 2;

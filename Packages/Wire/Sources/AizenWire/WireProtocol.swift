@@ -918,6 +918,35 @@ public struct ResourceMutationResultPayload: WirePayload, Sendable, Hashable {
     public func protobufBytes() throws -> Data { try AizenWireV1_ResourceMutationResult().serializedData() }
 }
 
+public struct RefreshRepositoryResourceCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.resource.refresh-repository@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let resourceID: String
+    public init(resourceID: String) { self.resourceID = resourceID }
+    public init(protobufBytes: Data) throws {
+        self.init(resourceID: try AizenWireV1_RefreshRepositoryResourceCommand(serializedBytes: protobufBytes).resourceID)
+    }
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_RefreshRepositoryResourceCommand()
+        message.resourceID = resourceID
+        return try message.serializedData()
+    }
+}
+
+public struct RefreshRepositoryResourceResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.resource.refresh-repository@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public init() {}
+    public init(protobufBytes: Data) throws {
+        _ = try AizenWireV1_RefreshRepositoryResourceResult(serializedBytes: protobufBytes)
+    }
+    public func protobufBytes() throws -> Data {
+        try AizenWireV1_RefreshRepositoryResourceResult().serializedData()
+    }
+}
+
 public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.query.execution-context.list@1")
     public static let schemaVersion: UInt32 = 1

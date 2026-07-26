@@ -82,6 +82,8 @@ public actor LocalHost: WireEndpoint {
                 ImportLocalRepositoryResultPayload.identifier,
                 RemoveResourceCommandPayload.identifier,
                 ResourceMutationResultPayload.identifier,
+                RefreshRepositoryResourceCommandPayload.identifier,
+                RefreshRepositoryResourceResultPayload.identifier,
                 CreateLocalFolderContextCommandPayload.identifier,
                 CreateLocalFolderContextResultPayload.identifier,
                 CreateRepositoryCheckoutContextCommandPayload.identifier,
@@ -316,6 +318,24 @@ public actor LocalHost: WireEndpoint {
                     }
                     return try TypedPayload(ResourceMutationResultPayload())
                 }
+            }
+            kind = .commandResult
+        case .command where envelope.payload.identifier == RefreshRepositoryResourceCommandPayload.identifier:
+            let command = try RefreshRepositoryResourceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resourceID = try Self.resourceID(from: command.resourceID)
+            guard let resource = try await storage.load().resources.first(where: { $0.id == resourceID }) else {
+                throw HostProtocolError.unknownResource(resourceID)
+            }
+            payload = try await executeDurably(envelope: envelope, spaceID: resource.spaceID) {
+                guard resource.kind == .repository,
+                      case let .hostPrivate(reference) = resource.details,
+                      reference.rawValue.hasPrefix("local-repository:") else {
+                    throw HostProtocolError.invalidResourcePath(resource.title)
+                }
+                let path = String(reference.rawValue.dropFirst("local-repository:".count))
+                let directory = try Self.localDirectory(from: path)
+                guard Self.isGitRepository(directory) else { throw HostProtocolError.invalidResourcePath(directory.path) }
+                return try TypedPayload(RefreshRepositoryResourceResultPayload())
             }
             kind = .commandResult
         case .command where envelope.payload.identifier == CreateLocalFolderContextCommandPayload.identifier:

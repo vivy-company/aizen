@@ -70,6 +70,10 @@ public actor LocalHostClient {
         try await client.removeResource(id: id)
     }
 
+    public func refreshRepositoryResource(id: ResourceID) async throws {
+        try await client.refreshRepositoryResource(id: id)
+    }
+
     public func executionContexts(in spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
         try await client.executionContexts(spaceID: spaceID, resourceID: resourceID)
     }

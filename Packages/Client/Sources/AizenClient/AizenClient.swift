@@ -412,6 +412,20 @@ public actor HostClient {
         _ = try ResourceMutationResultPayload(protobufBytes: response.payload.protobufBytes)
     }
 
+    public func refreshRepositoryResource(id: ResourceID) async throws {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(RefreshRepositoryResourceCommandPayload(resourceID: id.description))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == RefreshRepositoryResourceResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        _ = try RefreshRepositoryResourceResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
         let response = try await send(.init(
             messageID: UUID().uuidString,

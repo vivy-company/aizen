@@ -87,6 +87,11 @@ actor V2CLIClient {
         try await client.removeResource(id: id)
     }
 
+    func refreshRepositoryResource(id: ResourceID) async throws {
+        try await recoverPendingCommands()
+        try await client.refreshRepositoryResource(id: id)
+    }
+
     func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
         try await recoverPendingCommands()
         return try await client.executionContexts(in: spaceID, resourceID: resourceID)

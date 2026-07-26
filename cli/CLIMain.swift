@@ -541,18 +541,20 @@ private extension AizenCLI {
             throw CLIError.invalidArguments("sync accepts at most one path argument")
         }
 
-        let store = try CLIStore()
-        let context = store.container.viewContext
-        let manager = CLIRepositoryManager(context: context)
         let style = OutputStyle(useColor: shouldUseColor(flags: parsed.flags))
 
         let targetPath = parsed.positionals.first.map(normalizePath) ?? FileManager.default.currentDirectoryPath
-        guard let repository = findRepository(for: targetPath, in: context) else {
+        let canonicalPath = URL(fileURLWithPath: targetPath).standardizedFileURL.resolvingSymlinksInPath().path
+        let client = V2CLIClient()
+        guard let resource = try await client.resources().first(where: {
+            guard case let .hostPrivate(reference) = $0.details else { return false }
+            return reference.rawValue == "local-repository:\(canonicalPath)"
+        }) else {
             throw CLIError.repositoryNotFound(targetPath)
         }
 
-        try await manager.refreshRepository(repository)
-        print(style.success("Synced repository: \(repository.name ?? "")"))
+        try await client.refreshRepositoryResource(id: resource.id)
+        print(style.success("Synced repository: \(resource.title)"))
     }
 
     static func handleStatus(_ args: [String]) async throws {
