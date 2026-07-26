@@ -143,6 +143,52 @@ final class ReignitionConversationStore: ObservableObject {
         }
     }
 
+    func createLinkedWorktree(
+        resourceID: ResourceID,
+        to sessionID: SessionID,
+        destinationPath: String,
+        branch: String,
+        createBranch: Bool = true,
+        baseBranch: String? = nil
+    ) async {
+        guard let session = conversations.first(where: { $0.id == sessionID }),
+              let resource = resources.first(where: { $0.id == resourceID && $0.spaceID == session.spaceID }),
+              resource.kind == .repository else { return }
+        await perform {
+            let contextID = try await self.host.createLinkedWorktreeContext(
+                spaceID: session.spaceID,
+                resourceID: resource.id,
+                destinationPath: destinationPath,
+                branch: branch,
+                createBranch: createBranch,
+                baseBranch: baseBranch
+            )
+            try await self.host.attachExecutionContext(sessionID: session.id, contextID: contextID)
+            try await self.refreshProjection(spaceID: session.spaceID)
+        }
+    }
+
+    func createIndependentContext(
+        resourceID: ResourceID,
+        to sessionID: SessionID,
+        destinationPath: String,
+        mode: IndependentContextMode
+    ) async {
+        guard let session = conversations.first(where: { $0.id == sessionID }),
+              let resource = resources.first(where: { $0.id == resourceID && $0.spaceID == session.spaceID }),
+              resource.kind == .repository else { return }
+        await perform {
+            let contextID = try await self.host.createIndependentContext(
+                spaceID: session.spaceID,
+                resourceID: resource.id,
+                destinationPath: destinationPath,
+                mode: mode
+            )
+            try await self.host.attachExecutionContext(sessionID: session.id, contextID: contextID)
+            try await self.refreshProjection(spaceID: session.spaceID)
+        }
+    }
+
     func detachExecutionContext(from sessionID: SessionID) async {
         guard let session = conversations.first(where: { $0.id == sessionID }) else { return }
         await perform {

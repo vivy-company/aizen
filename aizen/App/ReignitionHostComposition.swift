@@ -104,6 +104,14 @@ actor ReignitionHostComposition {
         try await client.createRepositoryCheckoutContext(spaceID: spaceID, resourceID: resourceID)
     }
 
+    func createLinkedWorktreeContext(spaceID: SpaceID, resourceID: ResourceID, destinationPath: String, branch: String, createBranch: Bool, baseBranch: String? = nil) async throws -> ExecutionContextID {
+        try await client.createLinkedWorktreeContext(spaceID: spaceID, resourceID: resourceID, destinationPath: destinationPath, branch: branch, createBranch: createBranch, baseBranch: baseBranch).contextID
+    }
+
+    func createIndependentContext(spaceID: SpaceID, resourceID: ResourceID, destinationPath: String, mode: IndependentContextMode) async throws -> ExecutionContextID {
+        try await client.createIndependentContext(spaceID: spaceID, resourceID: resourceID, destinationPath: destinationPath, mode: mode).contextID
+    }
+
     func attachExecutionContext(sessionID: SessionID, contextID: ExecutionContextID) async throws {
         try await client.attachExecutionContext(sessionID: sessionID, contextID: contextID)
     }

@@ -1,5 +1,6 @@
 import AizenCore
 import AizenClient
+import AizenWire
 import AppKit
 import SwiftUI
 
@@ -11,6 +12,7 @@ struct ReignitionConversationWindow: View {
     @State private var draft = ""
     @State private var newConversationTitle = ""
     @State private var newSpaceName = ""
+    @State private var contextCreation: ReignitionContextCreation?
 
     init(host: ReignitionHostComposition) {
         _store = StateObject(wrappedValue: ReignitionConversationStore(host: host))
@@ -72,6 +74,14 @@ struct ReignitionConversationWindow: View {
             TextField("Name", text: $newSpaceName)
             Button("Create") { createSpace() }
             Button("Cancel", role: .cancel) { newSpaceName = "" }
+        }
+        .sheet(item: $contextCreation) { creation in
+            ReignitionContextCreationSheet(creation: creation) { destinationPath, branch in
+                contextCreation = nil
+                createContext(creation, destinationPath: destinationPath, branch: branch)
+            } onCancel: {
+                contextCreation = nil
+            }
         }
     }
 
@@ -223,6 +233,24 @@ struct ReignitionConversationWindow: View {
                     }
                 }
             }
+            let repositories = store.resources.filter { $0.kind == .repository }
+            if !repositories.isEmpty {
+                Section("Create Repository Context") {
+                    ForEach(repositories) { resource in
+                        Menu(resource.title) {
+                            Button("Linked Worktree…", systemImage: "arrow.triangle.branch") {
+                                presentContextCreation(.linkedWorktree, resource: resource, conversation: conversation)
+                            }
+                            Button("Independent Clone…", systemImage: "arrow.down.forward") {
+                                presentContextCreation(.clone, resource: resource, conversation: conversation)
+                            }
+                            Button("Copied Environment…", systemImage: "doc.on.doc") {
+                                presentContextCreation(.copy, resource: resource, conversation: conversation)
+                            }
+                        }
+                    }
+                }
+            }
             Button("Choose Folder\u{2026}") {
                 chooseFolder(for: conversation.id)
             }
@@ -251,5 +279,118 @@ struct ReignitionConversationWindow: View {
         panel.prompt = "Attach Repository"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task { await store.importAndAttachRepository(at: url, to: sessionID) }
+    }
+
+    private func presentContextCreation(
+        _ kind: ReignitionContextCreation.Kind,
+        resource: Resource,
+        conversation: Session
+    ) {
+        contextCreation = ReignitionContextCreation(
+            sessionID: conversation.id,
+            resourceID: resource.id,
+            kind: kind,
+            destinationPath: "",
+            branch: "aizen/new-worktree"
+        )
+    }
+
+    private func createContext(_ creation: ReignitionContextCreation, destinationPath: String, branch: String?) {
+        Task {
+            switch creation.kind {
+            case .linkedWorktree:
+                await store.createLinkedWorktree(
+                    resourceID: creation.resourceID,
+                    to: creation.sessionID,
+                    destinationPath: destinationPath,
+                    branch: branch ?? "",
+                    createBranch: true
+                )
+            case .clone:
+                await store.createIndependentContext(
+                    resourceID: creation.resourceID,
+                    to: creation.sessionID,
+                    destinationPath: destinationPath,
+                    mode: .clone
+                )
+            case .copy:
+                await store.createIndependentContext(
+                    resourceID: creation.resourceID,
+                    to: creation.sessionID,
+                    destinationPath: destinationPath,
+                    mode: .copy
+                )
+            }
+        }
+    }
+}
+
+private struct ReignitionContextCreation: Identifiable {
+    enum Kind: String {
+        case linkedWorktree
+        case clone
+        case copy
+
+        var title: String {
+            switch self {
+            case .linkedWorktree: "New Linked Worktree"
+            case .clone: "New Independent Clone"
+            case .copy: "New Copied Environment"
+            }
+        }
+    }
+
+    let id = UUID()
+    let sessionID: SessionID
+    let resourceID: ResourceID
+    let kind: Kind
+    let destinationPath: String
+    let branch: String
+}
+
+private struct ReignitionContextCreationSheet: View {
+    let creation: ReignitionContextCreation
+    let onCreate: (String, String?) -> Void
+    let onCancel: () -> Void
+    @State private var destinationPath: String
+    @State private var branch: String
+
+    init(
+        creation: ReignitionContextCreation,
+        onCreate: @escaping (String, String?) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.creation = creation
+        self.onCreate = onCreate
+        self.onCancel = onCancel
+        _destinationPath = State(initialValue: creation.destinationPath)
+        _branch = State(initialValue: creation.branch)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(creation.kind.title)
+                .font(.headline)
+            TextField("New directory path", text: $destinationPath)
+                .textFieldStyle(.roundedBorder)
+            if creation.kind == .linkedWorktree {
+                TextField("New branch", text: $branch)
+                    .textFieldStyle(.roundedBorder)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel", action: onCancel)
+                Button("Create") {
+                    onCreate(
+                        destinationPath.trimmingCharacters(in: .whitespacesAndNewlines),
+                        creation.kind == .linkedWorktree ? branch.trimmingCharacters(in: .whitespacesAndNewlines) : nil
+                    )
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(destinationPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (creation.kind == .linkedWorktree && branch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+            }
+        }
+        .padding()
+        .frame(width: 460)
     }
 }
