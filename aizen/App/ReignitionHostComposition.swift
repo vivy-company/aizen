@@ -52,6 +52,10 @@ actor ReignitionHostComposition {
         try JSONDecoder().decode(StorageSnapshot.self, from: try await client.snapshotData())
     }
 
+    func spaces() async throws -> [Space] {
+        try await client.spaces()
+    }
+
     func conversations(spaceID: SpaceID? = nil) async throws -> [Session] {
         try await client.conversations(spaceID: spaceID)
     }

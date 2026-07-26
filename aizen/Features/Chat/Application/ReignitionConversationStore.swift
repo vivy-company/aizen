@@ -6,6 +6,7 @@ import Foundation
 /// Host remains the sole owner of durable data and ACP runtime lifetime.
 @MainActor
 final class ReignitionConversationStore: ObservableObject {
+    @Published private(set) var spaces: [Space] = []
     @Published private(set) var conversations: [Session] = []
     @Published private(set) var selectedConversationID: SessionID?
     @Published private(set) var messages: [ConversationMessage] = []
@@ -16,6 +17,12 @@ final class ReignitionConversationStore: ObservableObject {
 
     init(host: ReignitionHostComposition) {
         self.host = host
+    }
+
+    func refreshSpaces() async {
+        await perform {
+            self.spaces = try await self.host.spaces()
+        }
     }
 
     func refresh(spaceID: SpaceID? = nil) async {
