@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Host resolves the repository URL from a Resource before this actor is called; this type never
 /// receives a client-provided command or path fragment.
-public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryBranchReading, RepositoryIndexUpdating {
+public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryBranchReading, RepositoryIndexUpdating, RepositoryCommitting {
     private static let maximumStatusBytes = 1_048_576
     private static let maximumIndexBytes = 67_108_864
 
@@ -86,6 +86,16 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
         return try currentIndexRevision(at: repositoryURL)
     }
 
+    public func commit(at repositoryURL: URL, message: String, expectedRepositoryRevision: String, expectedIndexRevision: String, amend: Bool) async throws -> RepositoryCommitResult {
+        guard FileManager.default.fileExists(atPath: repositoryURL.appendingPathComponent(".git").path) else { throw Error.notRepository }
+        guard try currentRepositoryRevision(at: repositoryURL) == expectedRepositoryRevision else { throw Error.repositoryRevisionConflict }
+        guard try currentIndexRevision(at: repositoryURL) == expectedIndexRevision else { throw Error.indexRevisionConflict }
+        var arguments = ["-C", repositoryURL.path, "commit", "--no-gpg-sign", "--file=-"]
+        if amend { arguments.append("--amend") }
+        _ = try runGitWithInput(arguments, input: Data(message.utf8), maximumOutputBytes: 8_192)
+        return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL))
+    }
+
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
         case notRepository
         case gitFailed(String)
@@ -94,6 +104,7 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
         case invalidStatusPath
         case indexTooLarge
         case indexRevisionConflict
+        case repositoryRevisionConflict
 
         public var errorDescription: String? {
             switch self {
@@ -104,6 +115,7 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
             case .invalidStatusPath: "Git returned an invalid repository-relative path."
             case .indexTooLarge: "The Git index exceeded the Host safety limit."
             case .indexRevisionConflict: "The Git index changed; refresh before updating it."
+            case .repositoryRevisionConflict: "The Git repository changed; refresh before committing it."
             }
         }
     }
@@ -218,6 +230,27 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
             throw Error.gitFailed(String(decoding: error, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
         }
         return output
+    }
+
+    private func runGitWithInput(_ arguments: [String], input: Data, maximumOutputBytes: Int) throws -> String {
+        let process = Process()
+        let stdin = Pipe()
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = arguments
+        process.standardInput = stdin
+        process.standardOutput = stdout
+        process.standardError = stderr
+        try process.run()
+        try stdin.fileHandleForWriting.write(contentsOf: input)
+        try stdin.fileHandleForWriting.close()
+        let output = try stdout.fileHandleForReading.readToEnd() ?? Data()
+        let error = stderr.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard output.count <= maximumOutputBytes else { throw Error.statusOutputTooLarge }
+        guard process.terminationStatus == 0 else { throw Error.gitFailed(String(decoding: error, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)) }
+        return String(decoding: output, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func runGitDataTruncating(_ arguments: [String], maximumOutputBytes: Int) throws -> (data: Data, truncated: Bool) {

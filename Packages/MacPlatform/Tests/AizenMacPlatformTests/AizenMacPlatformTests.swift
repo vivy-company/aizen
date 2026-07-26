@@ -261,6 +261,35 @@ import Testing
     #expect(branches.indexRevision.count == 64)
 }
 
+@Test func gitRepositoryStatusReaderCommitsAndAmendsAtExpectedRevisions() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try runGit(["init", "--initial-branch=main", root.path])
+    try runGit(["-C", root.path, "config", "user.email", "aizen@example.test"])
+    try runGit(["-C", root.path, "config", "user.name", "Aizen Test"])
+    let file = root.appendingPathComponent("README.md")
+    try Data("seed\n".utf8).write(to: file)
+    try runGit(["-C", root.path, "add", "README.md"])
+
+    let reader = GitRepositoryStatusReader()
+    let initial = try await reader.status(at: root, maximumEntries: 10)
+    let committed = try await reader.commit(at: root, message: "seed", expectedRepositoryRevision: initial.repositoryRevision, expectedIndexRevision: initial.indexRevision, amend: false)
+    #expect(committed.repositoryRevision.count == 40)
+    #expect(try gitOutput(["-C", root.path, "log", "-1", "--format=%s"]) == "seed")
+
+    await #expect(throws: GitRepositoryStatusReader.Error.repositoryRevisionConflict) {
+        _ = try await reader.commit(at: root, message: "stale", expectedRepositoryRevision: initial.repositoryRevision, expectedIndexRevision: committed.indexRevision, amend: false)
+    }
+
+    try Data("amended\n".utf8).write(to: file)
+    try runGit(["-C", root.path, "add", "README.md"])
+    let beforeAmend = try await reader.status(at: root, maximumEntries: 10)
+    let amended = try await reader.commit(at: root, message: "amended", expectedRepositoryRevision: beforeAmend.repositoryRevision, expectedIndexRevision: beforeAmend.indexRevision, amend: true)
+    #expect(amended.repositoryRevision != beforeAmend.repositoryRevision)
+    #expect(try gitOutput(["-C", root.path, "log", "-1", "--format=%s"]) == "amended")
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")
