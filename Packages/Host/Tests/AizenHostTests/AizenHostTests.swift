@@ -204,7 +204,7 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
         route: .lan
     )
     let keys = try ConnectionAuthenticator.deriveKeys(participant: .host, ephemeralKey: hostEphemeral, peerEphemeralPublicKey: deviceEphemeral.publicKey, binding: binding)
-    return AuthenticatedRemoteSession(connectionID: binding.connectionID, deviceID: deviceID, route: .lan, keys: keys)
+    return AuthenticatedRemoteSession(connectionID: binding.connectionID, deviceID: deviceID, route: .lan, binding: binding, keys: keys)
 }
 
 @Test func localHostReturnsTheStorageSnapshotThroughWire() async throws {

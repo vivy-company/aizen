@@ -345,6 +345,10 @@ public actor StorageRepository {
         try load().deviceAuthorizations.first { $0.device.deviceID == deviceID }
     }
 
+    public func deviceAuthorizations() throws -> [DeviceAuthorization] {
+        try load().deviceAuthorizations
+    }
+
     public func issuePairingToken(_ token: PairingTokenRecord) throws {
         _ = try transact { snapshot in
             guard !snapshot.pairingTokens.contains(where: { $0.tokenID == token.tokenID }) else {

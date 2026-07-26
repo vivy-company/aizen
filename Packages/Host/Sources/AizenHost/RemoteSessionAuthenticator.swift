@@ -16,6 +16,7 @@ public struct AuthenticatedRemoteSession: Sendable {
     public let connectionID: UUID
     public let deviceID: DeviceID
     public let route: ConnectionRoute
+    public let binding: ConnectionAuthenticationBinding
     public let keys: AuthenticatedConnectionKeys
 }
 
@@ -139,7 +140,13 @@ public actor RemoteSessionAuthenticator {
                 peerEphemeralPublicKey: pending.binding.clientEphemeralPublicKey,
                 binding: pending.binding
             )
-            return AuthenticatedRemoteSession(connectionID: proof.connectionID, deviceID: pending.device.deviceID, route: pending.route, keys: keys)
+            return AuthenticatedRemoteSession(
+                connectionID: proof.connectionID,
+                deviceID: pending.device.deviceID,
+                route: pending.route,
+                binding: pending.binding,
+                keys: keys
+            )
         } catch {
             await auditFailure(deviceID: pending.device.deviceID, route: pending.route.rawValue)
             throw error
