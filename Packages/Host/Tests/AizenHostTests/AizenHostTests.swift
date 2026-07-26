@@ -27,3 +27,18 @@ import AizenWire
         try await registry.updateLifecycle(.running, for: RunID())
     }
 }
+
+@Test func coordinatorOwnsRunLifecycle() async throws {
+    let registry = HostRunRegistry()
+    let coordinator = RunCoordinator(registry: registry, runtime: RecordingRuntime())
+    let run = Run(spaceID: SpaceID(), sessionID: SessionID())
+    try await coordinator.start(run)
+    #expect(await registry.run(for: run.id)?.lifecycle == .running)
+    try await coordinator.cancel(run.id)
+    #expect(await registry.run(for: run.id)?.lifecycle == .cancelled)
+}
+
+private actor RecordingRuntime: RunRuntime {
+    func start(run: Run) async throws {}
+    func cancel(runID: RunID) async throws {}
+}

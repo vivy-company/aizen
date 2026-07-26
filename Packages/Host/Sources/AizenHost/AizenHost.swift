@@ -52,3 +52,30 @@ public actor HostRunRegistry {
         runs[id] = run
     }
 }
+
+/// Host-facing runtime contract. ACP, Process, and UI concerns remain in a macOS adapter.
+public protocol RunRuntime: Sendable {
+    func start(run: Run) async throws
+    func cancel(runID: RunID) async throws
+}
+
+public actor RunCoordinator {
+    private let registry: HostRunRegistry
+    private let runtime: any RunRuntime
+
+    public init(registry: HostRunRegistry, runtime: any RunRuntime) {
+        self.registry = registry
+        self.runtime = runtime
+    }
+
+    public func start(_ run: Run) async throws {
+        await registry.register(run)
+        try await runtime.start(run: run)
+        try await registry.updateLifecycle(.running, for: run.id)
+    }
+
+    public func cancel(_ runID: RunID) async throws {
+        try await runtime.cancel(runID: runID)
+        try await registry.updateLifecycle(.cancelled, for: runID)
+    }
+}
