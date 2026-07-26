@@ -17,17 +17,20 @@ public actor LocalHost: WireEndpoint {
     private let conversationRuns: ConversationRunCoordinator?
     private let managedSandboxes: ManagedSandboxService?
     private let runEventPublisher: RunEventPublisher?
+    private let terminalRuntime: (any TerminalRuntime)?
 
     public init(
         storage: StorageRepository,
         conversationRuns: ConversationRunCoordinator? = nil,
         managedSandboxes: ManagedSandboxService? = nil,
-        runEventPublisher: RunEventPublisher? = nil
+        runEventPublisher: RunEventPublisher? = nil,
+        terminalRuntime: (any TerminalRuntime)? = nil
     ) {
         self.storage = storage
         self.conversationRuns = conversationRuns
         self.managedSandboxes = managedSandboxes
         self.runEventPublisher = runEventPublisher
+        self.terminalRuntime = terminalRuntime
     }
 
     public func runEvents() async -> AsyncStream<RunEvent> {
@@ -67,6 +70,8 @@ public actor LocalHost: WireEndpoint {
                 ListExecutionContextsResponsePayload.identifier,
                 ListTerminalSessionsQueryPayload.identifier,
                 ListTerminalSessionsResponsePayload.identifier,
+                CreateTerminalSessionCommandPayload.identifier,
+                CreateTerminalSessionResultPayload.identifier,
                 CreateSpaceCommandPayload.identifier,
                 CreateSpaceResultPayload.identifier,
                 RenameSpaceCommandPayload.identifier,
@@ -165,6 +170,45 @@ public actor LocalHost: WireEndpoint {
             let sessions = try await storage.load().terminalSessions.filter { spaceID == nil || $0.spaceID == spaceID }
             kind = .queryResponse
             payload = try TypedPayload(ListTerminalSessionsResponsePayload(sessions: sessions))
+        case .command where envelope.payload.identifier == CreateTerminalSessionCommandPayload.identifier:
+            let command = try CreateTerminalSessionCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let terminalSessionID = try Self.sessionID(from: command.terminalSessionID)
+            let spaceID = try Self.spaceID(from: command.spaceID)
+            let executionContextID = try Self.executionContextID(from: command.executionContextID)
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                guard let terminalRuntime = self.terminalRuntime else { throw HostProtocolError.runtimeUnavailable }
+                let snapshot = try await self.storage.load()
+                guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
+                guard !snapshot.terminalSessions.contains(where: { $0.id == terminalSessionID }) else {
+                    throw HostProtocolError.duplicateTerminalSession(terminalSessionID)
+                }
+                guard let executionContext = snapshot.executionContexts.first(where: { $0.id == executionContextID && $0.spaceID == spaceID }) else {
+                    throw HostProtocolError.unknownExecutionContext(executionContextID)
+                }
+                let resource = executionContext.resourceID.flatMap { resourceID in
+                    snapshot.resources.first(where: { $0.id == resourceID && $0.spaceID == spaceID })
+                }
+                let launch = try await terminalRuntime.createTerminal(
+                    id: terminalSessionID,
+                    spaceID: spaceID,
+                    executionContext: executionContext,
+                    resource: resource,
+                    title: command.title,
+                    initialCommand: command.initialCommand
+                )
+                let session = TerminalSession(
+                    id: terminalSessionID,
+                    spaceID: spaceID,
+                    executionContextID: executionContextID,
+                    title: command.title,
+                    tmuxSessionName: launch.tmuxSessionName,
+                    paneID: launch.paneID,
+                    initialCommand: command.initialCommand
+                )
+                _ = try await self.storage.transact { $0.terminalSessions.append(session) }
+                return try TypedPayload(CreateTerminalSessionResultPayload(session: session))
+            }
+            kind = .commandResult
         case .command where envelope.payload.identifier == CreateSpaceCommandPayload.identifier:
             let command = try CreateSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             payload = try await executeDurably(envelope: envelope, spaceID: nil) {
@@ -605,6 +649,7 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case unknownRun(RunID)
     case unknownResource(ResourceID)
     case unknownExecutionContext(ExecutionContextID)
+    case duplicateTerminalSession(SessionID)
     case duplicateResource(ResourceID)
     case resourceInUse(ResourceID)
     case executionContextInUse(ExecutionContextID)
@@ -622,6 +667,29 @@ extension LocalHost: RunEventEndpoint {}
 public protocol RunRuntime: Sendable {
     func start(run: Run) async throws
     func cancel(runID: RunID) async throws
+}
+
+/// macOS terminal process management belongs in a platform adapter; the Host owns validation and persistence.
+public protocol TerminalRuntime: Sendable {
+    func createTerminal(
+        id: SessionID,
+        spaceID: SpaceID,
+        executionContext: ExecutionContext,
+        resource: Resource?,
+        title: String?,
+        initialCommand: String?
+    ) async throws -> TerminalLaunch
+}
+
+public struct TerminalLaunch: Sendable, Equatable {
+    public let tmuxSessionName: String
+    public let paneID: String
+
+    public init(tmuxSessionName: String, paneID: String) {
+        precondition(!tmuxSessionName.isEmpty && !paneID.isEmpty, "Terminal launch requires tmux identities")
+        self.tmuxSessionName = tmuxSessionName
+        self.paneID = paneID
+    }
 }
 
 public protocol PromptRunRuntime: RunRuntime {

@@ -81,6 +81,48 @@ import AizenWire
     #expect(try ListSpacesResponsePayload(protobufBytes: response.payload.protobufBytes).spaces.map(\.name) == ["Vivy"])
 }
 
+@Test func hostCreatesTerminalSessionsThroughThePlatformRuntime() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let resource = Resource(spaceID: space.id, kind: .folder, title: "Project", details: .hostPrivate(.init(rawValue: "local-folder:/tmp/project")))
+    let context = ExecutionContext(spaceID: space.id, kind: .localFolder, resourceID: resource.id)
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.resources.append(resource)
+        $0.executionContexts.append(context)
+    }
+    let runtime = RecordingTerminalRuntime()
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage, terminalRuntime: runtime))
+    let terminalID = SessionID()
+    let envelope = ProtocolEnvelope(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .command,
+        channel: .terminal,
+        payload: try .init(CreateTerminalSessionCommandPayload(
+            terminalSessionID: terminalID.description,
+            spaceID: space.id.description,
+            executionContextID: context.id.description,
+            title: "Server",
+            initialCommand: "npm run dev"
+        ))
+    )
+
+    let response = try await transport.send(envelope)
+    let replay = try await transport.send(envelope)
+    let session = try CreateTerminalSessionResultPayload(protobufBytes: response.payload.protobufBytes).session
+    #expect(response.payload == replay.payload)
+    #expect(session.id == terminalID)
+    #expect(session.executionContextID == context.id)
+    #expect(session.tmuxSessionName == "aizen-terminal")
+    let storedSession = try #require(try await storage.load().terminalSessions.first)
+    #expect(storedSession.id == session.id)
+    #expect(storedSession.tmuxSessionName == session.tmuxSessionName)
+    #expect(await runtime.createdTerminalID == terminalID)
+}
+
 @Test func coordinatorOwnsRunLifecycle() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -573,6 +615,22 @@ import AizenWire
 private actor RecordingRuntime: RunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
+}
+
+private actor RecordingTerminalRuntime: TerminalRuntime {
+    private(set) var createdTerminalID: SessionID?
+
+    func createTerminal(
+        id: SessionID,
+        spaceID: SpaceID,
+        executionContext: ExecutionContext,
+        resource: Resource?,
+        title: String?,
+        initialCommand: String?
+    ) async throws -> TerminalLaunch {
+        createdTerminalID = id
+        return TerminalLaunch(tmuxSessionName: "aizen-terminal", paneID: "%1")
+    }
 }
 
 private actor PromptRecordingRuntime: PromptRunRuntime {
