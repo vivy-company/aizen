@@ -2,6 +2,7 @@ import ACP
 import AizenCore
 import AizenHost
 import AizenMacPlatform
+import AizenSecurity
 import AizenStorage
 import AizenTransport
 import AizenWire
@@ -35,6 +36,19 @@ import Testing
     let credentials = try await HostIdentityStore(persistence: persistence).loadOrCreateCredentials(displayName: "Mac")
     let message = Data("aizen-host".utf8)
     #expect(credentials.publicIdentity.cryptographicIdentity.verifies(signature: credentials.localIdentity.sign(message), message: message))
+}
+
+@Test func bonjourMetadataPublishesOnlyProtocolAndIdentityHints() throws {
+    let identity = LocalCryptographicIdentity()
+    let host = HostPublicIdentity(hostID: HostID(), displayName: "Wiedy's Mac", cryptographicIdentity: identity.publicIdentity())
+    let metadata = HostBonjourMetadata(host: host, minimumProtocolGeneration: 1, maximumProtocolGeneration: 2)
+    let values = metadata.txtRecord.mapValues { String(decoding: $0, as: UTF8.self) }
+
+    #expect(Set(values.keys) == ["pr", "h", "fp", "pair"])
+    #expect(values["pr"] == "1-2")
+    #expect(values["fp"] == host.cryptographicIdentity.fingerprint.prefix)
+    #expect(values["pair"] == "1")
+    #expect(values.values.joined().contains("Wiedy") == false)
 }
 
 @Test func localHostRuntimeOwnsTheStorageBackedHost() async throws {
