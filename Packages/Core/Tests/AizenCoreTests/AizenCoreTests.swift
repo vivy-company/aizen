@@ -55,6 +55,14 @@ import Testing
     #expect(XcodeProjectAction.test.rawValue == "test")
 }
 
+@Test func contextFileSearchResultsStayRelativeAndBounded() throws {
+    let match = ContextFileSearchMatch(relativePath: "Sources/App.swift", lineNumber: 12, preview: "let greeting = \\\"Hello\\\"")
+    let result = ContextFileSearchResult(matches: [match], truncated: false)
+
+    #expect(try JSONDecoder().decode(ContextFileSearchResult.self, from: JSONEncoder().encode(result)) == result)
+    #expect(match.id == "Sources/App.swift:12")
+}
+
 @Test func operationRejectsInvalidDurableState() {
     #expect(OperationLifecycle.queued.canTransition(to: .running))
     #expect(!OperationLifecycle.completed.canTransition(to: .running))

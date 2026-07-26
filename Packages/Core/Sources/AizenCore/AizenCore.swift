@@ -434,6 +434,36 @@ public struct ContextFileEntry: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+/// A bounded text match returned by a Host-owned execution-context search.
+public struct ContextFileSearchMatch: Codable, Sendable, Hashable, Identifiable {
+    public static let maximumPreviewUTF8Count = 512
+
+    public let relativePath: String
+    public let lineNumber: Int
+    public let preview: String
+
+    public var id: String { "\(relativePath):\(lineNumber)" }
+
+    public init(relativePath: String, lineNumber: Int, preview: String) {
+        precondition(!relativePath.isEmpty && !relativePath.hasPrefix("/"), "Context search paths must be relative")
+        precondition(lineNumber > 0, "Context search line numbers start at one")
+        precondition(!preview.isEmpty && preview.utf8.count <= Self.maximumPreviewUTF8Count, "Context search previews must be bounded")
+        self.relativePath = relativePath
+        self.lineNumber = lineNumber
+        self.preview = preview
+    }
+}
+
+public struct ContextFileSearchResult: Codable, Sendable, Hashable {
+    public let matches: [ContextFileSearchMatch]
+    public let truncated: Bool
+
+    public init(matches: [ContextFileSearchMatch], truncated: Bool) {
+        self.matches = matches
+        self.truncated = truncated
+    }
+}
+
 /// Host-owned metadata for a persistent terminal runtime. The tmux identity is opaque to clients;
 /// they use it only when asking the host/platform adapter to attach.
 public struct TerminalSession: Codable, Sendable, Hashable, Identifiable {
