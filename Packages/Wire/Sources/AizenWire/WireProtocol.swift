@@ -1865,10 +1865,10 @@ public struct UpdateRepositoryIndexCommandPayload: WirePayload, Sendable, Hashab
 
 public struct UpdateRepositoryIndexResultPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.repository.update-index@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
-    public let indexRevision: String
-    public init(indexRevision: String) { precondition(indexRevision.count == 64); self.indexRevision = indexRevision }
-    public init(protobufBytes: Data) throws { let m = try AizenWireV1_UpdateRepositoryIndexResult(serializedBytes: protobufBytes); guard m.indexRevision.count == 64 else { throw WireCodecError.invalidRepositoryIndexCommand }; self.init(indexRevision: m.indexRevision) }
-    public func protobufBytes() throws -> Data { var m = AizenWireV1_UpdateRepositoryIndexResult(); m.indexRevision = indexRevision; return try m.serializedData() }
+    public let indexRevision: String; public let operationID: String
+    public init(indexRevision: String, operationID: String) { precondition(indexRevision.count == 64 && UUID(uuidString: operationID) != nil); self.indexRevision = indexRevision; self.operationID = operationID }
+    public init(protobufBytes: Data) throws { let m = try AizenWireV1_UpdateRepositoryIndexResult(serializedBytes: protobufBytes); guard m.indexRevision.count == 64, UUID(uuidString: m.operationID) != nil else { throw WireCodecError.invalidRepositoryIndexCommand }; self.init(indexRevision: m.indexRevision, operationID: m.operationID) }
+    public func protobufBytes() throws -> Data { var m = AizenWireV1_UpdateRepositoryIndexResult(); m.indexRevision = indexRevision; m.operationID = operationID; return try m.serializedData() }
 }
 
 public struct ListExecutionContextsQueryPayload: WirePayload, Sendable, Hashable {

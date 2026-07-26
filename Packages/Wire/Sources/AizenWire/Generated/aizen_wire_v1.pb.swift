@@ -1482,6 +1482,8 @@ nonisolated struct AizenWireV1_UpdateRepositoryIndexResult: Sendable {
 
   var indexRevision: String = String()
 
+  var operationID: String = String()
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -5215,7 +5217,7 @@ nonisolated extension AizenWireV1_UpdateRepositoryIndexCommand: SwiftProtobuf.Me
 
 nonisolated extension AizenWireV1_UpdateRepositoryIndexResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".UpdateRepositoryIndexResult"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}index_revision\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}index_revision\0\u{3}operation_id\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5224,6 +5226,7 @@ nonisolated extension AizenWireV1_UpdateRepositoryIndexResult: SwiftProtobuf.Mes
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.indexRevision) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.operationID) }()
       default: break
       }
     }
@@ -5233,11 +5236,15 @@ nonisolated extension AizenWireV1_UpdateRepositoryIndexResult: SwiftProtobuf.Mes
     if !self.indexRevision.isEmpty {
       try visitor.visitSingularStringField(value: self.indexRevision, fieldNumber: 1)
     }
+    if !self.operationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.operationID, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: AizenWireV1_UpdateRepositoryIndexResult, rhs: AizenWireV1_UpdateRepositoryIndexResult) -> Bool {
     if lhs.indexRevision != rhs.indexRevision {return false}
+    if lhs.operationID != rhs.operationID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -482,6 +482,7 @@ message UpdateRepositoryIndexCommand {
 
 message UpdateRepositoryIndexResult {
   string index_revision = 1;
+  string operation_id = 2;
 }
 
 message ListExecutionContextsQuery {

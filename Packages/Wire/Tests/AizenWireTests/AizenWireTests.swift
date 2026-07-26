@@ -116,6 +116,20 @@ import Testing
     #expect(try ReadRepositoryHistoryResponsePayload(protobufBytes: response.protobufBytes()) == response)
 }
 
+@Test func repositoryIndexUpdatePayloadsCarryTheDurableOperation() throws {
+    let resourceID = UUID().uuidString
+    let operationID = UUID().uuidString
+    let command = UpdateRepositoryIndexCommandPayload(
+        resourceID: resourceID,
+        relativePaths: ["Sources/App.swift"],
+        expectedIndexRevision: String(repeating: "a", count: 64),
+        stage: true
+    )
+    let result = UpdateRepositoryIndexResultPayload(indexRevision: String(repeating: "b", count: 64), operationID: operationID)
+    #expect(try UpdateRepositoryIndexCommandPayload(protobufBytes: command.protobufBytes()) == command)
+    #expect(try UpdateRepositoryIndexResultPayload(protobufBytes: result.protobufBytes()) == result)
+}
+
 @Test func webResourceImportPayloadRoundTripsAsProtobuf() throws {
     let url = try #require(URL(string: "https://example.com/docs"))
     let payload = ImportWebResourceCommandPayload(spaceID: UUID().uuidString, url: url, title: "Docs")
