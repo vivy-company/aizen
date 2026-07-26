@@ -1,19 +1,22 @@
+import AizenClient
 import AizenCore
 import AizenMacPlatform
 import AizenWire
 import Foundation
 
-/// CLI composition for the local v2 Host. The CLI stays a client and never opens v2 files directly.
+/// CLI composition for the persistent v2 Host. The CLI stays a client and never opens v2 files directly.
 actor V2CLIClient {
     static let productVersion = "2.0.0"
-    private let client: LocalHostClient
+    private let client: HostClient
     private var negotiated = false
 
     init(storageURL: URL? = nil) {
         let storageURL = storageURL ?? Self.defaultStorageURL()
-        client = LocalHostClient(
-            storageURL: storageURL,
-            commandOutboxURL: storageURL.deletingLastPathComponent().appendingPathComponent("cli-command-outbox.json")
+        client = HostClient(
+            transport: MachWireTransport(machServiceName: HostService.machServiceName),
+            commandOutbox: FileCommandOutbox(
+                url: storageURL.deletingLastPathComponent().appendingPathComponent("cli-command-outbox.json")
+            )
         )
     }
 
@@ -39,7 +42,7 @@ actor V2CLIClient {
 
     func conversations(spaceID: SpaceID? = nil) async throws -> [Session] {
         try await recoverPendingCommands()
-        return try await client.conversations(in: spaceID)
+        return try await client.conversations(spaceID: spaceID)
     }
 
     func createConversation(spaceID: SpaceID, title: String) async throws -> SessionID {
@@ -59,7 +62,7 @@ actor V2CLIClient {
 
     func runs(spaceID: SpaceID? = nil) async throws -> [Run] {
         try await recoverPendingCommands()
-        return try await client.runs(in: spaceID)
+        return try await client.runs(spaceID: spaceID)
     }
 
     func cancelRun(id: RunID) async throws {
@@ -69,7 +72,7 @@ actor V2CLIClient {
 
     func resources(spaceID: SpaceID? = nil) async throws -> [Resource] {
         try await recoverPendingCommands()
-        return try await client.resources(in: spaceID)
+        return try await client.resources(spaceID: spaceID)
     }
 
     func importLocalFolder(spaceID: SpaceID, path: String, title: String? = nil) async throws -> ResourceID {
@@ -94,12 +97,12 @@ actor V2CLIClient {
 
     func executionContexts(spaceID: SpaceID? = nil, resourceID: ResourceID? = nil) async throws -> [ExecutionContext] {
         try await recoverPendingCommands()
-        return try await client.executionContexts(in: spaceID, resourceID: resourceID)
+        return try await client.executionContexts(spaceID: spaceID, resourceID: resourceID)
     }
 
     func terminalSessions(spaceID: SpaceID? = nil) async throws -> [AizenCore.TerminalSession] {
         try await recoverPendingCommands()
-        return try await client.terminalSessions(in: spaceID)
+        return try await client.terminalSessions(spaceID: spaceID)
     }
 
     func createTerminalSession(
@@ -156,7 +159,7 @@ actor V2CLIClient {
             _ = try await client.negotiate()
             negotiated = true
         }
-        try await client.recoverPendingCommands()
+        _ = try await client.retryPendingCommands()
     }
 
     static func defaultStorageURL(fileManager: FileManager = .default) -> URL {
