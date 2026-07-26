@@ -19,6 +19,9 @@ struct AizenCLI {
     }
 
     static func run() async throws {
+        if ProcessInfo.processInfo.environment["AIZEN_HOST_SERVICE"] == "1" {
+            try HostService.serve(storageURL: V2CLIClient.defaultStorageURL())
+        }
         let args = Array(CommandLine.arguments.dropFirst())
         if args.isEmpty {
             try openApp()

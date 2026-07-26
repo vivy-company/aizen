@@ -272,6 +272,7 @@
 				CC2917C72EFBDAE300440062 /* Frameworks */,
 				CC2917D62EFBDAE300440062 /* Resources */,
 				CCF00000000000000000000B /* Copy CLI */,
+				F27400000000000000000002 /* Install Host LaunchAgent */,
 				CC2917D72EFBDAE300440062 /* Organize Ghostty Resources */,
 			);
 			buildRules = (
@@ -311,6 +312,7 @@
 				CCB04B3F2EA241B30007DBB1 /* Frameworks */,
 				CCB04B402EA241B30007DBB1 /* Resources */,
 				CCF00000000000000000000A /* Copy CLI */,
+				F27400000000000000000001 /* Install Host LaunchAgent */,
 				CC1234582EA241B30007DBC1 /* Organize Ghostty Resources */,
 			);
 			buildRules = (
@@ -509,6 +511,38 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		F27400000000000000000001 /* Install Host LaunchAgent */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/aizen/Resources/LaunchAgents/win.aizen.host.plist",
+			);
+			name = "Install Host LaunchAgent";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/win.aizen.host.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\ninstall -d \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ninstall -m 644 \"${SRCROOT}/aizen/Resources/LaunchAgents/win.aizen.host.plist\" \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents/win.aizen.host.plist\"\n";
+		};
+		F27400000000000000000002 /* Install Host LaunchAgent */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/aizen/Resources/LaunchAgents/win.aizen.host.plist",
+			);
+			name = "Install Host LaunchAgent";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/win.aizen.host.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\ninstall -d \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ninstall -m 644 \"${SRCROOT}/aizen/Resources/LaunchAgents/win.aizen.host.plist\" \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents/win.aizen.host.plist\"\n";
+		};
 		CC1234582EA241B30007DBC1 /* Organize Ghostty Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
