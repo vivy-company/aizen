@@ -17,6 +17,7 @@ enum HostService {
             let credentials = try await HostIdentityStore().loadOrCreateCredentials(displayName: displayName)
             let runtime = LocalHostRuntime(storageURL: storageURL, credentials: credentials)
             _ = try await runtime.recoverInterruptedOperations()
+            _ = try? await runtime.recoverTerminalSessions()
             let listener = try runtime.makeMachListener(configuration: configuration)
             let lanListener = runtime.makeLANListener(credentials: credentials)
             try await lanListener.start()

@@ -13,6 +13,7 @@ public final class LocalHostRuntime: @unchecked Sendable {
     private let pairing: PairingRequestRegistry
     private let connectionRegistry = HostConnectionRegistry()
     private let storageURL: URL
+    private let terminalRuntime: any TerminalRuntime
 
     public init(storageURL: URL, credentials providedCredentials: HostIdentityCredentials? = nil) {
         self.storageURL = storageURL
@@ -44,12 +45,14 @@ public final class LocalHostRuntime: @unchecked Sendable {
         )
         self.agentLaunchConfiguration = agentLaunchConfiguration
         let worktrees = GitLinkedWorktreeService()
+        let terminalRuntime = TmuxTerminalRuntime()
+        self.terminalRuntime = terminalRuntime
         let host = LocalHost(
             storage: storage,
             conversationRuns: ConversationRunCoordinator(storage: storage, runtime: runtime, eventPublisher: runEvents),
             managedSandboxes: sandboxes,
             runEventPublisher: runEvents,
-            terminalRuntime: TmuxTerminalRuntime(),
+            terminalRuntime: terminalRuntime,
             agentLaunchConfiguration: agentLaunchConfiguration,
             pairingRegistry: pairing,
             linkedWorktrees: worktrees,
@@ -106,6 +109,19 @@ public final class LocalHostRuntime: @unchecked Sendable {
                 lastStartupError: error.localizedDescription
             )
         }
+    }
+
+    /// Drops only persisted sessions whose exact tmux pane can no longer be found.
+    @discardableResult
+    public func recoverTerminalSessions() async throws -> Int {
+        let sessions = try await storage.load().terminalSessions
+        let recoverableIDs = try await terminalRuntime.recoverableTerminalSessionIDs(sessions)
+        let staleIDs = Set(sessions.map(\.id)).subtracting(recoverableIDs)
+        guard !staleIDs.isEmpty else { return 0 }
+        _ = try await storage.transact { snapshot in
+            snapshot.terminalSessions.removeAll { staleIDs.contains($0.id) }
+        }
+        return staleIDs.count
     }
 
     /// A process-owned operation cannot survive a Host restart. Persist that fact before clients resume polling.

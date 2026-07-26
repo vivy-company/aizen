@@ -44,6 +44,19 @@ public actor TmuxTerminalRuntime: TerminalRuntime {
         return TerminalLaunch(tmuxSessionName: sessionName, paneID: paneID)
     }
 
+    public func recoverableTerminalSessionIDs(_ sessions: [TerminalSession]) async throws -> Set<SessionID> {
+        let tmux = try tmuxExecutable()
+        return Set(sessions.compactMap { session in
+            guard (try? run(tmux, arguments: ["has-session", "-t", session.tmuxSessionName])) != nil,
+                  let paneID = try? output(tmux, arguments: ["display-message", "-p", "-t", session.paneID, "#{pane_id}"])
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                  paneID == session.paneID else {
+                return nil
+            }
+            return session.id
+        })
+    }
+
     private var configurationURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".aizen", isDirectory: true)

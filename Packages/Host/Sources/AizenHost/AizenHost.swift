@@ -1101,6 +1101,15 @@ public protocol TerminalRuntime: Sendable {
         title: String?,
         initialCommand: String?
     ) async throws -> TerminalLaunch
+
+    /// Returns the persisted sessions that remain attachable after the Host starts again.
+    func recoverableTerminalSessionIDs(_ sessions: [TerminalSession]) async throws -> Set<SessionID>
+}
+
+public extension TerminalRuntime {
+    func recoverableTerminalSessionIDs(_ sessions: [TerminalSession]) async throws -> Set<SessionID> {
+        Set(sessions.map(\.id))
+    }
 }
 
 public struct TerminalLaunch: Sendable, Equatable {
