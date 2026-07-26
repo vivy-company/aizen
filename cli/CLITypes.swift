@@ -11,6 +11,7 @@ enum ExitCode: Int32 {
     case incompatibleHost = 8
     case commandFailed = 9
     case hostBlocked = 10
+    case hostTimeout = 11
 }
 
 enum CLIError: Error, LocalizedError {

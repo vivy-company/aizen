@@ -11,6 +11,7 @@ public enum MachWireTransportError: Swift.Error, Sendable, Equatable, LocalizedE
     case invalidResponse
     case unavailable
     case blocked
+    case timeout
     case invalidCodeSigningRequirement(Int32)
 
     public var errorDescription: String? {
@@ -21,6 +22,8 @@ public enum MachWireTransportError: Swift.Error, Sendable, Equatable, LocalizedE
             "Aizen Host is unavailable. Start or repair the Host service, then try again."
         case .blocked:
             "Aizen Host rejected this client. Check the app installation and code-signing identity."
+        case .timeout:
+            "Aizen Host did not respond before the command deadline. Retry the command or inspect its operation."
         case .invalidCodeSigningRequirement:
             "Aizen Host could not validate its trusted client signature requirement."
         }
@@ -55,8 +58,11 @@ public struct HostMachServiceConfiguration: Sendable, Equatable {
 public final class MachWireTransport: @unchecked Sendable, RunEventTransport {
     private let connection: xpc_connection_t
     private let events = MachRunEventHub()
+    private let responseTimeout: TimeInterval
 
-    public init(machServiceName: String) {
+    public init(machServiceName: String, responseTimeout: TimeInterval = 30) {
+        precondition(responseTimeout > 0, "Mach response timeout must be positive")
+        self.responseTimeout = responseTimeout
         connection = xpc_connection_create_mach_service(machServiceName, nil, 0)
         xpc_connection_set_event_handler(connection) { [events] message in
             guard xpc_get_type(message) == XPC_TYPE_DICTIONARY else { return }
@@ -80,21 +86,25 @@ public final class MachWireTransport: @unchecked Sendable, RunEventTransport {
         }
 
         let response = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+            let reply = MachResponseContinuation(continuation: continuation)
+            DispatchQueue.global().asyncAfter(deadline: .now() + responseTimeout) {
+                reply.resume(throwing: MachWireTransportError.timeout)
+            }
             xpc_connection_send_message_with_reply(connection, message, nil) { response in
                 guard xpc_get_type(response) == XPC_TYPE_DICTIONARY else {
                     if xpc_equal(response, XPC_ERROR_CONNECTION_INVALID) {
-                        continuation.resume(throwing: MachWireTransportError.blocked)
+                        reply.resume(throwing: MachWireTransportError.blocked)
                     } else {
-                        continuation.resume(throwing: MachWireTransportError.unavailable)
+                        reply.resume(throwing: MachWireTransportError.unavailable)
                     }
                     return
                 }
                 var length = 0
                 guard let bytes = xpc_dictionary_get_data(response, "response", &length) else {
-                    continuation.resume(throwing: MachWireTransportError.invalidResponse)
+                    reply.resume(throwing: MachWireTransportError.invalidResponse)
                     return
                 }
-                continuation.resume(returning: Data(bytes: bytes, count: length))
+                reply.resume(returning: Data(bytes: bytes, count: length))
             }
         }
         return try ProtocolEnvelope(serializedData: response)
@@ -102,6 +112,32 @@ public final class MachWireTransport: @unchecked Sendable, RunEventTransport {
 
     public func runEvents() async throws -> AsyncStream<RunEvent> {
         await events.stream()
+    }
+}
+
+/// Ensures a late XPC reply cannot resume a timed-out Swift continuation twice.
+final class MachResponseContinuation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Data, Error>?
+
+    init(continuation: CheckedContinuation<Data, Error>) {
+        self.continuation = continuation
+    }
+
+    func resume(returning value: Data) {
+        finish { $0.resume(returning: value) }
+    }
+
+    func resume(throwing error: Error) {
+        finish { $0.resume(throwing: error) }
+    }
+
+    private func finish(_ action: (CheckedContinuation<Data, Error>) -> Void) {
+        lock.lock()
+        let continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+        if let continuation { action(continuation) }
     }
 }
 

@@ -18,6 +18,9 @@ struct AizenCLI {
         } catch MachWireTransportError.blocked {
             printError("Aizen Host rejected this client. Check the Aizen installation and code-signing identity, then retry.")
             exit(ExitCode.hostBlocked.rawValue)
+        } catch MachWireTransportError.timeout {
+            printError("Aizen Host timed out. Retry the command or inspect its operation.")
+            exit(ExitCode.hostTimeout.rawValue)
         } catch let error as HostClient.Error {
             switch error {
             case .incompatibleHost:

@@ -27,6 +27,16 @@ import Testing
     #expect(hostErrorPayload(for: NSError(domain: "test", code: 1)).code == HostErrorCode.commandFailed.rawValue)
 }
 
+@Test func machResponseContinuationKeepsTheFirstReplyAfterTimeoutOrLateXPCResponse() async throws {
+    let response: Data = try await withCheckedThrowingContinuation { continuation in
+        let reply = MachResponseContinuation(continuation: continuation)
+        reply.resume(returning: Data("first".utf8))
+        reply.resume(throwing: MachWireTransportError.timeout)
+    }
+
+    #expect(String(decoding: response, as: UTF8.self) == "first")
+}
+
 @Test func localHostRuntimeFailsInterruptedOperationsBeforeServingClients() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
