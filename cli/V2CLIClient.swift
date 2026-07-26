@@ -5,6 +5,7 @@ import Foundation
 /// CLI composition for the local v2 Host. The CLI stays a client and never opens v2 files directly.
 actor V2CLIClient {
     private let client: LocalHostClient
+    private var negotiated = false
 
     init(storageURL: URL? = nil) {
         let storageURL = storageURL ?? Self.defaultStorageURL()
@@ -115,6 +116,10 @@ actor V2CLIClient {
     }
 
     private func recoverPendingCommands() async throws {
+        if !negotiated {
+            try await client.negotiate()
+            negotiated = true
+        }
         try await client.recoverPendingCommands()
     }
 

@@ -21,6 +21,10 @@ public actor LocalHostClient {
         _ = try await client.retryPendingCommands()
     }
 
+    public func negotiate() async throws {
+        _ = try await client.negotiate()
+    }
+
     public func spaces() async throws -> [Space] {
         try await client.spaces()
     }
