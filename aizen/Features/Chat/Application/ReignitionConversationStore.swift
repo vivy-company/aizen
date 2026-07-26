@@ -22,11 +22,16 @@ final class ReignitionConversationStore: ObservableObject {
     @Published private(set) var lastError: String?
 
     private let host: ReignitionHostComposition
+    private let journalSynchronizer: JournalEventSynchronizer
     private var sessionIDByRun: [RunID: SessionID] = [:]
     private var eventTask: Task<Void, Never>?
 
     init(host: ReignitionHostComposition) {
         self.host = host
+        let cursorURL = ReignitionHostComposition.defaultStorageURL()
+            .deletingLastPathComponent()
+            .appendingPathComponent("reignition-journal-cursor.json")
+        journalSynchronizer = JournalEventSynchronizer(cursorStore: FileJournalCursorStore(url: cursorURL))
         eventTask = Task { [weak self, host] in
             for await event in await host.events() {
                 guard !Task.isCancelled else { return }
@@ -199,6 +204,7 @@ final class ReignitionConversationStore: ObservableObject {
             self.selectedConversationID = nil
             messages = []
         }
+        try await journalSynchronizer.reset(to: response.cursor)
     }
 
     private func consume(_ event: RunEvent) async {
