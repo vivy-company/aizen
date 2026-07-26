@@ -291,8 +291,16 @@ final class ReignitionConversationStore: ObservableObject {
         let cursor = try await journalSynchronizer.lastAppliedCursor()
         if cursor > 0 {
             let replay = try await host.journalEvents(after: cursor)
-            _ = try await journalSynchronizer.apply(replay) { _ in }
-            if replay.events.isEmpty { return }
+            do {
+                _ = try await journalSynchronizer.apply(replay) { _ in }
+                if replay.events.isEmpty { return }
+            } catch let error as JournalSynchronizationError {
+                switch error {
+                case .snapshotRequired, .gap:
+                    // A retained snapshot is the only safe recovery for an expired or discontinuous journal.
+                    break
+                }
+            }
         }
         let response = try await host.projectionSnapshot()
         let snapshot = response.snapshot
