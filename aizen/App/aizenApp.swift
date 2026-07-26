@@ -44,9 +44,15 @@ struct aizenApp: App {
         let legacyModelURL = Bundle.main.url(forResource: "aizen", withExtension: "momd")
         Task { [host, legacyStoreURL, legacyModelURL] in
             do {
+                try await host.activate()
                 _ = try await host.prepareLegacyMigration(legacyStoreURL: legacyStoreURL, legacyModelURL: legacyModelURL)
-                let agentConfiguration = try await DefaultACPAgentLaunchConfigurationResolver().launchConfiguration()
-                try await host.activate(agentConfiguration: agentConfiguration)
+                do {
+                    let agentConfiguration = try await DefaultACPAgentLaunchConfigurationResolver().launchConfiguration()
+                    try await host.configureAgentLaunch(agentConfiguration)
+                } catch {
+                    Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "ReignitionAgentConfiguration")
+                        .error("Host started without an ACP agent: \(error.localizedDescription, privacy: .public)")
+                }
             } catch {
                 Logger(subsystem: Bundle.main.bundleIdentifier ?? "win.aizen.app", category: "ReignitionHostStartup")
                     .error("Reignition Host startup failed: \(error.localizedDescription, privacy: .public)")
