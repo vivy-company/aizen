@@ -65,9 +65,10 @@ public actor PairingRequestRegistry {
         return try await approval.approve(device: pending.device, tokenID: tokenID, secret: pending.request.pairingSecret, grants: grants, route: pending.request.route)
     }
 
-    public func reject(tokenID: UUID) async throws {
+    public func reject(tokenID: UUID) async throws -> DeviceID {
         guard let pending = requests.removeValue(forKey: tokenID) else { throw PairingRequestError.unknownRequest }
         try await approval.reject(deviceID: pending.device.deviceID, route: pending.request.route)
+        return pending.device.deviceID
     }
 
     private func prune(now: Date) {

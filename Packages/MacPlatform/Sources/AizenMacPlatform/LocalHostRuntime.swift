@@ -1,4 +1,6 @@
+import AizenCore
 import AizenHost
+import AizenSecurity
 import AizenStorage
 import Foundation
 
@@ -8,10 +10,21 @@ public final class LocalHostRuntime: @unchecked Sendable {
     public let agentLaunchConfiguration: HostAgentLaunchConfigurationStore
     private let storage: StorageRepository
     private let migrationGate: HostMigrationGate
+    private let pairing: PairingRequestRegistry
 
-    public init(storageURL: URL) {
+    public init(storageURL: URL, credentials providedCredentials: HostIdentityCredentials? = nil) {
         let storage = StorageRepository(url: storageURL)
         self.storage = storage
+        let credentials: HostIdentityCredentials
+        if let provided = providedCredentials {
+            self.pairing = PairingRequestRegistry(hostID: provided.publicIdentity.hostID, approval: PairingApprovalService(storage: storage))
+            credentials = provided
+        } else {
+            let identity = LocalCryptographicIdentity()
+            credentials = .init(publicIdentity: .init(hostID: HostID(), displayName: "Local Host", cryptographicIdentity: identity.publicIdentity()), localIdentity: identity)
+            self.pairing = PairingRequestRegistry(hostID: credentials.publicIdentity.hostID, approval: PairingApprovalService(storage: storage))
+        }
+        let pairing = self.pairing
         let root = storageURL.deletingLastPathComponent()
         let agentLaunchConfiguration = HostAgentLaunchConfigurationStore(
             configurationURL: root.appendingPathComponent("host-agent-launch.json")
@@ -33,7 +46,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
             managedSandboxes: sandboxes,
             runEventPublisher: runEvents,
             terminalRuntime: TmuxTerminalRuntime(),
-            agentLaunchConfiguration: agentLaunchConfiguration
+            agentLaunchConfiguration: agentLaunchConfiguration,
+            pairingRegistry: pairing
         )
         self.host = host
         migrationGate = HostMigrationGate(
@@ -52,7 +66,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
             host: credentials.publicIdentity,
             hostIdentity: credentials.localIdentity,
             storage: storage,
-            endpoint: migrationGate
+            endpoint: migrationGate,
+            pairing: pairing
         )
     }
 }

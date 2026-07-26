@@ -124,6 +124,36 @@ message PairingPending {
   string token_id = 1;
 }
 
+// These management payloads are accepted only by the signed local Host client.
+message ListPendingPairingRequestsQuery {}
+
+message PendingPairingRequestRecord {
+  string token_id = 1;
+  string device_id = 2;
+  string device_display_name = 3;
+  string device_platform = 4;
+  string fingerprint = 5;
+  string route = 6;
+  int64 received_at_unix_milliseconds = 7;
+}
+
+message ListPendingPairingRequestsResponse {
+  repeated PendingPairingRequestRecord requests = 1;
+}
+
+message ApprovePairingRequestCommand {
+  string token_id = 1;
+  repeated string capabilities = 2;
+}
+
+message RejectPairingRequestCommand {
+  string token_id = 1;
+}
+
+message PairingApprovalResult {
+  string device_id = 1;
+}
+
 message CommandReceipt {
   string command_id = 1;
   string operation_id = 2;

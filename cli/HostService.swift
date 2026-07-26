@@ -12,10 +12,10 @@ enum HostService {
             machServiceName: machServiceName,
             teamIdentifier: teamIdentifier
         )
-        let runtime = LocalHostRuntime(storageURL: storageURL)
-        let listener = try runtime.makeMachListener(configuration: configuration)
         let displayName = Host.current().localizedName ?? ProcessInfo.processInfo.hostName
         let credentials = try await HostIdentityStore().loadOrCreateCredentials(displayName: displayName)
+        let runtime = LocalHostRuntime(storageURL: storageURL, credentials: credentials)
+        let listener = try runtime.makeMachListener(configuration: configuration)
         let lanListener = runtime.makeLANListener(credentials: credentials)
         try await lanListener.start()
         withExtendedLifetime((runtime, listener, lanListener)) {

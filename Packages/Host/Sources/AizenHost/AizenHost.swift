@@ -1,4 +1,5 @@
 import AizenCore
+import AizenSecurity
 import AizenStorage
 import AizenTransport
 import AizenWire
@@ -24,6 +25,7 @@ public actor LocalHost: WireEndpoint {
     private let runEventPublisher: RunEventPublisher?
     private let terminalRuntime: (any TerminalRuntime)?
     private let agentLaunchConfiguration: (any AgentLaunchConfigurationUpdating)?
+    private let pairingRegistry: PairingRequestRegistry?
 
     public init(
         storage: StorageRepository,
@@ -31,7 +33,8 @@ public actor LocalHost: WireEndpoint {
         managedSandboxes: ManagedSandboxService? = nil,
         runEventPublisher: RunEventPublisher? = nil,
         terminalRuntime: (any TerminalRuntime)? = nil,
-        agentLaunchConfiguration: (any AgentLaunchConfigurationUpdating)? = nil
+        agentLaunchConfiguration: (any AgentLaunchConfigurationUpdating)? = nil,
+        pairingRegistry: PairingRequestRegistry? = nil
     ) {
         self.storage = storage
         self.conversationRuns = conversationRuns
@@ -39,6 +42,7 @@ public actor LocalHost: WireEndpoint {
         self.runEventPublisher = runEventPublisher
         self.terminalRuntime = terminalRuntime
         self.agentLaunchConfiguration = agentLaunchConfiguration
+        self.pairingRegistry = pairingRegistry
     }
 
     public func runEvents() async -> AsyncStream<RunEvent> {
@@ -109,7 +113,23 @@ public actor LocalHost: WireEndpoint {
                 DetachExecutionContextCommandPayload.identifier,
                 RemoveExecutionContextCommandPayload.identifier,
                 ExecutionContextMutationResultPayload.identifier
+                , ListPendingPairingRequestsQueryPayload.identifier, ListPendingPairingRequestsResponsePayload.identifier, ApprovePairingRequestCommandPayload.identifier, RejectPairingRequestCommandPayload.identifier, PairingApprovalResultPayload.identifier
             ], productVersion: AizenHostModule.productVersion, minimumCompatibleProductVersion: "2.0.0"))
+        case .query where envelope.payload.identifier == ListPendingPairingRequestsQueryPayload.identifier:
+            guard let pairingRegistry else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
+            _ = try ListPendingPairingRequestsQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            kind = .queryResponse
+            payload = try TypedPayload(ListPendingPairingRequestsResponsePayload(requests: await pairingRegistry.pending().map { .init(tokenID: $0.tokenID, deviceID: $0.device.deviceID, deviceDisplayName: $0.device.displayName, devicePlatform: $0.device.platform, fingerprint: $0.device.cryptographicIdentity.fingerprint.description, route: $0.route, receivedAt: $0.receivedAt) }))
+        case .command where envelope.payload.identifier == ApprovePairingRequestCommandPayload.identifier:
+            guard let pairingRegistry else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
+            let command = try ApprovePairingRequestCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let grants = try Set(command.capabilities.map { raw -> CapabilityGrant in guard let capability = HostCapability(rawValue: raw) else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }; return .init(capability: capability) })
+            let authorization = try await pairingRegistry.approve(tokenID: command.tokenID, grants: grants)
+            kind = .commandResult; payload = try TypedPayload(PairingApprovalResultPayload(deviceID: authorization.device.deviceID))
+        case .command where envelope.payload.identifier == RejectPairingRequestCommandPayload.identifier:
+            guard let pairingRegistry else { throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier) }
+            let deviceID = try await pairingRegistry.reject(tokenID: try RejectPairingRequestCommandPayload(protobufBytes: envelope.payload.protobufBytes).tokenID)
+            kind = .commandResult; payload = try TypedPayload(PairingApprovalResultPayload(deviceID: deviceID))
         case .query where envelope.payload.identifier == SnapshotRequestPayload.identifier:
             let request = try SnapshotRequestPayload(protobufBytes: envelope.payload.protobufBytes)
             let snapshot = try await storage.load()

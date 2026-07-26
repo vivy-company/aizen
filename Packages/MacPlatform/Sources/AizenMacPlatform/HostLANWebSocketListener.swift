@@ -29,7 +29,7 @@ public final class HostLANWebSocketListener {
     private var advertisement: HostBonjourAdvertisement?
     private var connections: [UUID: HostLANWebSocketConnection] = [:]
 
-    public init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, storage: StorageRepository, endpoint: any WireEndpoint) {
+    public init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, storage: StorageRepository, endpoint: any WireEndpoint, pairing: PairingRequestRegistry) {
         self.host = host
         self.hostIdentity = hostIdentity
         self.storage = storage
@@ -38,7 +38,7 @@ public final class HostLANWebSocketListener {
         self.rateLimiter = rateLimiter
         authenticator = RemoteSessionAuthenticator(host: host, hostIdentity: hostIdentity, storage: storage, rateLimiter: rateLimiter)
         authorization = DeviceAuthorizationGate(storage: storage)
-        pairing = PairingRequestRegistry(hostID: host.hostID, approval: PairingApprovalService(storage: storage))
+        self.pairing = pairing
     }
 
     public func start() async throws {
@@ -90,7 +90,7 @@ public final class HostLANWebSocketListener {
     }
 
     public func rejectPairingRequest(tokenID: UUID) async throws {
-        try await pairing.reject(tokenID: tokenID)
+        _ = try await pairing.reject(tokenID: tokenID)
     }
 
     private func accept(_ connection: NWConnection) {
