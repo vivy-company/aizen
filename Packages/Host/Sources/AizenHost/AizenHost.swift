@@ -291,20 +291,25 @@ public actor LocalHost: WireEndpoint {
             let command = try AttachExecutionContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let sessionID = try Self.sessionID(from: command.sessionID)
             let contextID = try Self.executionContextID(from: command.contextID)
-            _ = try await storage.transact { snapshot in
-                guard let context = snapshot.executionContexts.first(where: { $0.id == contextID }) else {
-                    throw HostProtocolError.unknownExecutionContext(contextID)
+            guard let spaceID = try await storage.load().executionContexts.first(where: { $0.id == contextID })?.spaceID else {
+                throw HostProtocolError.unknownExecutionContext(contextID)
+            }
+            payload = try await executeDurably(envelope: envelope, spaceID: spaceID) {
+                _ = try await self.storage.transact { snapshot in
+                    guard let context = snapshot.executionContexts.first(where: { $0.id == contextID }) else {
+                        throw HostProtocolError.unknownExecutionContext(contextID)
+                    }
+                    guard let index = snapshot.sessions.firstIndex(where: { $0.id == sessionID }) else {
+                        throw HostProtocolError.unknownSession(sessionID)
+                    }
+                    guard snapshot.sessions[index].spaceID == context.spaceID else {
+                        throw HostProtocolError.invalidExecutionContext(contextID)
+                    }
+                    snapshot.sessions[index].executionContextID = contextID
                 }
-                guard let index = snapshot.sessions.firstIndex(where: { $0.id == sessionID }) else {
-                    throw HostProtocolError.unknownSession(sessionID)
-                }
-                guard snapshot.sessions[index].spaceID == context.spaceID else {
-                    throw HostProtocolError.invalidExecutionContext(contextID)
-                }
-                snapshot.sessions[index].executionContextID = contextID
+                return try TypedPayload(ExecutionContextMutationResultPayload())
             }
             kind = .commandResult
-            payload = try TypedPayload(ExecutionContextMutationResultPayload())
         case .command where envelope.payload.identifier == CreateRepositoryCheckoutContextCommandPayload.identifier:
             let command = try CreateRepositoryCheckoutContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)

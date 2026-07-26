@@ -140,6 +140,22 @@ import AizenWire
     #expect(contextFirst.payload == contextReplay.payload)
     #expect(try await storage.load().executionContexts.count == 1)
     #expect(try await storage.load().commands.count == 2)
+
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    _ = try await storage.transact { $0.sessions.append(session) }
+    let contextID = try CreateLocalFolderContextResultPayload(protobufBytes: contextFirst.payload.protobufBytes).contextID
+    let attachEnvelope = ProtocolEnvelope(
+        messageID: UUID().uuidString,
+        connectionSequence: 3,
+        kind: .command,
+        channel: .state,
+        payload: try .init(AttachExecutionContextCommandPayload(sessionID: session.id.description, contextID: contextID))
+    )
+    let attachFirst = try await transport.send(attachEnvelope)
+    let attachReplay = try await transport.send(attachEnvelope)
+    #expect(attachFirst.payload == attachReplay.payload)
+    #expect(try await storage.load().sessions.first?.executionContextID?.description == contextID)
+    #expect(try await storage.load().commands.count == 3)
 }
 
 @Test func hostRenamesAndDeletesEmptySpacesThroughTypedCommands() async throws {
