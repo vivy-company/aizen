@@ -189,10 +189,10 @@ struct ReignitionConversationWindow: View {
                 }
                 Divider()
             }
-            let folderResources = store.resources.filter { $0.kind == .folder }
-            if !folderResources.isEmpty {
-                Section("Existing Folders") {
-                    ForEach(folderResources) { resource in
+            let attachableResources = store.resources.filter { $0.kind == .folder || $0.kind == .repository }
+            if !attachableResources.isEmpty {
+                Section("Existing Resources") {
+                    ForEach(attachableResources) { resource in
                         Button(resource.title) {
                             Task { await store.attach(resourceID: resource.id, to: conversation.id) }
                         }

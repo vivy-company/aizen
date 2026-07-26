@@ -92,7 +92,14 @@ final class ReignitionConversationStore: ObservableObject {
             if let existing = self.executionContexts.first(where: { $0.resourceID == resource.id }) {
                 contextID = existing.id
             } else {
-                contextID = try await self.host.createLocalFolderContext(spaceID: session.spaceID, resourceID: resource.id)
+                switch resource.kind {
+                case .folder:
+                    contextID = try await self.host.createLocalFolderContext(spaceID: session.spaceID, resourceID: resource.id)
+                case .repository:
+                    contextID = try await self.host.createRepositoryCheckoutContext(spaceID: session.spaceID, resourceID: resource.id)
+                default:
+                    return
+                }
             }
             try await self.host.attachExecutionContext(sessionID: session.id, contextID: contextID)
             try await self.refreshProjection(spaceID: session.spaceID)
