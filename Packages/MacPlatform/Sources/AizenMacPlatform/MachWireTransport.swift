@@ -128,9 +128,10 @@ private final class MachWireService: @unchecked Sendable {
     func accept(_ connection: xpc_object_t) {
         let peer = MachConnection(connection)
         if let eventEndpoint = endpoint as? any RunEventEndpoint {
-            Task { [peer] in
+            peer.startEventForwarding(Task { [peer] in
                 let stream = await eventEndpoint.runEvents()
                 for await event in stream {
+                    guard !Task.isCancelled else { return }
                     guard let envelope = try? ProtocolEnvelope(
                         messageID: UUID().uuidString,
                         connectionSequence: event.sequence,
@@ -140,9 +141,13 @@ private final class MachWireService: @unchecked Sendable {
                     ).serializedData() else { continue }
                     peer.sendEvent(envelope)
                 }
-            }
+            })
         }
         xpc_connection_set_event_handler(connection) { [endpoint, peer] message in
+            guard xpc_get_type(message) != XPC_TYPE_ERROR else {
+                peer.stopEventForwarding()
+                return
+            }
             guard xpc_get_type(message) == XPC_TYPE_DICTIONARY,
                   let reply = xpc_dictionary_create_reply(message) else {
                 return
@@ -173,6 +178,8 @@ private final class MachWireService: @unchecked Sendable {
 
 private final class MachConnection: @unchecked Sendable {
     let value: xpc_connection_t
+    private let eventTaskLock = NSLock()
+    private var eventTask: Task<Void, Never>?
 
     init(_ value: xpc_connection_t) {
         self.value = value
@@ -188,6 +195,24 @@ private final class MachConnection: @unchecked Sendable {
             xpc_dictionary_set_data(message, "event", bytes.baseAddress, bytes.count)
         }
         xpc_connection_send_message(value, message)
+    }
+
+    func startEventForwarding(_ task: Task<Void, Never>) {
+        eventTaskLock.lock()
+        defer { eventTaskLock.unlock() }
+        eventTask?.cancel()
+        eventTask = task
+    }
+
+    func stopEventForwarding() {
+        eventTaskLock.lock()
+        defer { eventTaskLock.unlock() }
+        eventTask?.cancel()
+        eventTask = nil
+    }
+
+    deinit {
+        stopEventForwarding()
     }
 }
 
