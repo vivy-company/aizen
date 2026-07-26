@@ -53,6 +53,12 @@ import Testing
     #expect(!CommandLifecycle.succeeded.canTransition(to: .executing))
 }
 
+@Test func durableCommandResultsPreserveTypedWireData() {
+    let result = DurableCommandResult(payloadIdentifier: "aizen.command-result.space.create@1", schemaVersion: 1, protobufBytes: Data([1, 2, 3]))
+    #expect(result.payloadIdentifier == "aizen.command-result.space.create@1")
+    #expect(result.protobufBytes == Data([1, 2, 3]))
+}
+
 @Test func runLifecycleModelsHostPreparationAndCancellation() {
     #expect(RunLifecycle.queued.canTransition(to: .preparingContext))
     #expect(RunLifecycle.preparingContext.canTransition(to: .startingAgent))

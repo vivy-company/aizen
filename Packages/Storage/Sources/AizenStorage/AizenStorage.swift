@@ -87,6 +87,8 @@ public enum StorageError: Error, Sendable, Equatable {
     case missingRun
     case missingResource
     case missingExecutionContext
+    case missingCommand
+    case invalidCommandTransition
     case migrationDestinationNotEmpty
 }
 
@@ -251,6 +253,17 @@ public actor StorageRepository {
         }
         if stored.payloadDigest != command.payloadDigest { return .conflict(stored) }
         return inserted ? .accepted(stored) : .duplicate(stored)
+    }
+
+    public func transitionCommand(id: CommandID, to lifecycle: CommandLifecycle, result: DurableCommandResult? = nil) throws -> DurableCommand {
+        let snapshot = try transact { snapshot in
+            guard let index = snapshot.commands.firstIndex(where: { $0.id == id }) else { throw StorageError.missingCommand }
+            guard snapshot.commands[index].lifecycle.canTransition(to: lifecycle) else { throw StorageError.invalidCommandTransition }
+            snapshot.commands[index].lifecycle = lifecycle
+            snapshot.commands[index].result = result
+        }
+        guard let command = snapshot.commands.first(where: { $0.id == id }) else { throw StorageError.missingCommand }
+        return command
     }
 
     private func validate(_ snapshot: StorageSnapshot) throws {

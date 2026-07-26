@@ -53,7 +53,11 @@ import AizenCore
     #expect(try await repository.acceptCommand(command) == .duplicate(command))
     let conflicting = DurableCommand(id: command.id, spaceID: space.id, payloadDigest: "sha256:two")
     #expect(try await repository.acceptCommand(conflicting) == .conflict(command))
-    #expect(try await repository.load().commands == [command])
+    _ = try await repository.transitionCommand(id: command.id, to: .executing)
+    let result = DurableCommandResult(payloadIdentifier: "aizen.command-result.example@1", schemaVersion: 1, protobufBytes: Data([1]))
+    let completed = try await repository.transitionCommand(id: command.id, to: .succeeded, result: result)
+    #expect(completed.result == result)
+    #expect(try await repository.load().commands == [completed])
 }
 
 @Test func failedTransactionsLeaveTheLastValidSnapshotIntact() async throws {

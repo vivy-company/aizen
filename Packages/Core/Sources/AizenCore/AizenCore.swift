@@ -457,6 +457,21 @@ public enum CommandLifecycle: String, Codable, Sendable, Hashable {
     }
 }
 
+/// A transport-neutral copy of a typed Host result, retained for idempotent command replay.
+public struct DurableCommandResult: Codable, Sendable, Hashable {
+    public let payloadIdentifier: String
+    public let schemaVersion: UInt32
+    public let protobufBytes: Data
+
+    public init(payloadIdentifier: String, schemaVersion: UInt32, protobufBytes: Data) {
+        precondition(!payloadIdentifier.isEmpty, "Durable command results require a payload identifier")
+        precondition(schemaVersion > 0, "Payload schema versions start at one")
+        self.payloadIdentifier = payloadIdentifier
+        self.schemaVersion = schemaVersion
+        self.protobufBytes = protobufBytes
+    }
+}
+
 /// Host-owned command receipt used to make mutating Client requests retry-safe across connections.
 public struct DurableCommand: Codable, Sendable, Hashable, Identifiable {
     public let id: CommandID
@@ -464,14 +479,16 @@ public struct DurableCommand: Codable, Sendable, Hashable, Identifiable {
     public let deviceID: DeviceID?
     public let payloadDigest: String
     public var lifecycle: CommandLifecycle
+    public var result: DurableCommandResult?
 
-    public init(id: CommandID = CommandID(), spaceID: SpaceID, deviceID: DeviceID? = nil, payloadDigest: String, lifecycle: CommandLifecycle = .accepted) {
+    public init(id: CommandID = CommandID(), spaceID: SpaceID, deviceID: DeviceID? = nil, payloadDigest: String, lifecycle: CommandLifecycle = .accepted, result: DurableCommandResult? = nil) {
         precondition(!payloadDigest.isEmpty, "Durable commands require a canonical payload digest")
         self.id = id
         self.spaceID = spaceID
         self.deviceID = deviceID
         self.payloadDigest = payloadDigest
         self.lifecycle = lifecycle
+        self.result = result
     }
 }
 
