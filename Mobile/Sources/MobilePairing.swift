@@ -100,6 +100,24 @@ final class MobilePairingStore: ObservableObject {
             messages = try await client.conversationTimeline(sessionID: id)
         } catch { state = .failed(error.localizedDescription) }
     }
+
+    func createConversation(title: String) async {
+        guard let client, let spaceID = selectedSpaceID, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        do {
+            let id = try await client.createConversation(spaceID: spaceID, title: title)
+            sessions = try await client.conversations(spaceID: spaceID)
+            await selectSession(id)
+        } catch { state = .failed(error.localizedDescription) }
+    }
+
+    func sendMessage(_ content: String) async {
+        guard let client, let spaceID = selectedSpaceID, let sessionID = selectedSessionID,
+              !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        do {
+            _ = try await client.sendConversation(spaceID: spaceID, sessionID: sessionID, content: content)
+            messages = try await client.conversationTimeline(sessionID: sessionID)
+        } catch { state = .failed(error.localizedDescription) }
+    }
 }
 
 private enum MobilePairingInvitation {

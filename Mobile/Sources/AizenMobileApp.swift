@@ -19,6 +19,8 @@ private struct MobileRootView: View {
     @StateObject private var pairing = MobilePairingStore()
     @State private var invitation = ""
     @State private var showsScanner = false
+    @State private var newConversationTitle = ""
+    @State private var composer = ""
 
     var body: some View {
         NavigationSplitView {
@@ -80,24 +82,48 @@ private struct MobileRootView: View {
                 .ignoresSafeArea()
             }
                 } else {
-                    List(pairing.sessions) { session in
-                        Button { Task { await pairing.selectSession(session.id) } } label: {
-                            VStack(alignment: .leading) {
-                                Text(session.title)
-                                Text(session.kind.rawValue).font(.caption).foregroundStyle(.secondary)
+                    VStack(spacing: 0) {
+                        List(pairing.sessions) { session in
+                            Button { Task { await pairing.selectSession(session.id) } } label: {
+                                VStack(alignment: .leading) {
+                                    Text(session.title)
+                                    Text(session.kind.rawValue).font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                         }
+                        HStack {
+                            TextField("New conversation", text: $newConversationTitle)
+                            Button("Create") {
+                                let title = newConversationTitle
+                                newConversationTitle = ""
+                                Task { await pairing.createConversation(title: title) }
+                            }
+                            .disabled(newConversationTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                        .padding()
                     }
                     .navigationTitle(pairing.spaces.first(where: { $0.id == pairing.selectedSpaceID })?.name ?? "Sessions")
                 }
             }
         } detail: {
             if let sessionID = pairing.selectedSessionID {
-                List(pairing.messages) { message in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(message.role.rawValue.capitalized).font(.caption).foregroundStyle(.secondary)
-                        Text(message.content)
+                VStack(spacing: 0) {
+                    List(pairing.messages) { message in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(message.role.rawValue.capitalized).font(.caption).foregroundStyle(.secondary)
+                            Text(message.content)
+                        }
                     }
+                    HStack(alignment: .bottom) {
+                        TextField("Message", text: $composer, axis: .vertical)
+                        Button("Send") {
+                            let content = composer
+                            composer = ""
+                            Task { await pairing.sendMessage(content) }
+                        }
+                        .disabled(composer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    .padding()
                 }
                 .navigationTitle(pairing.sessions.first(where: { $0.id == sessionID })?.title ?? "Conversation")
             } else {
