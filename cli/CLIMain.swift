@@ -136,10 +136,6 @@ private extension AizenCLI {
             return
         }
 
-        guard await GitUtils.isGitRepository(at: path) else {
-            throw CLIError.notGitRepository(path)
-        }
-
         throw CLIError.repositoryNotFound(path)
     }
 
@@ -161,8 +157,6 @@ private extension AizenCLI {
         }
         let path = normalizePath(target)
         guard FileManager.default.fileExists(atPath: path) else { throw CLIError.pathNotFound(path) }
-        guard await GitUtils.isGitRepository(at: path) else { throw CLIError.notGitRepository(path) }
-
         let client = V2CLIClient()
         let spaces = try await client.spaces()
         let space: Space
@@ -719,8 +713,6 @@ private extension AizenCLI {
 
         let targetPath = parsed.positionals.first.map(normalizePath) ?? FileManager.default.currentDirectoryPath
         guard FileManager.default.fileExists(atPath: targetPath) else { throw CLIError.pathNotFound(targetPath) }
-        guard await GitUtils.isGitRepository(at: targetPath) else { throw CLIError.notGitRepository(targetPath) }
-
         let client = V2CLIClient()
         let spaces = try await client.spaces()
         let space: Space
