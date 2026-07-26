@@ -281,7 +281,6 @@ public actor StorageRepository {
         guard Set(snapshot.commands.map(\.id)).count == snapshot.commands.count else { throw StorageError.duplicateIdentity("command") }
         guard snapshot.resources.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
         guard snapshot.executionContexts.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
-        guard snapshot.commands.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
 
         let sessions = Dictionary(uniqueKeysWithValues: snapshot.sessions.map { ($0.id, $0) })
         let resources = Dictionary(uniqueKeysWithValues: snapshot.resources.map { ($0.id, $0) })

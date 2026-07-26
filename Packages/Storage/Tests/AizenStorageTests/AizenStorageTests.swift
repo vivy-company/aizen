@@ -66,6 +66,20 @@ import AizenCore
     }
 }
 
+@Test func durableCommandReceiptsOutliveDeletedSpaces() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = StorageRepository(url: directory.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Personal")
+    let command = DurableCommand(spaceID: space.id, payloadDigest: "sha256:one")
+    _ = try await repository.transact {
+        $0.spaces.append(space)
+        $0.commands.append(command)
+    }
+    _ = try await repository.transact { $0.spaces.removeAll(where: { $0.id == space.id }) }
+    #expect(try await repository.load().commands == [command])
+}
+
 @Test func failedTransactionsLeaveTheLastValidSnapshotIntact() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: directory) }
