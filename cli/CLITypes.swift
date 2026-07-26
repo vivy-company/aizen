@@ -9,6 +9,7 @@ enum ExitCode: Int32 {
     case pathNotFound = 6
     case hostUnavailable = 7
     case incompatibleHost = 8
+    case commandFailed = 9
 }
 
 enum CLIError: Error, LocalizedError {

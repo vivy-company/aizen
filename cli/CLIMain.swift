@@ -20,6 +20,9 @@ struct AizenCLI {
             case .incompatibleHost:
                 printError(error.localizedDescription)
                 exit(ExitCode.incompatibleHost.rawValue)
+            case .hostFailure:
+                printError(error.localizedDescription)
+                exit(ExitCode.commandFailed.rawValue)
             default:
                 printError(error.localizedDescription)
                 exit(ExitCode.generalError.rawValue)
