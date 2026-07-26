@@ -26,7 +26,7 @@ import AizenWire
     #expect(await transcripts.snapshot(terminalID: terminal, after: 2).bytes.isEmpty)
     let replay = await transcripts.snapshot(terminalID: terminal, after: 1)
     #expect(replay.sequence == 2)
-    #expect(replay.bytes == Data("bcdef".utf8))
+    #expect(replay.bytes == Data("def".utf8))
 }
 
 @Test func hostAttachesToBoundedTerminalOutput() async throws {
@@ -48,6 +48,13 @@ import AizenWire
     let replay = ProtocolEnvelope(messageID: "attach-replay", connectionSequence: 2, kind: .query, channel: .terminal, payload: try .init(AttachTerminalQueryPayload(terminalSessionID: terminal.id.description, afterSequence: attached.sequence, scrollbackBytes: 4)))
     let replayResponse = try await host.receive(replay)
     #expect(try AttachTerminalResponsePayload(protobufBytes: replayResponse.payload.protobufBytes).output.isEmpty)
+
+    await runtime.setCapture(Data("abcdefg".utf8))
+    let resumed = ProtocolEnvelope(messageID: "attach-resumed", connectionSequence: 3, kind: .query, channel: .terminal, payload: try .init(AttachTerminalQueryPayload(terminalSessionID: terminal.id.description, afterSequence: attached.sequence, scrollbackBytes: 4)))
+    let resumedResponse = try await host.receive(resumed)
+    let resumedOutput = try AttachTerminalResponsePayload(protobufBytes: resumedResponse.payload.protobufBytes)
+    #expect(resumedOutput.sequence == attached.sequence + 1)
+    #expect(resumedOutput.output == Data("g".utf8))
 }
 
 @Test func terminalControlLeasesExpireAndDeduplicateDeviceInput() async throws {
