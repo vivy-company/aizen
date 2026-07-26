@@ -70,6 +70,15 @@ public protocol RepositoryDiffReading: Sendable {
     func diff(at repositoryURL: URL, relativePath: String, maximumBytes: Int) async throws -> RepositoryDiffSnapshot
 }
 
+public struct RepositoryHistorySnapshot: Sendable, Equatable {
+    public struct Commit: Sendable, Equatable { public let revision: String; public let subject: String; public let authorName: String; public let authoredAtUnixMilliseconds: Int64 }
+    public let repositoryRevision: String; public let indexRevision: String; public let branch: String?; public let isDetached: Bool; public let commits: [Commit]; public let truncated: Bool
+}
+
+public protocol RepositoryHistoryReading: Sendable {
+    func history(at repositoryURL: URL, maximumCommits: Int) async throws -> RepositoryHistorySnapshot
+}
+
 public protocol XcodeProjectOpening: Sendable {
     func openXcodeProject(at url: URL) async throws
 }
@@ -96,6 +105,7 @@ public actor LocalHost: WireEndpoint {
     private let independentContexts: (any IndependentContextCreating)?
     private let repositoryStatusReader: (any RepositoryStatusReading)?
     private let repositoryDiffReader: (any RepositoryDiffReading)?
+    private let repositoryHistoryReader: (any RepositoryHistoryReading)?
     private let xcodeProjectOpener: (any XcodeProjectOpening)?
     private let xcodeProjectInspector: (any XcodeProjectInspecting)?
     private let xcodeProjectBuilder: (any XcodeProjectBuilding)?
@@ -114,6 +124,7 @@ public actor LocalHost: WireEndpoint {
         independentContexts: (any IndependentContextCreating)? = nil,
         repositoryStatusReader: (any RepositoryStatusReading)? = nil,
         repositoryDiffReader: (any RepositoryDiffReading)? = nil,
+        repositoryHistoryReader: (any RepositoryHistoryReading)? = nil,
         xcodeProjectOpener: (any XcodeProjectOpening)? = nil,
         xcodeProjectInspector: (any XcodeProjectInspecting)? = nil,
         xcodeProjectBuilder: (any XcodeProjectBuilding)? = nil
@@ -130,6 +141,7 @@ public actor LocalHost: WireEndpoint {
         self.independentContexts = independentContexts
         self.repositoryStatusReader = repositoryStatusReader
         self.repositoryDiffReader = repositoryDiffReader
+        self.repositoryHistoryReader = repositoryHistoryReader
         self.xcodeProjectOpener = xcodeProjectOpener
         self.xcodeProjectInspector = xcodeProjectInspector
         self.xcodeProjectBuilder = xcodeProjectBuilder
@@ -221,6 +233,8 @@ public actor LocalHost: WireEndpoint {
                 ReadRepositoryStatusResponsePayload.identifier,
                 ReadRepositoryDiffQueryPayload.identifier,
                 ReadRepositoryDiffResponsePayload.identifier,
+                ReadRepositoryHistoryQueryPayload.identifier,
+                ReadRepositoryHistoryResponsePayload.identifier,
                 CreateLocalFolderContextCommandPayload.identifier,
                 CreateLocalFolderContextResultPayload.identifier,
                 CreateRepositoryCheckoutContextCommandPayload.identifier,
@@ -736,6 +750,14 @@ public actor LocalHost: WireEndpoint {
             let diff = try await repositoryDiffReader.diff(at: repositoryURL, relativePath: query.relativePath, maximumBytes: Int(query.maximumBytes))
             kind = .queryResponse
             payload = try TypedPayload(ReadRepositoryDiffResponsePayload(resourceID: resourceID.description, repositoryRevision: diff.repositoryRevision, indexRevision: diff.indexRevision, unifiedDiff: diff.unifiedDiff, truncated: diff.truncated))
+        case .query where envelope.payload.identifier == ReadRepositoryHistoryQueryPayload.identifier:
+            guard let repositoryHistoryReader else { throw HostProtocolError.runtimeUnavailable }
+            let query = try ReadRepositoryHistoryQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let resourceID = try Self.resourceID(from: query.resourceID)
+            guard let resource = try await storage.load().resources.first(where: { $0.id == resourceID }), resource.kind == .repository, let repositoryURL = try Self.localResourceDirectory(for: resource) else { throw HostProtocolError.unknownResource(resourceID) }
+            let history = try await repositoryHistoryReader.history(at: repositoryURL, maximumCommits: Int(query.maximumCommits))
+            kind = .queryResponse
+            payload = try TypedPayload(ReadRepositoryHistoryResponsePayload(resourceID: resourceID.description, repositoryRevision: history.repositoryRevision, indexRevision: history.indexRevision, branch: history.branch, isDetached: history.isDetached, commits: history.commits.map { .init(revision: $0.revision, subject: $0.subject, authorName: $0.authorName, authoredAtUnixMilliseconds: $0.authoredAtUnixMilliseconds) }, truncated: history.truncated))
         case .command where envelope.payload.identifier == CreateLocalFolderContextCommandPayload.identifier:
             let command = try CreateLocalFolderContextCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let spaceID = try Self.spaceID(from: command.spaceID)
