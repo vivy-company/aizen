@@ -97,7 +97,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
                 activeConnectionCount: connectionRegistry.count,
                 activeRunCount: snapshot.runs.filter { $0.lifecycle.isActive }.count,
                 activeOperationCount: snapshot.operations.filter { $0.lifecycle == .running }.count,
-                lastStartupError: HostStartupStatusStore.lastError(storageURL: storageURL)
+                lastStartupError: HostStartupStatusStore.lastError(storageURL: storageURL),
+                consecutiveStartupFailureCount: HostStartupStatusStore.consecutiveFailureCount(storageURL: storageURL)
             )
         } catch {
             return .init(
@@ -106,7 +107,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
                 activeConnectionCount: connectionRegistry.count,
                 activeRunCount: 0,
                 activeOperationCount: 0,
-                lastStartupError: error.localizedDescription
+                lastStartupError: error.localizedDescription,
+                consecutiveStartupFailureCount: HostStartupStatusStore.consecutiveFailureCount(storageURL: storageURL)
             )
         }
     }

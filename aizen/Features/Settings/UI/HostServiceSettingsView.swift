@@ -33,6 +33,9 @@ struct HostServiceSettingsView: View {
                     LabeledContent("Active connections", value: String(diagnostics.activeConnectionCount))
                     LabeledContent("Active runs", value: String(diagnostics.activeRunCount))
                     LabeledContent("Active operations", value: String(diagnostics.activeOperationCount))
+                    if diagnostics.consecutiveStartupFailureCount > 0 {
+                        LabeledContent("Consecutive startup failures", value: String(diagnostics.consecutiveStartupFailureCount))
+                    }
                     if let lastStartupError = diagnostics.lastStartupError {
                         Text(lastStartupError)
                             .font(.footnote)

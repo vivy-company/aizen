@@ -388,6 +388,7 @@ public struct HostDiagnosticsSnapshot: Codable, Sendable, Hashable {
     public let activeRunCount: Int
     public let activeOperationCount: Int
     public let lastStartupError: String?
+    public let consecutiveStartupFailureCount: Int
 
     public init(
         storageState: StorageState,
@@ -395,15 +396,17 @@ public struct HostDiagnosticsSnapshot: Codable, Sendable, Hashable {
         activeConnectionCount: Int,
         activeRunCount: Int,
         activeOperationCount: Int,
-        lastStartupError: String? = nil
+        lastStartupError: String? = nil,
+        consecutiveStartupFailureCount: Int = 0
     ) {
-        precondition(activeConnectionCount >= 0 && activeRunCount >= 0 && activeOperationCount >= 0, "Diagnostics counts cannot be negative")
+        precondition(activeConnectionCount >= 0 && activeRunCount >= 0 && activeOperationCount >= 0 && consecutiveStartupFailureCount >= 0, "Diagnostics counts cannot be negative")
         self.storageState = storageState
         self.migrationState = migrationState
         self.activeConnectionCount = activeConnectionCount
         self.activeRunCount = activeRunCount
         self.activeOperationCount = activeOperationCount
         self.lastStartupError = lastStartupError
+        self.consecutiveStartupFailureCount = consecutiveStartupFailureCount
     }
 }
 

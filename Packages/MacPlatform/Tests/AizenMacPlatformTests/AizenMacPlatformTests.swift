@@ -104,9 +104,12 @@ import Testing
     let storageURL = root.appendingPathComponent("storage-v2.json")
 
     try HostStartupStatusStore.recordFailure(NSError(domain: "Host", code: 1, userInfo: [NSLocalizedDescriptionKey: "Listener unavailable"]), storageURL: storageURL)
-    #expect(HostStartupStatusStore.lastError(storageURL: storageURL) == "Listener unavailable")
+    try HostStartupStatusStore.recordFailure(NSError(domain: "Host", code: 2, userInfo: [NSLocalizedDescriptionKey: "Listener still unavailable"]), storageURL: storageURL)
+    #expect(HostStartupStatusStore.lastError(storageURL: storageURL) == "Listener still unavailable")
+    #expect(HostStartupStatusStore.consecutiveFailureCount(storageURL: storageURL) == 2)
     try HostStartupStatusStore.clearFailure(storageURL: storageURL)
     #expect(HostStartupStatusStore.lastError(storageURL: storageURL) == nil)
+    #expect(HostStartupStatusStore.consecutiveFailureCount(storageURL: storageURL) == 0)
 }
 
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
