@@ -21,6 +21,12 @@ import Testing
     }
 }
 
+@Test func machWireServiceExportsStableHostErrorCodes() {
+    #expect(hostErrorPayload(for: HostProtocolError.unknownResource(ResourceID())).code == HostErrorCode.unknownResource.rawValue)
+    #expect(hostErrorPayload(for: HostProtocolError.runtimeUnavailable).code == HostErrorCode.unavailable.rawValue)
+    #expect(hostErrorPayload(for: NSError(domain: "test", code: 1)).code == HostErrorCode.commandFailed.rawValue)
+}
+
 @Test func hostIdentityIsStableAcrossHostRestarts() async throws {
     let persistence = MemoryHostIdentityPersistence()
     let first = try await HostIdentityStore(persistence: persistence).loadOrCreate(displayName: "Mac")

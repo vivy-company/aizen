@@ -1,4 +1,5 @@
 import AizenCore
+import AizenHost
 import AizenTransport
 import AizenWire
 import Dispatch
@@ -9,6 +10,7 @@ import Foundation
 public enum MachWireTransportError: Swift.Error, Sendable, Equatable, LocalizedError {
     case invalidResponse
     case unavailable
+    case blocked
     case invalidCodeSigningRequirement(Int32)
 
     public var errorDescription: String? {
@@ -17,6 +19,8 @@ public enum MachWireTransportError: Swift.Error, Sendable, Equatable, LocalizedE
             "Aizen Host returned an invalid response."
         case .unavailable:
             "Aizen Host is unavailable. Start or repair the Host service, then try again."
+        case .blocked:
+            "Aizen Host rejected this client. Check the app installation and code-signing identity."
         case .invalidCodeSigningRequirement:
             "Aizen Host could not validate its trusted client signature requirement."
         }
@@ -78,7 +82,11 @@ public final class MachWireTransport: @unchecked Sendable, RunEventTransport {
         let response = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
             xpc_connection_send_message_with_reply(connection, message, nil) { response in
                 guard xpc_get_type(response) == XPC_TYPE_DICTIONARY else {
-                    continuation.resume(throwing: MachWireTransportError.unavailable)
+                    if xpc_equal(response, XPC_ERROR_CONNECTION_INVALID) {
+                        continuation.resume(throwing: MachWireTransportError.blocked)
+                    } else {
+                        continuation.resume(throwing: MachWireTransportError.unavailable)
+                    }
                     return
                 }
                 var length = 0
@@ -181,7 +189,7 @@ private final class MachWireService: @unchecked Sendable {
                         connectionSequence: 0,
                         kind: .error,
                         channel: .control,
-                        payload: TypedPayload(HostErrorPayload(code: String(reflecting: type(of: error)), message: error.localizedDescription))
+                        payload: TypedPayload(hostErrorPayload(for: error))
                     )
                 }
                 guard let response, let data = try? response.serializedData() else { peer.send(replyMessage); return }
@@ -193,6 +201,13 @@ private final class MachWireService: @unchecked Sendable {
         }
         xpc_connection_activate(connection)
     }
+}
+
+func hostErrorPayload(for error: Error) -> HostErrorPayload {
+    if let error = error as? HostProtocolError {
+        return HostErrorPayload(code: error.errorCode, message: error.localizedDescription)
+    }
+    return HostErrorPayload(code: .commandFailed, message: error.localizedDescription)
 }
 
 private final class MachConnection: @unchecked Sendable {

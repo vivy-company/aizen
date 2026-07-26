@@ -1034,6 +1034,31 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case invalidExecutionContext(ExecutionContextID)
     case spaceNotEmpty(SpaceID)
     case runtimeUnavailable
+
+    public var errorCode: HostErrorCode {
+        switch self {
+        case .unsupportedRequest:
+            .unsupportedRequest
+        case .invalidIdentity, .invalidResourcePath, .invalidExecutionContext:
+            .invalidRequest
+        case .unknownSpace:
+            .unknownSpace
+        case .unknownSession:
+            .unknownSession
+        case .unknownRun:
+            .unknownRun
+        case .unknownResource:
+            .unknownResource
+        case .unknownExecutionContext:
+            .unknownExecutionContext
+        case .duplicateTerminalSession, .duplicateResource, .resourceInUse, .executionContextInUse, .commandIDConflict, .spaceNotEmpty:
+            .conflict
+        case .commandIncomplete:
+            .commandIncomplete
+        case .runtimeUnavailable:
+            .unavailable
+        }
+    }
 }
 
 extension LocalHost: RunEventEndpoint {}

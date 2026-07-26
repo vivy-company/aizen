@@ -63,6 +63,21 @@ public struct TypedPayload: Codable, Sendable, Hashable {
     }
 }
 
+/// Stable failure categories exposed to Clients. The message is diagnostic; the code is automation-safe.
+public enum HostErrorCode: String, Sendable, Hashable {
+    case unsupportedRequest = "unsupported-request"
+    case invalidRequest = "invalid-request"
+    case unknownSpace = "unknown-space"
+    case unknownSession = "unknown-session"
+    case unknownRun = "unknown-run"
+    case unknownResource = "unknown-resource"
+    case unknownExecutionContext = "unknown-execution-context"
+    case conflict = "conflict"
+    case commandIncomplete = "command-incomplete"
+    case unavailable = "unavailable"
+    case commandFailed = "command-failed"
+}
+
 public struct HostErrorPayload: Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.error@1")
     public static let schemaVersion: UInt32 = 1
@@ -74,6 +89,10 @@ public struct HostErrorPayload: Sendable, Hashable {
         precondition(!code.isEmpty && !message.isEmpty, "Host errors require a code and message")
         self.code = code
         self.message = message
+    }
+
+    public init(code: HostErrorCode, message: String) {
+        self.init(code: code.rawValue, message: message)
     }
 
     public init(protobufBytes: Data) throws {
