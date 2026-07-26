@@ -104,6 +104,40 @@ import AizenWire
     #expect(try await storage.load().spaces.map(\.name) == ["Vivy"])
 }
 
+@Test func hostReplaysSpaceScopedCommands() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    _ = try await storage.transact { $0.spaces.append(space) }
+    let transport = InProcessTransport(endpoint: LocalHost(storage: storage))
+
+    let renameEnvelope = ProtocolEnvelope(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(RenameSpaceCommandPayload(spaceID: space.id.description, name: "Aizen"))
+    )
+    let renameFirst = try await transport.send(renameEnvelope)
+    let renameReplay = try await transport.send(renameEnvelope)
+    #expect(renameFirst.payload == renameReplay.payload)
+    #expect(try await storage.load().spaces == [Space(id: space.id, name: "Aizen")])
+
+    let conversationEnvelope = ProtocolEnvelope(
+        messageID: UUID().uuidString,
+        connectionSequence: 2,
+        kind: .command,
+        channel: .state,
+        payload: try .init(CreateConversationCommandPayload(spaceID: space.id.description, title: "Plan"))
+    )
+    let conversationFirst = try await transport.send(conversationEnvelope)
+    let conversationReplay = try await transport.send(conversationEnvelope)
+    #expect(conversationFirst.payload == conversationReplay.payload)
+    #expect(try await storage.load().sessions.count == 1)
+    #expect(try await storage.load().commands.count == 2)
+}
+
 @Test func hostReplaysAcceptedFolderImportCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
