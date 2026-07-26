@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Host resolves the repository URL from a Resource before this actor is called; this type never
 /// receives a client-provided command or path fragment.
-public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryBranchReading, RepositoryIndexUpdating, RepositoryCommitting, RepositoryBranchUpdating, RepositoryFetching, RepositoryPulling {
+public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffReading, RepositoryHistoryReading, RepositoryBranchReading, RepositoryIndexUpdating, RepositoryCommitting, RepositoryBranchUpdating, RepositoryFetching, RepositoryPulling, RepositoryPushing {
     private static let maximumStatusBytes = 1_048_576
     private static let maximumIndexBytes = 67_108_864
 
@@ -123,6 +123,15 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
         return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL))
     }
 
+    public func push(at repositoryURL: URL, expectedRepositoryRevision: String, expectedIndexRevision: String) async throws -> RepositoryFetchResult {
+        guard FileManager.default.fileExists(atPath: repositoryURL.appendingPathComponent(".git").path) else { throw Error.notRepository }
+        guard try currentRepositoryRevision(at: repositoryURL) == expectedRepositoryRevision else { throw Error.repositoryRevisionConflict }
+        guard try currentIndexRevision(at: repositoryURL) == expectedIndexRevision else { throw Error.indexRevisionConflict }
+        guard let branch = try? runGit(["-C", repositoryURL.path, "symbolic-ref", "--quiet", "--short", "HEAD"], maximumOutputBytes: 512), !branch.isEmpty else { throw Error.detachedHead }
+        _ = try runGit(["-C", repositoryURL.path, "push", "origin", "HEAD:refs/heads/\(branch)"], maximumOutputBytes: 65_536)
+        return .init(repositoryRevision: try currentRepositoryRevision(at: repositoryURL), indexRevision: try currentIndexRevision(at: repositoryURL))
+    }
+
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
         case notRepository
         case gitFailed(String)
@@ -132,6 +141,7 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
         case indexTooLarge
         case indexRevisionConflict
         case repositoryRevisionConflict
+        case detachedHead
 
         public var errorDescription: String? {
             switch self {
@@ -143,6 +153,7 @@ public actor GitRepositoryStatusReader: RepositoryStatusReading, RepositoryDiffR
             case .indexTooLarge: "The Git index exceeded the Host safety limit."
             case .indexRevisionConflict: "The Git index changed; refresh before updating it."
             case .repositoryRevisionConflict: "The Git repository changed; refresh before committing it."
+            case .detachedHead: "Push requires the repository to be on a local branch."
             }
         }
     }
