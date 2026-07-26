@@ -1,23 +1,34 @@
 import AizenClient
 import AizenCore
-import AizenMacPlatform
 import AizenWire
 import Foundation
+#if canImport(AizenMacPlatform)
+import AizenMacPlatform
+#endif
 
 /// CLI composition for the persistent v2 Host. The CLI stays a client and never opens v2 files directly.
 actor V2CLIClient {
     static let productVersion = "2.0.0"
+    #if canImport(AizenMacPlatform)
+    static let machServiceName = "win.aizen.host"
+    #endif
     private let client: HostClient
     private var negotiated = false
 
+    #if canImport(AizenMacPlatform)
     init(storageURL: URL? = nil) {
         let storageURL = storageURL ?? Self.defaultStorageURL()
         client = HostClient(
-            transport: MachWireTransport(machServiceName: HostService.machServiceName),
+            transport: MachWireTransport(machServiceName: Self.machServiceName),
             commandOutbox: FileCommandOutbox(
                 url: storageURL.deletingLastPathComponent().appendingPathComponent("cli-command-outbox.json")
             )
         )
+    }
+    #endif
+
+    init(client: HostClient) {
+        self.client = client
     }
 
     func spaces() async throws -> [Space] {
