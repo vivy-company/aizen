@@ -16,6 +16,7 @@ public actor ExecutionContextFileService {
         case invalidText(String)
         case sensitivePath(String)
         case revisionConflict
+        case invalidSearchQuery
     }
 
     private let storage: StorageRepository
@@ -61,6 +62,63 @@ public actor ExecutionContextFileService {
         return text
     }
 
+    /// Searches only regular UTF-8 files that stay inside the execution-context root. Hidden,
+    /// sensitive, binary, and oversized files are intentionally not observable through search.
+    public func searchText(
+        contextID: ExecutionContextID,
+        query: String,
+        maximumMatches: Int
+    ) async throws -> ContextFileSearchResult {
+        guard !query.isEmpty,
+              query.utf8.count <= Self.maximumSearchQueryUTF8Count,
+              (1...Self.maximumSearchMatches).contains(maximumMatches) else {
+            throw Error.invalidSearchQuery
+        }
+        let root = try await contextRoot(contextID)
+        guard let enumerator = fileManager.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .fileSizeKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            throw Error.unavailableContext(contextID)
+        }
+
+        var matches: [ContextFileSearchMatch] = []
+        var filesExamined = 0
+        var truncated = false
+        while let candidate = enumerator.nextObject() as? URL {
+            let resolved = candidate.resolvingSymlinksInPath().standardizedFileURL
+            guard resolved.path.hasPrefix(root.path + "/") else {
+                enumerator.skipDescendants()
+                continue
+            }
+            let relativePath = String(resolved.path.dropFirst(root.path.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            guard !Self.isSensitive(relativePath) else {
+                enumerator.skipDescendants()
+                continue
+            }
+            guard let values = try? resolved.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .fileSizeKey]) else { continue }
+            guard values.isRegularFile == true else { continue }
+            guard (values.fileSize ?? 0) <= Self.maximumTextFileBytes else { continue }
+            guard filesExamined < Self.maximumSearchFiles else {
+                truncated = true
+                break
+            }
+            filesExamined += 1
+            guard let text = try? String(contentsOf: resolved, encoding: .utf8) else { continue }
+
+            for (offset, line) in text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).enumerated() {
+                guard line.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil else { continue }
+                matches.append(.init(relativePath: relativePath, lineNumber: offset + 1, preview: Self.preview(for: line)))
+                if matches.count == maximumMatches {
+                    truncated = true
+                    return .init(matches: matches, truncated: truncated)
+                }
+            }
+        }
+        return .init(matches: matches, truncated: truncated)
+    }
+
     /// Rechecks the expected SHA-256 while this actor owns the file operation, then replaces
     /// only a regular context-relative UTF-8 file using Foundation's atomic write.
     public func replaceTextFile(contextID: ExecutionContextID, relativePath: String, expectedContentHash: String, text: String) async throws -> String {
@@ -79,6 +137,13 @@ public actor ExecutionContextFileService {
     }
 
     private static let maximumTextFileBytes = 1_048_576
+    private static let maximumSearchQueryUTF8Count = 256
+    private static let maximumSearchMatches = 100
+    private static let maximumSearchFiles = 1_000
+
+    private static func preview(for line: Substring) -> String {
+        String(decoding: String(line).utf8.prefix(ContextFileSearchMatch.maximumPreviewUTF8Count), as: UTF8.self)
+    }
 
     private static func contentHash(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
