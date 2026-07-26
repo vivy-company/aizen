@@ -264,6 +264,21 @@ import Testing
     #expect(try SearchContextFilesResponsePayload(protobufBytes: response.protobufBytes()) == response)
 }
 
+@Test func contextFileChunkPayloadsCarryRevisionBoundedResumeOffsets() throws {
+    let contextID = UUID().uuidString
+    let hash = String(repeating: "a", count: 64)
+    let description = DescribeContextFileResponsePayload(relativePath: "attachment.bin", byteCount: 100_000, contentHash: hash)
+    let query = ReadContextFileChunkQueryPayload(executionContextID: contextID, relativePath: "attachment.bin", expectedContentHash: hash, offset: 65_536)
+    let response = ReadContextFileChunkResponsePayload(contentHash: hash, nextOffset: 100_000, bytes: Data(repeating: 1, count: 34_464), isFinal: true)
+
+    #expect(try DescribeContextFileResponsePayload(protobufBytes: description.protobufBytes()) == description)
+    #expect(try ReadContextFileChunkQueryPayload(protobufBytes: query.protobufBytes()) == query)
+    #expect(try ReadContextFileChunkResponsePayload(protobufBytes: response.protobufBytes()) == response)
+    #expect(throws: WireCodecError.invalidIdentity("context file chunk")) {
+        _ = try ReadContextFileChunkQueryPayload(protobufBytes: ReadContextFileChunkQueryPayload(executionContextID: contextID, relativePath: "attachment.bin", expectedContentHash: hash, offset: 0, maximumBytes: 65_537).protobufBytes())
+    }
+}
+
 @Test func xcodeProjectDiscoveryCarriesBuildConfigurations() throws {
     let descriptor = XcodeProjectDescriptor(resourceID: ResourceID(), id: "App.xcodeproj", name: "App", kind: .project, schemes: ["App"], configurations: ["Debug", "Release"])
     let payload = DiscoverXcodeProjectResponsePayload(project: descriptor)

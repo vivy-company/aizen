@@ -789,6 +789,18 @@ public actor HostClient {
         return try ReadContextTextFileResponsePayload(protobufBytes: response.payload.protobufBytes).text
     }
 
+    public func describeContextFile(executionContextID: ExecutionContextID, relativePath: String) async throws -> DescribeContextFileResponsePayload {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .query, channel: .blob, payload: try .init(DescribeContextFileQueryPayload(executionContextID: executionContextID.description, relativePath: relativePath))))
+        guard response.kind == .queryResponse, response.payload.identifier == DescribeContextFileResponsePayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try DescribeContextFileResponsePayload(protobufBytes: response.payload.protobufBytes)
+    }
+
+    public func contextFileChunk(executionContextID: ExecutionContextID, relativePath: String, expectedContentHash: String, offset: UInt64, maximumBytes: UInt32 = ReadContextFileChunkQueryPayload.maximumChunkBytes) async throws -> ReadContextFileChunkResponsePayload {
+        let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .query, channel: .blob, payload: try .init(ReadContextFileChunkQueryPayload(executionContextID: executionContextID.description, relativePath: relativePath, expectedContentHash: expectedContentHash, offset: offset, maximumBytes: maximumBytes))))
+        guard response.kind == .queryResponse, response.payload.identifier == ReadContextFileChunkResponsePayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }
+        return try ReadContextFileChunkResponsePayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func applyContextTextPatch(executionContextID: ExecutionContextID, relativePath: String, expectedContentHash: String, kind: ContextTextPatchKind, startLine: UInt32, endLineExclusive: UInt32, replacementText: String) async throws -> String {
         let response = try await send(.init(messageID: UUID().uuidString, connectionSequence: try nextConnectionSequence(), kind: .command, channel: .state, payload: try .init(ApplyContextTextPatchCommandPayload(executionContextID: executionContextID.description, relativePath: relativePath, expectedContentHash: expectedContentHash, kind: kind, startLine: startLine, endLineExclusive: endLineExclusive, replacementText: replacementText))))
         guard response.kind == .commandResult, response.payload.identifier == ApplyContextTextPatchResultPayload.identifier else { throw Error.unexpectedPayload(response.payload.identifier) }

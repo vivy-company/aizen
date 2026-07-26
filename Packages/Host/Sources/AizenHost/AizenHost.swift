@@ -644,6 +644,16 @@ public actor LocalHost: WireEndpoint {
             kind = .queryResponse
             let contentHash = SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
             payload = try TypedPayload(ReadContextTextFileResponsePayload(relativePath: query.relativePath, text: text, contentHash: contentHash))
+        case .query where envelope.payload.identifier == DescribeContextFileQueryPayload.identifier:
+            let query = try DescribeContextFileQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let description = try await contextFiles.describeFile(contextID: try Self.executionContextID(from: query.executionContextID), relativePath: query.relativePath)
+            kind = .queryResponse
+            payload = try TypedPayload(DescribeContextFileResponsePayload(relativePath: query.relativePath, byteCount: UInt64(description.byteCount), contentHash: description.contentHash))
+        case .query where envelope.payload.identifier == ReadContextFileChunkQueryPayload.identifier:
+            let query = try ReadContextFileChunkQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let chunk = try await contextFiles.readFileChunk(contextID: try Self.executionContextID(from: query.executionContextID), relativePath: query.relativePath, expectedContentHash: query.expectedContentHash, offset: query.offset, maximumBytes: query.maximumBytes)
+            kind = .queryResponse
+            payload = try TypedPayload(ReadContextFileChunkResponsePayload(contentHash: chunk.contentHash, nextOffset: UInt64(chunk.nextOffset), bytes: chunk.bytes, isFinal: chunk.isFinal))
         case .command where envelope.payload.identifier == ReplaceContextTextFileCommandPayload.identifier:
             let command = try ReplaceContextTextFileCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let contextID = try Self.executionContextID(from: command.executionContextID)

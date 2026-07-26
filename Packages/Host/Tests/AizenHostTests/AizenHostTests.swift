@@ -1703,6 +1703,41 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     #expect(try Data(contentsOf: destination) == replacement)
 }
 
+@Test func localHostStreamsRevisionBoundContextFileChunks() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let checkout = root.appendingPathComponent("checkout", isDirectory: true)
+    try FileManager.default.createDirectory(at: checkout, withIntermediateDirectories: true)
+    let bytes = Data((0..<100_000).map { UInt8($0 % 251) })
+    try bytes.write(to: checkout.appendingPathComponent("attachment.bin"))
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Files")
+    let context = ExecutionContext(spaceID: space.id, kind: .repositoryCheckout, hostReference: .init(rawValue: "local-checkout:\(checkout.path)"))
+    _ = try await storage.transact { $0.spaces.append(space); $0.executionContexts.append(context) }
+    let host = LocalHost(storage: storage)
+    let describeResponse = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: 1, kind: .query, channel: .blob, payload: try .init(DescribeContextFileQueryPayload(executionContextID: context.id.description, relativePath: "attachment.bin"))))
+    let description = try DescribeContextFileResponsePayload(protobufBytes: describeResponse.payload.protobufBytes)
+    #expect(description.byteCount == UInt64(bytes.count))
+
+    var received = Data()
+    var offset: UInt64 = 0
+    var sequence: UInt64 = 2
+    repeat {
+        let response = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: sequence, kind: .query, channel: .blob, payload: try .init(ReadContextFileChunkQueryPayload(executionContextID: context.id.description, relativePath: "attachment.bin", expectedContentHash: description.contentHash, offset: offset))))
+        let chunk = try ReadContextFileChunkResponsePayload(protobufBytes: response.payload.protobufBytes)
+        received.append(chunk.bytes)
+        offset = chunk.nextOffset
+        sequence += 1
+        if chunk.isFinal { break }
+    } while true
+    #expect(received == bytes)
+
+    try Data("changed".utf8).write(to: checkout.appendingPathComponent("attachment.bin"))
+    await #expect(throws: ExecutionContextFileService.Error.revisionConflict) {
+        _ = try await host.receive(.init(messageID: UUID().uuidString, connectionSequence: sequence, kind: .query, channel: .blob, payload: try .init(ReadContextFileChunkQueryPayload(executionContextID: context.id.description, relativePath: "attachment.bin", expectedContentHash: description.contentHash, offset: 0))))
+    }
+}
+
 @Test func hostCreatesLinkedWorktreeContextsThroughAHostOperation() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

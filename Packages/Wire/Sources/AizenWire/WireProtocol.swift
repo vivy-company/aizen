@@ -2364,6 +2364,57 @@ public struct ReadContextTextFileResponsePayload: WirePayload, Sendable, Hashabl
     public func protobufBytes() throws -> Data { var m = AizenWireV1_ReadContextTextFileResponse(); m.relativePath = relativePath; m.text = text; m.contentHash = contentHash; return try m.serializedData() }
 }
 
+public struct DescribeContextFileQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.context-files.describe@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let executionContextID: String
+    public let relativePath: String
+    public init(executionContextID: String, relativePath: String) { self.executionContextID = executionContextID; self.relativePath = relativePath }
+    public init(protobufBytes: Data) throws { let message = try AizenWireV1_DescribeContextFileQuery(serializedBytes: protobufBytes); guard !message.executionContextID.isEmpty, !message.relativePath.isEmpty else { throw WireCodecError.invalidIdentity("context file") }; self.init(executionContextID: message.executionContextID, relativePath: message.relativePath) }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_DescribeContextFileQuery(); message.executionContextID = executionContextID; message.relativePath = relativePath; return try message.serializedData() }
+}
+
+public struct DescribeContextFileResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.context-files.describe@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let relativePath: String
+    public let byteCount: UInt64
+    public let contentHash: String
+    public init(relativePath: String, byteCount: UInt64, contentHash: String) { self.relativePath = relativePath; self.byteCount = byteCount; self.contentHash = contentHash }
+    public init(protobufBytes: Data) throws { let message = try AizenWireV1_DescribeContextFileResponse(serializedBytes: protobufBytes); guard !message.relativePath.isEmpty, message.contentHash.count == 64 else { throw WireCodecError.invalidIdentity("context file") }; self.init(relativePath: message.relativePath, byteCount: message.byteCount, contentHash: message.contentHash) }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_DescribeContextFileResponse(); message.relativePath = relativePath; message.byteCount = byteCount; message.contentHash = contentHash; return try message.serializedData() }
+}
+
+public struct ReadContextFileChunkQueryPayload: WirePayload, Sendable, Hashable {
+    public static let maximumChunkBytes: UInt32 = 64 * 1_024
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.context-files.read-chunk@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let executionContextID: String
+    public let relativePath: String
+    public let expectedContentHash: String
+    public let offset: UInt64
+    public let maximumBytes: UInt32
+    public init(executionContextID: String, relativePath: String, expectedContentHash: String, offset: UInt64, maximumBytes: UInt32 = Self.maximumChunkBytes) { self.executionContextID = executionContextID; self.relativePath = relativePath; self.expectedContentHash = expectedContentHash; self.offset = offset; self.maximumBytes = maximumBytes }
+    public init(protobufBytes: Data) throws { let message = try AizenWireV1_ReadContextFileChunkQuery(serializedBytes: protobufBytes); guard !message.executionContextID.isEmpty, !message.relativePath.isEmpty, message.expectedContentHash.count == 64, (1...Self.maximumChunkBytes).contains(message.maximumBytes) else { throw WireCodecError.invalidIdentity("context file chunk") }; self.init(executionContextID: message.executionContextID, relativePath: message.relativePath, expectedContentHash: message.expectedContentHash, offset: message.offset, maximumBytes: message.maximumBytes) }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_ReadContextFileChunkQuery(); message.executionContextID = executionContextID; message.relativePath = relativePath; message.expectedContentHash = expectedContentHash; message.offset = offset; message.maximumBytes = maximumBytes; return try message.serializedData() }
+}
+
+public struct ReadContextFileChunkResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.context-files.read-chunk@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let contentHash: String
+    public let nextOffset: UInt64
+    public let bytes: Data
+    public let isFinal: Bool
+    public init(contentHash: String, nextOffset: UInt64, bytes: Data, isFinal: Bool) { self.contentHash = contentHash; self.nextOffset = nextOffset; self.bytes = bytes; self.isFinal = isFinal }
+    public init(protobufBytes: Data) throws { let message = try AizenWireV1_ReadContextFileChunkResponse(serializedBytes: protobufBytes); guard message.contentHash.count == 64, message.bytes.count <= Int(ReadContextFileChunkQueryPayload.maximumChunkBytes) else { throw WireCodecError.invalidIdentity("context file chunk") }; self.init(contentHash: message.contentHash, nextOffset: message.nextOffset, bytes: message.bytes, isFinal: message.isFinal) }
+    public func protobufBytes() throws -> Data { var message = AizenWireV1_ReadContextFileChunkResponse(); message.contentHash = contentHash; message.nextOffset = nextOffset; message.bytes = bytes; message.isFinal = isFinal; return try message.serializedData() }
+}
+
 public struct ReplaceContextTextFileCommandPayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.command.context-files.replace-text@1"); public static let schemaVersion: UInt32 = 1; public static let stateAffecting = true
     public let executionContextID: String; public let relativePath: String; public let expectedContentHash: String; public let text: String

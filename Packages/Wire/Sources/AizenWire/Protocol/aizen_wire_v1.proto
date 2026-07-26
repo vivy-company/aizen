@@ -680,6 +680,32 @@ message ReadContextTextFileResponse {
   string content_hash = 3;
 }
 
+message DescribeContextFileQuery {
+  string execution_context_id = 1;
+  string relative_path = 2;
+}
+
+message DescribeContextFileResponse {
+  string relative_path = 1;
+  uint64 byte_count = 2;
+  string content_hash = 3;
+}
+
+message ReadContextFileChunkQuery {
+  string execution_context_id = 1;
+  string relative_path = 2;
+  string expected_content_hash = 3;
+  uint64 offset = 4;
+  uint32 maximum_bytes = 5;
+}
+
+message ReadContextFileChunkResponse {
+  string content_hash = 1;
+  uint64 next_offset = 2;
+  bytes bytes = 3;
+  bool is_final = 4;
+}
+
 message ReplaceContextTextFileCommand {
   string execution_context_id = 1;
   string relative_path = 2;

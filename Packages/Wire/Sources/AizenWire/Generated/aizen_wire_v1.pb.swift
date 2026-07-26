@@ -2047,6 +2047,74 @@ nonisolated struct AizenWireV1_ReadContextTextFileResponse: Sendable {
   init() {}
 }
 
+nonisolated struct AizenWireV1_DescribeContextFileQuery: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var executionContextID: String = String()
+
+  var relativePath: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_DescribeContextFileResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var relativePath: String = String()
+
+  var byteCount: UInt64 = 0
+
+  var contentHash: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_ReadContextFileChunkQuery: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var executionContextID: String = String()
+
+  var relativePath: String = String()
+
+  var expectedContentHash: String = String()
+
+  var offset: UInt64 = 0
+
+  var maximumBytes: UInt32 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct AizenWireV1_ReadContextFileChunkResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var contentHash: String = String()
+
+  var nextOffset: UInt64 = 0
+
+  var bytes: Data = Data()
+
+  var isFinal: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct AizenWireV1_ReplaceContextTextFileCommand: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -7082,6 +7150,176 @@ nonisolated extension AizenWireV1_ReadContextTextFileResponse: SwiftProtobuf.Mes
     if lhs.relativePath != rhs.relativePath {return false}
     if lhs.text != rhs.text {return false}
     if lhs.contentHash != rhs.contentHash {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_DescribeContextFileQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".DescribeContextFileQuery"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}execution_context_id\0\u{3}relative_path\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.executionContextID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.relativePath) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.executionContextID.isEmpty {
+      try visitor.visitSingularStringField(value: self.executionContextID, fieldNumber: 1)
+    }
+    if !self.relativePath.isEmpty {
+      try visitor.visitSingularStringField(value: self.relativePath, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_DescribeContextFileQuery, rhs: AizenWireV1_DescribeContextFileQuery) -> Bool {
+    if lhs.executionContextID != rhs.executionContextID {return false}
+    if lhs.relativePath != rhs.relativePath {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_DescribeContextFileResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".DescribeContextFileResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}relative_path\0\u{3}byte_count\0\u{3}content_hash\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.relativePath) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.byteCount) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.contentHash) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.relativePath.isEmpty {
+      try visitor.visitSingularStringField(value: self.relativePath, fieldNumber: 1)
+    }
+    if self.byteCount != 0 {
+      try visitor.visitSingularUInt64Field(value: self.byteCount, fieldNumber: 2)
+    }
+    if !self.contentHash.isEmpty {
+      try visitor.visitSingularStringField(value: self.contentHash, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_DescribeContextFileResponse, rhs: AizenWireV1_DescribeContextFileResponse) -> Bool {
+    if lhs.relativePath != rhs.relativePath {return false}
+    if lhs.byteCount != rhs.byteCount {return false}
+    if lhs.contentHash != rhs.contentHash {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ReadContextFileChunkQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ReadContextFileChunkQuery"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}execution_context_id\0\u{3}relative_path\0\u{3}expected_content_hash\0\u{1}offset\0\u{3}maximum_bytes\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.executionContextID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.relativePath) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.expectedContentHash) }()
+      case 4: try { try decoder.decodeSingularUInt64Field(value: &self.offset) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self.maximumBytes) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.executionContextID.isEmpty {
+      try visitor.visitSingularStringField(value: self.executionContextID, fieldNumber: 1)
+    }
+    if !self.relativePath.isEmpty {
+      try visitor.visitSingularStringField(value: self.relativePath, fieldNumber: 2)
+    }
+    if !self.expectedContentHash.isEmpty {
+      try visitor.visitSingularStringField(value: self.expectedContentHash, fieldNumber: 3)
+    }
+    if self.offset != 0 {
+      try visitor.visitSingularUInt64Field(value: self.offset, fieldNumber: 4)
+    }
+    if self.maximumBytes != 0 {
+      try visitor.visitSingularUInt32Field(value: self.maximumBytes, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ReadContextFileChunkQuery, rhs: AizenWireV1_ReadContextFileChunkQuery) -> Bool {
+    if lhs.executionContextID != rhs.executionContextID {return false}
+    if lhs.relativePath != rhs.relativePath {return false}
+    if lhs.expectedContentHash != rhs.expectedContentHash {return false}
+    if lhs.offset != rhs.offset {return false}
+    if lhs.maximumBytes != rhs.maximumBytes {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension AizenWireV1_ReadContextFileChunkResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ReadContextFileChunkResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}content_hash\0\u{3}next_offset\0\u{1}bytes\0\u{3}is_final\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.contentHash) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.nextOffset) }()
+      case 3: try { try decoder.decodeSingularBytesField(value: &self.bytes) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.isFinal) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.contentHash.isEmpty {
+      try visitor.visitSingularStringField(value: self.contentHash, fieldNumber: 1)
+    }
+    if self.nextOffset != 0 {
+      try visitor.visitSingularUInt64Field(value: self.nextOffset, fieldNumber: 2)
+    }
+    if !self.bytes.isEmpty {
+      try visitor.visitSingularBytesField(value: self.bytes, fieldNumber: 3)
+    }
+    if self.isFinal != false {
+      try visitor.visitSingularBoolField(value: self.isFinal, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: AizenWireV1_ReadContextFileChunkResponse, rhs: AizenWireV1_ReadContextFileChunkResponse) -> Bool {
+    if lhs.contentHash != rhs.contentHash {return false}
+    if lhs.nextOffset != rhs.nextOffset {return false}
+    if lhs.bytes != rhs.bytes {return false}
+    if lhs.isFinal != rhs.isFinal {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

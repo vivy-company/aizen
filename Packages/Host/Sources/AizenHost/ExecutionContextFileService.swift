@@ -6,6 +6,18 @@ import Foundation
 
 /// Resolves filesystem access inside Host-owned execution-context roots.
 public actor ExecutionContextFileService {
+    public struct FileDescription: Sendable, Hashable {
+        public let byteCount: Int
+        public let contentHash: String
+    }
+
+    public struct FileChunk: Sendable, Hashable {
+        public let contentHash: String
+        public let nextOffset: Int
+        public let bytes: Data
+        public let isFinal: Bool
+    }
+
     public enum Error: Swift.Error, Sendable, Equatable {
         case unknownContext(ExecutionContextID)
         case unavailableContext(ExecutionContextID)
@@ -62,6 +74,38 @@ public actor ExecutionContextFileService {
         let data = try Data(contentsOf: file, options: [.mappedIfSafe])
         guard let text = String(data: data, encoding: .utf8) else { throw Error.invalidText(relativePath) }
         return text
+    }
+
+    /// Returns a revision token for a bounded regular file without exposing its local path.
+    public func describeFile(contextID: ExecutionContextID, relativePath: String) async throws -> FileDescription {
+        guard !Self.isSensitive(relativePath) else { throw Error.sensitivePath(relativePath) }
+        let root = try await contextRoot(contextID)
+        let file = try resolvedChild(relativePath, root: root)
+        let values = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true, let byteCount = values.fileSize else { throw Error.notFile(relativePath) }
+        guard byteCount <= Self.maximumBinaryFileBytes else { throw Error.fileTooLarge(relativePath) }
+        return .init(byteCount: byteCount, contentHash: try Self.contentHash(of: file))
+    }
+
+    /// Reads a bounded binary chunk only when the entire source still matches the caller's revision.
+    /// Offsets are absolute file offsets, making reconnect/resume deterministic without Host-side download state.
+    public func readFileChunk(contextID: ExecutionContextID, relativePath: String, expectedContentHash: String, offset: UInt64, maximumBytes: UInt32) async throws -> FileChunk {
+        guard !Self.isSensitive(relativePath) else { throw Error.sensitivePath(relativePath) }
+        guard let offset = Int(exactly: offset), let maximumBytes = Int(exactly: maximumBytes), (1...Self.maximumFileChunkBytes).contains(maximumBytes) else { throw Error.invalidText(relativePath) }
+        let root = try await contextRoot(contextID)
+        let file = try resolvedChild(relativePath, root: root)
+        let values = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true, let byteCount = values.fileSize else { throw Error.notFile(relativePath) }
+        guard byteCount <= Self.maximumBinaryFileBytes else { throw Error.fileTooLarge(relativePath) }
+        let contentHash = try Self.contentHash(of: file)
+        guard contentHash == expectedContentHash else { throw Error.revisionConflict }
+        guard offset <= byteCount else { throw Error.invalidText(relativePath) }
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+        try handle.seek(toOffset: UInt64(offset))
+        let bytes = try handle.read(upToCount: min(maximumBytes, byteCount - offset)) ?? Data()
+        let nextOffset = offset + bytes.count
+        return .init(contentHash: contentHash, nextOffset: nextOffset, bytes: bytes, isFinal: nextOffset == byteCount)
     }
 
     /// Searches only regular UTF-8 files that stay inside the execution-context root. Hidden,
@@ -190,6 +234,8 @@ public actor ExecutionContextFileService {
     }
 
     private static let maximumTextFileBytes = 1_048_576
+    private static let maximumBinaryFileBytes = BlobTransferStore.defaultMaximumBytes
+    private static let maximumFileChunkBytes = 64 * 1_024
     private static let maximumSearchQueryUTF8Count = 256
     private static let maximumSearchMatches = 100
     private static let maximumSearchFiles = 1_000

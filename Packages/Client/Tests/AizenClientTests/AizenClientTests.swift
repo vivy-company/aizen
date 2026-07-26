@@ -222,6 +222,26 @@ import AizenWire
     #expect(try Data(contentsOf: destination) == replacement)
 }
 
+@Test func clientResumesRevisionBoundContextFileDownloadsThroughTheHost() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let checkout = root.appendingPathComponent("checkout", isDirectory: true)
+    try FileManager.default.createDirectory(at: checkout, withIntermediateDirectories: true)
+    let bytes = Data((0..<70_000).map { UInt8($0 % 251) })
+    try bytes.write(to: checkout.appendingPathComponent("attachment.bin"))
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Files")
+    let context = ExecutionContext(spaceID: space.id, kind: .repositoryCheckout, hostReference: .init(rawValue: "local-checkout:\(checkout.path)"))
+    _ = try await storage.transact { $0.spaces.append(space); $0.executionContexts.append(context) }
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+    let description = try await client.describeContextFile(executionContextID: context.id, relativePath: "attachment.bin")
+    let first = try await client.contextFileChunk(executionContextID: context.id, relativePath: "attachment.bin", expectedContentHash: description.contentHash, offset: 0)
+    let final = try await client.contextFileChunk(executionContextID: context.id, relativePath: "attachment.bin", expectedContentHash: description.contentHash, offset: first.nextOffset)
+    #expect(!first.isFinal)
+    #expect(final.isFinal)
+    #expect(first.bytes + final.bytes == bytes)
+}
+
 @Test func clientListsHostOwnedTerminalSessions() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
