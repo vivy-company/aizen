@@ -2,6 +2,8 @@ import ACP
 import AizenCore
 import AizenHost
 import AizenMacPlatform
+import AizenStorage
+import Foundation
 import Testing
 
 @Test func acpRuntimeOwnsTheClientUntilTheRunIsCancelled() async throws {
@@ -21,6 +23,36 @@ import Testing
     #expect(await client.didTerminate)
 }
 
+@Test func storageBackedConfigurationUsesTheRunSandbox() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let contextID = ExecutionContextID()
+    let context = ExecutionContext(
+        id: contextID,
+        spaceID: space.id,
+        kind: .managedTemporarySandbox,
+        hostReference: HostPrivateReference(rawValue: "sandbox-\(contextID.description)")
+    )
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan", executionContextID: context.id)
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+        $0.executionContexts.append(context)
+    }
+    let run = Run(spaceID: space.id, sessionID: session.id, executionContextID: context.id)
+    let resolver = StorageBackedACPRunConfigurationResolver(
+        storage: storage,
+        agentConfiguration: StaticAgentConfigurationResolver(),
+        managedSandboxRoot: root.appendingPathComponent("sandboxes", isDirectory: true)
+    )
+
+    let configuration = try await resolver.configuration(for: run)
+    #expect(configuration.executablePath == "/usr/bin/true")
+    #expect(configuration.workingDirectory == root.appendingPathComponent("sandboxes").appendingPathComponent(space.id.description).appendingPathComponent(context.id.description).path)
+}
+
 private struct StaticConfigurationResolver: ACPRunConfigurationResolving {
     func configuration(for run: Run) async throws -> ACPRunConfiguration {
         ACPRunConfiguration(executablePath: "/usr/bin/true", workingDirectory: "/tmp/aizen")
@@ -29,6 +61,12 @@ private struct StaticConfigurationResolver: ACPRunConfigurationResolving {
 
 private struct NoDelegateProvider: ACPRunDelegateProviding {
     func delegate(for run: Run) async throws -> (any ACP.ClientDelegate)? { nil }
+}
+
+private struct StaticAgentConfigurationResolver: ACPAgentLaunchConfigurationResolving {
+    func launchConfiguration() async throws -> ACPAgentLaunchConfiguration {
+        ACPAgentLaunchConfiguration(executablePath: "/usr/bin/true")
+    }
 }
 
 private struct StaticClientFactory: ACPRunClientFactory {
