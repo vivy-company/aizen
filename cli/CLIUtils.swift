@@ -547,11 +547,15 @@ func isTmuxAvailable() -> Bool {
 }
 
 func tmuxSessionExists(paneId: String) -> Bool {
+    tmuxSessionExists(sessionName: "aizen-\(paneId)")
+}
+
+func tmuxSessionExists(sessionName: String) -> Bool {
     guard let tmux = tmuxPath() else { return false }
 
     let process = Process()
     process.executableURL = URL(fileURLWithPath: tmux)
-    process.arguments = ["has-session", "-t", "aizen-\(paneId)"]
+    process.arguments = ["has-session", "-t", sessionName]
     process.standardError = FileHandle.nullDevice
 
     do {

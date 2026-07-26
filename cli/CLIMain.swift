@@ -61,7 +61,7 @@ struct AizenCLI {
         case "status":
             try await handleStatus(subArgs)
         case "attach":
-            try handleAttach(subArgs)
+            try await handleAttach(subArgs)
         case "sessions":
             try await handleSessions(subArgs)
         case "terminal":
@@ -588,7 +588,49 @@ private extension AizenCLI {
         printKeyValue("Runs", "\(runCount)", style: style)
     }
 
-    static func handleAttach(_ args: [String]) throws {
+    static func handleAttach(_ args: [String]) async throws {
+        let parsed = try parseArguments(args)
+        if parsed.flags.contains("help") {
+            print(attachHelpText())
+            return
+        }
+        guard !parsed.flags.contains("cross-project") else {
+            throw CLIError.invalidArguments("Cross-project terminals are not available through the v2 Host yet.")
+        }
+        guard parsed.options["worktree"] == nil else {
+            throw CLIError.invalidArguments("Worktree filtering is not available for v2 Host-owned terminals.")
+        }
+
+        let client = V2CLIClient()
+        let spaces = try await client.spaces()
+        let selectedSpace: Space?
+        if let name = parsed.options["workspace"] {
+            guard let space = spaces.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                throw CLIError.workspaceNotFound(name)
+            }
+            selectedSpace = space
+        } else {
+            selectedSpace = nil
+        }
+        var sessions = try await client.terminalSessions(spaceID: selectedSpace?.id)
+        if let selector = parsed.positionals.first?.lowercased() {
+            sessions = sessions.filter {
+                $0.id.description.lowercased().hasPrefix(selector)
+                    || ($0.title?.lowercased().contains(selector) ?? false)
+            }
+        }
+        guard !sessions.isEmpty else { throw CLIError.noActiveSessions }
+        guard sessions.count == 1, let terminal = sessions.first else {
+            throw CLIError.invalidArguments("Multiple Host-owned terminals match. Specify a terminal title or session ID prefix, and use --workspace to filter.")
+        }
+        guard tmuxSessionExists(sessionName: terminal.tmuxSessionName) else {
+            throw CLIError.sessionNotFound(terminal.title ?? terminal.id.description)
+        }
+        print(OutputStyle(useColor: shouldUseColor(flags: parsed.flags)).success("Attaching to: \(terminal.title ?? terminal.id.description)"))
+        try tmuxAttach(sessionName: terminal.tmuxSessionName)
+    }
+
+    static func handleLegacyAttach(_ args: [String]) throws {
         let parsed = try parseArguments(args)
         if parsed.flags.contains("help") {
             print(attachHelpText())
@@ -1823,23 +1865,16 @@ Usage:
     static func attachHelpText() -> String {
         return """
 Usage:
-  aizen attach                                  Interactive session picker
-  aizen attach <project>                        Attach to project's terminal
-  aizen attach <project> --workspace <ws>       Filter by workspace
-  aizen attach <project> --worktree <branch>    Filter by worktree
-  aizen attach <project> --pane <n>             Attach to specific pane (1-based)
-  aizen attach --cross-project --workspace <ws> Attach to workspace cross-project session
+  aizen attach <terminal-title-or-id>            Attach to a Host-owned terminal
+  aizen attach <terminal-title-or-id> --workspace <space>
+  aizen attach --workspace <space>               Attach when the Space has one terminal
 
 Options:
-  -w, --workspace <name>    Filter sessions by workspace
-  --worktree <branch>       Filter sessions by worktree branch
-  --cross-project           Target cross-project sessions only
-  --pane <n>                Attach to pane number n (1-based index)
+  -w, --workspace <name>    Filter Host-owned terminals by Space
   --no-color                Disable colored output
 
-Attach to an active tmux terminal session from Aizen.
-If the session has multiple panes, you'll be prompted to choose one.
-Use arrow keys or j/k to navigate, Enter to select, Esc to cancel.
+Attach to an active Host-owned tmux terminal session from Aizen.
+Use a terminal title or unique session ID prefix when more than one matches.
 """
     }
 
