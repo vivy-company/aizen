@@ -101,10 +101,12 @@ private extension AizenCLI {
             throw CLIError.pathNotFound(path)
         }
 
-        let store = try CLIStore()
-        let context = store.container.viewContext
-
-        if findRepository(for: path, in: context) != nil {
+        let canonicalPath = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+        let client = V2CLIClient()
+        if try await client.resources().contains(where: {
+            guard case let .hostPrivate(reference) = $0.details else { return false }
+            return reference.rawValue == "local-repository:\(canonicalPath)"
+        }) {
             try openApp(path: path)
             return
         }
@@ -113,24 +115,7 @@ private extension AizenCLI {
             throw CLIError.notGitRepository(path)
         }
 
-        guard isTTY() else {
-            throw CLIError.invalidArguments("Repository not tracked. Run 'aizen add \(path)' first or run in an interactive terminal.")
-        }
-
-        let style = OutputStyle(useColor: shouldUseColor(flags: []))
-        print(style.warning("Repository not tracked in any workspace."))
-
-        let workspace = try selectWorkspace(
-            in: context,
-            preferredName: nil,
-            defaultWorkspaceId: readDefaultSetting(key: "defaultWorkspaceId")
-        )
-
-        let manager = CLIRepositoryManager(context: context)
-        let repository = try await manager.addExistingRepository(path: path, workspace: workspace)
-        print(style.success("Added repository: \(repository.name ?? "")"))
-
-        try openApp(path: path)
+        throw CLIError.repositoryNotFound(path)
     }
 
     static func handleAdd(_ args: [String]) async throws {
