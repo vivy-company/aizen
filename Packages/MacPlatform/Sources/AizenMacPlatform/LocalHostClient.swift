@@ -42,6 +42,18 @@ public actor LocalHostClient {
         try await client.runs(spaceID: spaceID)
     }
 
+    public func resources(in spaceID: SpaceID? = nil) async throws -> [Resource] {
+        try await client.resources(spaceID: spaceID)
+    }
+
+    public func importLocalFolder(spaceID: SpaceID, path: String, title: String? = nil) async throws -> ResourceID {
+        try await client.importLocalFolder(spaceID: spaceID, path: path, title: title)
+    }
+
+    public func removeResource(id: ResourceID) async throws {
+        try await client.removeResource(id: id)
+    }
+
     public func conversationTimeline(sessionID: SessionID) async throws -> [ConversationMessage] {
         try await client.conversationTimeline(sessionID: sessionID)
     }

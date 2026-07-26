@@ -177,6 +177,50 @@ public actor HostClient {
         return try ListRunsResponsePayload(protobufBytes: response.payload.protobufBytes).runs
     }
 
+    public func resources(spaceID: SpaceID? = nil) async throws -> [Resource] {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .query,
+            channel: .state,
+            payload: try .init(ListResourcesQueryPayload(spaceID: spaceID?.description))
+        ))
+        guard response.kind == .queryResponse, response.payload.identifier == ListResourcesResponsePayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        return try ListResourcesResponsePayload(protobufBytes: response.payload.protobufBytes).resources
+    }
+
+    public func importLocalFolder(spaceID: SpaceID, path: String, title: String? = nil) async throws -> ResourceID {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(ImportLocalFolderCommandPayload(spaceID: spaceID.description, path: path, title: title))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == ImportLocalFolderResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        let result = try ImportLocalFolderResultPayload(protobufBytes: response.payload.protobufBytes)
+        guard let uuid = UUID(uuidString: result.resourceID) else { throw Error.invalidIdentity(result.resourceID) }
+        return ResourceID(rawValue: uuid)
+    }
+
+    public func removeResource(id: ResourceID) async throws {
+        let response = try await send(.init(
+            messageID: UUID().uuidString,
+            connectionSequence: try nextConnectionSequence(),
+            kind: .command,
+            channel: .state,
+            payload: try .init(RemoveResourceCommandPayload(resourceID: id.description))
+        ))
+        guard response.kind == .commandResult, response.payload.identifier == ResourceMutationResultPayload.identifier else {
+            throw Error.unexpectedPayload(response.payload.identifier)
+        }
+        _ = try ResourceMutationResultPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
     public func sendConversation(
         spaceID: SpaceID,
         sessionID: SessionID,

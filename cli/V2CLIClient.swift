@@ -38,6 +38,18 @@ actor V2CLIClient {
         try await client.runs(in: spaceID)
     }
 
+    func resources(spaceID: SpaceID? = nil) async throws -> [Resource] {
+        try await client.resources(in: spaceID)
+    }
+
+    func importLocalFolder(spaceID: SpaceID, path: String, title: String? = nil) async throws -> ResourceID {
+        try await client.importLocalFolder(spaceID: spaceID, path: path, title: title)
+    }
+
+    func removeResource(id: ResourceID) async throws {
+        try await client.removeResource(id: id)
+    }
+
     static func defaultStorageURL(fileManager: FileManager = .default) -> URL {
         if let override = ProcessInfo.processInfo.environment["AIZEN_V2_STORE_PATH"], !override.isEmpty {
             return URL(fileURLWithPath: (override as NSString).expandingTildeInPath).standardizedFileURL

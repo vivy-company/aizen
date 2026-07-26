@@ -50,6 +50,8 @@ struct AizenCLI {
             try await handleConversation(subArgs)
         case "run":
             try await handleRun(subArgs)
+        case "resource":
+            try await handleResource(subArgs)
         case "sync":
             try await handleSync(subArgs)
         case "status":
@@ -307,6 +309,36 @@ private extension AizenCLI {
         let spaceID = try await resolveV2Space(rest.first, client: client)
         for run in try await client.runs(spaceID: spaceID) {
             print("\(run.id.description)\t\(run.lifecycle.rawValue)\t\(run.sessionID.description)")
+        }
+    }
+
+    static func handleResource(_ args: [String]) async throws {
+        guard let subcommand = args.first else {
+            throw CLIError.invalidArguments("resource requires list, add, or remove")
+        }
+        let rest = Array(args.dropFirst())
+        let client = V2CLIClient()
+        switch subcommand {
+        case "list":
+            guard rest.count <= 1 else { throw CLIError.invalidArguments("resource list accepts at most one space") }
+            let spaceID = try await resolveV2Space(rest.first, client: client)
+            for resource in try await client.resources(spaceID: spaceID) {
+                print("\(resource.id.description)\t\(resource.kind.rawValue)\t\(resource.title)")
+            }
+        case "add":
+            guard rest.count >= 2 else { throw CLIError.invalidArguments("resource add requires a space and absolute folder path") }
+            let spaceID = try await resolveV2Space(rest[0], client: client)
+            guard let spaceID else { throw CLIError.invalidArguments("resource add requires a space") }
+            let path = rest[1]
+            let title = rest.count > 2 ? rest.dropFirst(2).joined(separator: " ") : nil
+            print(try await client.importLocalFolder(spaceID: spaceID, path: path, title: title).description)
+        case "remove":
+            guard rest.count == 1, let uuid = UUID(uuidString: rest[0]) else {
+                throw CLIError.invalidArguments("resource remove requires a Resource ID")
+            }
+            try await client.removeResource(id: ResourceID(rawValue: uuid))
+        default:
+            throw CLIError.invalidArguments("Unknown resource command: \(subcommand)")
         }
     }
 

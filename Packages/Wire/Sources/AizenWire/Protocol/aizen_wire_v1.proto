@@ -194,6 +194,37 @@ message ListRunsResponse {
   repeated RunRecord runs = 1;
 }
 
+message ListResourcesQuery {
+  string space_id = 1;
+}
+
+message ResourceRecord {
+  string resource_id = 1;
+  string space_id = 2;
+  string kind = 3;
+  string title = 4;
+}
+
+message ListResourcesResponse {
+  repeated ResourceRecord resources = 1;
+}
+
+message ImportLocalFolderCommand {
+  string space_id = 1;
+  string path = 2;
+  string title = 3;
+}
+
+message ImportLocalFolderResult {
+  string resource_id = 1;
+}
+
+message RemoveResourceCommand {
+  string resource_id = 1;
+}
+
+message ResourceMutationResult {}
+
 message SnapshotRequest {
   string scope = 1;
   uint64 after_cursor = 2;

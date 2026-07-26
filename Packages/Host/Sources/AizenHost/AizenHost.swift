@@ -52,6 +52,8 @@ public actor LocalHost: WireEndpoint {
                 GetConversationTimelineResponsePayload.identifier,
                 ListRunsQueryPayload.identifier,
                 ListRunsResponsePayload.identifier,
+                ListResourcesQueryPayload.identifier,
+                ListResourcesResponsePayload.identifier,
                 CreateSpaceCommandPayload.identifier,
                 CreateSpaceResultPayload.identifier,
                 RenameSpaceCommandPayload.identifier,
@@ -62,7 +64,11 @@ public actor LocalHost: WireEndpoint {
                 SendConversationCommandPayload.identifier,
                 SendConversationResultPayload.identifier,
                 CancelRunCommandPayload.identifier,
-                CancelRunResultPayload.identifier
+                CancelRunResultPayload.identifier,
+                ImportLocalFolderCommandPayload.identifier,
+                ImportLocalFolderResultPayload.identifier,
+                RemoveResourceCommandPayload.identifier,
+                ResourceMutationResultPayload.identifier
             ]))
         case .query where envelope.payload.identifier == SnapshotRequestPayload.identifier:
             let request = try SnapshotRequestPayload(protobufBytes: envelope.payload.protobufBytes)
@@ -96,6 +102,12 @@ public actor LocalHost: WireEndpoint {
             let runs = try await storage.load().runs.filter { spaceID == nil || $0.spaceID == spaceID }
             kind = .queryResponse
             payload = try TypedPayload(ListRunsResponsePayload(runs: runs))
+        case .query where envelope.payload.identifier == ListResourcesQueryPayload.identifier:
+            let query = try ListResourcesQueryPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try query.spaceID.map(Self.spaceID(from:))
+            let resources = try await storage.load().resources.filter { spaceID == nil || $0.spaceID == spaceID }
+            kind = .queryResponse
+            payload = try TypedPayload(ListResourcesResponsePayload(resources: resources))
         case .command where envelope.payload.identifier == CreateSpaceCommandPayload.identifier:
             let command = try CreateSpaceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
             let space = Space(name: command.name, icon: command.icon, summary: command.summary)
@@ -171,6 +183,38 @@ public actor LocalHost: WireEndpoint {
             try await conversationRuns.cancel(runID: RunID(rawValue: rawRunID))
             kind = .commandResult
             payload = try TypedPayload(CancelRunResultPayload())
+        case .command where envelope.payload.identifier == ImportLocalFolderCommandPayload.identifier:
+            let command = try ImportLocalFolderCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            let spaceID = try Self.spaceID(from: command.spaceID)
+            let directory = try Self.localDirectory(from: command.path)
+            let resource = Resource(
+                spaceID: spaceID,
+                kind: .folder,
+                title: command.title ?? directory.lastPathComponent,
+                details: .hostPrivate(HostPrivateReference(rawValue: "local-folder:\(directory.path)"))
+            )
+            _ = try await storage.transact { snapshot in
+                guard snapshot.spaces.contains(where: { $0.id == spaceID }) else { throw HostProtocolError.unknownSpace(spaceID) }
+                guard !snapshot.resources.contains(where: { $0.details == resource.details }) else {
+                    throw HostProtocolError.duplicateResource(resource.id)
+                }
+                snapshot.resources.append(resource)
+            }
+            kind = .commandResult
+            payload = try TypedPayload(ImportLocalFolderResultPayload(resourceID: resource.id.description))
+        case .command where envelope.payload.identifier == RemoveResourceCommandPayload.identifier:
+            let command = try RemoveResourceCommandPayload(protobufBytes: envelope.payload.protobufBytes)
+            guard let uuid = UUID(uuidString: command.resourceID) else { throw HostProtocolError.invalidIdentity(command.resourceID) }
+            let resourceID = ResourceID(rawValue: uuid)
+            _ = try await storage.transact { snapshot in
+                guard snapshot.resources.contains(where: { $0.id == resourceID }) else { throw HostProtocolError.unknownResource(resourceID) }
+                guard !snapshot.executionContexts.contains(where: { $0.resourceID == resourceID }) else {
+                    throw HostProtocolError.resourceInUse(resourceID)
+                }
+                snapshot.resources.removeAll(where: { $0.id == resourceID })
+            }
+            kind = .commandResult
+            payload = try TypedPayload(ResourceMutationResultPayload())
         default:
             throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier)
         }
@@ -193,6 +237,16 @@ public actor LocalHost: WireEndpoint {
     private static func sessionID(from value: String) throws -> SessionID {
         guard let rawValue = UUID(uuidString: value) else { throw HostProtocolError.invalidIdentity(value) }
         return SessionID(rawValue: rawValue)
+    }
+
+    private static func localDirectory(from path: String) throws -> URL {
+        guard path.hasPrefix("/") else { throw HostProtocolError.invalidResourcePath(path) }
+        let directory = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw HostProtocolError.invalidResourcePath(path)
+        }
+        return directory
     }
 
     private func executionContext(for sessionID: SessionID, in spaceID: SpaceID) async throws -> ExecutionContextID {
@@ -224,6 +278,10 @@ public enum HostProtocolError: Swift.Error, Sendable, Equatable {
     case invalidIdentity(String)
     case unknownSpace(SpaceID)
     case unknownSession(SessionID)
+    case unknownResource(ResourceID)
+    case duplicateResource(ResourceID)
+    case resourceInUse(ResourceID)
+    case invalidResourcePath(String)
     case spaceNotEmpty(SpaceID)
     case runtimeUnavailable
 }

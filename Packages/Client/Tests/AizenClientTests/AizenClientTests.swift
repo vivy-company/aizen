@@ -140,6 +140,25 @@ import AizenWire
     #expect(event.kind == .assistantTextDelta("Hello"))
 }
 
+@Test func clientImportsAndRemovesLocalFolderResourcesThroughHost() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage)))
+    let spaceID = try await client.createSpace(name: "Vivy")
+
+    let resourceID = try await client.importLocalFolder(spaceID: spaceID, path: folder.path)
+    let resource = try #require(try await client.resources(spaceID: spaceID).first)
+    #expect(resource.id == resourceID)
+    #expect(resource.kind == .folder)
+    #expect(resource.title == "folder")
+    #expect(resource.details == .none)
+    try await client.removeResource(id: resourceID)
+    #expect(try await client.resources(spaceID: spaceID).isEmpty)
+}
+
 @Test func clientCancelsRunsThroughHostCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

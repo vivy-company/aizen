@@ -736,6 +736,137 @@ public struct ListRunsResponsePayload: WirePayload, Sendable, Hashable {
     }
 }
 
+public struct ListResourcesQueryPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.resource.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+    public let spaceID: String?
+
+    public init(spaceID: String? = nil) { self.spaceID = spaceID }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListResourcesQuery(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID.isEmpty ? nil : message.spaceID)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListResourcesQuery()
+        message.spaceID = spaceID ?? ""
+        return try message.serializedData()
+    }
+}
+
+public struct ListResourcesResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query-result.resource.list@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let resources: [Resource]
+
+    public init(resources: [Resource]) { self.resources = resources }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ListResourcesResponse(serializedBytes: protobufBytes)
+        resources = try message.resources.map { record in
+            guard let resourceUUID = UUID(uuidString: record.resourceID), let spaceUUID = UUID(uuidString: record.spaceID) else {
+                throw WireCodecError.invalidIdentity(record.resourceID)
+            }
+            return Resource(
+                id: ResourceID(rawValue: resourceUUID),
+                spaceID: SpaceID(rawValue: spaceUUID),
+                kind: ResourceKind(rawValue: record.kind),
+                title: record.title
+            )
+        }
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ListResourcesResponse()
+        message.resources = resources.map { resource in
+            var record = AizenWireV1_ResourceRecord()
+            record.resourceID = resource.id.description
+            record.spaceID = resource.spaceID.description
+            record.kind = resource.kind.rawValue
+            record.title = resource.title
+            return record
+        }
+        return try message.serializedData()
+    }
+}
+
+public struct ImportLocalFolderCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.resource.import-local-folder@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let spaceID: String
+    public let path: String
+    public let title: String?
+
+    public init(spaceID: String, path: String, title: String? = nil) {
+        precondition(!spaceID.isEmpty && !path.isEmpty, "Folder imports require a Space and path")
+        self.spaceID = spaceID
+        self.path = path
+        self.title = title
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_ImportLocalFolderCommand(serializedBytes: protobufBytes)
+        self.init(spaceID: message.spaceID, path: message.path, title: message.title.isEmpty ? nil : message.title)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ImportLocalFolderCommand()
+        message.spaceID = spaceID
+        message.path = path
+        message.title = title ?? ""
+        return try message.serializedData()
+    }
+}
+
+public struct ImportLocalFolderResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.resource.import-local-folder@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let resourceID: String
+
+    public init(resourceID: String) { self.resourceID = resourceID }
+    public init(protobufBytes: Data) throws { self.init(resourceID: try AizenWireV1_ImportLocalFolderResult(serializedBytes: protobufBytes).resourceID) }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_ImportLocalFolderResult()
+        message.resourceID = resourceID
+        return try message.serializedData()
+    }
+}
+
+public struct RemoveResourceCommandPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command.resource.remove@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public let resourceID: String
+
+    public init(resourceID: String) {
+        precondition(!resourceID.isEmpty, "Resource removal requires an identity")
+        self.resourceID = resourceID
+    }
+
+    public init(protobufBytes: Data) throws { self.init(resourceID: try AizenWireV1_RemoveResourceCommand(serializedBytes: protobufBytes).resourceID) }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_RemoveResourceCommand()
+        message.resourceID = resourceID
+        return try message.serializedData()
+    }
+}
+
+public struct ResourceMutationResultPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.command-result.resource.mutation@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+    public init() {}
+    public init(protobufBytes: Data) throws { _ = try AizenWireV1_ResourceMutationResult(serializedBytes: protobufBytes) }
+    public func protobufBytes() throws -> Data { try AizenWireV1_ResourceMutationResult().serializedData() }
+}
+
 public struct SnapshotResponsePayload: WirePayload, Sendable, Hashable {
     public static let identifier = PayloadIdentifier(rawValue: "aizen.snapshot.host@1")
     public static let schemaVersion: UInt32 = 1
