@@ -534,8 +534,25 @@ public struct DurableCommand: Codable, Sendable, Hashable, Identifiable {
     public let payloadDigest: String
     public var lifecycle: CommandLifecycle
     public var result: DurableCommandResult?
+    public var operationID: OperationID?
+    public var runID: RunID?
+    public let acceptedAt: Date
+    public var startedAt: Date?
+    public var completedAt: Date?
 
-    public init(id: CommandID = CommandID(), spaceID: SpaceID, deviceID: DeviceID? = nil, payloadDigest: String, lifecycle: CommandLifecycle = .accepted, result: DurableCommandResult? = nil) {
+    public init(
+        id: CommandID = CommandID(),
+        spaceID: SpaceID,
+        deviceID: DeviceID? = nil,
+        payloadDigest: String,
+        lifecycle: CommandLifecycle = .accepted,
+        result: DurableCommandResult? = nil,
+        operationID: OperationID? = nil,
+        runID: RunID? = nil,
+        acceptedAt: Date = Date(),
+        startedAt: Date? = nil,
+        completedAt: Date? = nil
+    ) {
         precondition(!payloadDigest.isEmpty, "Durable commands require a canonical payload digest")
         self.id = id
         self.spaceID = spaceID
@@ -543,6 +560,32 @@ public struct DurableCommand: Codable, Sendable, Hashable, Identifiable {
         self.payloadDigest = payloadDigest
         self.lifecycle = lifecycle
         self.result = result
+        self.operationID = operationID
+        self.runID = runID
+        self.acceptedAt = acceptedAt
+        self.startedAt = startedAt
+        self.completedAt = completedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, spaceID, deviceID, payloadDigest, lifecycle, result, operationID, runID, acceptedAt, startedAt, completedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try values.decode(CommandID.self, forKey: .id),
+            spaceID: try values.decode(SpaceID.self, forKey: .spaceID),
+            deviceID: try values.decodeIfPresent(DeviceID.self, forKey: .deviceID),
+            payloadDigest: try values.decode(String.self, forKey: .payloadDigest),
+            lifecycle: try values.decode(CommandLifecycle.self, forKey: .lifecycle),
+            result: try values.decodeIfPresent(DurableCommandResult.self, forKey: .result),
+            operationID: try values.decodeIfPresent(OperationID.self, forKey: .operationID),
+            runID: try values.decodeIfPresent(RunID.self, forKey: .runID),
+            acceptedAt: try values.decodeIfPresent(Date.self, forKey: .acceptedAt) ?? .distantPast,
+            startedAt: try values.decodeIfPresent(Date.self, forKey: .startedAt),
+            completedAt: try values.decodeIfPresent(Date.self, forKey: .completedAt)
+        )
     }
 }
 

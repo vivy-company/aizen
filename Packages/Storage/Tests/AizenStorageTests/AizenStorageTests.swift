@@ -57,6 +57,10 @@ import AizenCore
     let result = DurableCommandResult(payloadIdentifier: "aizen.command-result.example@1", schemaVersion: 1, protobufBytes: Data([1]))
     let completed = try await repository.transitionCommand(id: command.id, to: .succeeded, result: result)
     #expect(completed.result == result)
+    let startedAt = try #require(completed.startedAt)
+    let completedAt = try #require(completed.completedAt)
+    #expect(completed.acceptedAt <= startedAt)
+    #expect(startedAt <= completedAt)
     #expect(try await repository.load().commands == [completed])
 
     let secondCommand = DurableCommand(spaceID: space.id, payloadDigest: "sha256:three")

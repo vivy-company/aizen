@@ -270,6 +270,10 @@ public actor StorageRepository {
             guard snapshot.commands[index].lifecycle.canTransition(to: lifecycle) else { throw StorageError.invalidCommandTransition }
             snapshot.commands[index].lifecycle = lifecycle
             snapshot.commands[index].result = result
+            if lifecycle == .executing { snapshot.commands[index].startedAt = Date() }
+            if lifecycle == .succeeded || lifecycle == .failed || lifecycle == .cancelled {
+                snapshot.commands[index].completedAt = Date()
+            }
         }
         guard let command = snapshot.commands.first(where: { $0.id == id }) else { throw StorageError.missingCommand }
         return command
