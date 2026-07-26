@@ -46,6 +46,13 @@ import Testing
     #expect(!OperationLifecycle.running.canTransition(to: .queued))
 }
 
+@Test func durableCommandsCarryStableIdempotencyIdentity() {
+    let command = DurableCommand(spaceID: SpaceID(), deviceID: DeviceID(), payloadDigest: "sha256:abc")
+    #expect(command.lifecycle == .accepted)
+    #expect(command.lifecycle.canTransition(to: .executing))
+    #expect(!CommandLifecycle.succeeded.canTransition(to: .executing))
+}
+
 @Test func runLifecycleModelsHostPreparationAndCancellation() {
     #expect(RunLifecycle.queued.canTransition(to: .preparingContext))
     #expect(RunLifecycle.preparingContext.canTransition(to: .startingAgent))

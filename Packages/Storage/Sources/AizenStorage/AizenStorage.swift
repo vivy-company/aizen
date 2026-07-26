@@ -15,11 +15,12 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
     public var runs: [Run]
     public var operations: [AizenCore.Operation]
     public var artifacts: [Artifact]
+    public var commands: [DurableCommand]
 
     public init(
         schemaVersion: Int = Self.schemaVersion,
         spaces: [Space] = [], sessions: [Session] = [], conversationMessages: [ConversationMessage] = [], resources: [Resource] = [],
-        executionContexts: [ExecutionContext] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], artifacts: [Artifact] = []
+        executionContexts: [ExecutionContext] = [], runs: [Run] = [], operations: [AizenCore.Operation] = [], artifacts: [Artifact] = [], commands: [DurableCommand] = []
     ) {
         precondition(schemaVersion == Self.schemaVersion, "Storage snapshots must use schema v2")
         self.schemaVersion = schemaVersion
@@ -31,15 +32,16 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         self.runs = runs
         self.operations = operations
         self.artifacts = artifacts
+        self.commands = commands
     }
 
     public var isEmpty: Bool {
         spaces.isEmpty && sessions.isEmpty && conversationMessages.isEmpty && resources.isEmpty && executionContexts.isEmpty &&
-            runs.isEmpty && operations.isEmpty && artifacts.isEmpty
+            runs.isEmpty && operations.isEmpty && artifacts.isEmpty && commands.isEmpty
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, runs, operations, artifacts
+        case schemaVersion, spaces, sessions, conversationMessages, resources, executionContexts, runs, operations, artifacts, commands
     }
 
     public init(from decoder: Decoder) throws {
@@ -53,6 +55,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         runs = try values.decode([Run].self, forKey: .runs)
         operations = try values.decode([AizenCore.Operation].self, forKey: .operations)
         artifacts = try values.decode([Artifact].self, forKey: .artifacts)
+        commands = try values.decodeIfPresent([DurableCommand].self, forKey: .commands) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -66,6 +69,7 @@ public struct StorageSnapshot: Codable, Sendable, Hashable {
         try values.encode(runs, forKey: .runs)
         try values.encode(operations, forKey: .operations)
         try values.encode(artifacts, forKey: .artifacts)
+        try values.encode(commands, forKey: .commands)
     }
 }
 
@@ -237,8 +241,10 @@ public actor StorageRepository {
         guard Set(snapshot.resources.map(\.id)).count == snapshot.resources.count else { throw StorageError.duplicateIdentity("resource") }
         guard Set(snapshot.executionContexts.map(\.id)).count == snapshot.executionContexts.count else { throw StorageError.duplicateIdentity("execution context") }
         guard Set(snapshot.runs.map(\.id)).count == snapshot.runs.count else { throw StorageError.duplicateIdentity("run") }
+        guard Set(snapshot.commands.map(\.id)).count == snapshot.commands.count else { throw StorageError.duplicateIdentity("command") }
         guard snapshot.resources.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
         guard snapshot.executionContexts.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
+        guard snapshot.commands.allSatisfy({ spaceIDs.contains($0.spaceID) }) else { throw StorageError.missingSpace }
 
         let sessions = Dictionary(uniqueKeysWithValues: snapshot.sessions.map { ($0.id, $0) })
         let resources = Dictionary(uniqueKeysWithValues: snapshot.resources.map { ($0.id, $0) })

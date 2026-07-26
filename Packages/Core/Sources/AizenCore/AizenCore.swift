@@ -43,6 +43,7 @@ public enum ExecutionContextIdentity: DomainIDKind {}
 public enum RunIdentity: DomainIDKind {}
 public enum OperationIdentity: DomainIDKind {}
 public enum ArtifactIdentity: DomainIDKind {}
+public enum CommandIdentity: DomainIDKind {}
 
 public typealias AccountID = DomainID<AccountIdentity>
 public typealias HostID = DomainID<HostIdentity>
@@ -55,6 +56,7 @@ public typealias ExecutionContextID = DomainID<ExecutionContextIdentity>
 public typealias RunID = DomainID<RunIdentity>
 public typealias OperationID = DomainID<OperationIdentity>
 public typealias ArtifactID = DomainID<ArtifactIdentity>
+public typealias CommandID = DomainID<CommandIdentity>
 
 /// An opaque identifier to a secret or platform credential held outside Core and Storage snapshots.
 public struct SecureReferenceID: RawRepresentable, Codable, Sendable, Hashable {
@@ -436,6 +438,40 @@ public struct Operation: Codable, Sendable, Hashable, Identifiable {
         self.lifecycle = lifecycle
         self.progress = progress
         self.failureDescription = failureDescription
+    }
+}
+
+public enum CommandLifecycle: String, Codable, Sendable, Hashable {
+    case accepted
+    case executing
+    case succeeded
+    case failed
+    case cancelled
+
+    public func canTransition(to next: Self) -> Bool {
+        switch (self, next) {
+        case (.accepted, .executing), (.accepted, .cancelled),
+             (.executing, .succeeded), (.executing, .failed), (.executing, .cancelled): true
+        default: false
+        }
+    }
+}
+
+/// Host-owned command receipt used to make mutating Client requests retry-safe across connections.
+public struct DurableCommand: Codable, Sendable, Hashable, Identifiable {
+    public let id: CommandID
+    public let spaceID: SpaceID
+    public let deviceID: DeviceID?
+    public let payloadDigest: String
+    public var lifecycle: CommandLifecycle
+
+    public init(id: CommandID = CommandID(), spaceID: SpaceID, deviceID: DeviceID? = nil, payloadDigest: String, lifecycle: CommandLifecycle = .accepted) {
+        precondition(!payloadDigest.isEmpty, "Durable commands require a canonical payload digest")
+        self.id = id
+        self.spaceID = spaceID
+        self.deviceID = deviceID
+        self.payloadDigest = payloadDigest
+        self.lifecycle = lifecycle
     }
 }
 
