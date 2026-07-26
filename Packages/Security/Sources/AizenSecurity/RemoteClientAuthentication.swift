@@ -9,6 +9,12 @@ public enum RemoteClientAuthenticationError: Swift.Error, Sendable, Equatable {
     case hostIdentityMismatch
 }
 
+public enum PairingClientAuthenticationError: Swift.Error, Sendable, Equatable {
+    case malformedHandshake
+    case hostIdentityMismatch
+    case unexpectedResponse
+}
+
 public enum AuthenticatedRemoteWireTransportError: Swift.Error, Sendable, Equatable {
     case queueFull(WireChannel)
 }
@@ -18,6 +24,76 @@ public typealias RemoteFrameExchange = @Sendable (Data) async throws -> Data
 
 /// The post-authentication send half of a full-duplex secure route.
 public typealias RemoteFrameSender = @Sendable (Data) async throws -> Void
+
+/// Performs the invitation-bound LAN handshake for a device that is not authorized yet. The
+/// resulting receipt only means the Host queued a request for local approval; it grants nothing.
+public struct PairingClientAuthenticator: Sendable {
+    private let invitation: PairingInvitation
+    private let device: DevicePublicIdentity
+    private let deviceIdentity: LocalCryptographicIdentity
+    private let protocolGeneration: UInt32
+
+    public init(invitation: PairingInvitation, device: DevicePublicIdentity, deviceIdentity: LocalCryptographicIdentity, protocolGeneration: UInt32 = UInt32(AizenWireModule.protocolGeneration)) {
+        precondition(device.cryptographicIdentity == deviceIdentity.publicIdentity(createdAt: device.cryptographicIdentity.createdAt), "Device public and private identities must match")
+        self.invitation = invitation
+        self.device = device
+        self.deviceIdentity = deviceIdentity
+        self.protocolGeneration = protocolGeneration
+    }
+
+    public func submit(using exchange: @escaping RemoteFrameExchange) async throws -> PairingPendingPayload {
+        try invitation.validate()
+        let connectionID = UUID()
+        let ephemeralKey = ConnectionEphemeralKey()
+        let clientNonce = try randomNonce()
+        let start = AuthenticationStartPayload(
+            hostID: invitation.host.hostID,
+            deviceID: device.deviceID,
+            connectionID: connectionID,
+            clientNonce: clientNonce,
+            deviceSigningPublicKey: device.cryptographicIdentity.signingPublicKey,
+            deviceKeyAgreementPublicKey: device.cryptographicIdentity.keyAgreementPublicKey,
+            clientEphemeralPublicKey: ephemeralKey.publicKey,
+            route: ConnectionRoute.lan.rawValue
+        )
+        let startEnvelope = try ProtocolEnvelope(messageID: UUID().uuidString, connectionID: connectionID.uuidString, connectionSequence: 1, kind: .authentication, channel: .control, payload: .init(start))
+        let challengeEnvelope = try ProtocolEnvelope(serializedData: try await exchange(startEnvelope.serializedData()))
+        guard challengeEnvelope.kind == .authentication, challengeEnvelope.payload.identifier == AuthenticationChallengePayload.identifier else {
+            throw PairingClientAuthenticationError.malformedHandshake
+        }
+        let challenge = try AuthenticationChallengePayload(protobufBytes: challengeEnvelope.payload.protobufBytes)
+        guard challenge.hostID == invitation.host.hostID,
+              challenge.deviceID == device.deviceID,
+              challenge.connectionID == connectionID,
+              challenge.clientNonce == clientNonce,
+              challenge.hostSigningPublicKey == invitation.host.cryptographicIdentity.signingPublicKey,
+              challenge.hostKeyAgreementPublicKey == invitation.host.cryptographicIdentity.keyAgreementPublicKey,
+              challenge.route == ConnectionRoute.lan.rawValue else {
+            throw PairingClientAuthenticationError.hostIdentityMismatch
+        }
+        let binding = try ConnectionAuthenticationBinding(protocolGeneration: protocolGeneration, hostID: invitation.host.hostID, deviceID: device.deviceID, connectionID: connectionID, clientNonce: clientNonce, serverNonce: challenge.serverNonce, clientEphemeralPublicKey: ephemeralKey.publicKey, serverEphemeralPublicKey: challenge.serverEphemeralPublicKey, route: .lan)
+        try ConnectionAuthenticator.verify(.init(participant: .host, signature: challenge.hostSignature), expectedParticipant: .host, identity: invitation.host.cryptographicIdentity, binding: binding)
+        let channel = AuthenticatedWireChannel(keys: try ConnectionAuthenticator.deriveKeys(participant: .device, ephemeralKey: ephemeralKey, peerEphemeralPublicKey: challenge.serverEphemeralPublicKey, binding: binding), binding: binding)
+        let proof = ConnectionAuthenticator.makeProof(participant: .device, identity: deviceIdentity, binding: binding)
+        let proofEnvelope = try ProtocolEnvelope(messageID: UUID().uuidString, connectionID: connectionID.uuidString, connectionSequence: 2, kind: .authentication, channel: .control, payload: .init(AuthenticationProofPayload(connectionID: connectionID, deviceSignature: proof.signature)))
+        let ready = try await channel.open(try await exchange(proofEnvelope.serializedData()))
+        guard ready.kind == .capabilities else { throw PairingClientAuthenticationError.malformedHandshake }
+        let transport = AuthenticatedRemoteWireTransport(channel: channel, exchange: exchange)
+        let request = PairingRequestPayload(tokenID: invitation.tokenID, pairingSecret: invitation.secret, hostID: invitation.host.hostID, deviceID: device.deviceID, deviceDisplayName: device.displayName, devicePlatform: device.platform, deviceSigningPublicKey: device.cryptographicIdentity.signingPublicKey, deviceKeyAgreementPublicKey: device.cryptographicIdentity.keyAgreementPublicKey, route: ConnectionRoute.lan.rawValue)
+        let response = try await transport.send(ProtocolEnvelope(messageID: UUID().uuidString, connectionID: connectionID.uuidString, connectionSequence: 3, kind: .command, channel: .control, payload: .init(request)))
+        guard response.kind == .commandReceipt, response.payload.identifier == PairingPendingPayload.identifier else {
+            throw PairingClientAuthenticationError.unexpectedResponse
+        }
+        return try PairingPendingPayload(protobufBytes: response.payload.protobufBytes)
+    }
+
+    private func randomNonce() throws -> Data {
+        var nonce = Data(count: ConnectionAuthenticationBinding.nonceLength)
+        let status = nonce.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, $0.count, $0.baseAddress!) }
+        guard status == errSecSuccess else { throw PairingClientAuthenticationError.malformedHandshake }
+        return nonce
+    }
+}
 
 /// Establishes a Host-pinned, mutually authenticated channel for any user-managed route.
 /// Network reachability, TLS hostnames, and third-party access layers are intentionally not trust.
