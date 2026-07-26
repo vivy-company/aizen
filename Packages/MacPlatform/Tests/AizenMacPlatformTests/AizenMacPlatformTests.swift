@@ -33,6 +33,24 @@ import Testing
     #expect(try ProtocolEnvelope(serializedData: responseData) == request)
 }
 
+@Test func xpcWireTransportRoundTripsThroughAnAcceptedConnection() async throws {
+    let request = ProtocolEnvelope(
+        messageID: "xpc-connection-round-trip",
+        connectionSequence: 1,
+        kind: .query,
+        channel: .state,
+        payload: try .init(ListSpacesQueryPayload())
+    )
+    let listener = XPCWireHostListener(wireEndpoint: EchoWireEndpoint())
+    listener.resume()
+    defer { listener.invalidate() }
+
+    let endpoint = try #require(listener.listenerEndpoint)
+    let response = try await XPCWireTransport(listenerEndpoint: endpoint).send(request)
+
+    #expect(response == request)
+}
+
 @Test func acpRuntimeOwnsTheClientUntilTheRunIsCancelled() async throws {
     let client = RecordingClient()
     let runtime = ACPRunRuntime(

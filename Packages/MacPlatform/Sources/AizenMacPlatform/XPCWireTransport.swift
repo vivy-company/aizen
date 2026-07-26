@@ -22,6 +22,12 @@ public final class XPCWireTransport: @unchecked Sendable, WireTransport {
         connection.resume()
     }
 
+    public init(listenerEndpoint: NSXPCListenerEndpoint) {
+        connection = NSXPCConnection(listenerEndpoint: listenerEndpoint)
+        connection.remoteObjectInterface = NSXPCInterface(with: AizenXPCWireService.self)
+        connection.resume()
+    }
+
     deinit {
         connection.invalidate()
     }
@@ -46,6 +52,48 @@ public final class XPCWireTransport: @unchecked Sendable, WireTransport {
             }
         }
         return try ProtocolEnvelope(serializedData: response)
+    }
+}
+
+/// Owns the server listener and makes the Wire service available to each accepted XPC connection.
+/// The persistent Host process uses the Mach-service initializer; the endpoint initializer is used
+/// for local integration tests without registering a system service.
+public final class XPCWireHostListener: NSObject, NSXPCListenerDelegate {
+    public let listenerEndpoint: NSXPCListenerEndpoint?
+
+    private let listener: NSXPCListener
+    private let service: XPCWireService
+
+    public init(wireEndpoint: any WireEndpoint) {
+        let listener = NSXPCListener.anonymous()
+        self.listener = listener
+        listenerEndpoint = listener.endpoint
+        service = XPCWireService(endpoint: wireEndpoint)
+        super.init()
+        listener.delegate = self
+    }
+
+    public init(machServiceName: String, wireEndpoint: any WireEndpoint) {
+        listener = NSXPCListener(machServiceName: machServiceName)
+        listenerEndpoint = nil
+        service = XPCWireService(endpoint: wireEndpoint)
+        super.init()
+        listener.delegate = self
+    }
+
+    public func resume() {
+        listener.resume()
+    }
+
+    public func invalidate() {
+        listener.invalidate()
+    }
+
+    public func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
+        connection.exportedInterface = NSXPCInterface(with: AizenXPCWireService.self)
+        connection.exportedObject = service
+        connection.resume()
+        return true
     }
 }
 
