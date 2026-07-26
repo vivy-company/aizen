@@ -916,6 +916,82 @@ private func authenticatedSession(for deviceID: DeviceID) throws -> Authenticate
     ))
 }
 
+@Test func repositoryRefreshReportsBranchSubmodulesAndRebaseState() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    let git = repository.appendingPathComponent(".git", isDirectory: true)
+    try FileManager.default.createDirectory(at: git.appendingPathComponent("rebase-merge", isDirectory: true), withIntermediateDirectories: true)
+    try Data("ref: refs/heads/feature/reignition\n".utf8).write(to: git.appendingPathComponent("HEAD"))
+    try Data("[submodule \"shared\"]\n".utf8).write(to: repository.appendingPathComponent(".gitmodules"))
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Repository")
+    let resource = Resource(
+        spaceID: space.id,
+        kind: .repository,
+        title: "Repository",
+        details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)"))
+    )
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.resources.append(resource)
+    }
+    let host = LocalHost(storage: storage)
+
+    let response = try await host.receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(RefreshRepositoryResourceCommandPayload(resourceID: resource.id.description))
+    ))
+
+    #expect(try RefreshRepositoryResourceResultPayload(protobufBytes: response.payload.protobufBytes) == .init(
+        resourceID: resource.id.description,
+        availability: .available,
+        branch: "feature/reignition",
+        isDetached: false,
+        hasSubmodules: true,
+        isRebaseInProgress: true
+    ))
+}
+
+@Test func repositoryRefreshReportsDetachedHead() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("repository", isDirectory: true)
+    let git = repository.appendingPathComponent(".git", isDirectory: true)
+    try FileManager.default.createDirectory(at: git, withIntermediateDirectories: true)
+    try Data("0123456789abcdef\n".utf8).write(to: git.appendingPathComponent("HEAD"))
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Repository")
+    let resource = Resource(
+        spaceID: space.id,
+        kind: .repository,
+        title: "Repository",
+        details: .hostPrivate(.init(rawValue: "local-repository:\(repository.path)"))
+    )
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.resources.append(resource)
+    }
+    let host = LocalHost(storage: storage)
+
+    let response = try await host.receive(.init(
+        messageID: UUID().uuidString,
+        connectionSequence: 1,
+        kind: .command,
+        channel: .state,
+        payload: try .init(RefreshRepositoryResourceCommandPayload(resourceID: resource.id.description))
+    ))
+
+    #expect(try RefreshRepositoryResourceResultPayload(protobufBytes: response.payload.protobufBytes) == .init(
+        resourceID: resource.id.description,
+        availability: .available,
+        isDetached: true
+    ))
+}
+
 @Test func localHostListsExecutionContextFilesThroughTypedWire() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
