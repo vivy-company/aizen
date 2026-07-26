@@ -362,6 +362,38 @@ public struct Run: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+/// A transient, ordered update from the Host-owned runtime. Durable history stays in Storage;
+/// clients may reconnect and reload it independently of this event stream.
+public enum RunEventKind: Codable, Sendable, Hashable {
+    case lifecycle(RunLifecycle)
+    case assistantTextDelta(String)
+}
+
+public struct RunEvent: Sendable, Hashable, Identifiable {
+    public let id: UUID
+    public let sequence: UInt64
+    public let spaceID: SpaceID
+    public let sessionID: SessionID
+    public let runID: RunID
+    public let kind: RunEventKind
+
+    public init(
+        id: UUID = UUID(),
+        sequence: UInt64,
+        spaceID: SpaceID,
+        sessionID: SessionID,
+        runID: RunID,
+        kind: RunEventKind
+    ) {
+        self.id = id
+        self.sequence = sequence
+        self.spaceID = spaceID
+        self.sessionID = sessionID
+        self.runID = runID
+        self.kind = kind
+    }
+}
+
 public enum OperationLifecycle: String, Codable, Sendable, Hashable {
     case queued
     case running

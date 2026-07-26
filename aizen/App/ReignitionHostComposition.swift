@@ -17,6 +17,7 @@ actor ReignitionHostComposition {
     let storage: StorageRepository
     let host: LocalHost
     let client: HostClient
+    let runEvents: RunEventPublisher
 
     init(storageURL: URL? = nil) {
         let storageURL = storageURL ?? ReignitionHostComposition.defaultStorageURL()
@@ -31,10 +32,12 @@ actor ReignitionHostComposition {
             ),
             delegateProvider: NoACPToolDelegateProvider()
         )
+        let runEvents = RunEventPublisher()
         self.storage = storage
+        self.runEvents = runEvents
         host = LocalHost(
             storage: storage,
-            conversationRuns: ConversationRunCoordinator(storage: storage, runtime: runtime),
+            conversationRuns: ConversationRunCoordinator(storage: storage, runtime: runtime, eventPublisher: runEvents),
             managedSandboxes: sandboxes
         )
         client = HostClient(transport: InProcessTransport(endpoint: host))
@@ -74,6 +77,10 @@ actor ReignitionHostComposition {
 
     func cancelRun(id: RunID) async throws {
         try await client.cancelRun(id: id)
+    }
+
+    func events() async -> AsyncStream<RunEvent> {
+        await runEvents.events()
     }
 
     func prepareLegacyMigration(legacyStoreURL: URL?, legacyModelURL: URL?, fileManager: FileManager = .default) async throws -> MigrationPreparation {

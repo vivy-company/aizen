@@ -235,10 +235,16 @@ public actor RunCoordinator {
 
     private let storage: StorageRepository
     private let runtime: any RunRuntime
+    private let eventPublisher: RunEventPublisher?
 
-    public init(storage: StorageRepository, runtime: any RunRuntime) {
+    public init(
+        storage: StorageRepository,
+        runtime: any RunRuntime,
+        eventPublisher: RunEventPublisher? = nil
+    ) {
         self.storage = storage
         self.runtime = runtime
+        self.eventPublisher = eventPublisher
     }
 
     public func start(_ run: Run) async throws {
@@ -296,7 +302,7 @@ public actor RunCoordinator {
     }
 
     private func updateLifecycle(_ lifecycle: RunLifecycle, for id: RunID) async throws {
-        _ = try await storage.transact { snapshot in
+        let snapshot = try await storage.transact { snapshot in
             guard let index = snapshot.runs.firstIndex(where: { $0.id == id }) else { throw Error.unknownRun(id) }
             let current = snapshot.runs[index].lifecycle
             guard current.canTransition(to: lifecycle) else {
@@ -304,5 +310,7 @@ public actor RunCoordinator {
             }
             snapshot.runs[index].lifecycle = lifecycle
         }
+        guard let run = snapshot.runs.first(where: { $0.id == id }) else { throw Error.unknownRun(id) }
+        await eventPublisher?.publish(for: run, kind: .lifecycle(lifecycle))
     }
 }

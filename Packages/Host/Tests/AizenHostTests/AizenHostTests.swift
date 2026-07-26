@@ -56,6 +56,37 @@ import AizenWire
     #expect(try await coordinator.run(for: run.id)?.lifecycle == .cancelled)
 }
 
+@Test func runEventsAreOrderedAndScopedToTheHostRun() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Host")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Run")
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+    }
+    let publisher = RunEventPublisher()
+    let stream = await publisher.events()
+    let collector = Task { () -> [RunEvent] in
+        var iterator = stream.makeAsyncIterator()
+        var events: [RunEvent] = []
+        while events.count < 5, let event = await iterator.next() {
+            events.append(event)
+        }
+        return events
+    }
+    let coordinator = RunCoordinator(storage: storage, runtime: RecordingRuntime(), eventPublisher: publisher)
+    let run = Run(spaceID: space.id, sessionID: session.id)
+    try await coordinator.start(run)
+    try await coordinator.cancel(run.id)
+    let events = await collector.value
+
+    #expect(events.map(\.sequence) == [1, 2, 3, 4, 5])
+    #expect(events.allSatisfy { $0.spaceID == space.id && $0.sessionID == session.id && $0.runID == run.id })
+    #expect(events.map(\.kind) == [.lifecycle(.preparingContext), .lifecycle(.startingAgent), .lifecycle(.running), .lifecycle(.cancelling), .lifecycle(.cancelled)])
+}
+
 @Test func hostCreatesSpacesThroughTypedCommands() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

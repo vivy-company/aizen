@@ -15,10 +15,14 @@ public actor ConversationRunCoordinator {
     private let runtime: any PromptRunRuntime
     private let runs: RunCoordinator
 
-    public init(storage: StorageRepository, runtime: any PromptRunRuntime) {
+    public init(
+        storage: StorageRepository,
+        runtime: any PromptRunRuntime,
+        eventPublisher: RunEventPublisher? = nil
+    ) {
         self.storage = storage
         self.runtime = runtime
-        runs = RunCoordinator(storage: storage, runtime: runtime)
+        runs = RunCoordinator(storage: storage, runtime: runtime, eventPublisher: eventPublisher)
     }
 
     public func submit(message: ConversationMessage, run: Run) async throws {
