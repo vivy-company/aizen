@@ -350,18 +350,32 @@ private extension AizenCLI {
     }
 
     static func handleOperation(_ args: [String]) async throws {
-        guard let subcommand = args.first else { throw CLIError.invalidArguments("operation requires list, show, or watch") }
-        let rest = Array(args.dropFirst())
+        let parsed = try parseArguments(args)
+        if parsed.flags.contains("help") {
+            print(operationHelpText())
+            return
+        }
+        guard let subcommand = parsed.positionals.first else { throw CLIError.invalidArguments("operation requires list, show, or watch") }
+        let rest = Array(parsed.positionals.dropFirst())
         let client = V2CLIClient()
         switch subcommand {
         case "list":
             guard rest.count <= 1 else { throw CLIError.invalidArguments("operation list accepts at most one space") }
             let spaceID = try await resolveV2Space(rest.first, client: client)
-            for operation in try await client.operations(spaceID: spaceID) { print(operationLine(operation)) }
+            let operations = try await client.operations(spaceID: spaceID)
+            if parsed.flags.contains("json") {
+                printJSON(OperationListPayload(operations: operations.map(operationOutput)))
+            } else {
+                for operation in operations { print(operationLine(operation)) }
+            }
         case "show":
             guard rest.count == 1, let rawID = UUID(uuidString: rest[0]) else { throw CLIError.invalidArguments("operation show requires an Operation ID") }
             guard let operation = try await client.operations(operationID: .init(rawValue: rawID)).first else { throw CLIError.invalidArguments("Operation not found: \(rest[0])") }
-            print(operationLine(operation))
+            if parsed.flags.contains("json") {
+                printJSON(OperationPayload(operation: operationOutput(operation)))
+            } else {
+                print(operationLine(operation))
+            }
         case "watch":
             guard rest.count == 1, let rawID = UUID(uuidString: rest[0]) else { throw CLIError.invalidArguments("operation watch requires an Operation ID") }
             let operationID = OperationID(rawValue: rawID)
@@ -377,7 +391,14 @@ private extension AizenCLI {
                     try await Task.sleep(for: .seconds(1))
                     continue
                 }
-                if operation != last { print(operationLine(operation)); last = operation }
+                if operation != last {
+                    if parsed.flags.contains("json") {
+                        printJSONLine(OperationPayload(operation: operationOutput(operation)))
+                    } else {
+                        print(operationLine(operation))
+                    }
+                    last = operation
+                }
                 if operation.lifecycle == .completed || operation.lifecycle == .failed || operation.lifecycle == .cancelled { return }
                 try await Task.sleep(for: .milliseconds(500))
             }
@@ -389,6 +410,17 @@ private extension AizenCLI {
     static func operationLine(_ operation: AizenCore.Operation) -> String {
         let progress = operation.progress.map { String(format: "%.0f%%", $0 * 100) } ?? "-"
         return "\(operation.id.description)\t\(operation.lifecycle.rawValue)\t\(progress)\t\(operation.failureDescription ?? "")"
+    }
+
+    static func operationOutput(_ operation: AizenCore.Operation) -> OperationOutput {
+        OperationOutput(
+            id: operation.id.description,
+            spaceID: operation.spaceID.description,
+            sessionID: operation.sessionID?.description,
+            lifecycle: operation.lifecycle.rawValue,
+            progress: operation.progress,
+            failure: operation.failureDescription
+        )
     }
 
     static func handleResource(_ args: [String]) async throws {
@@ -896,6 +928,23 @@ private extension AizenCLI {
         let workspaces: [WorkspaceOutput]
     }
 
+    struct OperationOutput: Encodable {
+        let id: String
+        let spaceID: String
+        let sessionID: String?
+        let lifecycle: String
+        let progress: Double?
+        let failure: String?
+    }
+
+    struct OperationPayload: Encodable {
+        let operation: OperationOutput
+    }
+
+    struct OperationListPayload: Encodable {
+        let operations: [OperationOutput]
+    }
+
     static func v2Workspaces(filters: WorkspaceFilters) async throws -> [Space] {
         let all = try await V2CLIClient().spaces().sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
@@ -1029,6 +1078,15 @@ private extension AizenCLI {
         }
     }
 
+    static func printJSONLine<T: Encodable>(_ payload: T) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        if let data = try? encoder.encode(payload),
+           let output = String(data: data, encoding: .utf8) {
+            print(output)
+        }
+    }
+
     static func repositoryFilters(from parsed: ParsedArguments, positionalWorkspace: String?) -> RepositoryFilters {
         var include = Set(splitList(parsed.options["workspace"]))
         if let positionalWorkspace = positionalWorkspace, !positionalWorkspace.isEmpty {
@@ -1120,6 +1178,17 @@ Options:
   --path <text>                  Unavailable for v2 Resources
   --json                         Output JSON
   --no-color                     Disable colored output
+"""
+    }
+
+    static func operationHelpText() -> String {
+        return """
+Usage:
+  aizen operation list [space] [--json]
+  aizen operation show <operation-id> [--json]
+  aizen operation watch <operation-id> [--json]
+
+`watch --json` emits newline-delimited JSON, one object for each observed operation state.
 """
     }
 
