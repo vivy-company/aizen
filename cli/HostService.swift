@@ -17,7 +17,11 @@ enum HostService {
         let displayName = Host.current().localizedName ?? ProcessInfo.processInfo.hostName
         let credentials = try await HostIdentityStore().loadOrCreateCredentials(displayName: displayName)
         let lanListener = runtime.makeLANListener(credentials: credentials)
-        try await lanListener.start()
+        do {
+            try await lanListener.start()
+        } catch PairedTLSOptionsError.noAuthorizedDevices {
+            // A fresh Host has no PSK to offer until local pairing approval provisions one.
+        }
         withExtendedLifetime((runtime, listener, lanListener)) {
             dispatchMain()
         }
