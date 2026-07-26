@@ -2,6 +2,7 @@ import AizenCore
 import AizenClient
 import AizenWire
 import AppKit
+import Combine
 import GhosttyKit
 import SwiftUI
 
@@ -14,7 +15,7 @@ struct ReignitionConversationWindow: View {
     @State private var newConversationTitle = ""
     @State private var newSpaceName = ""
     @State private var contextCreation: ReignitionContextCreation?
-    @State private var terminalPresentation: AizenCore.TerminalSession?
+    @State private var terminalPresentation: ReignitionTerminalPresentation?
     @State private var fileBrowserContext: ExecutionContext?
     @State private var showingLicenseDeepLinkSheet = false
 
@@ -105,8 +106,8 @@ struct ReignitionConversationWindow: View {
                 contextCreation = nil
             }
         }
-        .sheet(item: $terminalPresentation) { terminal in
-            ReignitionTerminalSheet(terminal: terminal)
+        .sheet(item: $terminalPresentation) { presentation in
+            ReignitionTerminalSheet(store: store, presentation: presentation)
         }
         .sheet(item: $fileBrowserContext) { context in
             ReignitionContextFilesSheet(store: store, context: context)
@@ -390,7 +391,11 @@ struct ReignitionConversationWindow: View {
 
     private func openTerminal(for sessionID: SessionID) {
         Task {
-            terminalPresentation = await store.createTerminal(for: sessionID)
+            guard let terminal = await store.createTerminal(for: sessionID) else { return }
+            terminalPresentation = ReignitionTerminalPresentation(
+                conversationID: sessionID,
+                terminal: terminal
+            )
         }
     }
 
@@ -510,12 +515,133 @@ private struct ReignitionContextTextFileSheet: View {
     }
 }
 
-private struct ReignitionTerminalSheet: View {
+private struct ReignitionTerminalPresentation: Identifiable {
+    let id: UUID
+    let conversationID: SessionID
     let terminal: AizenCore.TerminalSession
 
+    init(conversationID: SessionID, terminal: AizenCore.TerminalSession) {
+        id = UUID()
+        self.conversationID = conversationID
+        self.terminal = terminal
+    }
+}
+
+private struct ReignitionTerminalSheet: View {
+    @ObservedObject var store: ReignitionConversationStore
+    let presentation: ReignitionTerminalPresentation
+    @StateObject private var controller: ReignitionTerminalPresentationController
+
+    init(store: ReignitionConversationStore, presentation: ReignitionTerminalPresentation) {
+        self.store = store
+        self.presentation = presentation
+        _controller = StateObject(
+            wrappedValue: ReignitionTerminalPresentationController(initialTerminal: presentation.terminal)
+        )
+    }
+
     var body: some View {
-        ReignitionTerminalSurface(terminal: terminal)
-            .frame(minWidth: 760, minHeight: 480)
+        Group {
+            if controller.axis == .horizontal {
+                HStack(spacing: 1) {
+                    terminalPanes
+                }
+            } else {
+                VStack(spacing: 1) {
+                    terminalPanes
+                }
+            }
+        }
+        .background(Color.black)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button("Split Right", systemImage: "rectangle.split.2x1") {
+                    controller.split(.horizontal, store: store, conversationID: presentation.conversationID)
+                }
+                Button("Split Down", systemImage: "rectangle.split.1x2") {
+                    controller.split(.vertical, store: store, conversationID: presentation.conversationID)
+                }
+                Button("Close Pane", systemImage: "xmark") {
+                    controller.closePane()
+                }
+                .disabled(controller.terminals.count == 1)
+            }
+        }
+        .onAppear {
+            controller.activate(store: store, conversationID: presentation.conversationID)
+        }
+        .onDisappear {
+            controller.deactivate()
+        }
+        .frame(minWidth: 760, minHeight: 480)
+    }
+
+    @ViewBuilder
+    private var terminalPanes: some View {
+        ForEach(controller.terminals) { terminal in
+            ReignitionTerminalSurface(terminal: terminal)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+@MainActor
+private final class ReignitionTerminalPresentationController: ObservableObject {
+    enum Axis: Equatable {
+        case horizontal
+        case vertical
+    }
+
+    @Published private(set) var terminals: [AizenCore.TerminalSession]
+    @Published private(set) var axis: Axis = .horizontal
+
+    private let splitActions = TerminalSplitActions()
+
+    init(initialTerminal: AizenCore.TerminalSession) {
+        terminals = [initialTerminal]
+    }
+
+    func activate(store: ReignitionConversationStore, conversationID: SessionID) {
+        splitActions.configure(
+            splitRight: { [weak self] in
+                self?.split(.horizontal, store: store, conversationID: conversationID)
+            },
+            splitLeft: { [weak self] in
+                self?.split(.horizontal, store: store, conversationID: conversationID)
+            },
+            splitDown: { [weak self] in
+                self?.split(.vertical, store: store, conversationID: conversationID)
+            },
+            splitUp: { [weak self] in
+                self?.split(.vertical, store: store, conversationID: conversationID)
+            },
+            closePane: { [weak self] in
+                self?.closePane()
+            }
+        )
+        TerminalSplitActionRouter.shared.activate(splitActions)
+    }
+
+    func deactivate() {
+        TerminalSplitActionRouter.shared.clear(splitActions)
+        splitActions.clear()
+    }
+
+    func split(
+        _ axis: Axis,
+        store: ReignitionConversationStore,
+        conversationID: SessionID
+    ) {
+        self.axis = axis
+        Task { @MainActor [weak self, store] in
+            guard let terminal = await store.createTerminal(for: conversationID) else { return }
+            self?.terminals.append(terminal)
+        }
+    }
+
+    func closePane() {
+        guard terminals.count > 1 else { return }
+        terminals.removeLast()
     }
 }
 
