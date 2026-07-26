@@ -264,7 +264,7 @@ private extension AizenCLI {
 
     static func handleConversation(_ args: [String]) async throws {
         guard let subcommand = args.first else {
-            throw CLIError.invalidArguments("conversation requires list or new")
+            throw CLIError.invalidArguments("conversation requires list, new, or show")
         }
         let rest = Array(args.dropFirst())
         switch subcommand {
@@ -283,6 +283,15 @@ private extension AizenCLI {
             let title = rest.dropFirst().joined(separator: " ")
             let sessionID = try await client.createConversation(spaceID: spaceID, title: title)
             print(sessionID.description)
+        case "show":
+            guard rest.count == 1, let sessionUUID = UUID(uuidString: rest[0]) else {
+                throw CLIError.invalidArguments("conversation show requires a Session ID")
+            }
+            let client = V2CLIClient()
+            let messages = try await client.conversationTimeline(sessionID: SessionID(rawValue: sessionUUID))
+            for message in messages {
+                print("\(message.role.rawValue)\t\(message.content)")
+            }
         default:
             throw CLIError.invalidArguments("Unknown conversation command: \(subcommand)")
         }
@@ -1668,6 +1677,7 @@ Usage:
         return """
 Usage:
   aizen workspace rename <old-name> <new-name>
+  aizen conversation show <session-id>
   aizen ws rename <old-name> <new-name>
 """
     }

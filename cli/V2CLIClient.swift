@@ -34,6 +34,10 @@ actor V2CLIClient {
         try await client.createConversation(spaceID: spaceID, title: title)
     }
 
+    func conversationTimeline(sessionID: SessionID) async throws -> [ConversationMessage] {
+        try await client.conversationTimeline(sessionID: sessionID)
+    }
+
     func runs(spaceID: SpaceID? = nil) async throws -> [Run] {
         try await client.runs(in: spaceID)
     }
