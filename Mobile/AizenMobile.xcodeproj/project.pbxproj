@@ -1,0 +1,395 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0BA0A9EE9F5ECAA702C488E8 /* AizenClient in Frameworks */ = {isa = PBXBuildFile; productRef = 2700820BD260DF145C723A31 /* AizenClient */; };
+		171D76207A7CD00FE5FD8F8A /* AizenMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA06BE12AD3BA3EB9552B6C6 /* AizenMobileApp.swift */; };
+		8B790E5EFEFE4C98750A47FC /* AizenCore in Frameworks */ = {isa = PBXBuildFile; productRef = 54F48D1FAB1B75CB71ECDD97 /* AizenCore */; };
+		AD130E2F89C153531D09E3AD /* AizenTransport in Frameworks */ = {isa = PBXBuildFile; productRef = BFEF27BE37BB92379B72B12C /* AizenTransport */; };
+		AE6ADAEC1A2A6D76746B4ABD /* AizenSecurity in Frameworks */ = {isa = PBXBuildFile; productRef = 404E1B2BCCB2D2969928FB3C /* AizenSecurity */; };
+		E20F71192DEA8625080DC45C /* AizenWire in Frameworks */ = {isa = PBXBuildFile; productRef = C0A3D792BEC31BF0AA01E57D /* AizenWire */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		19EF7143258535E5FC77BA2C /* Security */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Security; path = ../Packages/Security; sourceTree = SOURCE_ROOT; };
+		1A9DB7AE5785043DA72F9912 /* Wire */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Wire; path = ../Packages/Wire; sourceTree = SOURCE_ROOT; };
+		1D0433D03A6FA4290163D805 /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = ../Packages/Core; sourceTree = SOURCE_ROOT; };
+		342D8946D4A54621D0A944EA /* Client */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Client; path = ../Packages/Client; sourceTree = SOURCE_ROOT; };
+		64B5DB681DCFC4E6EEB5A27D /* AizenMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AizenMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CA06BE12AD3BA3EB9552B6C6 /* AizenMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AizenMobileApp.swift; sourceTree = "<group>"; };
+		F31F8117B8DE250DBB7FD0E3 /* Transport */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Transport; path = ../Packages/Transport; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		022EEEE135E5CD5FB50E525A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8B790E5EFEFE4C98750A47FC /* AizenCore in Frameworks */,
+				E20F71192DEA8625080DC45C /* AizenWire in Frameworks */,
+				0BA0A9EE9F5ECAA702C488E8 /* AizenClient in Frameworks */,
+				AE6ADAEC1A2A6D76746B4ABD /* AizenSecurity in Frameworks */,
+				AD130E2F89C153531D09E3AD /* AizenTransport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		BE476C4B86916FCF3860700F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				64B5DB681DCFC4E6EEB5A27D /* AizenMobile.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		CD5754CD3D7721AC92826A02 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				CA06BE12AD3BA3EB9552B6C6 /* AizenMobileApp.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		EECBA283E60856FBEF4AAC8D /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				342D8946D4A54621D0A944EA /* Client */,
+				1D0433D03A6FA4290163D805 /* Core */,
+				19EF7143258535E5FC77BA2C /* Security */,
+				F31F8117B8DE250DBB7FD0E3 /* Transport */,
+				1A9DB7AE5785043DA72F9912 /* Wire */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		FA9B2B4CEF3D763CB58BB805 = {
+			isa = PBXGroup;
+			children = (
+				EECBA283E60856FBEF4AAC8D /* Packages */,
+				CD5754CD3D7721AC92826A02 /* Sources */,
+				BE476C4B86916FCF3860700F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		81B2874A6D20BDA36EB4F606 /* AizenMobile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CCEF435830A1325AFCC41501 /* Build configuration list for PBXNativeTarget "AizenMobile" */;
+			buildPhases = (
+				C72769A128B33C167270ABD7 /* Sources */,
+				022EEEE135E5CD5FB50E525A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AizenMobile;
+			packageProductDependencies = (
+				54F48D1FAB1B75CB71ECDD97 /* AizenCore */,
+				C0A3D792BEC31BF0AA01E57D /* AizenWire */,
+				2700820BD260DF145C723A31 /* AizenClient */,
+				404E1B2BCCB2D2969928FB3C /* AizenSecurity */,
+				BFEF27BE37BB92379B72B12C /* AizenTransport */,
+			);
+			productName = AizenMobile;
+			productReference = 64B5DB681DCFC4E6EEB5A27D /* AizenMobile.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		CFD69E64AD56924064355044 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 7FBF34A47868A1006979E68D /* Build configuration list for PBXProject "AizenMobile" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = FA9B2B4CEF3D763CB58BB805;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A0FFB7BF0A32113B8ABCEFA0 /* XCLocalSwiftPackageReference "../Packages/Client" */,
+				36C512A5006F337126ACFEDA /* XCLocalSwiftPackageReference "../Packages/Core" */,
+				F094C2CAD6E04553785393D1 /* XCLocalSwiftPackageReference "../Packages/Security" */,
+				5EE7B2EBC0227E92EF0FA686 /* XCLocalSwiftPackageReference "../Packages/Transport" */,
+				2F9BA585D87367B008A3E64A /* XCLocalSwiftPackageReference "../Packages/Wire" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = BE476C4B86916FCF3860700F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				81B2874A6D20BDA36EB4F606 /* AizenMobile */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C72769A128B33C167270ABD7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				171D76207A7CD00FE5FD8F8A /* AizenMobileApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1FE1E20D0EFD697F4BD72168 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 2.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		3C5A5608DF4B96322AD7A769 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 2.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		9CE1FE6539A60AC3DBA79EFA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Aizen;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = win.aizen.mobile;
+				PRODUCT_NAME = Aizen;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BF5700ACE57C347FDBFBB13F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Aizen;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = win.aizen.mobile;
+				PRODUCT_NAME = Aizen;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7FBF34A47868A1006979E68D /* Build configuration list for PBXProject "AizenMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3C5A5608DF4B96322AD7A769 /* Debug */,
+				1FE1E20D0EFD697F4BD72168 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CCEF435830A1325AFCC41501 /* Build configuration list for PBXNativeTarget "AizenMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9CE1FE6539A60AC3DBA79EFA /* Debug */,
+				BF5700ACE57C347FDBFBB13F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		2F9BA585D87367B008A3E64A /* XCLocalSwiftPackageReference "../Packages/Wire" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/Wire;
+		};
+		36C512A5006F337126ACFEDA /* XCLocalSwiftPackageReference "../Packages/Core" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/Core;
+		};
+		5EE7B2EBC0227E92EF0FA686 /* XCLocalSwiftPackageReference "../Packages/Transport" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/Transport;
+		};
+		A0FFB7BF0A32113B8ABCEFA0 /* XCLocalSwiftPackageReference "../Packages/Client" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/Client;
+		};
+		F094C2CAD6E04553785393D1 /* XCLocalSwiftPackageReference "../Packages/Security" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/Security;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2700820BD260DF145C723A31 /* AizenClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AizenClient;
+		};
+		404E1B2BCCB2D2969928FB3C /* AizenSecurity */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AizenSecurity;
+		};
+		54F48D1FAB1B75CB71ECDD97 /* AizenCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AizenCore;
+		};
+		BFEF27BE37BB92379B72B12C /* AizenTransport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AizenTransport;
+		};
+		C0A3D792BEC31BF0AA01E57D /* AizenWire */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AizenWire;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = CFD69E64AD56924064355044 /* Project object */;
+}
