@@ -37,7 +37,7 @@ public protocol ACPRunDelegateProviding: Sendable {
 /// Narrow external boundary that lets Host tests use fake ACP clients while production uses `ACP.Client`.
 public protocol ACPRunClient: Sendable {
     func start(configuration: ACPRunConfiguration, delegate: (any ClientDelegate)?) async throws -> String
-    func sendPrompt(sessionID: String, text: String) async throws
+    func sendPrompt(sessionID: String, text: String) async throws -> String?
     func cancel(sessionID: String) async throws
     func terminate() async
 }
@@ -56,6 +56,8 @@ public struct SwiftACPClientFactory: ACPRunClientFactory {
 /// protocol initialization, and session creation steps before a Run becomes active.
 public actor SwiftACPClient: ACPRunClient {
     private let client = Client()
+    private var assistantTextBySession: [String: String] = [:]
+    private var notificationTask: Task<Void, Never>?
 
     public init() {}
 
@@ -78,6 +80,7 @@ public actor SwiftACPClient: ACPRunClient {
                 timeout: 120
             )
             let session = try await client.newSession(workingDirectory: configuration.workingDirectory, timeout: 120)
+            observeAssistantMessages(for: session.sessionId.value)
             return session.sessionId.value
         } catch {
             await client.setDelegate(nil)
@@ -90,13 +93,47 @@ public actor SwiftACPClient: ACPRunClient {
         try await client.sendCancelNotification(sessionId: SessionId(sessionID))
     }
 
-    public func sendPrompt(sessionID: String, text: String) async throws {
+    public func sendPrompt(sessionID: String, text: String) async throws -> String? {
+        assistantTextBySession[sessionID] = ""
         _ = try await client.sendPrompt(sessionId: SessionId(sessionID), content: [.text(.init(text: text))])
+        // ACP returns the prompt response before this consumer has necessarily drained every queued update.
+        try? await Task.sleep(for: .milliseconds(100))
+        let assistantText = assistantTextBySession[sessionID, default: ""]
+        return assistantText.isEmpty ? nil : assistantText
     }
 
     public func terminate() async {
+        notificationTask?.cancel()
+        notificationTask = nil
+        assistantTextBySession.removeAll()
         await client.setDelegate(nil)
         await client.terminate()
+    }
+
+    private func observeAssistantMessages(for sessionID: String) {
+        notificationTask?.cancel()
+        notificationTask = Task { [weak self, client] in
+            for await notification in await client.notifications {
+                guard let text = Self.assistantText(from: notification, expectedSessionID: sessionID) else { continue }
+                await self?.appendAssistantText(text, for: sessionID)
+            }
+        }
+    }
+
+    private func appendAssistantText(_ text: String, for sessionID: String) {
+        assistantTextBySession[sessionID, default: ""] += text
+    }
+
+    private nonisolated static func assistantText(from notification: JSONRPCNotification, expectedSessionID: String) -> String? {
+        guard notification.method == "session/update",
+            let params = notification.params?.value as? [String: Any],
+            let data = try? JSONSerialization.data(withJSONObject: params),
+            let update = try? JSONDecoder().decode(SessionUpdateNotification.self, from: data),
+            update.sessionId.value == expectedSessionID,
+            case .agentMessageChunk(.text(let content)) = update.update else {
+            return nil
+        }
+        return content.text
     }
 }
 
@@ -147,9 +184,9 @@ public actor ACPRunRuntime: RunRuntime {
         await activeRun.client.terminate()
     }
 
-    public func send(message: String, to runID: RunID) async throws {
+    public func send(message: String, to runID: RunID) async throws -> String? {
         guard let activeRun = activeRuns[runID] else { throw Error.unknownRun(runID) }
-        try await activeRun.client.sendPrompt(sessionID: activeRun.sessionID, text: message)
+        return try await activeRun.client.sendPrompt(sessionID: activeRun.sessionID, text: message)
     }
 }
 

@@ -16,7 +16,7 @@ import Testing
     let run = Run(spaceID: SpaceID(), sessionID: SessionID())
     try await runtime.start(run: run)
     #expect(await client.startedWorkingDirectory == "/tmp/aizen")
-    try await runtime.send(message: "Hello", to: run.id)
+    #expect(try await runtime.send(message: "Hello", to: run.id) == "Hello from ACP")
     #expect(await client.promptedText == "Hello")
     try await runtime.cancel(runID: run.id)
     #expect(await client.cancelledSessionID == "acp-session")
@@ -85,7 +85,10 @@ private actor RecordingClient: ACPRunClient {
         return "acp-session"
     }
 
-    func sendPrompt(sessionID: String, text: String) async throws { promptedText = text }
+    func sendPrompt(sessionID: String, text: String) async throws -> String? {
+        promptedText = text
+        return "Hello from ACP"
+    }
     func cancel(sessionID: String) async throws { cancelledSessionID = sessionID }
     func terminate() async { didTerminate = true }
 }

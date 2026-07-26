@@ -228,6 +228,29 @@ import AizenWire
     #expect(prompted.first?.1 == "Make a plan")
 }
 
+@Test func conversationRunCoordinatorPersistsAssistantOutputWithItsRun() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Plan")
+    _ = try await storage.transact {
+        $0.spaces.append(space)
+        $0.sessions.append(session)
+    }
+    let runtime = PromptRecordingRuntime(assistantReply: "Here is the plan.")
+    let coordinator = ConversationRunCoordinator(storage: storage, runtime: runtime)
+    let run = Run(spaceID: space.id, sessionID: session.id)
+    let message = ConversationMessage(spaceID: space.id, sessionID: session.id, role: .user, content: "Make a plan")
+
+    try await coordinator.submit(message: message, run: run)
+
+    let messages = try await storage.load().conversationMessages
+    #expect(messages.map(\.role) == [.user, .assistant])
+    #expect(messages.map(\.content) == ["Make a plan", "Here is the plan."])
+    #expect(messages.last?.runID == run.id)
+}
+
 @Test func coordinatorRejectsUnknownRunWithoutTouchingRuntime() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -245,10 +268,16 @@ private actor RecordingRuntime: RunRuntime {
 
 private actor PromptRecordingRuntime: PromptRunRuntime {
     private(set) var prompted: [(RunID, String)] = []
+    private let assistantReply: String?
+
+    init(assistantReply: String? = nil) {
+        self.assistantReply = assistantReply
+    }
 
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
-    func send(message: String, to runID: RunID) async throws {
+    func send(message: String, to runID: RunID) async throws -> String? {
         prompted.append((runID, message))
+        return assistantReply
     }
 }

@@ -181,7 +181,7 @@ public protocol RunRuntime: Sendable {
 }
 
 public protocol PromptRunRuntime: RunRuntime {
-    func send(message: String, to runID: RunID) async throws
+    func send(message: String, to runID: RunID) async throws -> String?
 }
 
 public actor RunCoordinator {

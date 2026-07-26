@@ -35,7 +35,19 @@ public actor ConversationRunCoordinator {
         }
         do {
             try await runs.startPersisted(run)
-            try await runtime.send(message: message.content, to: run.id)
+            if let assistantContent = try await runtime.send(message: message.content, to: run.id), !assistantContent.isEmpty {
+                _ = try await storage.transact { snapshot in
+                    snapshot.conversationMessages.append(
+                        ConversationMessage(
+                            spaceID: run.spaceID,
+                            sessionID: run.sessionID,
+                            runID: run.id,
+                            role: .assistant,
+                            content: assistantContent
+                        )
+                    )
+                }
+            }
             try await runs.complete(run.id)
         } catch {
             try? await runs.cancel(run.id)

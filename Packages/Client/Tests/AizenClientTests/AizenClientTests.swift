@@ -89,7 +89,8 @@ import AizenWire
     let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
     let runtime = ClientPromptRuntime()
     let coordinator = ConversationRunCoordinator(storage: storage, runtime: runtime)
-    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, conversationRuns: coordinator)))
+    let sandboxes = ManagedSandboxService(storage: storage, rootURL: root.appendingPathComponent("sandboxes", isDirectory: true))
+    let client = HostClient(transport: InProcessTransport(endpoint: LocalHost(storage: storage, conversationRuns: coordinator, managedSandboxes: sandboxes)))
     let spaceID = try await client.createSpace(name: "CLI")
     let sessionID = try await client.createConversation(spaceID: spaceID, title: "Untethered")
     let runID = RunID()
@@ -111,5 +112,5 @@ private struct EchoHost: WireEndpoint {
 private actor ClientPromptRuntime: PromptRunRuntime {
     func start(run: Run) async throws {}
     func cancel(runID: RunID) async throws {}
-    func send(message: String, to runID: RunID) async throws {}
+    func send(message: String, to runID: RunID) async throws -> String? { nil }
 }
