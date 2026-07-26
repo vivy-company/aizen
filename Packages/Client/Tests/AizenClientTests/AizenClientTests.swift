@@ -77,6 +77,42 @@ import AizenWire
     #expect(try await storage.load().resources.count == 1)
 }
 
+@Test func routeFailoverReplaysTheSameCommandWithoutDuplicatingHostWork() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appendingPathComponent("folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
+    let space = Space(name: "Vivy")
+    _ = try await storage.transact { $0.spaces.append(space) }
+    let host = LocalHost(storage: storage)
+    let lan = try TransportRouteConfiguration(kind: .lan, endpoint: URL(string: "wss://aizen.local")!, expectedHostIdentity: "host")
+    let tailscale = try TransportRouteConfiguration(kind: .tailscale, endpoint: URL(string: "wss://aizen.tailnet.ts.net")!, expectedHostIdentity: "host")
+    let droppedReceipt = ReceiptDroppingTransport(endpoint: host)
+    let recoveredRoute = RecordingTransport(endpoint: host)
+    let router = TransportRouter(routes: [lan, tailscale]) { route in
+        let transport: any WireTransport = route.id == lan.id ? droppedReceipt : recoveredRoute
+        return .init(transport: transport, authenticatedHostIdentity: "host")
+    }
+    let outbox = FileCommandOutbox(url: root.appendingPathComponent("client-outbox.json"))
+    let client = HostClient(transport: router, commandOutbox: outbox)
+
+    await #expect(throws: ReceiptDroppingTransport.Error.receiptLost) {
+        _ = try await client.importLocalFolder(spaceID: space.id, path: folder.path)
+    }
+    #expect(await router.activeRoute() == nil)
+    #expect(try await outbox.pendingCommands().count == 1)
+
+    _ = try await client.retryPendingCommands()
+
+    #expect(await router.activeRoute()?.id == tailscale.id)
+    #expect(try await storage.load().resources.count == 1)
+    let droppedCommandIDs = await droppedReceipt.sentCommandIDs()
+    let recoveredCommandIDs = await recoveredRoute.sentCommandIDs()
+    #expect(droppedCommandIDs == recoveredCommandIDs)
+    #expect(try await outbox.pendingCommands().isEmpty)
+}
+
 @Test func clientNegotiatesThroughTheProtobufInProcessTransport() async throws {
     let client = HostClient(transport: InProcessTransport(endpoint: EchoHost()))
     let response = try await client.send(.init(
@@ -481,15 +517,35 @@ private actor ReceiptDroppingTransport: WireTransport {
     }
 
     private let endpoint: any WireEndpoint
+    private var commandIDs: [String] = []
 
     init(endpoint: any WireEndpoint) {
         self.endpoint = endpoint
     }
 
     func send(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
+        if envelope.kind == .command { commandIDs.append(envelope.messageID) }
         _ = try await endpoint.receive(envelope)
         throw Error.receiptLost
     }
+
+    func sentCommandIDs() -> [String] { commandIDs }
+}
+
+private actor RecordingTransport: WireTransport {
+    private let endpoint: any WireEndpoint
+    private var commandIDs: [String] = []
+
+    init(endpoint: any WireEndpoint) {
+        self.endpoint = endpoint
+    }
+
+    func send(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
+        if envelope.kind == .command { commandIDs.append(envelope.messageID) }
+        return try await endpoint.receive(envelope)
+    }
+
+    func sentCommandIDs() -> [String] { commandIDs }
 }
 
 private actor RecordingJournalCursorStore: JournalCursorStore {
