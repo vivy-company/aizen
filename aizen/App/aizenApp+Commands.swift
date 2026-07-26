@@ -93,5 +93,20 @@ extension aizenApp {
                 }
             }
         }
+
+        ReignitionConversationCommands()
+    }
+}
+
+private struct ReignitionConversationCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(after: .newItem) {
+            Button("Reignition Conversations") {
+                openWindow(id: "reignition-conversations")
+            }
+            .keyboardShortcut("r", modifiers: [.command, .shift])
+        }
     }
 }

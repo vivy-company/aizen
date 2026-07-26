@@ -54,6 +54,11 @@ struct ReignitionConversationWindow: View {
             Button("Create") { createConversation() }
             Button("Cancel", role: .cancel) { newConversationTitle = "" }
         }
+        .alert("Conversation Error", isPresented: errorAlert) {
+            Button("OK") { store.dismissError() }
+        } message: {
+            Text(store.lastError ?? "An unknown error occurred.")
+        }
     }
 
     @ViewBuilder
@@ -101,6 +106,13 @@ struct ReignitionConversationWindow: View {
         Binding(
             get: { !newConversationTitle.isEmpty },
             set: { if !$0 { newConversationTitle = "" } }
+        )
+    }
+
+    private var errorAlert: Binding<Bool> {
+        Binding(
+            get: { store.lastError != nil },
+            set: { if !$0 { store.dismissError() } }
         )
     }
 

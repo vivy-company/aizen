@@ -62,6 +62,10 @@ final class ReignitionConversationStore: ObservableObject {
         }
     }
 
+    func dismissError() {
+        lastError = nil
+    }
+
     private func refreshTimeline(sessionID: SessionID) async {
         await perform {
             self.messages = try await self.host.conversationTimeline(sessionID: sessionID)
