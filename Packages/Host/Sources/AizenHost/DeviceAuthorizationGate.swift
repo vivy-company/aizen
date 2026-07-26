@@ -33,6 +33,18 @@ public actor DeviceAuthorizationGate {
         }
     }
 
+    /// Checks a long-lived stream without generating an audit record for every dropped event.
+    /// Request boundaries still use `require`, which records denied privileged operations.
+    public func permits(
+        deviceID: DeviceID,
+        capability: HostCapability,
+        spaceID: SpaceID? = nil,
+        resourceID: ResourceID? = nil
+    ) async -> Bool {
+        guard let authorization = try? await storage.deviceAuthorization(for: deviceID) else { return false }
+        return authorization.permits(capability, spaceID: spaceID, resourceID: resourceID)
+    }
+
     private func recordDenial(deviceID: DeviceID, route: String, detail: String) async throws {
         try await storage.appendSecurityAuditRecord(SecurityAuditRecord(
             kind: .authorizationDenied,

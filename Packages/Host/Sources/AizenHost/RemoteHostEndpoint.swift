@@ -470,3 +470,54 @@ public struct RemoteHostEndpoint: WireEndpoint {
         return .init(rawValue: value)
     }
 }
+
+extension RemoteHostEndpoint: RunEventEndpoint {
+    /// A device receives only events it could actively read at the same scope. This check happens
+    /// for each event so revoking a device or narrowing a grant takes effect without reconnecting.
+    public func runEvents() async -> AsyncStream<HostEvent> {
+        guard let eventEndpoint = endpoint as? any RunEventEndpoint else {
+            return AsyncStream { $0.finish() }
+        }
+        let upstream = await eventEndpoint.runEvents()
+        return AsyncStream { continuation in
+            let forwarding = Task {
+                for await event in upstream {
+                    guard !Task.isCancelled else { return }
+                    if await permits(event) {
+                        continuation.yield(event)
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in forwarding.cancel() }
+        }
+    }
+
+    private func permits(_ event: HostEvent) async -> Bool {
+        switch event {
+        case let .run(run):
+            return await authorization.permits(
+                deviceID: session.deviceID,
+                capability: .sessionRead,
+                spaceID: run.spaceID
+            )
+        case let .terminalOutput(output):
+            guard let terminal = try? await requiredTerminal(output.terminalSessionID.description),
+                  terminal.spaceID == output.spaceID else {
+                return false
+            }
+            let resourceID: ResourceID?
+            if let executionContextID = terminal.executionContextID {
+                resourceID = try? await requiredExecutionContext(executionContextID.description).resourceID
+            } else {
+                resourceID = nil
+            }
+            return await authorization.permits(
+                deviceID: session.deviceID,
+                capability: .terminalRead,
+                spaceID: output.spaceID,
+                resourceID: resourceID
+            )
+        }
+    }
+}
