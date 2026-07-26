@@ -45,3 +45,11 @@ import Testing
     #expect(registry.disposition(for: .init(identifier: .init(rawValue: "aizen.optional.future@1"), schemaVersion: 1, protobufBytes: Data(), stateAffecting: false)) == .ignoredOptional)
     #expect(registry.disposition(for: .init(identifier: .init(rawValue: "aizen.event.future@1"), schemaVersion: 1, protobufBytes: Data(), stateAffecting: true)) == .snapshotRequired)
 }
+
+@Test func snapshotPayloadKeepsStorageBytesInsideProtobuf() throws {
+    let storageBytes = Data("{\"schemaVersion\":2}".utf8)
+    let payload = SnapshotResponsePayload(cursor: 42, snapshot: storageBytes)
+    let decoded = try SnapshotResponsePayload(protobufBytes: payload.protobufBytes())
+    #expect(decoded.cursor == 42)
+    #expect(decoded.snapshot == storageBytes)
+}

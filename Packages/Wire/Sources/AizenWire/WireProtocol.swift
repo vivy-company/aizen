@@ -131,6 +131,121 @@ public extension TypedPayload {
     }
 }
 
+public struct HelloPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.control.hello@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let minimumProtocolGeneration: UInt32
+    public let maximumProtocolGeneration: UInt32
+    public let productVersion: String
+
+    public init(minimumProtocolGeneration: UInt32, maximumProtocolGeneration: UInt32, productVersion: String) {
+        precondition(minimumProtocolGeneration > 0 && minimumProtocolGeneration <= maximumProtocolGeneration, "Protocol ranges must be ordered and non-zero")
+        self.minimumProtocolGeneration = minimumProtocolGeneration
+        self.maximumProtocolGeneration = maximumProtocolGeneration
+        self.productVersion = productVersion
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_Hello(serializedBytes: protobufBytes)
+        self.init(
+            minimumProtocolGeneration: message.minimumProtocolGeneration,
+            maximumProtocolGeneration: message.maximumProtocolGeneration,
+            productVersion: message.productVersion
+        )
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_Hello()
+        message.minimumProtocolGeneration = minimumProtocolGeneration
+        message.maximumProtocolGeneration = maximumProtocolGeneration
+        message.productVersion = productVersion
+        return try message.serializedData()
+    }
+}
+
+public struct CapabilitiesPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.control.capabilities@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let identifiers: [PayloadIdentifier]
+
+    public init(identifiers: [PayloadIdentifier]) {
+        self.identifiers = identifiers.sorted { $0.rawValue < $1.rawValue }
+    }
+
+    public init(protobufBytes: Data) throws {
+        self.init(identifiers: try AizenWireV1_Capabilities(serializedBytes: protobufBytes).identifiers.map { PayloadIdentifier(rawValue: $0) })
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_Capabilities()
+        message.identifiers = identifiers.map(\.rawValue)
+        return try message.serializedData()
+    }
+}
+
+public struct SnapshotRequestPayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.query.snapshot@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = false
+
+    public let scope: String
+    public let afterCursor: UInt64
+
+    public init(scope: String = "host", afterCursor: UInt64 = 0) {
+        precondition(!scope.isEmpty, "Snapshot queries require a scope")
+        self.scope = scope
+        self.afterCursor = afterCursor
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_SnapshotRequest(serializedBytes: protobufBytes)
+        self.init(scope: message.scope, afterCursor: message.afterCursor)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_SnapshotRequest()
+        message.scope = scope
+        message.afterCursor = afterCursor
+        return try message.serializedData()
+    }
+}
+
+/// `snapshot` is a versioned Storage representation whose internal encoding is owned by Storage,
+/// while this enclosing payload remains an actual protobuf message on every transport.
+public struct SnapshotResponsePayload: WirePayload, Sendable, Hashable {
+    public static let identifier = PayloadIdentifier(rawValue: "aizen.snapshot.host@1")
+    public static let schemaVersion: UInt32 = 1
+    public static let stateAffecting = true
+
+    public let scope: String
+    public let cursor: UInt64
+    public let snapshot: Data
+
+    public init(scope: String = "host", cursor: UInt64, snapshot: Data) {
+        precondition(!scope.isEmpty, "Snapshots require a scope")
+        self.scope = scope
+        self.cursor = cursor
+        self.snapshot = snapshot
+    }
+
+    public init(protobufBytes: Data) throws {
+        let message = try AizenWireV1_SnapshotResponse(serializedBytes: protobufBytes)
+        self.init(scope: message.scope, cursor: message.cursor, snapshot: message.snapshot)
+    }
+
+    public func protobufBytes() throws -> Data {
+        var message = AizenWireV1_SnapshotResponse()
+        message.scope = scope
+        message.cursor = cursor
+        message.snapshot = snapshot
+        return try message.serializedData()
+    }
+}
+
 public enum UnknownPayloadDisposition: Sendable, Hashable {
     case decoded
     case ignoredOptional

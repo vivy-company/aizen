@@ -18,18 +18,39 @@ public actor LocalHost: WireEndpoint {
     }
 
     public func receive(_ envelope: ProtocolEnvelope) async throws -> ProtocolEnvelope {
-        let snapshot = try await storage.load()
-        let payload = try JSONEncoder().encode(snapshot)
+        let payload: TypedPayload
+        let kind: WireMessageKind
+        switch envelope.kind {
+        case .hello:
+            kind = .capabilities
+            payload = try TypedPayload(CapabilitiesPayload(identifiers: [
+                HelloPayload.identifier,
+                CapabilitiesPayload.identifier,
+                SnapshotRequestPayload.identifier,
+                SnapshotResponsePayload.identifier
+            ]))
+        case .query where envelope.payload.identifier == SnapshotRequestPayload.identifier:
+            let request = try SnapshotRequestPayload(protobufBytes: envelope.payload.protobufBytes)
+            let snapshot = try await storage.load()
+            kind = .queryResponse
+            payload = try TypedPayload(SnapshotResponsePayload(scope: request.scope, cursor: 0, snapshot: JSONEncoder().encode(snapshot)))
+        default:
+            throw HostProtocolError.unsupportedRequest(kind: envelope.kind, payload: envelope.payload.identifier)
+        }
         return ProtocolEnvelope(
             messageID: envelope.messageID,
             connectionID: envelope.connectionID,
             connectionSequence: envelope.connectionSequence,
-            kind: envelope.kind == .hello ? .capabilities : .snapshot,
+            kind: kind,
             channel: .state,
             correlationID: envelope.correlationID,
-            payload: .init(identifier: .init(rawValue: "aizen.snapshot.host@1"), schemaVersion: 1, protobufBytes: payload, stateAffecting: true)
+            payload: payload
         )
     }
+}
+
+public enum HostProtocolError: Swift.Error, Sendable, Equatable {
+    case unsupportedRequest(kind: WireMessageKind, payload: PayloadIdentifier)
 }
 
 /// Host-facing runtime contract. ACP, Process, and UI concerns remain in a macOS adapter.
