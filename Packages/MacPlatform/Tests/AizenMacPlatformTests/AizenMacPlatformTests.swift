@@ -7,6 +7,7 @@ import AizenStorage
 import AizenTransport
 import AizenWire
 import Foundation
+import Security
 import Testing
 
 @Test func hostMachServiceConfigurationBuildsTheTeamRequirement() throws {
@@ -84,9 +85,11 @@ import Testing
     let storageURL = root.appendingPathComponent("storage-v2.json")
     let storage = StorageRepository(url: storageURL)
     let space = Space(name: "Diagnostics")
+    let session = Session(spaceID: space.id, kind: .conversation, title: "Diagnostics")
     _ = try await storage.transact { snapshot in
         snapshot.spaces.append(space)
-        snapshot.runs.append(.init(spaceID: space.id, sessionID: SessionID(), lifecycle: .running))
+        snapshot.sessions.append(session)
+        snapshot.runs.append(.init(spaceID: space.id, sessionID: session.id, lifecycle: .running))
         snapshot.operations.append(.init(spaceID: space.id, lifecycle: .running, progress: 0.5))
     }
 
@@ -153,11 +156,66 @@ import Testing
 }
 
 @Test func pairedTLSOptionsKeepTheHostReachableBeforeFirstPairing() throws {
+    _ = try PairedTLSOptions.server()
+    _ = PairedTLSOptions.client()
+}
+
+@Test func bootstrapTLSCertificateIsAValidSelfSignedTrustAnchor() throws {
+    let data = try BootstrapTLSIdentity.makeCertificateData()
+    let certificate = try #require(SecCertificateCreateWithData(nil, data as CFData))
+    var trust: SecTrust?
+    #expect(SecTrustCreateWithCertificates(certificate, SecPolicyCreateSSL(true, "127.0.0.1" as CFString), &trust) == errSecSuccess)
+    let evaluatedTrust = try #require(trust)
+    #expect(SecTrustSetAnchorCertificates(evaluatedTrust, [certificate] as CFArray) == errSecSuccess)
+    #expect(SecTrustSetAnchorCertificatesOnly(evaluatedTrust, true) == errSecSuccess)
+    var error: CFError?
+    guard SecTrustEvaluateWithError(evaluatedTrust, &error) else {
+        throw error ?? NSError(domain: "AizenMacPlatformTests", code: 1)
+    }
+}
+
+@Test @MainActor func pairedWebSocketConnectorAuthenticatesAgainstTheLiveHostListener() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = StorageRepository(url: root.appendingPathComponent("storage-v2.json"))
     let hostIdentity = LocalCryptographicIdentity()
     let host = HostPublicIdentity(hostID: HostID(), displayName: "Mac", cryptographicIdentity: hostIdentity.publicIdentity())
-    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: LocalCryptographicIdentity().publicIdentity())
-    _ = try PairedTLSOptions.server(host: host, hostIdentity: hostIdentity, authorizations: [])
-    _ = try PairedTLSOptions.server(host: host, hostIdentity: hostIdentity, authorizations: [.init(device: device, grants: [.init(capability: .hostRead)])])
+    let deviceIdentity = LocalCryptographicIdentity()
+    let device = DevicePublicIdentity(deviceID: DeviceID(), displayName: "Phone", platform: "iOS", cryptographicIdentity: deviceIdentity.publicIdentity())
+    try await storage.saveDeviceAuthorization(.init(device: device, grants: [.init(capability: .hostRead)]))
+    let listener = HostLANWebSocketListener(
+        host: host,
+        hostIdentity: hostIdentity,
+        storage: storage,
+        endpoint: LocalHost(storage: storage),
+        pairing: PairingRequestRegistry(hostID: host.hostID, approval: PairingApprovalService(storage: storage))
+    )
+    try await listener.start()
+    defer { listener.stop() }
+    let port = try await listenerPort(listener)
+    let route = try TransportRouteConfiguration(
+        kind: .lan,
+        endpoint: URL(string: "wss://localhost:\(port)")!,
+        expectedHostIdentity: host.cryptographicIdentity.fingerprint.description
+    )
+    let connection = try await RemoteWebSocketRouteConnector(host: host, device: device, deviceIdentity: deviceIdentity).connect(route: route)
+    let response = try await connection.transport.send(.init(
+        messageID: "live-websocket",
+        connectionSequence: 1,
+        kind: .hello,
+        channel: .control,
+        payload: try .init(HelloPayload(minimumProtocolGeneration: 1, maximumProtocolGeneration: 1, productVersion: "2.0.0"))
+    ))
+    #expect(response.kind == .capabilities)
+}
+
+@MainActor
+private func listenerPort(_ listener: HostLANWebSocketListener) async throws -> UInt16 {
+    for _ in 0..<100 {
+        if let port = listener.port { return port }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    throw RemoteWebSocketTransportError.connectionFailed("Listener did not publish a port.")
 }
 
 @Test func lanWebSocketProcessorAuthenticatesAndSealsRemoteRequests() async throws {

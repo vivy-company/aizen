@@ -5,44 +5,20 @@ import Foundation
 import Network
 import Security
 
-/// TLS 1.3 options. Paired clients use PSKs; a bootstrap certificate keeps the
-/// listener reachable until the first local pairing approval exists.
+/// TLS 1.3 options for the encrypted transport. A bootstrap certificate keeps
+/// the listener reachable until the first local pairing approval exists.
 public enum PairedTLSOptions {
-    public static func server(
-        host: HostPublicIdentity,
-        hostIdentity: LocalCryptographicIdentity,
-        authorizations: [DeviceAuthorization]
-    ) throws -> NWProtocolTLS.Options {
-        let authorized = authorizations.filter { $0.revokedAt == nil }.sorted { $0.device.deviceID.description < $1.device.deviceID.description }
+    public static func server() throws -> NWProtocolTLS.Options {
         let options = makeTLS13Options()
         let securityOptions = options.securityProtocolOptions
         sec_protocol_options_set_local_identity(securityOptions, try BootstrapTLSIdentity.make())
-        for authorization in authorized {
-            let key = try PairedTLSPreSharedKey.derive(hostID: host.hostID, device: authorization.device, hostIdentity: hostIdentity)
-            sec_protocol_options_add_pre_shared_key(
-                securityOptions,
-                dispatchData(key),
-                dispatchData(PairedTLSPreSharedKey.identity(for: authorization.device.deviceID))
-            )
-        }
         return options
     }
 
-    public static func client(
-        host: HostPublicIdentity,
-        deviceID: DeviceID,
-        deviceIdentity: LocalCryptographicIdentity
-    ) throws -> NWProtocolTLS.Options {
+    public static func client() -> NWProtocolTLS.Options {
         let options = makeTLS13Options()
-        let key = try PairedTLSPreSharedKey.derive(host: host, deviceID: deviceID, deviceIdentity: deviceIdentity)
-        sec_protocol_options_add_pre_shared_key(
-            options.securityProtocolOptions,
-            dispatchData(key),
-            dispatchData(PairedTLSPreSharedKey.identity(for: deviceID))
-        )
-        // The Host uses a bootstrap certificate. The paired PSK and the signed Aizen
-        // challenge immediately above Wire are the identity checks; a public PKI name
-        // must not substitute for either of them.
+        // The Host uses a bootstrap certificate. The signed Aizen challenge above
+        // Wire pins the Host identity; a public PKI name must not replace it.
         sec_protocol_options_set_verify_block(options.securityProtocolOptions, { _, _, complete in
             complete(true)
         }, DispatchQueue(label: "win.aizen.remote-tls-verify"))
@@ -57,15 +33,12 @@ public enum PairedTLSOptions {
         return options
     }
 
-    private static func dispatchData(_ data: Data) -> __DispatchData {
-        data.withUnsafeBytes { DispatchData(bytes: $0) as __DispatchData }
-    }
 }
 
 /// A per-listener certificate provides TLS confidentiality during first-device
 /// bootstrap. The subsequent signed Wire challenge is what pins the Host to
 /// the public identity carried by the QR invitation.
-private enum BootstrapTLSIdentity {
+enum BootstrapTLSIdentity {
     private enum Error: Swift.Error {
         case keyGenerationFailed
         case publicKeyUnavailable
@@ -89,7 +62,7 @@ private enum BootstrapTLSIdentity {
             throw error?.takeRetainedValue() ?? Error.publicKeyUnavailable
         }
 
-        let certificateData = try SelfSignedCertificate.make(publicKey: publicKeyData, privateKey: privateKey, now: now)
+        let certificateData = try makeCertificateData(publicKey: publicKeyData, privateKey: privateKey, now: now)
         guard let certificate = SecCertificateCreateWithData(nil, certificateData as CFData) else {
             throw Error.certificateCreationFailed
         }
@@ -99,6 +72,26 @@ private enum BootstrapTLSIdentity {
         return protocolIdentity
     }
 
+    static func makeCertificateData(now: Date = Date()) throws -> Data {
+        var error: Unmanaged<CFError>?
+        guard let privateKey = SecKeyCreateRandomKey([
+            kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits: 256,
+            kSecPrivateKeyAttrs: [kSecAttrIsPermanent: false]
+        ] as CFDictionary, &error) else {
+            throw error?.takeRetainedValue() ?? Error.keyGenerationFailed
+        }
+        guard let publicKey = SecKeyCopyPublicKey(privateKey),
+              let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
+            throw error?.takeRetainedValue() ?? Error.publicKeyUnavailable
+        }
+        return try makeCertificateData(publicKey: publicKeyData, privateKey: privateKey, now: now)
+    }
+
+    private static func makeCertificateData(publicKey: Data, privateKey: SecKey, now: Date) throws -> Data {
+        try SelfSignedCertificate.make(publicKey: publicKey, privateKey: privateKey, now: now)
+    }
+
     private enum SelfSignedCertificate {
         private static let ecdsaWithSHA256 = Data([0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x02])
         private static let commonName = Data([0x06, 0x03, 0x55, 0x04, 0x03])
@@ -106,6 +99,9 @@ private enum BootstrapTLSIdentity {
         private static let prime256v1 = Data([0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07])
         private static let basicConstraints = Data([0x06, 0x03, 0x55, 0x1D, 0x13])
         private static let keyUsage = Data([0x06, 0x03, 0x55, 0x1D, 0x0F])
+        private static let extendedKeyUsage = Data([0x06, 0x03, 0x55, 0x1D, 0x25])
+        private static let subjectAlternativeName = Data([0x06, 0x03, 0x55, 0x1D, 0x11])
+        private static let serverAuthentication = Data([0x06, 0x08, 0x2B, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x01])
 
         static func make(publicKey: Data, privateKey: SecKey, now: Date) throws -> Data {
             guard publicKey.count == 65, publicKey.first == 0x04 else { throw Error.publicKeyUnavailable }
@@ -121,7 +117,9 @@ private enum BootstrapTLSIdentity {
             let subjectPublicKey = sequence(sequence(ecPublicKey + prime256v1) + bitString(publicKey))
             let extensions = explicit(3, sequence(
                 sequence(basicConstraints + boolean(true) + octetString(sequence(Data()))) +
-                sequence(keyUsage + boolean(true) + octetString(bitString(Data([0x80]))))
+                sequence(keyUsage + boolean(true) + octetString(bitString(Data([0x80])))) +
+                sequence(extendedKeyUsage + octetString(sequence(serverAuthentication))) +
+                sequence(subjectAlternativeName + octetString(sequence(Data([0x87, 0x04, 127, 0, 0, 1]) + tagged(0x82, Data("localhost".utf8)))))
             ))
             let tbs = sequence(explicit(0, integer(Data([2]))) + integer(serial) + algorithm + name + validity + name + subjectPublicKey + extensions)
             var error: Unmanaged<CFError>?
@@ -132,11 +130,14 @@ private enum BootstrapTLSIdentity {
         }
 
         private static func derECDSASignature(_ raw: Data) throws -> Data {
-            // Security returns X9.62 DER on current Apple platforms. Keep the
-            // raw 64-byte form as a compatibility fallback for older providers.
-            if raw.first == 0x30, raw.count >= 8 { return raw }
-            guard raw.count == 64 else { throw Error.invalidSignature }
-            return sequence(integer(raw.prefix(32)) + integer(raw.suffix(32)))
+            // The X9.62 signature representation has a fixed 64-byte size for
+            // P-256. Check that shape before considering DER: a raw `r || s`
+            // signature can legitimately begin with the SEQUENCE tag byte.
+            if raw.count == 64 {
+                return sequence(integer(raw.prefix(32)) + integer(raw.suffix(32)))
+            }
+            guard raw.first == 0x30, raw.count >= 8 else { throw Error.invalidSignature }
+            return raw
         }
 
         private static func sequence(_ value: Data) -> Data { tagged(0x30, value) }
@@ -150,7 +151,8 @@ private enum BootstrapTLSIdentity {
         private static func integer<S: DataProtocol>(_ value: S) -> Data {
             var bytes = Data(value)
             while bytes.count > 1, bytes.first == 0 { bytes.removeFirst() }
-            if bytes.first.map({ $0 & 0x80 != 0 }) == true { bytes.insert(0, at: 0) }
+            if bytes.isEmpty { bytes = Data([0]) }
+            if bytes.first.map({ $0 & 0x80 != 0 }) == true { bytes = Data([0]) + bytes }
             return tagged(0x02, bytes)
         }
 

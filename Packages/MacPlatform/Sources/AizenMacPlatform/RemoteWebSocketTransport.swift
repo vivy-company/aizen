@@ -41,7 +41,7 @@ public struct RemoteWebSocketRouteConnector: Sendable {
         let bridge = try RemoteWebSocketFrameExchange(
             host: hostname,
             port: port,
-            tls: PairedTLSOptions.client(host: host, deviceID: device.deviceID, deviceIdentity: deviceIdentity)
+            tls: PairedTLSOptions.client()
         )
         try await bridge.start()
         let routeKind = connectionRoute(for: route.kind)
@@ -109,6 +109,8 @@ private final class RemoteWebSocketFrameExchange: @unchecked Sendable {
                     self.completeStart()
                 case let .failed(error):
                     self.failStart(error)
+                case .waiting:
+                    break
                 case .cancelled:
                     self.failStart(RemoteWebSocketTransportError.connectionFailed("Connection cancelled."))
                 default:
@@ -117,6 +119,9 @@ private final class RemoteWebSocketFrameExchange: @unchecked Sendable {
             }
             stateLock.unlock()
             connection.start(queue: queue)
+            queue.asyncAfter(deadline: .now() + 10) { [weak self] in
+                self?.failStart(RemoteWebSocketTransportError.connectionFailed("Timed out while opening the secure WebSocket route."))
+            }
         }
     }
 
@@ -164,11 +169,14 @@ private final class RemoteWebSocketFrameExchange: @unchecked Sendable {
 
     private func completeStart() {
         stateLock.lock()
-        let continuation = startContinuation
+        guard let continuation = startContinuation else {
+            stateLock.unlock()
+            return
+        }
         startContinuation = nil
         isStarted = true
         stateLock.unlock()
-        continuation?.resume()
+        continuation.resume()
     }
 
     private func failStart(_ error: Error) {

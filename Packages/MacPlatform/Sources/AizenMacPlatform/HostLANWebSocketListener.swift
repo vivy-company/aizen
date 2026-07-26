@@ -28,6 +28,7 @@ public final class HostLANWebSocketListener {
     private var listener: NWListener?
     private var advertisement: HostBonjourAdvertisement?
     private var connections: [UUID: HostLANWebSocketConnection] = [:]
+    public private(set) var port: UInt16?
 
     public init(host: HostPublicIdentity, hostIdentity: LocalCryptographicIdentity, storage: StorageRepository, endpoint: any WireEndpoint, pairing: PairingRequestRegistry) {
         self.host = host
@@ -43,7 +44,7 @@ public final class HostLANWebSocketListener {
 
     public func start() async throws {
         stop()
-        let tls = try PairedTLSOptions.server(host: host, hostIdentity: hostIdentity, authorizations: try await storage.deviceAuthorizations())
+        let tls = try PairedTLSOptions.server()
         let parameters = NWParameters(tls: tls, tcp: NWProtocolTCP.Options())
         let webSocket = NWProtocolWebSocket.Options()
         webSocket.setClientRequestHandler(queue) { _, _ in
@@ -60,6 +61,7 @@ public final class HostLANWebSocketListener {
             guard case .ready = state, let port = listener.port else { return }
             Task { @MainActor [weak self] in
                 guard let self, self.advertisement == nil else { return }
+                self.port = port.rawValue
                 self.advertisement = HostBonjourAdvertisement(
                     host: self.host,
                     metadata: HostBonjourMetadata(host: self.host, minimumProtocolGeneration: 1, maximumProtocolGeneration: 1)
@@ -78,6 +80,7 @@ public final class HostLANWebSocketListener {
         connections.removeAll()
         listener?.cancel()
         listener = nil
+        port = nil
     }
 
     /// The local approval UI reads only safe device metadata from this surface.
