@@ -11,6 +11,7 @@ public final class LocalHostRuntime: @unchecked Sendable {
     private let storage: StorageRepository
     private let migrationGate: HostMigrationGate
     private let pairing: PairingRequestRegistry
+    public let pendingPermissions: PendingPermissionRegistry
     private let connectionRegistry = HostConnectionRegistry()
     private let storageURL: URL
     private let terminalRuntime: any TerminalRuntime
@@ -30,6 +31,8 @@ public final class LocalHostRuntime: @unchecked Sendable {
             self.pairing = PairingRequestRegistry(hostID: credentials.publicIdentity.hostID, approval: PairingApprovalService(storage: storage))
         }
         let pairing = self.pairing
+        let pendingPermissions = PendingPermissionRegistry()
+        self.pendingPermissions = pendingPermissions
         let root = storageURL.deletingLastPathComponent()
         let agentLaunchConfiguration = HostAgentLaunchConfigurationStore(
             configurationURL: root.appendingPathComponent("host-agent-launch.json")
@@ -42,7 +45,7 @@ public final class LocalHostRuntime: @unchecked Sendable {
                 agentConfiguration: agentLaunchConfiguration,
                 managedSandboxRoot: root.appendingPathComponent("Sandboxes", isDirectory: true)
             ),
-            delegateProvider: NoACPToolDelegateProvider()
+            delegateProvider: ACPPermissionDelegateProvider(registry: pendingPermissions)
         )
         self.agentLaunchConfiguration = agentLaunchConfiguration
         let worktrees = GitLinkedWorktreeService()
