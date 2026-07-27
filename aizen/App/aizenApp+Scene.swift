@@ -41,11 +41,6 @@ extension aizenApp {
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified)
         .defaultSize(width: 1200, height: 800)
-        WindowGroup("Reignition Conversations", id: "reignition-conversations") {
-            ReignitionConversationWindow(host: reignitionHost)
-                .modifier(AppearanceModifier())
-        }
-        .defaultSize(width: 1000, height: 700)
         .commands { appCommands }
     }
 }

@@ -22,15 +22,6 @@ extension aizenApp {
             CheckForUpdatesView(updater: updaterController.updater)
         }
 
-        CommandGroup(replacing: .appSettings) {
-            Button {
-                ReignitionHostSettingsWindowController.shared.show()
-            } label: {
-                Label("Settings...", systemImage: "gearshape")
-            }
-            .keyboardShortcut(",", modifiers: .command)
-        }
-
         CommandGroup(after: .appSettings) {
             Button {
                 installCLIFromMenu()
