@@ -511,38 +511,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		F27400000000000000000001 /* Install Host LaunchAgent */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/aizen/Resources/LaunchAgents/win.aizen.host.plist",
-			);
-			name = "Install Host LaunchAgent";
-			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/win.aizen.host.plist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -eu\ninstall -d \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ninstall -m 644 \"${SRCROOT}/aizen/Resources/LaunchAgents/win.aizen.host.plist\" \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents/win.aizen.host.plist\"\n";
-		};
-		F27400000000000000000002 /* Install Host LaunchAgent */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/aizen/Resources/LaunchAgents/win.aizen.host.plist",
-			);
-			name = "Install Host LaunchAgent";
-			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/win.aizen.host.plist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -eu\ninstall -d \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ninstall -m 644 \"${SRCROOT}/aizen/Resources/LaunchAgents/win.aizen.host.plist\" \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents/win.aizen.host.plist\"\n";
-		};
 		CC1234582EA241B30007DBC1 /* Organize Ghostty Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -592,6 +560,38 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
 			shellScript = "\"${SRCROOT}/scripts/organize-resources.sh\"\n";
+		};
+		F27400000000000000000001 /* Install Host LaunchAgent */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/aizen/Resources/LaunchAgents/win.aizen.host.plist",
+			);
+			name = "Install Host LaunchAgent";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/win.aizen.host.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\ninstall -d \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ninstall -m 644 \"${SRCROOT}/aizen/Resources/LaunchAgents/win.aizen.host.plist\" \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents/win.aizen.host.plist\"\n";
+		};
+		F27400000000000000000002 /* Install Host LaunchAgent */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/aizen/Resources/LaunchAgents/win.aizen.host.plist",
+			);
+			name = "Install Host LaunchAgent";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/win.aizen.host.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\ninstall -d \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ninstall -m 644 \"${SRCROOT}/aizen/Resources/LaunchAgents/win.aizen.host.plist\" \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents/win.aizen.host.plist\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
